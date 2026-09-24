@@ -1,0 +1,27 @@
+[project]
+name = "mash-backend"
+version = "0.1.0"
+description = "Mash AI Statutory Audit Operating System Backend"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlmodel>=0.0.22",
+    "sqlalchemy>=2.0.35",
+    "aiosqlite>=0.20.0",
+    "python-dotenv>=1.0.1",
+    "httpx>=0.27.0",
+    "pydantic>=2.9.0",
+    "nexau>=0.4.0",
+    "duckdb>=1.0.0",
+    "pandas>=2.2.0",
+    "polars>=1.0.0",
+    "openpyxl>=3.1.0",
+    "pdfplumber>=0.11.0",
+    "python-calamine>=0.8.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+

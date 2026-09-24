@@ -1,0 +1,11 @@
+## Gemini Added Memories
+- Client fiscal year ends March 31
+- Test fact persistence verification.
+- The audit reporting currency is INR (Lakhs).
+- The audit reporting currency is INR (Lakhs).
+- Any adjustment exceeding 10 Lakhs requires signoff by senior audit partner Jane Doe.
+- The client's financial year closes on March 31.
+- The user's preferred language for audit reports is English (UK).
+- Any deviation greater than 2% requires immediate escalation to audit committee.
+- Materiality threshold set to INR 50,00,000 for FY2025
+- Materiality threshold set to INR 50,00,000 for FY2025
