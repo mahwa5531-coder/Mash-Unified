@@ -1,0 +1,194 @@
+{
+  "unanchored": {
+    "benchmark": "anchoring_unanchored",
+    "timestamp": "2026-08-24T15:06:38Z",
+    "llm_calls": 3,
+    "tool_calls": 3,
+    "wall_clock_seconds": 14.83,
+    "max_concurrency": 1,
+    "input_tokens": 69675,
+    "cached_input_tokens": 48883,
+    "uncached_input_tokens": 20792,
+    "output_tokens": 54,
+    "uncached_cost_usd": 0.001559,
+    "cached_cost_usd": 0.001833,
+    "output_cost_usd": 1.6e-05,
+    "total_cost_usd": 0.003409,
+    "extra": {
+      "response": "\\n\\n[Error: Maximum iteration limit reached.]"
+    },
+    "raw_llm_calls": [
+      {
+        "call_id": "llm_1",
+        "timestamp": 1787583986.2127626,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 22916,
+        "cached_input_tokens": 16300,
+        "uncached_input_tokens": 6616,
+        "output_tokens": 18,
+        "latency_ms": 1820.09,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='list_directory', parameters={'dir_path': '.'}, raw_content='{\"dir_path\": \".\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 3
+      },
+      {
+        "call_id": "llm_2",
+        "timestamp": 1787583988.5139697,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23333,
+        "cached_input_tokens": 16295,
+        "uncached_input_tokens": 7038,
+        "output_tokens": 18,
+        "latency_ms": 1775.64,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='glob', parameters={'pattern': '**/*gl*.csv'}, raw_content='{\"pattern\": \"**/*gl*.csv\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 5
+      },
+      {
+        "call_id": "llm_3",
+        "timestamp": 1787583998.03424,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23426,
+        "cached_input_tokens": 16288,
+        "uncached_input_tokens": 7138,
+        "output_tokens": 18,
+        "latency_ms": 7461.16,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='glob', parameters={'pattern': '**/*gl*.xlsx'}, raw_content='{\"pattern\": \"**/*gl*.xlsx\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 7
+      }
+    ],
+    "raw_tool_calls": [
+      {
+        "tool_id": "tool_1",
+        "timestamp_start": 989717.2131041,
+        "timestamp_end": 989717.2372081,
+        "duration_ms": 24.1,
+        "tool_name": "list_directory",
+        "arguments_size": 17,
+        "result_size": 1116,
+        "success": true
+      },
+      {
+        "tool_id": "tool_2",
+        "timestamp_start": 989719.0204977,
+        "timestamp_end": 989721.073408,
+        "duration_ms": 2052.91,
+        "tool_name": "glob",
+        "arguments_size": 26,
+        "result_size": 258,
+        "success": true
+      },
+      {
+        "tool_id": "tool_3",
+        "timestamp_start": 989728.5407601,
+        "timestamp_end": 989729.2400645,
+        "duration_ms": 699.3,
+        "tool_name": "glob",
+        "arguments_size": 27,
+        "result_size": 143,
+        "success": true
+      }
+    ]
+  },
+  "anchored": {
+    "benchmark": "anchoring_anchored",
+    "timestamp": "2026-08-24T15:06:50Z",
+    "llm_calls": 3,
+    "tool_calls": 2,
+    "wall_clock_seconds": 7.94,
+    "max_concurrency": 1,
+    "input_tokens": 69919,
+    "cached_input_tokens": 48884,
+    "uncached_input_tokens": 21035,
+    "output_tokens": 414,
+    "uncached_cost_usd": 0.001578,
+    "cached_cost_usd": 0.001833,
+    "output_cost_usd": 0.000124,
+    "total_cost_usd": 0.003535,
+    "extra": {
+      "response": "The requested dataset has been successfully inspected using `read_file`.\n\n### File Summary\n- **File Path:** [`gl_dataset_10k.csv`](file:///C:/Users/rama/Downloads/Mash/NexAU/tests/nexau_runtime_benchm"
+    },
+    "raw_llm_calls": [
+      {
+        "call_id": "llm_1",
+        "timestamp": 1787584005.5132785,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 22958,
+        "cached_input_tokens": 16300,
+        "uncached_input_tokens": 6658,
+        "output_tokens": 56,
+        "latency_ms": 2068.64,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='read_file', parameters={'file_path': 'C:/Users/rama/Downloads/Mash/NexAU/tests/nexau_runtime_benchmarks/temp_phase3_data/gl_dataset_10k.csv'}, raw_content='{\"file_path\": \"C:/Users/rama/Downloads/Mash/NexAU/tests/nexau_runtime_benchmarks/temp_phase3_data/gl_dataset_10k.csv\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 3
+      },
+      {
+        "call_id": "llm_2",
+        "timestamp": 1787584008.6601422,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23369,
+        "cached_input_tokens": 16295,
+        "uncached_input_tokens": 7074,
+        "output_tokens": 179,
+        "latency_ms": 2497.8,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='complete_task', parameters={'result': 'The file `C:\\\\Users\\\\rama\\\\Downloads\\\\Mash\\\\NexAU\\\\tests\\\\nexau_runtime_benchmarks\\\\temp_phase3_data\\\\gl_dataset_10k.csv` was successfully read using `read_file`.\\n\\nHere are the schema dimensions and details:\\n- **Dimensions:** 10,000 rows, 5 columns\\n- **Schema Columns:** `transaction_id`, `category`, `amount`, `vendor`, `status`\\n- **Cached Parquet Path:** [`gl_dataset_10k.parquet`](file:///C:/Users/rama/.nexau/cache/gl_dataset_10k_86883215_fast_bundle/gl_dataset_10k.parquet)'}, raw_content='{\"result\": \"The file `C:\\\\\\\\Users\\\\\\\\rama\\\\\\\\Downloads\\\\\\\\Mash\\\\\\\\NexAU\\\\\\\\tests\\\\\\\\nexau_runtime_benchmarks\\\\\\\\temp_phase3_data\\\\\\\\gl_dataset_10k.csv` was successfully read using `read_file`.\\\\n\\\\nHere are the schema dimensions and details:\\\\n- **Dimensions:** 10,000 rows, 5 columns\\\\n- **Schema Columns:** `transaction_id`, `category`, `amount`, `vendor`, `status`\\\\n- **Cached Parquet Path:** [`gl_dataset_10k.parquet`](file:///C:/Users/rama/.nexau/cache/gl_dataset_10k_86883215_fast_bundle/gl_dataset_10k.parquet)\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 5
+      },
+      {
+        "call_id": "llm_3",
+        "timestamp": 1787584010.8394842,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23592,
+        "cached_input_tokens": 16289,
+        "uncached_input_tokens": 7303,
+        "output_tokens": 179,
+        "latency_ms": 2174.33,
+        "finish_reason": "stop",
+        "tool_calls_emitted": [],
+        "message_count": 7
+      }
+    ],
+    "raw_tool_calls": [
+      {
+        "tool_id": "tool_1",
+        "timestamp_start": 989736.5044855,
+        "timestamp_end": 989736.6619811,
+        "duration_ms": 157.5,
+        "tool_name": "read_file",
+        "arguments_size": 118,
+        "result_size": 917,
+        "success": true
+      },
+      {
+        "tool_id": "tool_2",
+        "timestamp_start": 989739.1666348,
+        "timestamp_end": 989739.1672299,
+        "duration_ms": 0.6,
+        "tool_name": "complete_task",
+        "arguments_size": 497,
+        "result_size": 134,
+        "success": true
+      }
+    ]
+  },
+  "turns_saved": 0,
+  "decision": "NEUTRAL"
+}

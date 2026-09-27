@@ -1,0 +1,101 @@
+{
+  "dataset_seed": 42,
+  "total_tables": 8,
+  "anomalies": [
+    {
+      "anomaly_id": "A001",
+      "type": "DUPLICATE_PURCHASE_INVOICE",
+      "target_table": "purchase_register",
+      "invoice_id": "INV-PUR-9010",
+      "amount": 53100.0,
+      "vendor_id": "V-105",
+      "description": "Invoice INV-PUR-9010 appears multiple times in purchase register."
+    },
+    {
+      "anomaly_id": "A002",
+      "type": "PURCHASE_INVOICE_MISSING_FROM_LEDGER",
+      "target_table": "purchase_register_vs_gl",
+      "invoice_id": "INV-PUR-9055",
+      "amount": 100300.0,
+      "vendor_id": "V-110",
+      "description": "Invoice INV-PUR-9055 recorded in purchase register but unbooked in general ledger."
+    },
+    {
+      "anomaly_id": "A003",
+      "type": "LEDGER_PAYMENT_MISSING_FROM_BANK",
+      "target_table": "gl_vs_bank",
+      "transaction_id": "GL-8821",
+      "amount": 45000.0,
+      "vendor_id": "V-108",
+      "description": "Payment GL-8821 recorded in GL but never debited in bank statement."
+    },
+    {
+      "anomaly_id": "A004",
+      "type": "BANK_DEBIT_UNRECORDED_IN_LEDGER",
+      "target_table": "bank_vs_gl",
+      "bank_txn_id": "BNK-9901",
+      "amount": 28500.0,
+      "description": "Direct debit BNK-9901 in bank statement with no corresponding GL entry."
+    },
+    {
+      "anomaly_id": "A005",
+      "type": "UNUSUALLY_LARGE_TRANSACTION",
+      "target_table": "general_ledger",
+      "transaction_id": "GL-9999",
+      "amount": 1500000.0,
+      "vendor_id": "V-999_UNAPPROVED",
+      "description": "Outlier transaction of 1,500,000 to unapproved vendor."
+    },
+    {
+      "anomaly_id": "A006",
+      "type": "ROUND_NUMBER_PAYMENT",
+      "target_table": "general_ledger",
+      "transaction_id": "GL-8850",
+      "amount": 500000.0,
+      "vendor_id": "V-115",
+      "description": "Suspicious exact round-number transaction of 500,000."
+    },
+    {
+      "anomaly_id": "A007",
+      "type": "DUPLICATE_VENDOR_GSTIN",
+      "target_table": "vendors",
+      "vendor_ids": [
+        "V-102",
+        "V-199"
+      ],
+      "gstin": "27AABCU1002R1ZM",
+      "description": "Two distinct vendor IDs share identical tax registration number."
+    },
+    {
+      "anomaly_id": "A008",
+      "type": "GST_ARITHMETIC_MISMATCH",
+      "target_table": "purchase_register",
+      "invoice_id": "INV-PUR-9080",
+      "taxable": 100000.0,
+      "gst_recorded": 28000.0,
+      "expected_gst": 18000.0,
+      "description": "GST charged at 28% instead of standard 18%."
+    },
+    {
+      "anomaly_id": "A009",
+      "type": "DATE_PERIOD_MISMATCH",
+      "target_table": "general_ledger",
+      "transaction_id": "GL-7701",
+      "date": "2024-02-15",
+      "description": "Transaction dated in prior financial year (2024)."
+    },
+    {
+      "anomaly_id": "A010",
+      "type": "REPEATED_PAYMENT_SAME_DAY",
+      "target_table": "general_ledger",
+      "transaction_ids": [
+        "GL-8811",
+        "GL-8812"
+      ],
+      "amount": 33400.0,
+      "vendor_id": "V-105",
+      "date": "2025-06-30",
+      "description": "Identical payments of 33,400 to same vendor on same date."
+    }
+  ]
+}

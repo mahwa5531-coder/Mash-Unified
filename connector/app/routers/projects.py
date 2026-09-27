@@ -20,6 +20,8 @@ async def create_project(request: CreateProjectRequest, engine: DatabaseEngineDe
     normalized_path = os.path.normpath(request.local_folder_path).replace("\\", "/")
     try:
         os.makedirs(normalized_path, exist_ok=True)
+        os.makedirs(os.path.join(normalized_path, "Audit_Deliverables"), exist_ok=True)
+        os.makedirs(os.path.join(normalized_path, "NexAU_Outputs"), exist_ok=True)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create directory: {e}")
 

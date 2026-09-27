@@ -20,10 +20,13 @@ _DYNAMIC_ROOTS_CACHE: tuple[float, list[Path]] | None = None
 
 
 def get_base_allowed_roots() -> list[Path]:
-    """Get the immutable base allowed directories (Mash root, NexAU brain, Gemini brain, user data folders)."""
+    """Get the immutable base allowed directories (Mash root, NexAU brain, Gemini brain, user home)."""
     global _BASE_ROOTS
     if _BASE_ROOTS is None:
         roots = [APP_WORKSPACE_ROOT.resolve()]
+        user_home = Path.home().resolve()
+        if user_home.is_dir():
+            roots.append(user_home)
         nexau_brain = (Path.home() / ".nexau" / "brain").resolve()
         gemini_brain = (Path.home() / ".gemini" / "antigravity" / "brain").resolve()
         if nexau_brain.is_dir():

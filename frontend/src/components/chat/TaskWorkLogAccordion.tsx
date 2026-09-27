@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { 
   ChevronRight, Loader2, Check, Copy, AlertCircle
 } from 'lucide-react';
@@ -9,6 +8,7 @@ import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import FileIcon from '../common/FileIcon';
 
 export interface ToolCallItem {
   id?: string;
@@ -37,12 +37,6 @@ export interface ExecutionStep {
   thoughts?: string[];
   tools?: ToolCallItem[];
 }
-
-const CONTENT_EASE: [number, number, number, number] = [0.32, 0.72, 0, 1];
-const HEIGHT_MOTION = {
-  height: { duration: 0.22, ease: CONTENT_EASE },
-  opacity: { duration: 0.16, ease: CONTENT_EASE },
-} as const;
 
 // ponytail: explicit status check prevents completed tools with empty output from staying stuck on "running"
 function isToolRunning(tool?: ToolCallItem, isStreaming?: boolean): boolean {
@@ -103,12 +97,13 @@ function FilePill({
         e.stopPropagation();
         onOpenFile?.(filePath);
       }}
-      className="inline-flex items-center gap-1 text-foreground hover:underline cursor-pointer select-none group/file truncate text-xs font-medium"
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] font-mono text-[12px] bg-zinc-100 hover:bg-zinc-200/90 dark:bg-[#1e1e22] dark:hover:bg-[#27272c] text-zinc-900 dark:text-zinc-200 border border-zinc-300/80 dark:border-white/[0.08] hover:border-zinc-400 dark:hover:border-white/[0.22] hover:shadow-sm dark:hover:shadow-[0_0_10px_rgba(255,255,255,0.08)] transition-all duration-150 ease-out cursor-pointer select-none shadow-xs group/file active:scale-[0.98]"
       title={`Open ${filePath}`}
     >
-      <span className="truncate">{filename}</span>
+      <FileIcon filename={filename || filePath} size={13} className="shrink-0 group-hover/file:scale-105 transition-transform" />
+      <span className="truncate max-w-[240px] font-medium text-zinc-800 dark:text-zinc-200 group-hover/file:text-zinc-950 dark:group-hover/file:text-white transition-colors">{filename}</span>
       {lineRange && (
-        <span className="text-muted-foreground font-mono text-[11px] shrink-0 font-normal">
+        <span className="text-zinc-500 dark:text-zinc-400 font-mono text-[11px] shrink-0 font-normal ml-0.5">
           {lineRange}
         </span>
       )}
@@ -412,35 +407,45 @@ export default function TaskWorkLogAccordion({
       steps.forEach((step: any, sIdx) => {
         // 1. Unitised 'thinking' step or legacy step.thoughts
         if (step.type === 'thinking' || (step.thoughts && step.thoughts.length > 0)) {
-          const thText = (step.content || (step.thoughts ? step.thoughts.join('\n\n') : '')).trim();
+          const thText = (step.content || (step.thoughts ? step.thoughts.join('\n\n') : '')).replace(/\[VERIFIED\]\s*/gi, '').trim();
           if (thText) {
             const computedSecs = step.thinkingDurationSeconds 
               || Math.max(1, Math.min(60, Math.round(thText.length / 120)));
-            rawEntries.push({
-              id: step.id ? `thought-${step.id}-${sIdx}` : `thought-step-${sIdx}`,
-              type: 'thought',
-              data: {
-                text: thText,
-                durationSecs: computedSecs,
-                status: step.status || (isStreaming && sIdx === steps.length - 1 ? 'running' : 'completed'),
-                isLatest: sIdx === steps.length - 1,
-              }
-            });
+            const lastEntry = rawEntries[rawEntries.length - 1];
+            if (lastEntry && lastEntry.type === 'thought') {
+              lastEntry.data.text += '\n\n' + thText;
+              lastEntry.data.durationSecs = (lastEntry.data.durationSecs || 0) + computedSecs;
+              if (step.status === 'running') lastEntry.data.status = 'running';
+            } else {
+              rawEntries.push({
+                id: step.id ? `thought-${step.id}-${sIdx}` : `thought-step-${sIdx}`,
+                type: 'thought',
+                data: {
+                  text: thText,
+                  durationSecs: computedSecs,
+                  status: step.status || (isStreaming && sIdx === steps.length - 1 ? 'running' : 'completed'),
+                  isLatest: sIdx === steps.length - 1,
+                }
+              });
+            }
           }
         } else if (step.type === 'tool') {
           // 2. Unitised 'tool' step
           rawEntries.push(parseToolItem(step, step.tool_call_id || (step.id ? `${step.id}_${sIdx}` : `tool_${sIdx}`)));
         } else if (step.type === 'text' && step.content && step.content.trim()) {
           // ponytail: Render intermediate working text between tools as an authentic unitised step
-          const hasRemainingTools = steps.slice(sIdx + 1).some((s: any) => s.type === 'tool' || (s.tools && s.tools.length > 0) || s.type === 'thinking');
-          if (hasRemainingTools || (isStreaming && sIdx < steps.length - 1)) {
-            rawEntries.push({
-              id: step.id ? `text-${step.id}-${sIdx}` : `text-step-${sIdx}`,
-              type: 'text',
-              data: {
-                text: step.content.trim(),
-              },
-            });
+          const cleanText = step.content.replace(/\[VERIFIED\]\s*/gi, '').trim();
+          if (cleanText) {
+            const hasRemainingTools = steps.slice(sIdx + 1).some((s: any) => s.type === 'tool' || (s.tools && s.tools.length > 0) || s.type === 'thinking');
+            if (hasRemainingTools || (isStreaming && sIdx < steps.length - 1)) {
+              rawEntries.push({
+                id: step.id ? `text-${step.id}-${sIdx}` : `text-step-${sIdx}`,
+                type: 'text',
+                data: {
+                  text: cleanText,
+                },
+              });
+            }
           }
         } else if (step.tools && step.tools.length > 0) {
           // 3. Legacy step with tools array
@@ -558,7 +563,7 @@ export default function TaskWorkLogAccordion({
     if (entry.type === 'exploration_group') {
       const isGroupExpanded = !!expandedGroups[entry.id];
       return (
-        <div key={entry.id} className="flex flex-col min-w-0 max-w-full my-1 rounded-xl border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-white/[0.015] overflow-hidden transition-colors duration-200">
+        <div key={entry.id} className={cn("flex flex-col min-w-0 max-w-full my-1 rounded-xl overflow-hidden transition-colors duration-200", isGroupExpanded ? "border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-white/[0.015]" : "hover:bg-muted/30")}>
           <button
             type="button"
             onClick={() => toggleGroup(entry.id)}
@@ -584,19 +589,11 @@ export default function TaskWorkLogAccordion({
             </div>
           </button>
 
-          <AnimatePresence initial={false}>
-            {isGroupExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={HEIGHT_MOTION}
-                className="border-t border-zinc-200/60 dark:border-white/[0.05] overflow-hidden divide-y divide-zinc-200/40 dark:divide-white/[0.03]"
-              >
-                {entry.items?.map((child) => renderTimelineRow(child, true))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {isGroupExpanded && (
+            <div className="border-t border-zinc-200/60 dark:border-white/[0.05] overflow-hidden divide-y divide-zinc-200/40 dark:divide-white/[0.03] transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
+              {entry.items?.map((child) => renderTimelineRow(child, true))}
+            </div>
+          )}
         </div>
       );
     }
@@ -605,7 +602,7 @@ export default function TaskWorkLogAccordion({
     if (entry.type === 'command_group') {
       const isGroupExpanded = !!expandedGroups[entry.id];
       return (
-        <div key={entry.id} className="flex flex-col min-w-0 max-w-full my-1 rounded-xl border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-white/[0.015] overflow-hidden transition-colors duration-200">
+        <div key={entry.id} className={cn("flex flex-col min-w-0 max-w-full my-1 rounded-xl overflow-hidden transition-colors duration-200", isGroupExpanded ? "border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-white/[0.015]" : "hover:bg-muted/30")}>
           <button
             type="button"
             onClick={() => toggleGroup(entry.id)}
@@ -627,19 +624,11 @@ export default function TaskWorkLogAccordion({
             </div>
           </button>
 
-          <AnimatePresence initial={false}>
-            {isGroupExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={HEIGHT_MOTION}
-                className="border-t border-zinc-200/60 dark:border-white/[0.05] overflow-hidden divide-y divide-zinc-200/40 dark:divide-white/[0.03]"
-              >
-                {entry.items?.map((child) => renderTimelineRow(child, true))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {isGroupExpanded && (
+            <div className="border-t border-zinc-200/60 dark:border-white/[0.05] overflow-hidden divide-y divide-zinc-200/40 dark:divide-white/[0.03] transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
+              {entry.items?.map((child) => renderTimelineRow(child, true))}
+            </div>
+          )}
         </div>
       );
     }
@@ -648,7 +637,7 @@ export default function TaskWorkLogAccordion({
     if (entry.type === 'edit_group') {
       const isGroupExpanded = !!expandedGroups[entry.id];
       return (
-        <div key={entry.id} className="flex flex-col min-w-0 max-w-full my-1 rounded-xl border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-white/[0.015] overflow-hidden transition-colors duration-200">
+        <div key={entry.id} className={cn("flex flex-col min-w-0 max-w-full my-1 rounded-xl overflow-hidden transition-colors duration-200", isGroupExpanded ? "border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-50/50 dark:bg-white/[0.015]" : "hover:bg-muted/30")}>
           <button
             type="button"
             onClick={() => toggleGroup(entry.id)}
@@ -680,19 +669,11 @@ export default function TaskWorkLogAccordion({
             </div>
           </button>
 
-          <AnimatePresence initial={false}>
-            {isGroupExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={HEIGHT_MOTION}
-                className="border-t border-zinc-200/60 dark:border-white/[0.05] overflow-hidden divide-y divide-zinc-200/40 dark:divide-white/[0.03]"
-              >
-                {entry.items?.map((child) => renderTimelineRow(child, true))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {isGroupExpanded && (
+            <div className="border-t border-zinc-200/60 dark:border-white/[0.05] overflow-hidden divide-y divide-zinc-200/40 dark:divide-white/[0.03] transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
+              {entry.items?.map((child) => renderTimelineRow(child, true))}
+            </div>
+          )}
         </div>
       );
     }
@@ -737,48 +718,39 @@ export default function TaskWorkLogAccordion({
             </div>
           </div>
 
-          <AnimatePresence initial={false}>
-            {hasOutput && isCmdExpanded && (
-              <motion.div
-                key={`cmd-detail-${entry.id}`}
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={HEIGHT_MOTION}
-                className="py-1 overflow-hidden"
-              >
-                <div className="w-full rounded-lg border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-100/40 dark:bg-white/[0.02] p-2 font-mono text-[11px] transition-colors duration-200 shadow-none">
-                  <div className="text-muted-foreground mb-1 flex items-center justify-between border-b border-zinc-200/60 dark:border-white/[0.05] pb-1 text-[10.5px]">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className="text-muted-foreground/60 truncate text-[10px]">...\Mash &gt;</span>
-                      <span className="text-foreground/90 font-medium truncate text-[10.5px]">{entry.data.fullCmd}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopy(outputText || entry.data.fullCmd, toolId);
-                        }}
-                        className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
-                        title="Copy command/output"
-                      >
-                        {copiedId === toolId ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
-                      </button>
-                      {isFailed ? (
-                        <AlertCircle size={12} className="text-rose-500" />
-                      ) : (
-                        <Check size={12} className="text-emerald-500/80" />
-                      )}
-                    </div>
+          {hasOutput && isCmdExpanded && (
+            <div className="py-1 overflow-hidden transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
+              <div className="w-full rounded-lg border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-100/40 dark:bg-white/[0.02] p-2 font-mono text-[11px] transition-colors duration-200 shadow-none">
+                <div className="text-muted-foreground mb-1 flex items-center justify-between border-b border-zinc-200/60 dark:border-white/[0.05] pb-1 text-[10.5px]">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="text-muted-foreground/60 truncate text-[10px]">...\Mash &gt;</span>
+                    <span className="text-foreground/90 font-medium truncate text-[10.5px]">{entry.data.fullCmd}</span>
                   </div>
-                  <pre className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-tight max-h-24 overflow-y-auto custom-scrollbar font-mono text-[10.5px]">
-                    {renderOutputWithLinks(outputText, onOpenFile)}
-                  </pre>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCopy(outputText || entry.data.fullCmd, toolId);
+                      }}
+                      className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                      title="Copy command/output"
+                    >
+                      {copiedId === toolId ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                    </button>
+                    {isFailed ? (
+                      <AlertCircle size={12} className="text-rose-500" />
+                    ) : (
+                      <Check size={12} className="text-emerald-500/80" />
+                    )}
+                  </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <pre className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-tight max-h-24 overflow-y-auto custom-scrollbar font-mono text-[10.5px]">
+                  {renderOutputWithLinks(outputText, onOpenFile)}
+                </pre>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -828,15 +800,15 @@ export default function TaskWorkLogAccordion({
               filePath={entry.data.filePath}
               onOpenFile={onOpenFile}
             />
-            <span className="inline-flex items-center gap-1 text-[11px] font-mono shrink-0 ml-1">
+            <span className="inline-flex items-center gap-1 text-[11.5px] font-mono shrink-0 ml-1.5 font-medium select-none">
               {entry.data.added > 0 && (
-                <span className="px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">+{entry.data.added}</span>
+                <span className="text-emerald-500 dark:text-emerald-400">+{entry.data.added}</span>
               )}
               {entry.data.deleted > 0 && (
-                <span className="px-1 py-0.2 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium">-{entry.data.deleted}</span>
+                <span className="text-rose-500 dark:text-rose-400">-{entry.data.deleted}</span>
               )}
               {entry.data.added === 0 && entry.data.deleted === 0 && (
-                <span className="text-muted-foreground">+0 -0</span>
+                <span className="text-zinc-500 dark:text-zinc-400">+0 -0</span>
               )}
             </span>
           </div>
@@ -1026,9 +998,11 @@ export default function TaskWorkLogAccordion({
 
     // 12. Intermediate In-Flow Text Step Row
     if (entry.type === 'text') {
+      const cleanText = (entry.data.text || '').replace(/\[VERIFIED\]\s*/gi, '').trim();
+      if (!cleanText) return null;
       return (
         <div key={entry.id} className="text-zinc-600 dark:text-zinc-400 text-xs py-1 px-1 font-sans leading-relaxed select-text whitespace-pre-wrap">
-          {entry.data.text}
+          {cleanText}
         </div>
       );
     }
@@ -1045,7 +1019,7 @@ export default function TaskWorkLogAccordion({
             {groupedTimeline.map((entry) => renderTimelineRow(entry, false))}
           </div>
         )}
-        {isActivelyThinking ? (
+        {isActivelyThinking && !groupedTimeline.some(e => e.type === 'thought') ? (
           <div className="flex items-center gap-1.5 text-xs text-foreground font-sans py-0.5">
             <Loader2 size={11} className="animate-spin text-sky-500 shrink-0" />
             <span>Thinking for {formatDurationDisplay(liveThinkingSeconds)}</span>
@@ -1055,7 +1029,7 @@ export default function TaskWorkLogAccordion({
               <span>.</span>
             </span>
           </div>
-        ) : (
+        ) : !isActivelyThinking && groupedTimeline.length === 0 ? (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-sans py-0.5">
             <span className="inline-flex items-center text-muted-foreground">
               <span>Working</span>
@@ -1066,12 +1040,15 @@ export default function TaskWorkLogAccordion({
               </span>
             </span>
           </div>
-        )}
+        ) : null}
       </div>
     );
   }
 
-  // 2. Completed turn: render "Worked for {formattedTime} >" naked text link dropdown
+  // 2. Completed turn: render "Worked for {formattedTime} >" or "Thought for {formattedTime} >" naked text link dropdown
+  const hasOnlyThoughts = (!tools || tools.length === 0) && (!steps || steps.length === 0 || steps.every((s: any) => s.type === 'thinking' || (!s.tools || s.tools.length === 0) && (!s.name || s.name === 'thought')));
+  const actionLabel = hasOnlyThoughts ? `Thought for ${formattedTime}` : `Worked for ${formattedTime}`;
+
   return (
     <div className="w-full min-w-0 text-[13px] font-sans my-1 select-text">
       <button
@@ -1080,27 +1057,18 @@ export default function TaskWorkLogAccordion({
         onClick={() => setClusterOpen((v) => !v)}
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-normal py-0.5 px-1 -mx-1 rounded-md hover:bg-muted/50 transition-all cursor-pointer select-none my-0.5 w-fit group"
       >
-        <span className="font-sans">Worked for {formattedTime}</span>
+        <span className="font-sans">{actionLabel}</span>
         <ChevronRight size={11} className={cn("text-muted-foreground group-hover:text-foreground transition-transform", clusterOpen && "rotate-90")} />
       </button>
 
       {/* Chronological Timeline List revealed only when user expands */}
-      <AnimatePresence initial={false}>
-        {clusterOpen && (
-          <motion.div
-            key="cluster-content"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={HEIGHT_MOTION}
-            className="min-w-0 overflow-hidden mt-0.5"
-          >
-            <div className="flex flex-col gap-1 py-1 text-xs">
-              {groupedTimeline.map((entry) => renderTimelineRow(entry, false))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {clusterOpen && (
+        <div className="min-w-0 overflow-hidden mt-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
+          <div className="flex flex-col gap-1 py-1 text-xs">
+            {groupedTimeline.map((entry) => renderTimelineRow(entry, false))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,410 @@
+[
+  {
+    "benchmark_name": "parallel_n_2",
+    "timestamp": "2026-08-24T14:49:57Z",
+    "model": "gemini-3.5-flash-lite",
+    "provider": "google_gemini_rest",
+    "llm_calls": 3,
+    "tool_calls": 3,
+    "wall_clock_seconds": 9.74,
+    "max_observed_concurrency": 2,
+    "input_tokens": 71211,
+    "cached_input_tokens": 48830,
+    "uncached_input_tokens": 22381,
+    "output_tokens": 212,
+    "uncached_cost_usd": 0.001679,
+    "cached_cost_usd": 0.001831,
+    "output_cost_usd": 6.4e-05,
+    "total_cost_usd": 0.003573,
+    "extra": {
+      "n": 2,
+      "response": "Both parallel operations have completed successfully.\n\n- **Operation 1 (tool_id: 101)**: Completed in ~300.65 ms (Hash: `131`)\n- **Operation 2 (tool_id: 102)**: Completed in ~300.26 ms (Hash: `162`)"
+    },
+    "raw_llm_calls": [
+      {
+        "call_id": "llm_call_1",
+        "timestamp": 1787582991.5603373,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23506,
+        "cached_input_tokens": 16286,
+        "uncached_input_tokens": 7220,
+        "output_tokens": 56,
+        "latency_ms": 3416.25,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'delay_ms': 300, 'tool_id': 101}, raw_content='{\"delay_ms\": 300, \"tool_id\": 101}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'tool_id': 102, 'delay_ms': 300}, raw_content='{\"tool_id\": 102, \"delay_ms\": 300}', tool_call_id='gemini_tc_1', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 3
+      },
+      {
+        "call_id": "llm_call_2",
+        "timestamp": 1787582994.8026037,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23791,
+        "cached_input_tokens": 16275,
+        "uncached_input_tokens": 7516,
+        "output_tokens": 79,
+        "latency_ms": 2443.89,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='complete_task', parameters={'result': 'Both independent parallel operations (tool_id: 101 and tool_id: 102) have been successfully executed concurrently using `benchmark_parallel_tool` with a delay of 300ms each. Both tools completed successfully with hashes 131 and 162 respectively.'}, raw_content='{\"result\": \"Both independent parallel operations (tool_id: 101 and tool_id: 102) have been successfully executed concurrently using `benchmark_parallel_tool` with a delay of 300ms each. Both tools completed successfully with hashes 131 and 162 respectively.\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 6
+      },
+      {
+        "call_id": "llm_call_3",
+        "timestamp": 1787582997.3941944,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23914,
+        "cached_input_tokens": 16269,
+        "uncached_input_tokens": 7645,
+        "output_tokens": 77,
+        "latency_ms": 2581.32,
+        "finish_reason": "stop",
+        "tool_calls_emitted": [],
+        "message_count": 8
+      }
+    ],
+    "raw_tool_calls": [
+      {
+        "tool_call_id": "tool_call_1",
+        "timestamp_start": 988722.5230122,
+        "timestamp_end": 988722.824982,
+        "duration_ms": 301.97,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 160,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_2",
+        "timestamp_start": 988722.5230122,
+        "timestamp_end": 988722.8260598,
+        "duration_ms": 303.05,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 159,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_3",
+        "timestamp_start": 988725.3092806,
+        "timestamp_end": 988725.3102425,
+        "duration_ms": 0.96,
+        "tool_name": "complete_task",
+        "arguments_size": 259,
+        "result_size": 134,
+        "success": true
+      }
+    ]
+  },
+  {
+    "benchmark_name": "parallel_n_5",
+    "timestamp": "2026-08-24T14:50:30Z",
+    "model": "gemini-3.5-flash-lite",
+    "provider": "google_gemini_rest",
+    "llm_calls": 3,
+    "tool_calls": 6,
+    "wall_clock_seconds": 28.81,
+    "max_observed_concurrency": 5,
+    "input_tokens": 72185,
+    "cached_input_tokens": 48802,
+    "uncached_input_tokens": 23383,
+    "output_tokens": 245,
+    "uncached_cost_usd": 0.001754,
+    "cached_cost_usd": 0.00183,
+    "output_cost_usd": 7.3e-05,
+    "total_cost_usd": 0.003657,
+    "extra": {
+      "n": 5,
+      "response": "All five parallel operations (`benchmark_parallel_tool` with tool IDs 101, 102, 103, 104, and 105) have successfully completed in parallel."
+    },
+    "raw_llm_calls": [
+      {
+        "call_id": "llm_call_1",
+        "timestamp": 1787583020.085003,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23554,
+        "cached_input_tokens": 16286,
+        "uncached_input_tokens": 7268,
+        "output_tokens": 140,
+        "latency_ms": 17424.89,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'delay_ms': 300, 'tool_id': 101}, raw_content='{\"delay_ms\": 300, \"tool_id\": 101}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'delay_ms': 300, 'tool_id': 102}, raw_content='{\"delay_ms\": 300, \"tool_id\": 102}', tool_call_id='gemini_tc_1', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'tool_id': 103, 'delay_ms': 300}, raw_content='{\"tool_id\": 103, \"delay_ms\": 300}', tool_call_id='gemini_tc_2', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'delay_ms': 300, 'tool_id': 104}, raw_content='{\"delay_ms\": 300, \"tool_id\": 104}', tool_call_id='gemini_tc_3', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'tool_id': 105, 'delay_ms': 300}, raw_content='{\"tool_id\": 105, \"delay_ms\": 300}', tool_call_id='gemini_tc_4', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 3
+      },
+      {
+        "call_id": "llm_call_2",
+        "timestamp": 1787583025.2791204,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 24264,
+        "cached_input_tokens": 16261,
+        "uncached_input_tokens": 8003,
+        "output_tokens": 59,
+        "latency_ms": 3687.99,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='complete_task', parameters={'result': 'All five parallel benchmark operations (tool_id 101 through 105) have been executed concurrently with a delay of 300 ms each. All operations completed successfully with valid timestamps and hashes.'}, raw_content='{\"result\": \"All five parallel benchmark operations (tool_id 101 through 105) have been executed concurrently with a delay of 300 ms each. All operations completed successfully with valid timestamps and hashes.\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 9
+      },
+      {
+        "call_id": "llm_call_3",
+        "timestamp": 1787583030.4792676,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 24367,
+        "cached_input_tokens": 16255,
+        "uncached_input_tokens": 8112,
+        "output_tokens": 46,
+        "latency_ms": 5134.88,
+        "finish_reason": "stop",
+        "tool_calls_emitted": [],
+        "message_count": 11
+      }
+    ],
+    "raw_tool_calls": [
+      {
+        "tool_call_id": "tool_call_1",
+        "timestamp_start": 988751.779093,
+        "timestamp_end": 988752.0624395,
+        "duration_ms": 283.35,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 159,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_2",
+        "timestamp_start": 988751.779093,
+        "timestamp_end": 988752.0662552,
+        "duration_ms": 287.16,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 159,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_3",
+        "timestamp_start": 988751.779093,
+        "timestamp_end": 988752.0724853,
+        "duration_ms": 293.39,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 160,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_4",
+        "timestamp_start": 988751.779093,
+        "timestamp_end": 988752.0792337,
+        "duration_ms": 300.14,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 160,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_5",
+        "timestamp_start": 988751.779093,
+        "timestamp_end": 988752.0859959,
+        "duration_ms": 306.9,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 160,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_6",
+        "timestamp_start": 988755.7873165,
+        "timestamp_end": 988755.7892851,
+        "duration_ms": 1.97,
+        "tool_name": "complete_task",
+        "arguments_size": 211,
+        "result_size": 134,
+        "success": true
+      }
+    ]
+  },
+  {
+    "benchmark_name": "parallel_n_8",
+    "timestamp": "2026-08-24T14:50:49Z",
+    "model": "gemini-3.5-flash-lite",
+    "provider": "google_gemini_rest",
+    "llm_calls": 3,
+    "tool_calls": 9,
+    "wall_clock_seconds": 14.67,
+    "max_observed_concurrency": 8,
+    "input_tokens": 73193,
+    "cached_input_tokens": 48776,
+    "uncached_input_tokens": 24417,
+    "output_tokens": 333,
+    "uncached_cost_usd": 0.001831,
+    "cached_cost_usd": 0.001829,
+    "output_cost_usd": 0.0001,
+    "total_cost_usd": 0.00376,
+    "extra": {
+      "n": 8,
+      "response": "All 8 parallel operations (`tool_id` 101 through 108) have successfully completed concurrently with an approximate duration of 300ms each."
+    },
+    "raw_llm_calls": [
+      {
+        "call_id": "llm_call_1",
+        "timestamp": 1787583041.5358603,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23602,
+        "cached_input_tokens": 16286,
+        "uncached_input_tokens": 7316,
+        "output_tokens": 224,
+        "latency_ms": 5687.7,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'tool_id': 101, 'delay_ms': 300}, raw_content='{\"tool_id\": 101, \"delay_ms\": 300}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'delay_ms': 300, 'tool_id': 102}, raw_content='{\"delay_ms\": 300, \"tool_id\": 102}', tool_call_id='gemini_tc_1', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'delay_ms': 300, 'tool_id': 103}, raw_content='{\"delay_ms\": 300, \"tool_id\": 103}', tool_call_id='gemini_tc_2', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'tool_id': 104, 'delay_ms': 300}, raw_content='{\"tool_id\": 104, \"delay_ms\": 300}', tool_call_id='gemini_tc_3', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'delay_ms': 300, 'tool_id': 105}, raw_content='{\"delay_ms\": 300, \"tool_id\": 105}', tool_call_id='gemini_tc_4', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'delay_ms': 300, 'tool_id': 106}, raw_content='{\"delay_ms\": 300, \"tool_id\": 106}', tool_call_id='gemini_tc_5', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'tool_id': 107, 'delay_ms': 300}, raw_content='{\"tool_id\": 107, \"delay_ms\": 300}', tool_call_id='gemini_tc_6', source='structured', parallel_execution_id=None)",
+          "ToolCall(tool_name='benchmark_parallel_tool', parameters={'tool_id': 108, 'delay_ms': 300}, raw_content='{\"tool_id\": 108, \"delay_ms\": 300}', tool_call_id='gemini_tc_7', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 3
+      },
+      {
+        "call_id": "llm_call_2",
+        "timestamp": 1787583046.0905523,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 24737,
+        "cached_input_tokens": 16248,
+        "uncached_input_tokens": 8489,
+        "output_tokens": 73,
+        "latency_ms": 3436.71,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='complete_task', parameters={'result': 'All 8 independent parallel operations (`benchmark_parallel_tool` with tool_ids 101 through 108, each with 300ms delay) have successfully executed and completed. All durations were approximately 300.3ms with distinct hash outputs.'}, raw_content='{\"result\": \"All 8 independent parallel operations (`benchmark_parallel_tool` with tool_ids 101 through 108, each with 300ms delay) have successfully executed and completed. All durations were approximately 300.3ms with distinct hash outputs.\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 12
+      },
+      {
+        "call_id": "llm_call_3",
+        "timestamp": 1787583049.5370047,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 24854,
+        "cached_input_tokens": 16242,
+        "uncached_input_tokens": 8612,
+        "output_tokens": 36,
+        "latency_ms": 3433.44,
+        "finish_reason": "stop",
+        "tool_calls_emitted": [],
+        "message_count": 14
+      }
+    ],
+    "raw_tool_calls": [
+      {
+        "tool_call_id": "tool_call_1",
+        "timestamp_start": 988772.8340924,
+        "timestamp_end": 988773.1059602,
+        "duration_ms": 271.87,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 159,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_2",
+        "timestamp_start": 988772.8340924,
+        "timestamp_end": 988773.1105762,
+        "duration_ms": 276.48,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 160,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_3",
+        "timestamp_start": 988772.8340924,
+        "timestamp_end": 988773.1154388,
+        "duration_ms": 281.35,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 160,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_4",
+        "timestamp_start": 988772.8340924,
+        "timestamp_end": 988773.1205689,
+        "duration_ms": 286.48,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 160,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_5",
+        "timestamp_start": 988772.8340924,
+        "timestamp_end": 988773.1265318,
+        "duration_ms": 292.44,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 159,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_6",
+        "timestamp_start": 988772.8340924,
+        "timestamp_end": 988773.1294654,
+        "duration_ms": 295.37,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 160,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_7",
+        "timestamp_start": 988772.8340924,
+        "timestamp_end": 988773.1345856,
+        "duration_ms": 300.49,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 159,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_8",
+        "timestamp_start": 988772.8340924,
+        "timestamp_end": 988773.1399168,
+        "duration_ms": 305.82,
+        "tool_name": "benchmark_parallel_tool",
+        "arguments_size": 33,
+        "result_size": 160,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_9",
+        "timestamp_start": 988776.5975269,
+        "timestamp_end": 988776.5986244,
+        "duration_ms": 1.1,
+        "tool_name": "complete_task",
+        "arguments_size": 243,
+        "result_size": 134,
+        "success": true
+      }
+    ]
+  }
+]

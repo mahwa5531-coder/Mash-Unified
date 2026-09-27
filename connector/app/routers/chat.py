@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -55,6 +55,7 @@ async def _ensure_project_and_context(
     brain_path = scaffold_session_storage(sid, project_id)
     resolved_context["brain_directory"] = str(brain_path)
     resolved_context["scratch_directory"] = str(brain_path / "scratch")
+    resolved_context["cache_directory"] = str(brain_path / "cache")
     resolved_context["session_id"] = sid
     if not resolved_context.get("working_directory"):
         resolved_context["working_directory"] = workspace_target
@@ -171,6 +172,7 @@ def _enrich_prompt_with_editor_context(user_prompt: str, context: dict) -> str:
 @router.post("/api/chat/{path_session_id}/stream")
 async def stream_query_bridge(
     payload: StreamQueryPayload,
+    request: Request,
     path_session_id: str | None = None,
 ):
     """SSE stream bridge: app-specific prep then clean delegation to NexAU runtime."""
@@ -204,8 +206,11 @@ async def stream_query_bridge(
     # Per-session sandbox work_dir binding (app-specific: per-workspace isolation)
     target_work_dir = resolved_context.get("working_directory")
     if target_work_dir and target_work_dir != "No Repo" and os.path.exists(target_work_dir):
-        # ponytail: Scaffold a visible outputs folder for the Auditor to find generated proofs
-        outputs_dir = os.path.join(target_work_dir, "NexAU_Outputs")
+        # ponytail: Scaffold a visible deliverables folder for the Auditor to find generated proofs and working papers
+        # Standardize on Audit_Deliverables while smoothly supporting legacy NexAU_Outputs if existing
+        deliverables_dir = os.path.join(target_work_dir, "Audit_Deliverables")
+        legacy_dir = os.path.join(target_work_dir, "NexAU_Outputs")
+        outputs_dir = legacy_dir if (os.path.exists(legacy_dir) and not os.path.exists(deliverables_dir)) else deliverables_dir
         try:
             os.makedirs(outputs_dir, exist_ok=True)
             resolved_context["outputs_directory"] = outputs_dir
@@ -216,6 +221,26 @@ async def stream_query_bridge(
         cur_sb = getattr(effective_agent_config, "sandbox_config", None)
         new_sb = cur_sb.model_copy(update={"work_dir": target_work_dir}) if cur_sb else LocalSandboxConfig(work_dir=target_work_dir)
         effective_agent_config = effective_agent_config.model_copy(update={"sandbox_config": new_sb})
+    else:
+        # ponytail: Standalone individual session (not bound to any project workspace)
+        # Isolate sandbox work_dir to session scratch directory so the server root is protected
+        scratch_dir = resolved_context.get("scratch_directory")
+        brain_dir = resolved_context.get("brain_directory")
+        session_work_dir = scratch_dir or brain_dir
+        if session_work_dir and os.path.exists(session_work_dir):
+            from nexau.archs.sandbox.base_sandbox import LocalSandboxConfig
+            cur_sb = getattr(effective_agent_config, "sandbox_config", None)
+            new_sb = cur_sb.model_copy(update={"work_dir": session_work_dir}) if cur_sb else LocalSandboxConfig(work_dir=session_work_dir)
+            effective_agent_config = effective_agent_config.model_copy(update={"sandbox_config": new_sb})
+
+        # Deliverables directory for standalone individual session
+        wp_dir = os.path.join(brain_dir, "working_papers") if brain_dir else None
+        if wp_dir:
+            try:
+                os.makedirs(wp_dir, exist_ok=True)
+                resolved_context["outputs_directory"] = wp_dir
+            except Exception as e:
+                logger.warning(f"Failed to create standalone working_papers directory: {e}")
 
     # ponytail: NexAU's handle_streaming_request already handles:
     # - Session creation (SessionManager._get_or_create_session)
@@ -234,7 +259,17 @@ async def stream_query_bridge(
                 context=resolved_context,
                 variables=ContextValue(template={k: v if isinstance(v, str) else json.dumps(v) for k, v in resolved_context.items()}),
             ):
+                if await request.is_disconnected():
+                    raise asyncio.CancelledError("Client disconnected")
                 yield f"data: {event.model_dump_json()}\n\n"
+        except (asyncio.CancelledError, GeneratorExit):
+            # ponytail: Client disconnected mid-stream — terminate running agent immediately to prevent wasted execution/token burn
+            logger.info("Client disconnected from stream for session %s. Terminating running agent immediately.", sid)
+            try:
+                await server.handle_stop_request(user_id=user_id, session_id=sid, force=True)
+            except Exception as stop_err:
+                logger.warning("Error stopping agent on client disconnect: %s", stop_err)
+            raise
         finally:
             # ponytail: only app-specific post-stream work — sync last_user_view_time
             # so the sidebar's "unread" blue dot doesn't false-fire. NexAU has no UI concept of "unread".

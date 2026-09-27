@@ -1,0 +1,49 @@
+services:
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexau_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - nexau_net
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexau_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: nexau
+      POSTGRES_PASSWORD: nexau-dev-only
+      POSTGRES_DB: nexau
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - nexau_net
+
+  bifrost:
+    image: maximhq/bifrost:latest
+    container_name: nexau_bifrost
+    restart: always
+    environment:
+      REDIS_ADDR: "nexau_redis:6379"
+      GEMINI_API_KEYS: "${GEMINI_API_KEYS:-your_gemini_api_key_here}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-your_gemini_api_key_here}"
+    ports:
+      - "8081:8080"
+    depends_on:
+      - redis
+    volumes:
+      - bifrost_data:/app/data
+    networks:
+      - nexau_net
+
+networks:
+  nexau_net:
+    driver: bridge
+
+volumes:
+  bifrost_data:
+  pgdata:

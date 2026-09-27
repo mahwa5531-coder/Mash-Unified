@@ -1,0 +1,91 @@
+{
+  "benchmark_name": "native_query_prototype",
+  "timestamp": "2026-08-24T14:58:07Z",
+  "model": "gemini-3.5-flash-lite",
+  "provider": "google_gemini_rest",
+  "llm_calls": 3,
+  "tool_calls": 2,
+  "wall_clock_seconds": 13.41,
+  "max_observed_concurrency": 1,
+  "input_tokens": 71561,
+  "cached_input_tokens": 48842,
+  "uncached_input_tokens": 22719,
+  "output_tokens": 168,
+  "uncached_cost_usd": 0.001704,
+  "cached_cost_usd": 0.001832,
+  "output_cost_usd": 5e-05,
+  "total_cost_usd": 0.003586,
+  "extra": {
+    "response": "The query on `test_transactions.csv` completed successfully. \n\n### Summary of Top Category\n- **Category**: Software\n- **Transaction Count**: 28\n- **Total Amount**: 62,025.0"
+  },
+  "raw_llm_calls": [
+    {
+      "call_id": "llm_call_1",
+      "timestamp": 1787583478.3832676,
+      "model": "gemini-3.5-flash-lite",
+      "provider": "google_gemini_rest",
+      "input_tokens": 23513,
+      "cached_input_tokens": 16286,
+      "uncached_input_tokens": 7227,
+      "output_tokens": 64,
+      "latency_ms": 3192.24,
+      "finish_reason": "tool_calls",
+      "tool_calls_emitted": [
+        "ToolCall(tool_name='prototype_query_dataframe', parameters={'dataset_path': 'test_transactions.csv', 'sql_query': \"SELECT category, COUNT(*), SUM(amount) FROM read_csv_auto('test_transactions.csv') GROUP BY category ORDER BY SUM(amount) DESC\"}, raw_content='{\"dataset_path\": \"test_transactions.csv\", \"sql_query\": \"SELECT category, COUNT(*), SUM(amount) FROM read_csv_auto(\\'test_transactions.csv\\') GROUP BY category ORDER BY SUM(amount) DESC\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+      ],
+      "message_count": 3
+    },
+    {
+      "call_id": "llm_call_2",
+      "timestamp": 1787583484.5273664,
+      "model": "gemini-3.5-flash-lite",
+      "provider": "google_gemini_rest",
+      "input_tokens": 23975,
+      "cached_input_tokens": 16281,
+      "uncached_input_tokens": 7694,
+      "output_tokens": 54,
+      "latency_ms": 2554.97,
+      "finish_reason": "tool_calls",
+      "tool_calls_emitted": [
+        "ToolCall(tool_name='complete_task', parameters={'result': 'The query on `test_transactions.csv` completed successfully. The top category by total amount is **Software**, with 28 transactions totaling **62,025.0**.'}, raw_content='{\"result\": \"The query on `test_transactions.csv` completed successfully. The top category by total amount is **Software**, with 28 transactions totaling **62,025.0**.\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+      ],
+      "message_count": 5
+    },
+    {
+      "call_id": "llm_call_3",
+      "timestamp": 1787583487.6847398,
+      "model": "gemini-3.5-flash-lite",
+      "provider": "google_gemini_rest",
+      "input_tokens": 24073,
+      "cached_input_tokens": 16275,
+      "uncached_input_tokens": 7798,
+      "output_tokens": 50,
+      "latency_ms": 3135.98,
+      "finish_reason": "stop",
+      "tool_calls_emitted": [],
+      "message_count": 7
+    }
+  ],
+  "raw_tool_calls": [
+    {
+      "tool_call_id": "tool_call_1",
+      "timestamp_start": 989209.8256376,
+      "timestamp_end": 989212.4653399,
+      "duration_ms": 2639.7,
+      "tool_name": "prototype_query_dataframe",
+      "arguments_size": 184,
+      "result_size": 658,
+      "success": true
+    },
+    {
+      "tool_call_id": "tool_call_2",
+      "timestamp_start": 989215.0344371,
+      "timestamp_end": 989215.0362266,
+      "duration_ms": 1.79,
+      "tool_name": "complete_task",
+      "arguments_size": 168,
+      "result_size": 134,
+      "success": true
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "tests": [
+    {
+      "size_kb": 1,
+      "call_1_input_tokens": 23237,
+      "call_1_cached_tokens": 16290,
+      "call_2_input_tokens": 0,
+      "call_2_cached_tokens": 0,
+      "call_2_uncached_tokens": 0,
+      "call_2_latency_ms": 0,
+      "total_duration_s": 25.95
+    },
+    {
+      "size_kb": 5,
+      "call_1_input_tokens": 23237,
+      "call_1_cached_tokens": 16290,
+      "call_2_input_tokens": 0,
+      "call_2_cached_tokens": 0,
+      "call_2_uncached_tokens": 0,
+      "call_2_latency_ms": 0,
+      "total_duration_s": 4.06
+    },
+    {
+      "size_kb": 15,
+      "call_1_input_tokens": 23238,
+      "call_1_cached_tokens": 16290,
+      "call_2_input_tokens": 0,
+      "call_2_cached_tokens": 0,
+      "call_2_uncached_tokens": 0,
+      "call_2_latency_ms": 0,
+      "total_duration_s": 2.78
+    }
+  ]
+}

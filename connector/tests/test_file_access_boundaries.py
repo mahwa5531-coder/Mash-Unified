@@ -10,6 +10,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 from app.routers.artifacts import get_file_content
 
 
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
 @pytest.mark.anyio
 async def test_file_content_rejects_unregistered_downloads_root() -> None:
     """Local Downloads is not an app workspace unless the user registers it."""

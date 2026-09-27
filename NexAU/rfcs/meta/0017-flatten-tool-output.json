@@ -1,0 +1,115 @@
+{
+  "rfc": "0017",
+  "title": "（Flatten Tool Output）",
+  "status": "implemented",
+  "priority": "P1",
+  "tags": [
+    "architecture",
+    "dx",
+    "llm"
+  ],
+  "affects": "nexau core (tool yaml, tool executor, middleware, messages)",
+  "created": "2026-04-10",
+  "updated": "2026-04-10",
+  "requires": [],
+  "related": [
+    "0014",
+    "0015"
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": " ToolYamlSchema  Tool ， formatter  xml",
+      "depends_on": [],
+      "status": "implemented",
+      "ref": "Implemented in workspace; verified via targeted pytest suites and make typecheck"
+    },
+    {
+      "id": "T2",
+      "title": " formatter resolver， builtin alias（ xml） import path",
+      "depends_on": [
+        "T1"
+      ],
+      "status": "implemented",
+      "ref": "Implemented in workspace; verified via targeted pytest suites and make typecheck"
+    },
+    {
+      "id": "T3",
+      "title": " XML formatter， MCP / Python tool  bypass ",
+      "depends_on": [
+        "T2"
+      ],
+      "status": "implemented",
+      "ref": "Implemented in workspace; verified via targeted pytest suites and make typecheck"
+    },
+    {
+      "id": "T4",
+      "title": " AfterToolHookInput / HookResult / MiddlewareManager， raw tool_output  llm_tool_output ",
+      "depends_on": [
+        "T1"
+      ],
+      "status": "implemented",
+      "ref": "Implemented in workspace; verified via targeted pytest suites and make typecheck"
+    },
+    {
+      "id": "T5",
+      "title": " tool  formatter， after_tool middleware",
+      "depends_on": [
+        "T2",
+        "T4"
+      ],
+      "status": "implemented",
+      "ref": "Implemented in workspace; verified via targeted pytest suites and make typecheck"
+    },
+    {
+      "id": "T6",
+      "title": " LongToolOutputMiddleware， llm_tool_output 、",
+      "depends_on": [
+        "T4",
+        "T5"
+      ],
+      "status": "implemented",
+      "ref": "Implemented in workspace; verified via targeted pytest suites and make typecheck"
+    },
+    {
+      "id": "T7",
+      "title": " AgentEventsMiddleware / LoggingMiddleware ",
+      "depends_on": [
+        "T4"
+      ],
+      "status": "implemented",
+      "ref": "Implemented in workspace; verified via targeted pytest suites and make typecheck"
+    },
+    {
+      "id": "T8",
+      "title": " ToolResultBlock ， llm_tool_output， repr fallback",
+      "depends_on": [
+        "T5",
+        "T6"
+      ],
+      "status": "implemented",
+      "ref": "Implemented in workspace; verified via targeted pytest suites and make typecheck"
+    },
+    {
+      "id": "T9",
+      "title": " AgentTool  custom formatter，、",
+      "depends_on": [
+        "T3",
+        "T6",
+        "T7",
+        "T8"
+      ],
+      "status": "implemented",
+      "ref": "Implemented in workspace; verified via targeted pytest suites and make typecheck"
+    },
+    {
+      "id": "T10",
+      "title": " Sub-agent  Dict  raw output ",
+      "depends_on": [
+        "T9"
+      ],
+      "status": "implemented",
+      "ref": "Implemented in workspace; verified via targeted pytest suites and make typecheck"
+    }
+  ]
+}

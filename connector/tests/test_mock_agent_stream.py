@@ -37,7 +37,7 @@ def test_sync_mock_chat_completion():
     assert "mock" in resp.content.lower() or "offline" in resp.content.lower()
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_async_mock_chat_completion_stream():
     cfg = LLMConfig(api_type="openai_chat_completion", api_key="mock", base_url="http://mock", model="mock-model")
     kwargs = {
@@ -49,7 +49,7 @@ async def test_async_mock_chat_completion_stream():
     assert len(resp.content) > 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_async_mock_tool_calling():
     cfg = LLMConfig(api_type="openai_chat_completion", api_key="mock", base_url="http://mock", model="mock-model")
     kwargs = {
@@ -63,7 +63,7 @@ async def test_async_mock_tool_calling():
     assert resp.tool_calls[0].name == "view_file"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_mock_chat_stream_endpoint(monkeypatch):
     """Verify that the FastAPI /api/chat/stream SSE endpoint streams mock events offline."""
     monkeypatch.setenv("MOCK_LLM", "true")

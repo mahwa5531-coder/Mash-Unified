@@ -1,0 +1,455 @@
+# Copyright 2025 Google LLC
+# SPDX-License-Identifier: Apache-2.0
+"""
+run_shell_command tool (shell) - Executes shell commands.
+
+Based on gemini-cli's shell.ts implementation.
+Supports foreground and background execution, timeout handling, and process management.
+"""
+
+import time
+from collections.abc import Callable
+from typing import Any
+
+from nexau.archs.main_sub.agent_state import AgentState
+from nexau.archs.main_sub.framework_context import ExecutionAPI, FrameworkContext
+from nexau.archs.permissions.helpers import check_shell_permission
+from nexau.archs.sandbox import BaseSandbox, CommandResult, SandboxStatus
+from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
+
+# Configuration constants (matching Antigravity / modern agent limits)
+DEFAULT_TIMEOUT_MS = 600000  # 10 minutes default timeout (allows long test suites and builds to finish)
+TRUNCATE_OUTPUT_THRESHOLD = 48_000  # Truncate when output exceeds 48KB (~12,000 tokens)
+TRUNCATE_OUTPUT_LINES = 200  # Keep last 200 lines when truncating
+MAX_TRUNCATED_LINE_WIDTH = 500  # Max chars per line in truncated output
+MAX_TRUNCATED_CHARS = 4000  # Keep last N chars for single massive line
+FOREGROUND_COMMAND_POLL_INTERVAL_SECONDS = 0.2
+
+
+def _truncate_shell_output(content: str) -> str:
+    """
+    Truncate large shell output, keeping last N lines (matching gemini-cli).
+    Applied when content exceeds TRUNCATE_OUTPUT_THRESHOLD.
+    """
+    if len(content) <= TRUNCATE_OUTPUT_THRESHOLD:
+        return content
+
+    lines = content.split("\n")
+    total_lines = len(lines)
+
+    if total_lines > 1:
+        # Multi-line: show last N lines, truncate long lines
+        last_lines = lines[-TRUNCATE_OUTPUT_LINES:]
+        processed: list[str] = []
+        for line in last_lines:
+            if len(line) > MAX_TRUNCATED_LINE_WIDTH:
+                processed.append(line[:MAX_TRUNCATED_LINE_WIDTH] + "... [LINE WIDTH TRUNCATED]")
+            else:
+                processed.append(line)
+        return f"Output too large. Showing the last {len(processed)} of {total_lines} lines.\n...\n" + "\n".join(processed)
+    else:
+        # Single massive line: keep last N chars
+        snippet = content[-MAX_TRUNCATED_CHARS:]
+        return f"Output too large. Showing the last {MAX_TRUNCATED_CHARS:,} characters of the output.\n...{snippet}"
+
+
+def _build_terminal_command_result(
+    *,
+    status: SandboxStatus,
+    duration_ms: int,
+    error_message: str,
+    latest_result: CommandResult | None,
+) -> CommandResult:
+    """Build a terminal command result from the latest background task snapshot."""
+    stdout = latest_result.stdout if latest_result is not None else ""
+    stderr = latest_result.stderr if latest_result is not None else ""
+    truncated = latest_result.truncated if latest_result is not None else False
+    original_stdout_length = latest_result.original_stdout_length if latest_result is not None else None
+    original_stderr_length = latest_result.original_stderr_length if latest_result is not None else None
+    output_dir = latest_result.output_dir if latest_result is not None else None
+    stdout_file = latest_result.stdout_file if latest_result is not None else None
+    stderr_file = latest_result.stderr_file if latest_result is not None else None
+
+    return CommandResult(
+        status=status,
+        stdout=stdout,
+        stderr=stderr,
+        exit_code=-1,
+        duration_ms=duration_ms,
+        error=error_message,
+        truncated=truncated,
+        original_stdout_length=original_stdout_length,
+        original_stderr_length=original_stderr_length,
+        output_dir=output_dir,
+        stdout_file=stdout_file,
+        stderr_file=stderr_file,
+    )
+
+
+def _execute_foreground_command(
+    *,
+    sandbox: BaseSandbox,
+    command: str,
+    timeout_ms: int | None,
+    execution: ExecutionAPI | None = None,
+    cwd: str | None = None,
+    wait_ms_before_async: int | None = None,
+) -> CommandResult:
+    """Execute a foreground shell command via background task polling, supporting synchronous wait window."""
+    start_time = time.monotonic()
+    start_result = sandbox.execute_shell(command, timeout=timeout_ms, background=True, cwd=cwd)
+    background_pid = start_result.background_pid
+
+    if background_pid is None:
+        return start_result
+
+    # If wait_ms_before_async is 0, detach immediately
+    if wait_ms_before_async is not None and wait_ms_before_async <= 0:
+        return start_result
+
+    latest_result: CommandResult = start_result
+    poll_interval = FOREGROUND_COMMAND_POLL_INTERVAL_SECONDS
+    if wait_ms_before_async is not None and wait_ms_before_async < 1000:
+        poll_interval = min(0.05, max(0.01, wait_ms_before_async / 1000.0))
+
+    while True:
+        if execution is not None and execution.is_shutting_down():
+            sandbox.kill_background_task(background_pid)
+            duration_ms = int((time.monotonic() - start_time) * 1000)
+            return _build_terminal_command_result(
+                status=SandboxStatus.STOPPED,
+                duration_ms=duration_ms,
+                error_message="Command interrupted by stop request",
+                latest_result=latest_result,
+            )
+
+        current_result = sandbox.get_background_task_status(background_pid)
+        if current_result.status != SandboxStatus.RUNNING:
+            return current_result
+
+        latest_result = current_result
+        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+
+        # If synchronous wait window elapsed without task finishing, leave running in background
+        if wait_ms_before_async is not None and elapsed_ms >= wait_ms_before_async:
+            if latest_result.background_pid is None:
+                latest_result.background_pid = background_pid
+            return latest_result
+
+        if timeout_ms is not None and elapsed_ms >= timeout_ms:
+            sandbox.kill_background_task(background_pid)
+            return _build_terminal_command_result(
+                status=SandboxStatus.TIMEOUT,
+                duration_ms=elapsed_ms,
+                error_message=f"Command timed out after {timeout_ms}ms",
+                latest_result=latest_result,
+            )
+
+        time.sleep(poll_interval)
+
+
+def run_shell_command(
+    command: str | None = None,
+    description: str | None = None,
+    is_background: bool = False,
+    dir_path: str | None = None,
+    timeout_ms: int = DEFAULT_TIMEOUT_MS,
+    update_output: Callable[[str], None] | None = None,
+    agent_state: AgentState | None = None,
+    *,
+    ctx: FrameworkContext | None = None,
+    # Antigravity aliases
+    CommandLine: str | None = None,
+    Cwd: str | None = None,
+    WaitMsBeforeAsync: int | None = None,
+    IsDaemon: bool | None = None,
+    toolAction: str | None = None,
+    toolSummary: str | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """
+    Executes a shell command.
+
+    Commands are executed through the sandbox's active shell backend. For
+    LocalSandbox this means an explicit bash path on Unix, PowerShell/cmd by
+    default on Windows, or Git Bash when that optional backend is explicitly
+    selected.
+
+    The following information is returned:
+    - Output: Combined stdout/stderr. Can be `(empty)` or partial on error.
+    - Exit Code: Only included if non-zero (command failed).
+    - Error: Only included if a process-level error occurred.
+    - Signal: Only included if process was terminated by a signal.
+    - Background PIDs: Only included if background processes were started.
+    - Process Group PGID: Only included if available.
+
+    Args:
+        command: The exact command to execute (or CommandLine)
+        description: Brief description of the command for the user (or toolSummary / toolAction)
+        dir_path: Directory to run the command in (or Cwd) (optional)
+        is_background: Whether to run in background (or IsDaemon)
+        timeout_ms: Timeout in milliseconds (0 for no timeout)
+        update_output: Callback for streaming output updates
+
+    Returns:
+        Dict with content and returnDisplay matching gemini-cli format
+    """
+    # Clean parameter resolution (canonical schema keys first, legacy aliases as fallback)
+    command = command or CommandLine or kwargs.get("command") or ""
+    if Cwd is not None or "cwd" in kwargs:
+        dir_path = Cwd or kwargs.get("cwd") or dir_path
+    if toolSummary or toolAction:
+        description = toolSummary or toolAction or description
+    if IsDaemon is not None or "is_background" in kwargs:
+        is_background = IsDaemon if IsDaemon is not None else bool(kwargs.get("is_background", False))
+
+    # Normalize timeout / timer parameter
+    for t_alias in ("timeout_ms", "timeout", "timer", "timeout_seconds", "timeout_sec"):
+        if t_alias in kwargs and kwargs[t_alias] is not None:
+            try:
+                val = float(kwargs[t_alias])
+                timeout_ms = int(val * 1000) if (t_alias in ("timeout_seconds", "timeout_sec") or val < 60) else int(val)
+                break
+            except (ValueError, TypeError):
+                pass
+
+    # RFC-0019: permission check
+    if ctx is not None:
+        check_shell_permission(ctx, command)
+
+    try:
+        # Validate command
+        if not command or not command.strip():
+            return {
+                "content": "Command cannot be empty.",
+                "returnDisplay": "Error: Empty command.",
+                "error": {
+                    "message": "Command cannot be empty.",
+                    "type": "INVALID_COMMAND",
+                },
+            }
+
+        sandbox: BaseSandbox = get_sandbox(agent_state)
+
+        # Determine working directory (string resolution only; checks via sandbox)
+        if dir_path:
+            cwd = resolve_path(dir_path, sandbox)
+            if not sandbox.file_exists(cwd):
+                error_msg = f"Directory not found: {dir_path}"
+                return {
+                    "content": error_msg,
+                    "returnDisplay": "Error: Directory not found.",
+                    "error": {"message": error_msg, "type": "DIRECTORY_NOT_FOUND"},
+                }
+            info = sandbox.get_file_info(cwd)
+            if not info.is_directory:
+                error_msg = f"Path is not a directory: {dir_path}"
+                return {
+                    "content": error_msg,
+                    "returnDisplay": "Error: Path is not a directory.",
+                    "error": {"message": error_msg, "type": "NOT_A_DIRECTORY"},
+                }
+        else:
+            cwd = str(sandbox.work_dir)
+
+        timeout_arg = timeout_ms if timeout_ms and timeout_ms > 0 else None
+
+        if is_background:
+            # Background mode: sandbox.execute_shell supports cwd and background params
+            start = time.time()
+            cmd_result = sandbox.execute_shell(
+                command,
+                timeout=timeout_arg,
+                cwd=cwd,
+                background=True,
+            )
+            duration_ms = int((time.time() - start) * 1000)
+            bg_pid = cmd_result.background_pid
+            if bg_pid is not None:
+                log_path = cmd_result.stdout_file or (f"{cmd_result.output_dir}/stdout.txt" if cmd_result.output_dir else "")
+                log_uri = f"file:///{log_path.replace(chr(92), '/')}" if log_path else ""
+                llm_content = (
+                    f"Background task started (pid: {bg_pid}). "
+                    f"Use `background_task_manage_tool` with action='status' and pid={bg_pid} to check output."
+                )
+                if log_uri:
+                    llm_content += f"\n\nTask logs are available at: {log_uri}"
+                bg_result: dict[str, Any] = {
+                    "content": llm_content,
+                    "returnDisplay": f"Background task started (pid: {bg_pid})",
+                    "duration_ms": duration_ms,
+                    "backgroundPids": [bg_pid],
+                    "task_id": f"task-{bg_pid}",
+                }
+                if log_uri:
+                    bg_result["task_log_uri"] = log_uri
+                if cmd_result.output_dir:
+                    bg_result["output_dir"] = cmd_result.output_dir
+                    bg_result["stdout_file"] = cmd_result.stdout_file
+                    bg_result["stderr_file"] = cmd_result.stderr_file
+                return bg_result
+            # Fallback if sandbox didn't return pid
+            fallback_result: dict[str, Any] = {
+                "content": cmd_result.stdout or "Background task started.",
+                "returnDisplay": cmd_result.stdout or "Background task started.",
+                "duration_ms": duration_ms,
+            }
+            if cmd_result.error:
+                fallback_result["error"] = {
+                    "message": cmd_result.error,
+                    "type": "SHELL_EXECUTE_ERROR",
+                }
+            return fallback_result
+
+        # Foreground mode
+        # Build description for display
+        cmd_description = command
+        if dir_path:
+            cmd_description += f" [in {dir_path}]"
+        else:
+            cmd_description += f" [current working directory {cwd}]"
+        if description:
+            cmd_description += f" ({description.replace(chr(10), ' ')})"
+        # Streaming output is not supported by execute_shell; ignore update_output.
+        _ = update_output
+
+        # RFC-0006: framework execution API
+        execution = ctx.execution if ctx is not None else None
+
+        # Prepare commands for the active backend before execution. This includes
+        # Bash heredoc scriptification and PowerShell-compatible safe rewrites.
+        command = sandbox.prepare_shell_command(command)
+
+        start = time.time()
+        cmd_result = _execute_foreground_command(
+            sandbox=sandbox,
+            command=command,
+            timeout_ms=timeout_arg,
+            execution=execution,
+            cwd=cwd,
+            wait_ms_before_async=WaitMsBeforeAsync,
+        )
+        duration_ms = int((time.time() - start) * 1000)
+
+        # If synchronous wait window elapsed without task finishing, command continues in background
+        if cmd_result.status == SandboxStatus.RUNNING and cmd_result.background_pid is not None:
+            bg_pid = cmd_result.background_pid
+            log_path = cmd_result.stdout_file or (f"{cmd_result.output_dir}/stdout.txt" if cmd_result.output_dir else "")
+            log_uri = f"file:///{log_path.replace(chr(92), '/')}" if log_path else ""
+            msg = (
+                f"Command was sent to the background as task-{bg_pid}. The command is still running.\n"
+                f"You will receive a notification when it finishes, or you can check status using `background_task_manage_tool` (action='status', pid={bg_pid})."
+            )
+            if log_uri:
+                msg += f"\n\nTask logs are available at: {log_uri}"
+            res: dict[str, Any] = {
+                "content": msg,
+                "returnDisplay": f"Command sent to background (pid: {bg_pid})",
+                "duration_ms": duration_ms,
+                "backgroundPids": [bg_pid],
+                "task_id": f"task-{bg_pid}",
+            }
+            if log_uri:
+                res["task_log_uri"] = log_uri
+            if cmd_result.output_dir:
+                res["output_dir"] = cmd_result.output_dir
+                res["stdout_file"] = cmd_result.stdout_file
+                res["stderr_file"] = cmd_result.stderr_file
+            return res
+
+        stdout = cmd_result.stdout or ""
+        stderr = cmd_result.stderr or ""
+        output = stdout
+        if stderr:
+            output = f"{stdout}\n{stderr}" if stdout else stderr
+
+        # Truncate large output (matching gemini-cli: keep last N lines)
+        output = _truncate_shell_output(output)
+
+        exit_code = cmd_result.exit_code
+        error_message = cmd_result.error
+
+        # Build result
+        llm_parts: list[str] = []
+        if cmd_result.status == SandboxStatus.TIMEOUT:
+            timeout_minutes = (timeout_ms / 60000) if timeout_ms else 0
+            llm_parts.append(f"Timeout: command timed out after {timeout_minutes:.1f} minutes.")
+        elif cmd_result.status == SandboxStatus.STOPPED:
+            llm_parts.append("Interrupted: command stopped due to stop request.")
+        else:
+            llm_parts.append(f"Output: {output if output else '(empty)'}")
+
+        if error_message:
+            llm_parts.append(f"Error: {error_message}")
+
+        if exit_code != 0:
+            llm_parts.append(f"Exit Code: {exit_code}")
+
+        llm_content = "\n".join(llm_parts)
+
+        # Build return display
+        if output and output.strip():
+            return_display = output
+        elif cmd_result.status == SandboxStatus.STOPPED:
+            return_display = "Command interrupted by stop request."
+        elif cmd_result.status == SandboxStatus.TIMEOUT:
+            return_display = f"Command timed out after {timeout_ms / 60000:.1f} minutes."
+        elif error_message:
+            return_display = f"Command failed: {error_message}"
+        elif exit_code != 0:
+            return_display = f"Command exited with code: {exit_code}"
+        else:
+            return_display = "(empty)"
+
+        result: dict[str, Any] = {
+            "content": llm_content,
+            "returnDisplay": return_display,
+            "duration_ms": duration_ms,
+            "exit_code": exit_code,
+        }
+
+        # RFC-0017: shell formatter metadata; stdout/stderr are already in content.
+        result["interrupted"] = cmd_result.status == SandboxStatus.STOPPED
+        result["timed_out"] = cmd_result.status == SandboxStatus.TIMEOUT
+
+        # Include CommandResult truncation metadata and file paths
+        if cmd_result.output_dir:
+            result["output_dir"] = cmd_result.output_dir
+            result["stdout_file"] = cmd_result.stdout_file
+            result["stderr_file"] = cmd_result.stderr_file
+        if cmd_result.truncated:
+            result["truncated"] = True
+            result["original_stdout_length"] = cmd_result.original_stdout_length
+            result["original_stderr_length"] = cmd_result.original_stderr_length
+            # Append task log link so LLM and UI can access the full untruncated output
+            if cmd_result.stdout_file:
+                log_uri = f"file:///{cmd_result.stdout_file.replace(chr(92), '/')}"
+                log_line = f"\n\nTask logs are available at: {log_uri}"
+                llm_content += log_line
+                return_display += log_line
+                result["content"] = llm_content
+                result["returnDisplay"] = return_display
+                result["task_log_uri"] = log_uri
+
+        if error_message or cmd_result.status in (
+            SandboxStatus.ERROR,
+            SandboxStatus.STOPPED,
+            SandboxStatus.TIMEOUT,
+        ):
+            result["error"] = {
+                "message": error_message or "Command failed",
+                "type": "SHELL_EXECUTE_ERROR",
+            }
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Error executing shell command: {str(e)}"
+        return {
+            "content": error_msg,
+            "returnDisplay": error_msg,
+            "error": {
+                "message": error_msg,
+                "type": "SHELL_EXECUTE_ERROR",
+            },
+        }

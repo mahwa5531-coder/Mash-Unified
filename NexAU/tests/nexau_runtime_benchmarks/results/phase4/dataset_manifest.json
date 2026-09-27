@@ -1,0 +1,15 @@
+{
+  "data_directory": "C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data",
+  "files_generated": [
+    "vendors.parquet",
+    "customers.parquet",
+    "purchase_register.parquet",
+    "general_ledger.parquet",
+    "bank_transactions.parquet",
+    "sales_register.parquet",
+    "trial_balance.parquet",
+    "fixed_assets.parquet"
+  ],
+  "total_rows": 6148,
+  "anomalies_injected": 10
+}

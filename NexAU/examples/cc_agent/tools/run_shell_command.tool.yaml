@@ -1,0 +1,52 @@
+type: tool
+name: run_shell_command
+formatter: nexau.archs.tool.formatters.shell:format_run_shell_command_output
+description: >-
+  PROPOSE a command to run on behalf of the user. Operating System: windows. Shell: powershell.
+  **WINDOWS POWERSHELL SYNTAX**: Do NOT use '&&' or '||' to chain commands. Use ';' to separate statements or execute commands sequentially.
+  **NEVER PROPOSE A cd COMMAND**.
+  **CRITICAL SAFETY**: For irreversible or destructive commands (e.g. `rmdir /s`, `Remove-Item -Recurse`, `del /f /s /q`, `git reset --hard`, or deleting repositories/directories), NEVER execute them blindly. You MUST first use the `ask_user` tool (with `type: 'yesno'`) to obtain explicit confirmation from the user before executing.
+  If you have this tool, note that you DO have the ability to run commands directly on the USER's system.
+  Make sure to specify CommandLine exactly as it should be run in the shell.
+  If the step doesn't return the command output, it means that the command was sent to the background as a task. You will receive messages with the command's output as it runs. To interact with a running command, use the manage_task tool. Use `send_input` to send stdin, `kill` to terminate the command, and `status` to check current status. IMPORTANT: Do NOT poll or loop on `status` to wait for completion. The system will automatically notify you with a message when the command finishes. Simply proceed with other work or stop calling tools after launching a command.
+  Commands will be run with PAGER=cat. You may want to limit the length of output for commands that usually rely on paging and may contain very long output (e.g. git log, use git log -n <N>).
+input_schema:
+  type: object
+  properties:
+    CommandLine:
+      type: string
+      description: "The exact command line string to execute."
+    Cwd:
+      type: string
+      description: "The current working directory for the command"
+    WaitMsBeforeAsync:
+      type: integer
+      description: "This specifies the number of milliseconds to wait after starting the command before sending it to the background. If you want the command to complete execution synchronously, set this to a large enough value that you expect the command to complete in that time under ordinary circumstances. If you're starting an interactive or long-running command, set it to a large enough value that it would cause possible failure cases to execute synchronously (e.g. 500ms). Keep the value as small as possible, with a maximum of 10000ms."
+    IsDaemon:
+      type: boolean
+      description: "Set to true for long-running support processes that are meant to keep running in the background indefinitely and are not expected to finish on their own (e.g., dev servers, file watchers, tunnels). Leave false (the default) for normal commands that are expected to terminate."
+    toolAction:
+      type: string
+      description: "Brief 2-5 word summary of what this tool is doing. Capitalize like a sentence. Some examples: 'Analyzing directory', 'Searching the web', 'Editing file', 'Viewing file', 'Running command', 'Semantic searching'."
+    toolSummary:
+      type: string
+      description: "Brief 2-5 word noun phrase describing what this tool call is about. Capitalize like a sentence. Some examples: 'Directory analysis', 'Web search', 'File edit', 'Command execution', 'Semantic search'."
+    command:
+      type: string
+      description: "Alias for CommandLine: The exact command line string to execute."
+    dir_path:
+      type: string
+      description: "Alias for Cwd: The current working directory for the command."
+    description:
+      type: string
+      description: "Brief description of what this command accomplishes."
+    is_background:
+      type: boolean
+      description: "Alias for IsDaemon / background execution."
+  required:
+    - CommandLine
+    - Cwd
+    - toolAction
+    - toolSummary
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

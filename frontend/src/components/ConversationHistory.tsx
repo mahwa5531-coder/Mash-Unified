@@ -184,14 +184,6 @@ export default function ConversationHistory({
           >
             <FilterBarsIcon size={14} />
           </button>
-
-          <button
-            type="button"
-            className="p-2.5 rounded-xl bg-white dark:bg-[#181818] hover:bg-zinc-100 dark:hover:bg-[#202020] border border-zinc-200 dark:border-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors cursor-pointer shadow-2xs"
-            title="More options"
-          >
-            <MoreVertical size={14} />
-          </button>
         </div>
 
         {/* Filter Tag Pill (if active) */}

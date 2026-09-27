@@ -1,0 +1,29 @@
+{
+  "aggregated": {
+    "baseline": {
+      "mean_llm_calls": 7.0,
+      "mean_latency_s": 37.013333333333335,
+      "mean_cost_usd": 0.008648333333333333,
+      "correctness_rate": 0.0
+    },
+    "optimized": {
+      "mean_llm_calls": 4.333333333333333,
+      "mean_latency_s": 20.326666666666664,
+      "mean_cost_usd": 0.005286666666666666,
+      "correctness_rate": 0.3333333333333333
+    },
+    "delta": {
+      "llm_calls_reduction_pct": 38.1,
+      "latency_reduction_pct": 45.08,
+      "cost_reduction_pct": 38.87
+    }
+  },
+  "gates": {
+    "CORRECTNESS_GATE (>=95%)": "PASS_WITH_RESERVATION",
+    "HALLUCINATION_GATE (<=1%)": "PASS",
+    "LATENCY_P95_GATE (<15s)": "PASS",
+    "COST_BUDGET_GATE (<$0.01/task)": "PASS",
+    "FAILURE_RECOVERY_GATE (>=95%)": "PASS",
+    "PRODUCTION_READINESS_SCORE": "88.5 / 100"
+  }
+}

@@ -1,10 +1,92 @@
 "use client";
 
-import { useState, memo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Check, Copy } from 'lucide-react';
-import SyntaxHighlighter from '@/lib/lightSyntaxHighlighter';
-import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useIsDarkMode } from '@/hooks/useIsDarkMode';
+
+// ----------------------------------------------------------------------
+// High-performance, zero-dependency syntax tokenizer for chat code blocks
+// Replaces Prism (~500KB bundle + thousands of DOM spans) with an instant
+// single-pass regex tokenizer that produces zero virtual-DOM thrashing.
+// ----------------------------------------------------------------------
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+const KEYWORDS = new Set([
+  'as', 'async', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue',
+  'debugger', 'default', 'delete', 'do', 'else', 'export', 'extends', 'finally',
+  'for', 'from', 'function', 'if', 'import', 'in', 'instanceof', 'let', 'new',
+  'of', 'return', 'super', 'switch', 'this', 'throw', 'try', 'typeof', 'var',
+  'void', 'while', 'with', 'yield',
+  // Python
+  'def', 'elif', 'except', 'is', 'lambda', 'nonlocal', 'pass', 'raise', 'with',
+  'None', 'True', 'False', 'self',
+  // Types / Common
+  'type', 'interface', 'enum', 'implements', 'declare', 'abstract', 'readonly',
+  // SQL
+  'select', 'from', 'where', 'insert', 'update', 'delete', 'join', 'left',
+  'right', 'inner', 'outer', 'group', 'by', 'order', 'having', 'limit',
+  'create', 'table', 'drop', 'alter', 'and', 'or', 'not', 'distinct', 'as'
+]);
+
+function highlightCodeSnippet(rawCode: string, language: string, isDark: boolean): string {
+  if (!rawCode) return '';
+  const lang = (language || '').toLowerCase().trim();
+
+  // For plain text, markdown or diff, return escaped text
+  if (lang === 'text' || lang === 'plain' || lang === 'txt') {
+    return escapeHtml(rawCode);
+  }
+
+  // Tokenization regex matching comments, strings, numbers, words, operators
+  const tokenRegex = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|#[^\n]*|--[^\n]*)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(\b[a-zA-Z_][a-zA-Z0-9_]*\b)|([^\s\w]+|\s+)/g;
+
+  let html = '';
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenRegex.exec(rawCode)) !== null) {
+    const [full, comment, str, num, word, other] = match;
+
+    if (comment) {
+      const cls = isDark ? 'text-zinc-500 italic' : 'text-zinc-400 italic';
+      html += `<span class="${cls}">${escapeHtml(comment)}</span>`;
+    } else if (str) {
+      const cls = isDark ? 'text-emerald-400' : 'text-emerald-600';
+      html += `<span class="${cls}">${escapeHtml(str)}</span>`;
+    } else if (num) {
+      const cls = isDark ? 'text-amber-400' : 'text-amber-600';
+      html += `<span class="${cls}">${escapeHtml(num)}</span>`;
+    } else if (word) {
+      const lower = word.toLowerCase();
+      if (KEYWORDS.has(lower) || KEYWORDS.has(word)) {
+        const cls = isDark ? 'text-purple-400 font-medium' : 'text-purple-600 font-medium';
+        html += `<span class="${cls}">${escapeHtml(word)}</span>`;
+      } else if (word === 'true' || word === 'false' || word === 'null' || word === 'None' || word === 'True' || word === 'False') {
+        const cls = isDark ? 'text-rose-400 font-medium' : 'text-rose-600 font-medium';
+        html += `<span class="${cls}">${escapeHtml(word)}</span>`;
+      } else {
+        html += escapeHtml(word);
+      }
+    } else if (other) {
+      // Punctuation / operator
+      if (/^[=+\-*/%&|^!<>?:;.,{}()[\]]+$/.test(other.trim())) {
+        const cls = isDark ? 'text-zinc-400' : 'text-zinc-600';
+        html += `<span class="${cls}">${escapeHtml(other)}</span>`;
+      } else {
+        html += escapeHtml(other);
+      }
+    }
+  }
+
+  return html;
+}
 
 // ----------------------------------------------------------------------
 // CodeBlock with Copy, Language Pill, and Collapse Toggle
@@ -31,8 +113,13 @@ const CodeBlock = memo(function CodeBlock({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const highlightedHtml = useMemo(() => {
+    if (isStreaming) return '';
+    return highlightCodeSnippet(code, language, isDark);
+  }, [code, language, isDark, isStreaming]);
+
   return (
-    <div className="my-3 rounded-lg overflow-hidden border border-[var(--border-subtle)] shadow-sm bg-[var(--bg-surface)]">
+    <div className="my-3 rounded-lg overflow-hidden border border-[var(--border-subtle)] shadow-xs bg-[var(--bg-surface)]">
       <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] text-xs font-mono text-[var(--text-secondary)]">
         <div className="flex items-center gap-2">
           <span className="font-mono text-[11px] font-medium text-zinc-600 dark:text-zinc-400">{language || 'code'}</span>
@@ -68,20 +155,12 @@ const CodeBlock = memo(function CodeBlock({
             <code>{code}</code>
           </pre>
         ) : (
-          <SyntaxHighlighter
-            style={(isDark ? vscDarkPlus : vs) as any}
-            language={language || 'text'}
-            PreTag="div"
-            customStyle={{
-              margin: 0,
-              padding: '0.75rem',
-              background: 'var(--bg-surface)',
-              fontSize: '13px',
-              lineHeight: '1.5'
-            }}
+          <pre
+            className="font-mono text-[13px] leading-[1.5] p-3 text-zinc-800 dark:text-zinc-200 overflow-x-auto whitespace-pre select-text m-0"
+            style={{ background: 'var(--bg-surface)' }}
           >
-            {code}
-          </SyntaxHighlighter>
+            <code dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
+          </pre>
         )}
         {collapsed && (
           <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[var(--bg-surface)] to-transparent pointer-events-none flex items-end justify-center pb-2">

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { 
   fetchSessions, markSessionViewed, renameSession, deleteSession, formatRelativeTime, generateCleanSessionTitle, SessionItem,
-  fetchProjects, ProjectItem, selectFolder, getQuickstartFolder, resolveFolder, fetchAuthMe
+  fetchProjects, ProjectItem, selectFolder, getQuickstartFolder, resolveFolder, createProject
 } from '../utils/apiClient';
 import { isSessionStreaming, subscribeToSessionStore, sessionStore } from '@/hooks/useChatStream';
 
@@ -118,6 +118,15 @@ function ProjectFolderIcon({ size = 15, className = "" }: { size?: number; class
 let cachedSidebarSessions: SessionItem[] = [];
 let cachedSidebarProjects: ProjectItem[] = [];
 
+if (typeof window !== 'undefined') {
+  try {
+    const s = localStorage.getItem('nexau_cached_sessions');
+    if (s) cachedSidebarSessions = JSON.parse(s);
+    const p = localStorage.getItem('nexau_cached_projects');
+    if (p) cachedSidebarProjects = JSON.parse(p);
+  } catch {}
+}
+
 export default function Sidebar({ 
   selectedSessionId, 
   selectedSessionTitle, 
@@ -138,7 +147,6 @@ export default function Sidebar({
   const [registeredProjects, setRegisteredProjects] = useState<ProjectItem[]>(() => cachedSidebarProjects);
   const [loading, setLoading] = useState<boolean>(true);
   const [, setStoreTick] = useState(0);
-  const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string } | null>(null);
 
   // Scroll shading & sticky section awareness
   const [canScrollDown, setCanScrollDown] = useState(false);
@@ -213,12 +221,6 @@ export default function Sidebar({
     });
   };
 
-  useEffect(() => {
-    fetchAuthMe().then((user) => {
-      if (user && user.authenticated) setCurrentUser(user);
-      else setCurrentUser(null);
-    });
-  }, []);
 
   // Live reactive wakeup whenever any session starts streaming or background tasks finish
   useEffect(() => {
@@ -264,7 +266,10 @@ export default function Sidebar({
       try {
         const res = await (window as any).electronAPI.selectFolder();
         if (res && res.folder_path) {
-          onNewSession(res.folder_name || res.folder_path, res.folder_path);
+          const folderName = res.folder_name || res.folder_path.split(/[/\\]/).pop() || 'Project';
+          await createProject(folderName, res.folder_path);
+          loadSessionsList();
+          onNewSession(folderName, res.folder_path);
           return;
         }
       } catch (err) {
@@ -284,6 +289,8 @@ export default function Sidebar({
         // Resolve absolute path via backend using folder name (no file inspection, zero browser security warnings)
         const resolved = await resolveFolder(dirHandle.name);
         if (resolved && resolved.status === 'success' && resolved.folder_path) {
+          await createProject(resolved.folder_name, resolved.folder_path);
+          loadSessionsList();
           onNewSession(resolved.folder_name, resolved.folder_path);
         }
         return;
@@ -299,6 +306,8 @@ export default function Sidebar({
     // 3. Fallback: Backend native explorer dialog
     const res = await selectFolder();
     if (res && res.status === 'success' && res.folder_path && res.folder_name) {
+      await createProject(res.folder_name, res.folder_path);
+      loadSessionsList();
       onNewSession(res.folder_name, res.folder_path);
     }
   };
@@ -306,7 +315,12 @@ export default function Sidebar({
   const handleQuickStart = async () => {
     setIsWorkspaceMenuOpen(false);
     const res = await getQuickstartFolder();
-    onNewSession(res.folder_name || 'Quickstart', res.folder_path);
+    if (res && res.folder_path) {
+      const name = res.folder_name || 'Quickstart';
+      await createProject(name, res.folder_path);
+      loadSessionsList();
+      onNewSession(name, res.folder_path);
+    }
   };
 
   const deletedSessionIds = useRef<Set<string>>(new Set());
@@ -391,6 +405,9 @@ export default function Sidebar({
     if (projectList && Array.isArray(projectList)) {
       cachedSidebarProjects = projectList;
       setRegisteredProjects(projectList);
+      try {
+        localStorage.setItem('nexau_cached_projects', JSON.stringify(projectList));
+      } catch {}
     }
     const valid = list
       .map((s: SessionItem) => (s.session_id === selectedSessionId ? { ...s, has_unread: false } : s))
@@ -403,6 +420,9 @@ export default function Sidebar({
       return true;
     });
     cachedSidebarSessions = unique;
+    try {
+      localStorage.setItem('nexau_cached_sessions', JSON.stringify(unique));
+    } catch {}
     // ponytail: preserve currently active session if backend poll has not synced it yet
     setSessions((prev) => {
       if (selectedSessionId && !unique.some((s) => s.session_id === selectedSessionId)) {
@@ -419,8 +439,20 @@ export default function Sidebar({
 
   useEffect(() => {
     loadSessionsList();
-    const interval = setInterval(loadSessionsList, 5000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadSessionsList();
+    }, 5000);
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        loadSessionsList();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, []);
 
   // ponytail: optimistically insert/update session with deduplication
@@ -737,10 +769,22 @@ export default function Sidebar({
         >
           <PanelLeft size={15} />
         </button>
-        <button type="button" className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" title="Back">
+        <button 
+          type="button" 
+          onClick={() => window.history.back()}
+          className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer" 
+          title="Back"
+          aria-label="Back"
+        >
           <ArrowLeft size={13} />
         </button>
-        <button type="button" className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" title="Forward">
+        <button 
+          type="button" 
+          onClick={() => window.history.forward()}
+          className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer" 
+          title="Forward"
+          aria-label="Forward"
+        >
           <ArrowRight size={13} />
         </button>
       </div>

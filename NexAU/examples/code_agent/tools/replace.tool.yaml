@@ -1,0 +1,48 @@
+type: tool
+name: replace
+description: >-
+  Use this tool to edit an existing file by replacing a specific chunk of code or text.
+
+  Follow these rules:
+  1. Use this tool ONLY when making a SINGLE CONTIGUOUS block of edits to the same file.
+  2. Include 2-3 lines of surrounding context in `old_string` to ensure unique matching.
+  3. Exact whitespace and indentation MUST be preserved.
+  4. To edit multiple non-adjacent locations in the same file, use 'multiedit_tool' or make sequential calls.
+  5. DO NOT use this tool to replace the entire file content; use 'write_file' instead.
+  6. By default, this tool expects exactly 1 occurrence. Set `expected_replacements` if replacing multiple instances.
+
+input_schema:
+  type: object
+  properties:
+    file_path:
+      type: string
+      description: "The path to the file to modify. Must be an absolute path or workspace-relative path."
+    old_string:
+      type: string
+      description: "The exact target string or code chunk to find and replace. Include 2-3 lines of surrounding context for unique matching."
+    new_string:
+      type: string
+      description: "The new string or code chunk to replace old_string with. Must be a complete drop-in replacement."
+    instruction:
+      type: string
+      description: "A description of the changes that you are making to the file."
+    description:
+      type: string
+      description: "Brief, user-facing explanation of what this change did. Focus on non-obvious rationale, design decisions, or important context."
+    expected_replacements:
+      type: integer
+      default: 1
+      description: "Number of occurrences of old_string expected to be replaced (default: 1). If actual occurrences mismatch, the edit is aborted."
+    start_line:
+      type: integer
+      description: "(OPTIONAL) Starting line number (1-indexed) to scope the search chunk."
+    end_line:
+      type: integer
+      description: "(OPTIONAL) Ending line number (1-indexed) to scope the search chunk."
+  required:
+    - file_path
+    - old_string
+    - new_string
+    - description
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

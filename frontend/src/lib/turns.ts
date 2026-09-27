@@ -39,9 +39,10 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
           tasks: [],
         });
       } else if (step.role === 'assistant' || step.source === 'MODEL' || step.type === 'PLANNER_RESPONSE') {
-        let content = typeof step.content === 'string' ? step.content : '';
+        let content = typeof step.content === 'string' ? step.content.replace(/\[VERIFIED\]\s*/gi, '') : '';
         const thoughts: string[] = Array.isArray(step.thoughts) ? [...step.thoughts] : (step.thinking ? [step.thinking] : []);
         const rawTools: any[] = Array.isArray(step.tools) ? step.tools : (Array.isArray(step.tool_calls) ? step.tool_calls : []);
+        const stepPrefix = step.action_id || step.id || (step as any).step_index !== undefined ? `st_${(step as any).step_index}` : `m_${parsedMsgs.length}`;
         const tools: any[] = [];
         for (const t of rawTools) {
           const name = t.name || t.function?.name || 'action';
@@ -50,7 +51,7 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
             try { args = JSON.parse(args); } catch { args = {}; }
           }
           tools.push({
-            id: t.id || `tc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            id: t.id || `${stepPrefix}_tc_${tools.length}`,
             name,
             args,
             output: t.output || '',
@@ -61,7 +62,10 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
 
         if (Array.isArray(step.content)) {
           for (const b of step.content) {
-            if (b.type === 'text' && b.text) content += (content ? '\n' : '') + b.text;
+            if (b.type === 'text' && b.text) {
+              const cleanBText = b.text.replace(/\[VERIFIED\]\s*/gi, '');
+              content += (content ? '\n' : '') + cleanBText;
+            }
             if ((b.type === 'reasoning' || b.type === 'thinking') && (b.text || b.thinking)) {
               thoughts.push(b.text || b.thinking);
             }
@@ -72,7 +76,7 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
                 try { args = JSON.parse(args); } catch { args = {}; }
               }
               tools.push({
-                id: b.id || `tc_${Date.now()}`,
+                id: b.id || `${stepPrefix}_tc_${tools.length}`,
                 name,
                 args,
                 output: '',
@@ -92,7 +96,7 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
         } else {
           if (thoughts.length > 0) {
             resolvedSteps.push({
-              id: `step_th_${Date.now()}`,
+              id: `${stepPrefix}_th_${resolvedSteps.length}`,
               step_index: resolvedSteps.length,
               type: 'thinking',
               content: thoughts.join('\n'),
@@ -102,7 +106,7 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
           if (tools.length > 0) {
             for (const t of tools) {
               resolvedSteps.push({
-                id: t.id || `step_tc_${Date.now()}`,
+                id: t.id || `${stepPrefix}_tc_${resolvedSteps.length}`,
                 step_index: resolvedSteps.length,
                 type: 'tool',
                 tool_call_id: t.id,
@@ -115,7 +119,7 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
           }
           if (content && content.trim().length > 0) {
             resolvedSteps.push({
-              id: `step_tx_${Date.now()}`,
+              id: `${stepPrefix}_tx_${resolvedSteps.length}`,
               step_index: resolvedSteps.length,
               type: 'text',
               content: content,
@@ -128,13 +132,23 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
         if (prevMsg && prevMsg.role === 'assistant') {
           prevMsg.thoughts.push(...thoughts);
           prevMsg.tools.push(...tools);
-          if (content && tools.length === 0) {
-            prevMsg.content = (prevMsg.tools.length > 0 ? content : (prevMsg.content ? prevMsg.content + '\n' + content : content)).trim();
+          if (content) {
+            prevMsg.content = prevMsg.content ? (prevMsg.content + '\n\n' + content).trim() : content.trim();
           }
           if (tasks.length > 0) prevMsg.tasks = tasks;
           if (resolvedSteps.length > 0) {
             if (!prevMsg.steps) prevMsg.steps = [];
-            prevMsg.steps.push(...resolvedSteps);
+            for (const rStep of resolvedSteps) {
+              const last = prevMsg.steps[prevMsg.steps.length - 1];
+              if (last && last.type === 'thinking' && rStep.type === 'thinking') {
+                last.content = (last.content + '\n\n' + rStep.content).trim();
+                if (rStep.thinkingDurationSeconds) {
+                  last.thinkingDurationSeconds = (last.thinkingDurationSeconds || 0) + rStep.thinkingDurationSeconds;
+                }
+              } else {
+                prevMsg.steps.push(rStep);
+              }
+            }
           }
           if (step.created_at || (step as any).timestamp) {
             prevMsg.timestamp = step.created_at || (step as any).timestamp;
@@ -144,7 +158,7 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
         } else {
           parsedMsgs.push({ 
             role: 'assistant', 
-            content: tools.length > 0 ? '' : content, 
+            content: content.trim(), 
             thoughts: thoughts, 
             tools: tools,
             tasks: tasks,
@@ -169,7 +183,7 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
             target.status = 'completed';
           } else if (outputText) {
             prevMsg.tools.push({
-              id: toolId || `tc_${Date.now()}`,
+              id: toolId || `tc_${prevMsg.tools.length}`,
               name: step.name || 'action',
               args: {},
               output: outputText || 'Done.',

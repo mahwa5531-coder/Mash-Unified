@@ -40,8 +40,7 @@ from app.dependencies import init_engine
 from app.models.project import ProjectModel
 from app.routers import projects, sessions, chat, artifacts, uploads, tasks, system, auth, settings
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
-load_dotenv()
+
 
 # ──────────────────────────────────────────────
 # DB path (~/.nexau/nexau.db)
@@ -59,172 +58,73 @@ _DB_SYNC_URL  = f"sqlite:///{_DB_PATH}"
 
 
 def _build_agent_config() -> AgentConfig:
-    try:
-        from nexau.archs.tool import Tool
-        from nexau.archs.tool.builtin import (
-            view_file,
-            write_file,
-            run_shell_command,
-            search_file_content,
-            replace_file_content,
-            glob,
-            audit_skill_tool,
-            google_web_search,
-            web_fetch,
-            background_task_manage_tool,
-        )
-        from nexau.archs.platform.crypto_vault import load_secure_vault
-        from nexau.archs.platform.app_config import AppConfig
+    import nexau
+    from nexau.archs.main_sub.config import AgentConfig
+    from nexau.archs.platform.app_config import AppConfig
+    from nexau.archs.platform.crypto_vault import load_secure_vault
 
-        app_cfg = AppConfig.load()
-        vault = load_secure_vault() or {}
+    # Load canonical agent configuration directly from NexAU
+    manifest_path = Path(nexau.__file__).parent / "agents" / "main_agent.yaml"
+    agent_config = AgentConfig.from_yaml(manifest_path)
 
-        custom_base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("LLM_BASE_URL")
-        custom_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("OPENROUTER_API_KEY")
-        custom_model = os.getenv("OPENAI_MODEL") or os.getenv("LLM_MODEL")
+    # Runtime LLM credential resolution from settings/vault/env
+    app_cfg = AppConfig.load()
+    vault = load_secure_vault() or {}
 
-        active_key = (
-            custom_key
-            or vault.get("api_key")
-            or ("sk-local-test" if custom_base_url else "")
-        )
-        active_model = custom_model or app_cfg.model.default_model or "google/gemini-2.5-flash"
+    custom_base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("LLM_BASE_URL")
+    custom_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("OPENROUTER_API_KEY")
+    custom_model = os.getenv("OPENAI_MODEL") or os.getenv("LLM_MODEL")
 
-        # ponytail: Direct OpenAI-compatible endpoint support (local Ollama/vLLM or any OpenAI proxy)
-        active_api_type = os.getenv("LLM_API_TYPE", "openai_chat_completion")
-        is_mock = os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes") or active_key.lower() in ("mock", "none", "test")
+    active_key = (
+        custom_key
+        or vault.get("api_key")
+        or ("sk-local-test" if custom_base_url else "")
+    )
+    active_model = custom_model or app_cfg.model.default_model or "google/gemini-2.5-flash"
 
-        if is_mock:
-            active_key = active_key or "mock"
-            default_base_url = "http://mock"
-        elif custom_base_url:
-            default_base_url = custom_base_url
-        elif active_key.startswith("sk-or-"):
-            default_base_url = "https://openrouter.ai/api/v1"
-            if not ("/" in active_model):
-                active_model = "google/gemini-2.5-flash"
-        else:
-            default_base_url = app_cfg.model.gateway_url or os.getenv("BIFROST_GATEWAY_URL", "https://openrouter.ai/api/v1")
+    active_api_type = os.getenv("LLM_API_TYPE", "openai_chat_completion")
+    is_mock = os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes") or active_key.lower() in ("mock", "none", "test")
 
-        thinking_budget = int(os.getenv("LLM_THINKING_BUDGET", "16384"))
-        extra_llm_params: dict[str, Any] = {}
-        if thinking_budget > 0:
-            extra_llm_params["reasoning"] = {
-                "max_tokens": thinking_budget
-            }
+    if is_mock:
+        active_key = active_key or "mock"
+        default_base_url = "http://mock"
+    elif custom_base_url:
+        default_base_url = custom_base_url
+    elif active_key.startswith("sk-or-"):
+        default_base_url = "https://openrouter.ai/api/v1"
+        if not ("/" in active_model):
+            active_model = "google/gemini-2.5-flash"
+    else:
+        default_base_url = app_cfg.model.gateway_url or os.getenv("BIFROST_GATEWAY_URL", "https://openrouter.ai/api/v1")
 
-        common_llm_config = LLMConfig(
-            api_type=active_api_type,
-            model=active_model,
-            api_key=active_key,
-            max_tokens=(
-                int(os.getenv("LLM_MAX_TOKENS"))
-                if os.getenv("LLM_MAX_TOKENS")
-                else (65536 if (":free" in active_model or "openrouter/free" in active_model) else (app_cfg.model.max_tokens or 4096))
-            ),
-            base_url=custom_base_url or default_base_url,
-            timeout=float(os.getenv("LLM_TIMEOUT")) if os.getenv("LLM_TIMEOUT") else None,
-            stream_idle_timeout=float(os.getenv("LLM_STREAM_IDLE_TIMEOUT")) if os.getenv("LLM_STREAM_IDLE_TIMEOUT") else None,
-            **extra_llm_params,
-        )
+    thinking_budget = int(os.getenv("LLM_THINKING_BUDGET", "16384"))
+    extra_llm_params: dict[str, Any] = {}
+    if thinking_budget > 0:
+        extra_llm_params["reasoning"] = {
+            "max_tokens": thinking_budget
+        }
 
-        import nexau
-        schemas_dir = Path(nexau.__file__).parent / "archs" / "tool" / "builtin" / "schemas"
-        
-        # Core builtin tools (native NexAU execution)
-        view_file_tool = Tool.from_yaml(str(schemas_dir / "view_file.tool.yaml"), binding=view_file)
-        write_file_tool = Tool.from_yaml(str(schemas_dir / "write_file.tool.yaml"), binding=write_file)
-        audit_skill_tool_inst = Tool.from_yaml(str(schemas_dir / "audit_skill_tool.tool.yaml"), binding=audit_skill_tool)
-        replace_tool = Tool.from_yaml(str(schemas_dir / "replace_file_content.tool.yaml"), binding=replace_file_content)
-        search_file_tool = Tool.from_yaml(str(schemas_dir / "search_file_content.tool.yaml"), binding=search_file_content)
-        glob_tool = Tool.from_yaml(str(schemas_dir / "glob.tool.yaml"), binding=glob)
-        run_shell_tool = Tool.from_yaml(str(schemas_dir / "run_shell_command.tool.yaml"), binding=run_shell_command)
-        web_search_tool = Tool.from_yaml(str(schemas_dir / "web_search.tool.yaml"), binding=google_web_search)
-        web_fetch_tool = Tool.from_yaml(str(schemas_dir / "web_fetch.tool.yaml"), binding=web_fetch)
-        background_task_manage_tool_inst = Tool.from_yaml(str(schemas_dir / "background_task_manage_tool.tool.yaml"), binding=background_task_manage_tool)
+    agent_config.llm_config = LLMConfig(
+        api_type=active_api_type,
+        model=active_model,
+        api_key=active_key,
+        max_tokens=(
+            int(os.getenv("LLM_MAX_TOKENS"))
+            if os.getenv("LLM_MAX_TOKENS")
+            else (65536 if (":free" in active_model or "openrouter/free" in active_model) else (app_cfg.model.max_tokens or 4096))
+        ),
+        timeout=float(os.getenv("LLM_TIMEOUT") or "120.0"),
+        stream_idle_timeout=float(os.getenv("LLM_STREAM_IDLE_TIMEOUT") or "45.0"),
+        max_retries=int(os.getenv("LLM_MAX_RETRIES") or "3"),
+        **extra_llm_params,
+    )
 
-        max_ctx_tokens = int(os.getenv("LLM_MAX_CONTEXT_TOKENS", "1000000"))
+    if os.getenv("LLM_MAX_CONTEXT_TOKENS"):
+        agent_config.max_context_tokens = int(os.getenv("LLM_MAX_CONTEXT_TOKENS"))
+    if os.getenv("AGENT_MAX_ITERATIONS"):
+        agent_config.max_iterations = int(os.getenv("AGENT_MAX_ITERATIONS"))
 
-        # ponytail: NexAU native dynamic compaction (defaults to 75% of model context window)
-        target_tokens = os.getenv("COMPACTION_TARGET_TOKENS")
-        threshold = (
-            min(1.0, max(0.001, float(target_tokens) / max_ctx_tokens))
-            if target_tokens
-            else float(os.getenv("COMPACTION_THRESHOLD", "0.75"))
-        )
-
-        compaction_middleware = ContextCompactionMiddleware(
-            auto_compact=True,
-            compaction_strategy="llm_summary",
-            keep_user_rounds=int(os.getenv("COMPACTION_KEEP_USER_ROUNDS", "5")),
-            max_context_tokens=max_ctx_tokens,
-            threshold=threshold,
-            summary_model=os.getenv("SUMMARY_LLM_MODEL"),
-            save_history=True,
-            emergency_compact_enabled=True,
-        )
-
-        # Core tools - Direct execution without subagent indirection
-        unique_tools = []
-        seen_names = set()
-        for t in [
-            view_file_tool,
-            write_file_tool,
-            replace_tool,
-            search_file_tool,
-            glob_tool,
-            run_shell_tool,
-            audit_skill_tool_inst,
-            web_search_tool,
-            web_fetch_tool,
-            background_task_manage_tool_inst,
-        ]:
-            if t.name not in seen_names:
-                seen_names.add(t.name)
-                unique_tools.append(t)
-
-        from nexau.archs.main_sub.execution.middleware.long_tool_output import LongToolOutputMiddleware
-        from nexau.archs.main_sub.execution.middleware.round_and_token_reminder import RoundAndTokenReminderMiddleware
-
-        # ponytail: Use NexAU native defaults (10,000 chars / ~2,500 tokens cap, 50 head lines, 30 tail lines, disk temp-file offloading)
-        long_output_middleware = LongToolOutputMiddleware()
-
-        steering_middleware = RoundAndTokenReminderMiddleware(
-            max_context_tokens=max_ctx_tokens,
-            desired_max_tokens=16384,
-            enable_routine_reminders=False,
-        )
-
-        return AgentConfig(
-            name="main_auditor",
-            system_prompt=None,  # ponytail: None delegates to default_system_prompt.j2 with full runtime context and tools
-            tools=unique_tools,
-            sub_agents={},
-            llm_config=common_llm_config,
-            middlewares=[compaction_middleware, long_output_middleware, steering_middleware],
-            max_context_tokens=max_ctx_tokens,
-            max_iterations=int(os.getenv("AGENT_MAX_ITERATIONS", "10")),
-            stop_tools=set(),
-        )
-    except Exception as e:
-        print(f"[WARN] Error initializing tools: {e}")
-        from nexau.archs.main_sub.execution.middleware.round_and_token_reminder import RoundAndTokenReminderMiddleware
-        fallback_steering = RoundAndTokenReminderMiddleware(
-            max_context_tokens=1000000,
-            desired_max_tokens=16384,
-            enable_routine_reminders=False,
-        )
-        return AgentConfig(
-            name="main_auditor",
-            system_prompt=None,
-            llm_config=common_llm_config,
-            tools=[],
-            sub_agents={},
-            middlewares=[fallback_steering],
-            max_context_tokens=1000000,
-            max_iterations=int(os.getenv("AGENT_MAX_ITERATIONS", "10")),
-            stop_tools=set(),
-        )
+    return agent_config
 
 # ──────────────────────────────────────────────
 # Lifespan

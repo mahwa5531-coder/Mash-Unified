@@ -104,10 +104,26 @@ async def kill_task(pid: int):
     """Terminate an active background task by its PID."""
     try:
         from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
+        from nexau.archs.sandbox.base_sandbox import SandboxStatus
+        import sys, subprocess
         sandbox = get_sandbox(None)
         res = sandbox.kill_background_task(pid)
-        return {"success": True, "pid": pid, "status": str(res.status)}
+        is_success = (res.status == SandboxStatus.SUCCESS)
+
+        # Fallback direct OS tree kill if sandbox did not find it or to guarantee shutdown
+        if not is_success and sys.platform == "win32":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            is_success = True
+
+        return {"success": is_success, "pid": pid, "status": str(res.status) if is_success else "killed"}
     except Exception as e:
+        import sys, subprocess
+        if sys.platform == "win32":
+            try:
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                return {"success": True, "pid": pid, "status": "killed"}
+            except Exception:
+                pass
         return {"success": False, "pid": pid, "error": str(e)}
 
 

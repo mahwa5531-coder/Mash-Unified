@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { 
-  ChevronDown, ChevronUp, ArrowRight, Pencil, Trash2, History, Loader2, AlertCircle, Sparkles, Info
+  ChevronDown, ChevronUp, ArrowRight, Pencil, Trash2, History, Loader2, AlertCircle, Sparkles
 } from 'lucide-react';
 import ChatComposer from './chat/ChatComposer';
 import QuotaBanner from './chat/QuotaBanner';
@@ -49,11 +49,6 @@ export default function ChatCanvas({
     historyLoadError,
     retryLoadHistory,
     queuedMessage,
-    backgroundTasks,
-    showTasksBar,
-    setShowTasksBar,
-    selectedModel,
-    setSelectedModel,
     turns,
     artifactsByTurnMsg,
     send,
@@ -62,7 +57,6 @@ export default function ChatCanvas({
     undo,
     injectQueued,
     discardQueued,
-    killTask,
     hasEarlierTurns,
     isLoadingEarlier,
     remainingEarlierCount,
@@ -89,9 +83,10 @@ export default function ChatCanvas({
     }
   }, [isStreaming]);
 
-  // Reset window when session changes
+  // Reset window and dismiss quota banner when session changes
   useEffect(() => {
     setWindowOffsetFromEnd(0);
+    setShowQuotaBanner(false);
   }, [sessionId]);
 
   const startIndex = Math.max(0, turns.length - MAX_LIVE_TURNS - windowOffsetFromEnd);
@@ -103,8 +98,8 @@ export default function ChatCanvas({
 
   const handleLoadEarlier = async () => {
     if (startIndex > 0) {
-      // Shift visible window backwards by up to 50 turns
-      setWindowOffsetFromEnd((prev) => Math.min(turns.length - MAX_LIVE_TURNS, prev + 50));
+      // Shift visible window backwards by up to 50 turns without negative clamping
+      setWindowOffsetFromEnd((prev) => Math.max(0, Math.min(turns.length - MAX_LIVE_TURNS, prev + 50)));
     } else if (hasEarlierTurns) {
       await loadEarlierTurns();
       setWindowOffsetFromEnd((prev) => prev + 50);
@@ -140,16 +135,41 @@ export default function ChatCanvas({
     lastAiTools
   ]);
 
-  // Trigger quota banner if the assistant reports rate limit or quota exceeded
+  // Trigger quota banner ONLY if backend/model returns a rate limit or quota exceeded error
   useEffect(() => {
-    if (lastAiContent && (
-      lastAiContent.toLowerCase().includes("quota exceeded") ||
-      lastAiContent.toLowerCase().includes("rate limit") ||
-      lastAiContent.toLowerCase().includes("quota reached")
-    )) {
+    const errorText = (lastAiMsg?.error || '').toLowerCase();
+    if (
+      errorText.includes("quota exceeded") ||
+      errorText.includes("rate limit") ||
+      errorText.includes("quota reached") ||
+      errorText.includes("insufficient_quota") ||
+      errorText.includes("429")
+    ) {
       setShowQuotaBanner(true);
     }
-  }, [lastAiContent]);
+  }, [lastAiMsg?.error]);
+
+  const handleProceed = useCallback(() => {
+    send(undefined, undefined, "Proceed with the implementation plan");
+  }, [send]);
+
+  const handleContinue = useCallback(() => {
+    send(
+      undefined,
+      undefined,
+      "Continue from where you were interrupted. Please pick up right where the previous step stopped without re-doing completed work."
+    );
+    scrollDomToBottom();
+  }, [send, scrollDomToBottom]);
+
+  const handleSend = useCallback((text: string) => {
+    send(undefined, undefined, text);
+    scrollDomToBottom();
+  }, [send, scrollDomToBottom]);
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    onChatBodyScroll(e.currentTarget);
+  }, [onChatBodyScroll]);
 
   const handleEditQueued = () => {
     if (queuedMessage) {
@@ -159,12 +179,12 @@ export default function ChatCanvas({
   };
 
   return (
-    <div className="flex-1 min-w-[340px] min-h-0 bg-[var(--bg-app)] flex flex-col h-full overflow-hidden relative font-sans text-[var(--text-primary)] transition-colors">
+    <div className="flex-1 min-w-0 min-h-0 bg-[var(--bg-app)] flex flex-col h-full overflow-hidden relative font-sans text-[var(--text-primary)] transition-colors">
       
       {/* Main Chat Feed (Scrollable) */}
       <div 
         ref={chatScrollContainerRef} 
-        onScroll={(e) => onChatBodyScroll(e.currentTarget)} 
+        onScroll={handleScroll} 
         className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 custom-scrollbar relative"
       >
         
@@ -239,21 +259,22 @@ export default function ChatCanvas({
                 </div>
               )}
 
-              {visibleTurns.map((turn, i, arr) => {
+              {visibleTurns.map((turn, i) => {
                 const globalTurnIdx = startIndex + i;
                 const isLastTurn = globalTurnIdx === turns.length - 1;
                 const isSyntheticContext = turn.userMsg.content === '[Earlier Context]';
+                const turnKey = turn.id || `turn_${turn.flatIdx}_${globalTurnIdx}`;
+                const turnIdx = turn.turnIndex ?? globalTurnIdx;
                 return (
                   <div 
-                    key={turn.id || `turn_${turn.flatIdx}`} 
+                    key={turnKey} 
                     className="flex flex-col w-full relative pb-3 border-b border-zinc-200/50 dark:border-white/[0.04] last:border-b-0 last:pb-1"
-                    style={!isLastTurn ? { contentVisibility: 'auto', containIntrinsicSize: '0 120px' } : undefined}
                   >
                     {!isSyntheticContext && (
                       <div className="sticky top-0 z-20 py-2 bg-[var(--bg-app)]/90 backdrop-blur-md border-b border-zinc-200/40 dark:border-white/[0.04] transition-all">
                         <UserMessage
                           msg={turn.userMsg}
-                          onUndo={() => undo(turn.flatIdx, turn.userMsg.content, turn.turnIndex ?? globalTurnIdx)}
+                          onUndo={() => undo(turn.flatIdx, turn.userMsg.content, turnIdx)}
                         />
                       </div>
                     )}
@@ -261,14 +282,15 @@ export default function ChatCanvas({
                       {turn.aiMsgs.map((aiMsg, j) => {
                         const isLastMsg = isLastTurn && j === turn.aiMsgs.length - 1;
                         return (
-                          <ErrorBoundary key={`${turn.id || turn.flatIdx}_ai_${j}`} scope="assistant-turn">
+                          <ErrorBoundary key={`${turnKey}_ai_${j}`} scope="assistant-turn">
                             <AssistantMessage
                               msg={aiMsg}
-                              artifacts={artifactsByTurnMsg.get(`${globalTurnIdx}_${j}`) || []}
+                              artifacts={artifactsByTurnMsg.get(`${turnIdx}_${j}`) || EMPTY_ARTIFACTS}
                               isLast={isLastMsg}
                               isStreaming={isLastMsg && isStreaming}
                               onOpenFile={onOpenFile}
-                              onProceed={() => send(undefined, undefined, "Proceed with the implementation plan")}
+                              onProceed={handleProceed}
+                              onContinue={handleContinue}
                               onRetry={() => retry(turn.userMsg.content, turn.userMsg.sessionId)}
                             />
                           </ErrorBoundary>
@@ -303,46 +325,6 @@ export default function ChatCanvas({
       {/* Bottom Composer Dock */}
       <div className="shrink-0 w-full z-20 bg-transparent pb-3 px-4 sm:px-6 relative">
         <div className="max-w-3xl mx-auto w-full relative">
-
-          {/* Floating Background Tasks Bar */}
-          {backgroundTasks.length > 0 && (
-            <div className="mb-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl overflow-hidden shadow-lg backdrop-blur-md">
-              <button
-                type="button"
-                onClick={() => setShowTasksBar((v) => !v)}
-                className="w-full flex items-center justify-between px-3.5 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span className="font-medium text-[var(--text-primary)]">
-                    {backgroundTasks.length} task{backgroundTasks.length > 1 ? 's' : ''} running
-                  </span>
-                </div>
-                <span className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-                  {showTasksBar ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                </span>
-              </button>
-              {showTasksBar && (
-                <div className="px-3.5 py-2 border-t border-[var(--border-subtle)] space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar">
-                  {backgroundTasks.map((task) => (
-                    <div key={task.pid} className="flex items-center justify-between text-[11.5px] py-1">
-                      <div className="flex items-center gap-2 truncate pr-2">
-                        <span className="font-mono text-[var(--text-muted)]">#{task.pid}</span>
-                        <span className="font-mono text-[var(--text-primary)] truncate max-w-sm">{task.command}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => killTask(task.pid)}
-                        className="text-red-500 hover:text-red-600 text-[11px] px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 cursor-pointer shrink-0"
-                      >
-                        Stop
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Antigravity-Style Queued Messages Card */}
           {queuedMessage && (
@@ -430,16 +412,11 @@ export default function ChatCanvas({
             sessionId={sessionId}
             inputPrompt={inputPrompt}
             setInputPrompt={setInputPrompt}
-            onSend={(text) => {
-              send(undefined, undefined, text);
-              scrollDomToBottom();
-            }}
+            onSend={handleSend}
             onStop={stop}
             isStreaming={isStreaming}
             disabled={Boolean(sessionId && !isHistoryLoaded)}
             sessionRepo={sessionRepo}
-            selectedModel={selectedModel}
-            onSelectModel={setSelectedModel}
           />
         </div>
       </div>

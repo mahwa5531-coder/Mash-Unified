@@ -18,7 +18,6 @@ dependencies = [
   "duckdb>=1.0.0",
   "polars>=1.0.0",
   "openpyxl>=3.1.0",
-  "pdfplumber>=0.11.0",
   "langfuse>=3.2.3,<4",
   "tiktoken>=0.5.0",
   "anthropic>=0.84.0",
@@ -31,7 +30,6 @@ dependencies = [
   "asyncer>=0.0.12",
   "python-ulid>=3.1.0",
   "nest_asyncio>=1.6.0", # Allow nested event loops for sync/async interop
-  "transformers>=4.40,<5",
   "alembic>=1.18.4",
   # Pillow: pure-in-memory image downscale. Used by HistoryList to cap
   # oversized images to their pixel/token budget at the persistence entry
@@ -43,6 +41,9 @@ dependencies = [
   # permission helpers. Was missed when #481 landed; runtime fails
   # at module-import time without it.
   "pathspec>=0.12.0",
+  "PyMuPDF>=1.24.0",
+  "python-calamine>=0.8.0",
+  "duckduckgo_search>=6.0.0",
 ]
 description = "A general-purpose agent framework"
 name = "nexau"

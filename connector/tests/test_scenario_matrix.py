@@ -29,7 +29,7 @@ async def request(client: httpx.AsyncClient, path, method="GET", body=None):
     except Exception:
         return resp.status_code, resp.text
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_scenario_matrix():
     print("=" * 70)
     print("STARTING SCENARIO VERIFICATION TEST SUITE")

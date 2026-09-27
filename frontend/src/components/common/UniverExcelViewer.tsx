@@ -5,8 +5,6 @@ import dynamic from "next/dynamic";
 import { Loader2, FileSpreadsheet, Download } from "lucide-react";
 import { BASE_URL, safeFetch } from "../../utils/apiClient";
 
-import ExcelViewer, { type ExcelWorkbookData } from "./ExcelViewer";
-
 const UniverExcelViewerInner = dynamic(
   () => import("./UniverExcelViewerInner"),
   {
@@ -38,31 +36,18 @@ export default function UniverExcelViewer({
     if (data?.sheetOrder && data?.sheets) return data;
     return null;
   });
-  const [fallbackExcelData, setFallbackExcelData] = useState<any>(() => {
-    if (data?.type === 'excel') return data;
-    return null;
-  });
-  const [isLoading, setIsLoading] = useState<boolean>(!workbookData && !fallbackExcelData && !!path);
+  const [isLoading, setIsLoading] = useState<boolean>(!workbookData && !!path);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (data?.workbook) {
       setWorkbookData(data.workbook);
-      setFallbackExcelData(null);
       setLoadError(null);
       setIsLoading(false);
       return;
     }
     if (data?.sheetOrder && data?.sheets) {
       setWorkbookData(data);
-      setFallbackExcelData(null);
-      setLoadError(null);
-      setIsLoading(false);
-      return;
-    }
-    if (data?.type === 'excel') {
-      setFallbackExcelData(data);
-      setWorkbookData(null);
       setLoadError(null);
       setIsLoading(false);
       return;
@@ -81,13 +66,8 @@ export default function UniverExcelViewer({
         .then((json: any) => {
           if (json?.workbook) {
             setWorkbookData(json.workbook);
-            setFallbackExcelData(null);
           } else if (json?.sheetOrder && json?.sheets) {
             setWorkbookData(json);
-            setFallbackExcelData(null);
-          } else if (json?.type === 'excel') {
-            setFallbackExcelData(json);
-            setWorkbookData(null);
           } else {
             throw new Error("Invalid spreadsheet format received from server.");
           }
@@ -106,7 +86,7 @@ export default function UniverExcelViewer({
     return (
       <div className="flex flex-col items-center justify-center h-full py-24 text-zinc-500 dark:text-zinc-400 gap-3 bg-zinc-50/50 dark:bg-[#121212]/50">
         <Loader2 size={24} className="animate-spin text-emerald-500" />
-        <span className="text-xs font-medium">Parsing Excel with Rust engine...</span>
+        <span className="text-xs font-medium">Parsing spreadsheet with Rust engine...</span>
       </div>
     );
   }
@@ -130,10 +110,6 @@ export default function UniverExcelViewer({
         )}
       </div>
     );
-  }
-
-  if (fallbackExcelData) {
-    return <ExcelViewer data={fallbackExcelData as ExcelWorkbookData} filename={filename} path={path} />;
   }
 
   const sheetCount = workbookData?.sheetOrder?.length || Object.keys(workbookData?.sheets || {}).length || 0;
@@ -166,10 +142,10 @@ export default function UniverExcelViewer({
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-white dark:bg-white/[0.06] hover:bg-zinc-100 dark:hover:bg-white/[0.1] text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-white/[0.08] transition-colors cursor-pointer shadow-2xs"
-              title="Download original untouched .xlsx file"
+              title="Download original file"
             >
               <Download size={11} />
-              <span>Download .xlsx</span>
+              <span>Download</span>
             </a>
           )}
         </div>

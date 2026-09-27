@@ -1,0 +1,44 @@
+type: tool
+name: read_many_files
+description: |
+  Batch-reads and returns the structured content of multiple files matching glob patterns in a single tool call.
+
+  FORMAT CAPABILITIES:
+  1. Source Code & Text (.py, .ts, .js, .json, .md, .txt, .sql, .yaml):
+     - Concatenates file contents with '--- {filePath} ---' visual separators.
+     - Total output is safely capped at ~25,000 characters to protect your context window.
+     - Files exceeding 2,000 lines are safely truncated with pagination guidance.
+  2. Spreadsheets & CSVs (.xlsx, .xls, .csv, .tsv, .parquet):
+     - Automatically routes every matched spreadsheet/CSV through the Calamine & Polars ingestion engine.
+     - Small sheets (<=100 rows) are rendered directly as structured Markdown tables.
+     - Large sheets (>100 rows) return column schemas, 5 sample preview rows, and the queryable '.parquet' path for DuckDB.
+
+  WHEN TO USE:
+  - Use `read_many_files` when you need to inspect an entire folder or batch of files (e.g. `include=["src/**/*.py"]`, `include=["financials/*.xlsx"]`, `include=["data/*.csv"]`).
+  - For single targeted files or specific pagination with offset/limit, use `read_file`.
+  - For massive analytical queries across 50+ Parquet/CSV files, run embedded DuckDB in Python.
+
+  EXAMPLES:
+  1. Read all Python files in a directory:
+     read_many_files(include=["src/models/*.py"])
+  2. Read all quarterly balance sheets:
+     read_many_files(include=["C:/Audit/ClientA/2026_Q*.xlsx"])
+  3. Read all config files except tests:
+     read_many_files(include=["config/*.json"], exclude=["config/*test*.json"])
+input_schema:
+  type: object
+  properties:
+    include:
+      type: array
+      items:
+        type: string
+      description: "Array of glob patterns or file paths to read (e.g. ['src/*.py', 'data/*.xlsx'])."
+    exclude:
+      type: array
+      items:
+        type: string
+      description: "Optional glob patterns to exclude from reading."
+  required:
+    - include
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

@@ -1,0 +1,46 @@
+type: tool
+name: multiedit_tool
+description: >-
+  Make multiple find-and-replace edits to a single file in one atomic transaction.
+  All edits are applied in sequence — either all succeed or none are applied (no partial corruption).
+
+  Usage rules:
+  1. Each edit specifies `old_string` (exact match with 2-3 lines of context) and `new_string`.
+  2. Set `replace_all: true` only if intending to replace every occurrence in the file.
+  3. Prefer this tool over multiple sequential `replace` calls when modifying multiple locations in the same file.
+  4. Always provide a clear `description` explaining the architectural or statutory rationale for the batch edit.
+input_schema:
+  type: object
+  properties:
+    file_path:
+      type: string
+      description: "The path to the file to modify. Must be an absolute or workspace-relative path."
+    description:
+      type: string
+      description: "Brief, user-facing explanation of what this batch of edits accomplishes."
+    edits:
+      type: array
+      description: "Array of edit operations to apply atomically in sequence."
+      items:
+        type: object
+        properties:
+          old_string:
+            type: string
+            description: "The exact text chunk to find (must match exactly, including leading whitespace and surrounding context)."
+          new_string:
+            type: string
+            description: "The replacement text chunk."
+          replace_all:
+            type: boolean
+            default: false
+            description: "(OPTIONAL) Replace all occurrences of old_string. Defaults to false."
+        required:
+          - old_string
+          - new_string
+        additionalProperties: false
+  required:
+    - file_path
+    - edits
+    - description
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

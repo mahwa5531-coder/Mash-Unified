@@ -1,0 +1,31 @@
+type: tool
+name: run_shell_command
+formatter: nexau.archs.tool.formatters.shell:format_run_shell_command_output
+description: >-
+  Executes a shell command on the system (Windows PowerShell).
+  - Synchronous execution: Runs foreground commands and returns stdout/stderr.
+  - Background execution: If a command is long-running or needs to keep running (e.g. servers, long batch jobs), set `is_background: true`. Returns a background task PID immediately so you can continue other work without freezing.
+  - Timeout / Timer: To set a time limit, pass `timeout_ms` (in milliseconds, e.g. 10000 for 10s). Defaults to 120000 (2 minutes).
+  - Syntax note: In PowerShell, use ';' to separate statements. Do NOT use '&&' or '||'. Never use 'cd'.
+input_schema:
+  type: object
+  properties:
+    command:
+      type: string
+      description: "The exact shell command line string to execute."
+    cwd:
+      type: string
+      description: "Optional working directory to run the command in. Defaults to the workspace root."
+    timeout_ms:
+      type: integer
+      description: "Optional timeout in milliseconds. For example, 10000 for 10s. Defaults to 120000 (2 minutes)."
+    is_background:
+      type: boolean
+      description: "Set to true to start the command in the background and return immediately with a task PID. Use this for long-running processes."
+    description:
+      type: string
+      description: "Optional brief description of what this command accomplishes."
+  required:
+    - command
+  additionalProperties: true
+  $schema: http://json-schema.org/draft-07/schema#

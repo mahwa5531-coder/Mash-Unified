@@ -34,7 +34,7 @@ from nexau.archs.llm.llm_aggregators.events import (
 )
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_thinking_tokens_and_sse_lifecycle():
     """Verify that thinking tokens and text events stream and serialize correctly."""
     events = [
@@ -67,7 +67,7 @@ async def test_thinking_tokens_and_sse_lifecycle():
     assert "".join(text_deltas) == "Audit complete. All variances reconciled."
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_artifact_path_traversal_and_retrieval():
     """Verify that artifacts can be served safely and path traversal attempts are rejected."""
     async with lifespan(app):
@@ -115,7 +115,7 @@ async def test_artifact_path_traversal_and_retrieval():
             shutil.rmtree(brain_dir, ignore_errors=True)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_plan_approval_state_machine():
     """Verify manual plan approval endpoints (/approve and /api/chat/{id}/approve)."""
     async with lifespan(app):
@@ -151,7 +151,7 @@ async def test_plan_approval_state_machine():
             assert res_chat_appr.json().get("status") in ("ok", "success")
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_session_state_and_rename_persistence():
     """Verify session creation, renaming, view state, and SQLite persistence."""
     async with lifespan(app):

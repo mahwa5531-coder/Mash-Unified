@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useMemo, memo } from 'react';
+import React, { useState, useMemo, useEffect, memo } from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
-import { RotateCcw, Copy, Check, ArrowUpRight, ChevronRight, BookOpen } from 'lucide-react';
+import { RotateCcw, Copy, Check, ArrowUpRight, ChevronRight, BookOpen, AlertCircle, WifiOff, Play, X, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -44,6 +45,7 @@ interface AssistantMessageProps {
   onOpenFile?: (path: string) => void;
   onProceed?: (path: string) => void;
   onRetry?: () => void;
+  onContinue?: () => void;
 }
 
 // ponytail: safely extract plain text from nested React children / markdown AST nodes
@@ -135,7 +137,7 @@ function isFullFilePath(raw: string): boolean {
   }
 
   // 6. Must have a valid known file extension
-  const FILE_EXT_REGEX = /\.(py|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|csv|xlsx?|md|markdown|txt|diff|patch|html|css|env|log|sh|bat)$/i;
+  const FILE_EXT_REGEX = /\.(py|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|csv|xlsx?|md|markdown|txt|diff|patch|html|css|env|log|sh|bat|j2|jinja2?)$/i;
   if (FILE_EXT_REGEX.test(clean)) {
     const parts = clean.split(/[/\\]/);
     const filename = parts.pop() || '';
@@ -149,7 +151,7 @@ function isFullFilePath(raw: string): boolean {
 }
 
 function renderFileButton(filePath: string, label?: string, onOpenFile?: (p: string) => void) {
-  const { filePath: cleanPath, display, isDoc } = formatFilePill(label || filePath, filePath);
+  const { filePath: cleanPath, display } = formatFilePill(label || filePath, filePath);
   return (
     <button
       type="button"
@@ -159,21 +161,16 @@ function renderFileButton(filePath: string, label?: string, onOpenFile?: (p: str
         e.stopPropagation();
         onOpenFile?.(cleanPath);
       }}
-      className="inline-flex items-center gap-1.5 px-2 py-0.5 mx-0.5 rounded-[5px] font-sans text-[12px] bg-zinc-100 hover:bg-zinc-200 dark:bg-white/[0.05] dark:hover:bg-white/[0.10] text-zinc-800 hover:text-zinc-950 dark:text-zinc-200 dark:hover:text-white border border-zinc-200 hover:border-zinc-300 dark:border-white/[0.08] dark:hover:border-white/[0.16] transition-all cursor-pointer align-baseline my-0.5 select-none shadow-xs group active:scale-[0.98]"
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 mx-0.5 rounded-[6px] font-mono text-[12px] bg-zinc-100 hover:bg-zinc-200/90 dark:bg-[#1e1e22] dark:hover:bg-[#27272c] text-amber-900 dark:text-[#e5c07b] border border-zinc-300/80 dark:border-white/[0.08] hover:border-amber-500/40 dark:hover:border-[#e5c07b]/40 hover:shadow-[0_0_10px_rgba(217,119,6,0.15)] dark:hover:shadow-[0_0_12px_rgba(229,192,123,0.18)] transition-all duration-150 ease-out cursor-pointer align-baseline my-0.5 select-none shadow-xs group active:scale-[0.98]"
       title={`Open ${cleanPath}`}
     >
-      {isDoc ? (
-        <BookOpen size={12} className="text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200 shrink-0" />
-      ) : (
-        <FileIcon filename={cleanPath} size={13} className="shrink-0" />
-      )}
-      <span className="font-medium underline-offset-2 group-hover:underline truncate max-w-[280px]">{display}</span>
+      <FileIcon filename={cleanPath} size={13} className="shrink-0 group-hover:scale-105 transition-transform" />
+      <span className="truncate max-w-[280px] font-mono text-amber-900 dark:text-[#e5c07b] group-hover:text-amber-950 dark:group-hover:text-[#ffe082] transition-colors">{display}</span>
     </button>
   );
 }
 
 const BADGE_STYLES: Record<string, string> = {
-  VERIFIED: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
   COMPLIANT: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
   'NO EXCEPTION': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
   'NO EXCEPTION NOTED': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
@@ -191,14 +188,14 @@ const BADGE_STYLES: Record<string, string> = {
   CAUTION: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
 };
 
-const STATUS_TAG_REGEX = /(\[(?:VERIFIED|COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\])/g;
+const STATUS_TAG_REGEX = /(\[(?:COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\])/g;
 const FILE_PATH_IN_PROSE_REGEX = /((?:file:\/\/\/?|[a-zA-Z]:[/\\]|\/(?:Users|home|tmp)\/|(?:scratch|tests|django|frontend|connector|src)\/)[^\s'",;()<>]+\.(?:py|tsx?|jsx?|mjs|json|ya?ml|toml|sql|csv|xlsx?|md|txt|diff|patch|html|css|log)(?:#L\d+(?:-\d+)?)?)/gi;
 
 function processTextNodesForBadges(children: any, onOpenFile?: (path: string) => void): any {
   if (typeof children === 'string') {
     const parts = children.split(STATUS_TAG_REGEX);
     return parts.map((part, idx) => {
-      const match = part.match(/^\[(VERIFIED|COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\]$/);
+      const match = part.match(/^\[(COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\]$/);
       if (match) {
         const tag = match[1];
         const style = BADGE_STYLES[tag] || 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700';
@@ -300,10 +297,23 @@ const AssistantMessage = memo(function AssistantMessage({
   onOpenFile,
   onProceed,
   onRetry,
+  onContinue,
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [abortedOpen, setAbortedOpen] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string; path?: string } | null>(null);
+
+  // Close lightbox modal on Escape key
+  useEffect(() => {
+    if (!lightboxImage) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxImage(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxImage]);
+
   // Freeze fallback completion time once on mount so it never drifts with live clock
   const [latchedTime] = useState(() => 
     new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -315,8 +325,19 @@ const AssistantMessage = memo(function AssistantMessage({
   const artifacts = passedArtifacts !== undefined ? passedArtifacts : localArtifacts;
   const editedFilesData = useMemo(() => isActivelyStreaming ? { files: [], totalAdded: 0, totalDeleted: 0 } : extractEditedFiles(msg), [msg.tools, isActivelyStreaming]);
 
-  // ponytail: memoize formatted content — regex runs once per content change, not per render
-  const formattedContent = useMemo(() => formatMathInMarkdown(msg.content, isActivelyStreaming), [msg.content, isActivelyStreaming]);
+  // ponytail: memoize formatted content with fallback to text steps so assistant answers are never hidden
+  const rawText = useMemo(() => {
+    if (msg.content && msg.content.trim().length > 0) return msg.content;
+    if (msg.steps && msg.steps.length > 0) {
+      const textSteps = msg.steps.filter((s: any) => s.type === 'text' && s.content && s.content.trim().length > 0);
+      if (textSteps.length > 0) {
+        return textSteps.map((s: any) => s.content.trim()).join('\n\n');
+      }
+    }
+    return '';
+  }, [msg.content, msg.steps]);
+
+  const formattedContent = useMemo(() => formatMathInMarkdown(rawText, isActivelyStreaming), [rawText, isActivelyStreaming]);
 
   // ponytail: memoize ReactMarkdown components object — the #1 perf win
   // Without this, ReactMarkdown sees new function refs every flush and rebuilds its entire tree
@@ -364,25 +385,25 @@ const AssistantMessage = memo(function AssistantMessage({
       return <TableContainer>{children}</TableContainer>;
     },
     p({children, ...props}: any) {
-      return <p className="mb-2 text-[13.5px] leading-[1.68] text-foreground/90 last:mb-0" {...props}>{processTextNodesForBadges(children, onOpenFile)}</p>;
+      return <p className="mb-3 text-[14px] leading-[1.72] text-zinc-800 dark:text-[#ececed] last:mb-0" {...props}>{processTextNodesForBadges(children, onOpenFile)}</p>;
     },
     li({children, ...props}: any) {
-      return <li className="my-0.5 text-[13.5px] leading-[1.62] text-foreground/90" {...props}>{processTextNodesForBadges(children, onOpenFile)}</li>;
+      return <li className="my-1 text-[14px] leading-[1.68] text-zinc-800 dark:text-[#ececed]" {...props}>{processTextNodesForBadges(children, onOpenFile)}</li>;
     },
     h1({children, ...props}: any) {
-      return <h1 className="mt-4 mb-2 text-[17px] font-semibold text-foreground tracking-tight pb-1 border-b border-border/40 first:mt-0" {...props}>{processTextNodesForBadges(children, onOpenFile)}</h1>;
+      return <h1 className="mt-6 mb-3 text-[21px] font-bold text-zinc-950 dark:text-zinc-50 tracking-tight pb-2 border-b border-zinc-200/80 dark:border-white/[0.08] first:mt-0" {...props}>{processTextNodesForBadges(children, onOpenFile)}</h1>;
     },
     h2({children, ...props}: any) {
-      return <h2 className="mt-3.5 mb-1.5 text-[15px] font-semibold text-foreground tracking-tight first:mt-0" {...props}>{processTextNodesForBadges(children, onOpenFile)}</h2>;
+      return <h2 className="mt-5 mb-2.5 text-[17.5px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight pb-1 border-b border-zinc-100 dark:border-white/[0.04] first:mt-0" {...props}>{processTextNodesForBadges(children, onOpenFile)}</h2>;
     },
     h3({children, ...props}: any) {
-      return <h3 className="mt-2.5 mb-1 text-[13.5px] font-semibold text-foreground tracking-tight first:mt-0" {...props}>{processTextNodesForBadges(children, onOpenFile)}</h3>;
+      return <h3 className="mt-4 mb-2 text-[15.5px] font-semibold text-zinc-900 dark:text-zinc-200 tracking-tight first:mt-0" {...props}>{processTextNodesForBadges(children, onOpenFile)}</h3>;
     },
     h4({children, ...props}: any) {
-      return <h4 className="mt-2 mb-0.5 text-[13px] font-semibold text-foreground/90 tracking-tight first:mt-0" {...props}>{processTextNodesForBadges(children, onOpenFile)}</h4>;
+      return <h4 className="mt-3 mb-1.5 text-[14px] font-semibold text-zinc-800 dark:text-zinc-300 tracking-tight first:mt-0" {...props}>{processTextNodesForBadges(children, onOpenFile)}</h4>;
     },
     strong({children, ...props}: any) {
-      return <strong className="text-foreground font-semibold" {...props}>{children}</strong>;
+      return <strong className="text-zinc-950 dark:text-white font-semibold" {...props}>{children}</strong>;
     },
     td({children, ...props}: any) {
       const text = extractChildText(children).trim();
@@ -407,7 +428,7 @@ const AssistantMessage = memo(function AssistantMessage({
 
       const isFileUri = href.startsWith('file:///') || href.startsWith('file://');
       const isWinPath = /^[a-zA-Z]:[/\\]/.test(href);
-      const isRelativeFile = /\.(xlsx?|xlsm|csv|json|md|markdown|txt|log|py|tsx?|jsx?|mjs|sql|ya?ml|toml|xml|env|html|css|pdf|png|jpe?g)$/i.test(href.split('#')[0]);
+      const isRelativeFile = /\.(xlsx?|xlsm|csv|json|md|markdown|txt|log|py|tsx?|jsx?|mjs|sql|ya?ml|toml|xml|env|html|css|pdf|png|jpe?g|svg|webp|gif|j2|jinja2?)$/i.test(href.split('#')[0]);
       const isLocalPath = (href.startsWith('/') || href.startsWith('./') || href.startsWith('../')) && isFullFilePath(href);
 
       if (isFileUri || isWinPath || isRelativeFile || isLocalPath) {
@@ -422,14 +443,39 @@ const AssistantMessage = memo(function AssistantMessage({
     },
     img({src, alt, ...props}: any) {
       let resolvedSrc = src;
-      if (resolvedSrc && (resolvedSrc.startsWith('file:///') || resolvedSrc.startsWith('file://'))) {
-        const cleanPath = resolvedSrc.replace(/^file:\/\/\/?/, '');
-        resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}`;
+      let cleanPath = src;
+      const isRemote = resolvedSrc && (resolvedSrc.startsWith('http://') || resolvedSrc.startsWith('https://') || resolvedSrc.startsWith('data:'));
+
+      if (resolvedSrc && !isRemote) {
+        cleanPath = resolvedSrc.replace(/^file:\/\/\/?/, '');
+        cleanPath = cleanPath.replace(/^\/([a-zA-Z]:)/, '$1');
+        resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}${msg.sessionId ? `&session_id=${encodeURIComponent(msg.sessionId)}` : ''}`;
       }
+
+      const dynamicCaption = alt && alt.trim() ? alt.trim() : null;
+
       return (
-        <div className="my-3 rounded-xl overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 shadow-md">
-          <img src={resolvedSrc} alt={alt || 'Visual Chart'} className="max-w-full rounded-lg object-contain max-h-[500px] mx-auto" {...props} />
-          {alt && <div className="text-center text-xs text-[var(--text-muted)] mt-2 font-mono">{alt}</div>}
+        <div 
+          onClick={() => {
+            setLightboxImage({ src: resolvedSrc, alt: dynamicCaption || undefined, path: cleanPath });
+          }}
+          className="my-3 rounded-xl overflow-hidden border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#141414] p-2.5 shadow-xs group/img cursor-pointer transition-all hover:border-zinc-300 dark:hover:border-white/[0.15]"
+          title={dynamicCaption ? `Click to inspect: ${dynamicCaption}` : 'Click to inspect image on top screen'}
+        >
+          <div className="relative overflow-hidden rounded-lg bg-black/[0.02] dark:bg-white/[0.02] flex items-center justify-center min-h-[120px] max-h-[500px]">
+            <img 
+              src={resolvedSrc} 
+              alt={dynamicCaption || 'Visual Chart'} 
+              className="max-w-full rounded-md object-contain max-h-[480px] mx-auto transition-transform duration-200 group-hover/img:scale-[1.01]" 
+              loading="lazy"
+              {...props} 
+            />
+          </div>
+          {dynamicCaption && (
+            <div className="text-center text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium truncate px-2">
+              {dynamicCaption}
+            </div>
+          )}
         </div>
       );
     }
@@ -453,7 +499,7 @@ const AssistantMessage = memo(function AssistantMessage({
 
       {/* 2. Unified Clean Markdown Content */}
       {formattedContent && (
-        <div className="font-sans text-zinc-800 dark:text-zinc-300 leading-[1.68] mt-1.5 [&_ul]:my-1.5 [&_ul]:pl-5 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:marker:text-zinc-400 dark:[&_ul]:marker:text-zinc-600 [&_ol]:my-1.5 [&_ol]:pl-5 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:marker:text-zinc-400 dark:[&_ol]:marker:text-zinc-500 [&_li>ul]:mt-1 [&_li>ul]:mb-0.5 [&_li>ol]:mt-1 [&_li>ol]:mb-0.5 [&_li_p]:mb-0 [&_li_p]:mt-0 [&_hr]:my-3.5 [&_hr]:border-zinc-200 dark:[&_hr]:border-zinc-800/40 [&_pre]:my-2">
+        <div className="font-sans text-zinc-800 dark:text-[#ececed] text-[14px] leading-[1.72] mt-2 [&_ul]:my-3 [&_ul]:pl-5 [&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:marker:text-zinc-400 dark:[&_ul]:marker:text-zinc-500 [&_ol]:my-3 [&_ol]:pl-5 [&_ol]:list-decimal [&_ol]:space-y-1.5 [&_ol]:marker:text-zinc-400 dark:[&_ol]:marker:text-zinc-500 [&_li>ul]:mt-1.5 [&_li>ul]:mb-0.5 [&_li>ol]:mt-1.5 [&_li>ol]:mb-0.5 [&_li_p]:mb-0 [&_li_p]:mt-0 [&_hr]:my-4.5 [&_hr]:border-zinc-200/80 dark:[&_hr]:border-zinc-800/80 [&_pre]:my-3">
           <ReactMarkdown
             remarkPlugins={REMARK_PLUGINS as any}
             rehypePlugins={REHYPE_PLUGINS as any}
@@ -464,31 +510,101 @@ const AssistantMessage = memo(function AssistantMessage({
         </div>
       )}
 
-      {/* 4. Execution Status Disclosure (Error / Interrupted) */}
-      {msg.error && (
-        <div className="w-full min-w-0 text-[13px] font-sans my-1 select-text">
-          <button
-            type="button"
-            aria-expanded={errorOpen}
-            onClick={() => setErrorOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-[#8a8a8e] hover:text-zinc-900 dark:hover:text-zinc-200 font-normal py-0.5 px-1 -mx-1 rounded-[6px] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] transition-all cursor-pointer select-none my-0.5 w-fit group"
-          >
-            <span className="text-zinc-500 dark:text-[#8a8a8e] group-hover:text-zinc-700 dark:group-hover:text-zinc-300 font-sans">Error</span>
-            <span className="text-zinc-800 dark:text-zinc-200 font-medium font-sans">Agent execution terminated due to error.</span>
-            <ChevronRight size={11} className={cn("text-zinc-400 dark:text-zinc-500 transition-transform ml-0.5", errorOpen && "rotate-90")} />
-          </button>
-          {msg.errorId && (
-            <div className="text-xs text-zinc-500 dark:text-[#8a8a8e] font-sans py-0.5 pl-1 select-all font-mono">
-              Error ID: {msg.errorId}
-            </div>
-          )}
-          {errorOpen && msg.error !== "Agent execution terminated due to error." && (
-            <div className="py-1 text-xs text-zinc-800 dark:text-zinc-300 font-sans pl-1 leading-relaxed select-text">
-              {msg.error}
-            </div>
-          )}
-        </div>
-      )}
+      {/* 4. Execution Status Disclosure (Error / Interrupted / Network Disconnect) */}
+      {msg.error && (() => {
+        const lower = (msg.error || '').toLowerCase();
+        const isNetworkError = lower.includes('network') || lower.includes('wifi') || lower.includes('failed to fetch') || lower.includes('offline') || lower.includes('timed out');
+        return (
+          <div className="w-full min-w-0 text-[13px] font-sans my-1.5 select-text">
+            <button
+              type="button"
+              aria-expanded={errorOpen}
+              onClick={() => setErrorOpen((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-[#8a8a8e] hover:text-zinc-900 dark:hover:text-zinc-200 font-normal py-0.5 px-1 -mx-1 rounded-[6px] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] transition-all cursor-pointer select-none my-0.5 w-fit group"
+            >
+              {isNetworkError ? (
+                <span className="text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 font-sans flex items-center gap-1">
+                  <WifiOff size={11} className="shrink-0" />
+                  <span>Disconnected</span>
+                </span>
+              ) : (
+                <span className="text-rose-500 dark:text-rose-400 group-hover:text-rose-600 dark:group-hover:text-rose-300 font-sans flex items-center gap-1">
+                  <AlertCircle size={11} className="shrink-0" />
+                  <span>Terminated</span>
+                </span>
+              )}
+              <span className="text-zinc-800 dark:text-zinc-200 font-medium font-sans">
+                {isNetworkError 
+                  ? 'Agent execution terminated: Network connection lost.' 
+                  : 'Agent execution terminated due to error.'}
+              </span>
+              <ChevronRight size={11} className={cn("text-zinc-400 dark:text-zinc-500 transition-transform ml-0.5", errorOpen && "rotate-90")} />
+            </button>
+
+            {/* Tool-Rendering Style Expandable Details Box */}
+            {errorOpen && (
+              <div className="w-full rounded-lg border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-100/40 dark:bg-white/[0.02] p-2.5 font-mono text-[11px] my-1 shadow-none transition-colors">
+                <div className="text-muted-foreground mb-1.5 flex items-center justify-between border-b border-zinc-200/60 dark:border-white/[0.05] pb-1.5 text-[10.5px]">
+                  <div className="flex items-center gap-1.5 truncate">
+                    {isNetworkError ? (
+                      <WifiOff size={12} className="text-amber-500 shrink-0" />
+                    ) : (
+                      <AlertCircle size={12} className="text-rose-500 shrink-0" />
+                    )}
+                    <span className="text-foreground/90 font-medium truncate text-[10.5px]">
+                      {isNetworkError ? 'Network Disconnection' : 'Execution Error'}
+                    </span>
+                    {msg.errorId && (
+                      <span className="text-muted-foreground/60 truncate text-[10px]">
+                        (ID: {msg.errorId})
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(msg.error || '');
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1500);
+                      }}
+                      className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                      title="Copy error details"
+                    >
+                      {copied ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                    </button>
+
+                    {(onContinue || onRetry) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onContinue) {
+                            onContinue();
+                          } else if (onRetry) {
+                            onRetry();
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-sky-500/15 hover:bg-sky-500/25 text-sky-600 dark:text-sky-300 font-sans font-medium transition-colors cursor-pointer text-[10.5px] border border-sky-500/25 shadow-2xs"
+                        title="Continue execution from where it was interrupted without repeating completed work"
+                      >
+                        <Play size={10} className="fill-current" />
+                        <span>Continue</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <pre className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto custom-scrollbar font-mono text-[10.5px]">
+                  {msg.error}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* 4b. Sleek Execution Status Disclosure (Stopped / Aborted) */}
       {msg.status === 'aborted' && !msg.error && (
@@ -540,13 +656,17 @@ const AssistantMessage = memo(function AssistantMessage({
 
       {/* Footer: timestamp on left, copy button on right — clean and symmetrical when turn is completed */}
       {!isActivelyStreaming && (
-        <div className="flex items-center justify-between mt-3 pt-1 border-t border-zinc-200/70 dark:border-white/[0.04] text-[var(--text-muted)] transition-opacity">
+        <div className={`flex items-center justify-between mt-3 pt-1 text-[var(--text-muted)] transition-opacity ${
+          formattedContent || artifacts.length > 0 || editedFilesData.files.length > 0
+            ? 'border-t border-zinc-200/70 dark:border-white/[0.04]'
+            : ''
+        }`}>
           <span className="text-[11px] text-[var(--text-muted)] font-mono">
             {displayTime}
           </span>
           <button
             onClick={() => {
-              const textToCopy = msg.content || (msg.thoughts && msg.thoughts.length > 0 ? msg.thoughts.join('\n\n') : '');
+              const textToCopy = rawText || (msg.thoughts && msg.thoughts.length > 0 ? msg.thoughts.join('\n\n') : '');
               if (textToCopy) {
                 navigator.clipboard.writeText(textToCopy);
                 setCopied(true);
@@ -559,6 +679,71 @@ const AssistantMessage = memo(function AssistantMessage({
             {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
           </button>
         </div>
+      )}
+
+      {/* 7. Image Lightbox / Fullscreen Overlay on Top Screen */}
+      {lightboxImage && typeof document !== 'undefined' && createPortal(
+        <div 
+          className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-8 select-none animate-in fade-in duration-150"
+          onClick={() => setLightboxImage(null)}
+        >
+          {/* Top Floating Control Bar */}
+          <div 
+            className="absolute top-4 right-4 flex items-center gap-2 z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {lightboxImage.path && onOpenFile && (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenFile(lightboxImage.path!);
+                  setLightboxImage(null);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium backdrop-blur-md transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                title="Open in Right Sidebar Viewer"
+              >
+                <span>Open in Sidebar</span>
+                <ArrowUpRight size={13} />
+              </button>
+            )}
+            <a
+              href={lightboxImage.src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer shadow-sm"
+              title="Open full resolution in new tab"
+            >
+              <ExternalLink size={15} />
+            </a>
+            <button
+              type="button"
+              onClick={() => setLightboxImage(null)}
+              className="p-2 rounded-full bg-white/15 hover:bg-white/25 text-white/90 hover:text-white transition-colors cursor-pointer shadow-sm"
+              title="Close (Esc or click outside)"
+              aria-label="Close image preview"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Modal Center Image Box */}
+          <div 
+            className="max-w-[94vw] max-h-[88vh] flex flex-col items-center justify-center relative cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={lightboxImage.src} 
+              alt={lightboxImage.alt || 'Visual Chart'} 
+              className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl border border-white/10 select-text"
+            />
+            {lightboxImage.alt && (
+              <div className="mt-3 px-4 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white/90 text-xs font-medium text-center max-w-xl truncate border border-white/10 shadow-lg">
+                {lightboxImage.alt}
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

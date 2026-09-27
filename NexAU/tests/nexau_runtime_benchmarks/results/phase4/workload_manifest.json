@@ -1,0 +1,112 @@
+{
+  "total_tasks": 15,
+  "tasks": [
+    {
+      "task_id": "TASK_01",
+      "category": "DUPLICATE_DETECTION",
+      "prompt": "Audit 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\purchase_register.parquet': Identify any duplicate purchase invoice IDs.",
+      "expected_target": "INV-PUR-9010",
+      "anomaly_id": "A001"
+    },
+    {
+      "task_id": "TASK_02",
+      "category": "RECONCILIATION_PURCHASE_GL",
+      "prompt": "Reconcile 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\purchase_register.parquet' against 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\general_ledger.parquet': Find any purchase invoices recorded in the purchase register but missing from the general ledger.",
+      "expected_target": "INV-PUR-9055",
+      "anomaly_id": "A002"
+    },
+    {
+      "task_id": "TASK_03",
+      "category": "RECONCILIATION_GL_BANK",
+      "prompt": "Reconcile 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\general_ledger.parquet' against 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\bank_transactions.parquet': Find any payment recorded in the general ledger that does not appear in the bank transactions.",
+      "expected_target": "GL-8821",
+      "anomaly_id": "A003"
+    },
+    {
+      "task_id": "TASK_04",
+      "category": "RECONCILIATION_BANK_GL",
+      "prompt": "Reconcile 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\bank_transactions.parquet' against 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\general_ledger.parquet': Find any bank debit that has no matching general ledger booking.",
+      "expected_target": "BNK-9901",
+      "anomaly_id": "A004"
+    },
+    {
+      "task_id": "TASK_05",
+      "category": "OUTLIER_DETECTION",
+      "prompt": "Audit 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\general_ledger.parquet': Identify unusually high value transactions (amount >= 1,000,000).",
+      "expected_target": "GL-9999",
+      "anomaly_id": "A005"
+    },
+    {
+      "task_id": "TASK_06",
+      "category": "ROUND_NUMBER_DETECTION",
+      "prompt": "Audit 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\general_ledger.parquet': Identify suspicious exact round-number payments of 500,000 or greater.",
+      "expected_target": "GL-8850",
+      "anomaly_id": "A006"
+    },
+    {
+      "task_id": "TASK_07",
+      "category": "MASTER_DATA_INTEGRITY",
+      "prompt": "Audit 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\vendors.parquet': Identify any duplicate vendor registrations sharing the exact same GSTIN.",
+      "expected_target": "27AABCU1002R1ZM",
+      "anomaly_id": "A007"
+    },
+    {
+      "task_id": "TASK_08",
+      "category": "TAX_ARITHMETIC",
+      "prompt": "Audit 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\purchase_register.parquet': Find invoices where GST is charged at an incorrect tax rate (standard rate is 18% of taxable value).",
+      "expected_target": "INV-PUR-9080",
+      "anomaly_id": "A008"
+    },
+    {
+      "task_id": "TASK_09",
+      "category": "PERIOD_CUTOFF",
+      "prompt": "Audit 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\general_ledger.parquet': Find any transactions dated prior to FY 2025-2026 (i.e. dated before 2025-04-01).",
+      "expected_target": "GL-7701",
+      "anomaly_id": "A009"
+    },
+    {
+      "task_id": "TASK_10",
+      "category": "REPEATED_PAYMENT",
+      "prompt": "Audit 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\general_ledger.parquet': Find repeated identical payment amounts to the same vendor on the same date.",
+      "expected_target": "GL-8811",
+      "anomaly_id": "A010"
+    },
+    {
+      "task_id": "TASK_11",
+      "category": "ANALYTICAL_SUMMARY",
+      "prompt": "Summarize the total debit balance in 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\trial_balance.parquet'.",
+      "expected_target": "59300000.0",
+      "anomaly_id": null
+    },
+    {
+      "task_id": "TASK_12",
+      "category": "VENDOR_CONCENTRATION",
+      "prompt": "Query 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\purchase_register.parquet': Find the top vendor by total purchase spend.",
+      "expected_target": "spend",
+      "anomaly_id": null
+    },
+    {
+      "task_id": "TASK_13",
+      "category": "FIXED_ASSET_REGISTER",
+      "prompt": "Calculate the total net book value from 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\fixed_assets.parquet'.",
+      "expected_target": "8750000.0",
+      "anomaly_id": null
+    },
+    {
+      "task_id": "TASK_14",
+      "category": "HALLUCINATION_TEST_INVOICE",
+      "prompt": "Check 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\purchase_register.parquet' for invoice ID 'INV-NONEXISTENT-999'. Report what you find.",
+      "expected_target": "NOT_FOUND",
+      "anomaly_id": null,
+      "is_negative_test": true
+    },
+    {
+      "task_id": "TASK_15",
+      "category": "HALLUCINATION_TEST_VENDOR",
+      "prompt": "Check 'C:\\Users\\rama\\Downloads\\Mash\\NexAU\\tests\\nexau_runtime_benchmarks\\phase4_data\\vendors.parquet' for vendor 'XYZ-DOES-NOT-EXIST'. Report what you find.",
+      "expected_target": "NOT_FOUND",
+      "anomaly_id": null,
+      "is_negative_test": true
+    }
+  ]
+}

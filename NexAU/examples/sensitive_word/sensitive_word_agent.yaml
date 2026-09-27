@@ -1,0 +1,31 @@
+type: agent
+name: sensitive_word_demo
+system_prompt: ，。
+tool_call_mode: xml
+max_iterations: 10
+
+llm_config:
+  model: ${env.LLM_MODEL}
+  base_url: ${env.LLM_BASE_URL}
+  api_key: ${env.LLM_API_KEY}
+  api_type: ${env.LLM_API_TYPE}
+
+middlewares:
+  # （RFC-0027）。
+  # lexicon_dir ；。
+  #  lexicon_dir （ .txt ）。
+  - import: nexau.archs.main_sub.execution.middleware.sensitive_word:SensitiveWordMiddleware
+    params:
+      lexicon_dir: examples/sensitive_word/sensitive_lexicon   # ；
+      case_sensitive: false      #  false
+      block_input: true          # （ tool result）
+      block_output: true         # 
+      raise_on_block: false      # false=；true= SensitiveContentBlockedError
+
+# ： trace  Langfuse（ LANGFUSE_* ）。。
+tracers:
+  - import: nexau.archs.tracer.adapters.langfuse:LangfuseTracer
+    params:
+      public_key: ${env.LANGFUSE_PUBLIC_KEY}
+      secret_key: ${env.LANGFUSE_SECRET_KEY}
+      host: ${env.LANGFUSE_HOST}

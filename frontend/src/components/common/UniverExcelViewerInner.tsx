@@ -35,6 +35,17 @@ export default function UniverExcelViewerInner({
 
     let univerInstance: any = null;
     let isDisposed = false;
+    let resizeRaf: number | null = null;
+
+    // Auto-recalibrate Univer GPU canvas dimensions on sidebar resize or maximize
+    const ro = new ResizeObserver(() => {
+      if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = null;
+        window.dispatchEvent(new Event("resize"));
+      });
+    });
+    ro.observe(host);
 
     try {
       const isDark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
@@ -89,6 +100,11 @@ export default function UniverExcelViewerInner({
 
     return () => {
       isDisposed = true;
+      ro.disconnect();
+      if (resizeRaf !== null) {
+        cancelAnimationFrame(resizeRaf);
+        resizeRaf = null;
+      }
       if (univerInstance) {
         try {
           univerInstance.dispose();

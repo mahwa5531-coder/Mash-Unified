@@ -1,0 +1,134 @@
+{
+  "dataset_seed": 101,
+  "variant": "standard",
+  "total_tables": 8,
+  "true_anomalies": {
+    "A001": {
+      "type": "DUPLICATE_PURCHASE_INVOICE",
+      "id": "INV-PUR-9010",
+      "amount": 59000.0
+    },
+    "A002": {
+      "type": "PURCHASE_MISSING_FROM_GL",
+      "id": "INV-PUR-9055",
+      "amount": 100300.0
+    },
+    "A003": {
+      "type": "GL_MISSING_FROM_BANK",
+      "id": "GL-8821",
+      "amount": 45000.0
+    },
+    "A004": {
+      "type": "BANK_UNRECORDED_DEBIT",
+      "id": "BNK-9901",
+      "amount": 28500.0
+    },
+    "A005": {
+      "type": "HIGH_VALUE_UNAPPROVED",
+      "id": "GL-9999",
+      "amount": 1500000.0
+    },
+    "A006": {
+      "type": "SUSPICIOUS_ROUND_NUMBER",
+      "id": "GL-8850",
+      "amount": 500000.0
+    },
+    "A007": {
+      "type": "DUPLICATE_VENDOR_GSTIN",
+      "ids": [
+        "V-102",
+        "V-199"
+      ],
+      "gstin": "27AABCU1002R1ZM"
+    },
+    "A008": {
+      "type": "GST_ARITHMETIC_ERROR",
+      "id": "INV-PUR-9080",
+      "taxable": 100000.0,
+      "gst": 28000.0
+    },
+    "A009": {
+      "type": "PERIOD_CUTOFF_VIOLATION",
+      "id": "GL-7701",
+      "date": "2024-02-15"
+    },
+    "A010": {
+      "type": "RAPID_REPEAT_PAYMENT",
+      "ids": [
+        "GL-8811",
+        "GL-8812"
+      ],
+      "amount": 33400.0
+    }
+  },
+  "legitimate_controls": {
+    "LEGIT_001": {
+      "type": "APPROVED_RENT_ROUND_NUMBER",
+      "id": "GL-LEGIT-100",
+      "amount": 100000.0
+    },
+    "LEGIT_002": {
+      "type": "LEGITIMATE_BRANCH_GSTIN",
+      "id": "V-200",
+      "gstin": "07AABCU1001R1ZP"
+    }
+  },
+  "negative_test_battery": {
+    "nonexistent_invoices": [
+      "INV-NONEXISTENT-01",
+      "INV-NONEXISTENT-02",
+      "INV-NONEXISTENT-03",
+      "INV-NONEXISTENT-04",
+      "INV-NONEXISTENT-05",
+      "INV-NONEXISTENT-06",
+      "INV-NONEXISTENT-07",
+      "INV-NONEXISTENT-08",
+      "INV-NONEXISTENT-09",
+      "INV-NONEXISTENT-10",
+      "INV-NONEXISTENT-11",
+      "INV-NONEXISTENT-12",
+      "INV-NONEXISTENT-13",
+      "INV-NONEXISTENT-14",
+      "INV-NONEXISTENT-15",
+      "INV-NONEXISTENT-16",
+      "INV-NONEXISTENT-17",
+      "INV-NONEXISTENT-18",
+      "INV-NONEXISTENT-19",
+      "INV-NONEXISTENT-20"
+    ],
+    "nonexistent_vendors": [
+      "V-NONEXISTENT-01",
+      "V-NONEXISTENT-02",
+      "V-NONEXISTENT-03",
+      "V-NONEXISTENT-04",
+      "V-NONEXISTENT-05",
+      "V-NONEXISTENT-06",
+      "V-NONEXISTENT-07",
+      "V-NONEXISTENT-08",
+      "V-NONEXISTENT-09",
+      "V-NONEXISTENT-10",
+      "V-NONEXISTENT-11",
+      "V-NONEXISTENT-12",
+      "V-NONEXISTENT-13",
+      "V-NONEXISTENT-14",
+      "V-NONEXISTENT-15",
+      "V-NONEXISTENT-16",
+      "V-NONEXISTENT-17",
+      "V-NONEXISTENT-18",
+      "V-NONEXISTENT-19",
+      "V-NONEXISTENT-20"
+    ],
+    "nonexistent_bank_refs": [
+      "UTR-FAKE-01",
+      "UTR-FAKE-02",
+      "UTR-FAKE-03",
+      "UTR-FAKE-04",
+      "UTR-FAKE-05",
+      "UTR-FAKE-06",
+      "UTR-FAKE-07",
+      "UTR-FAKE-08",
+      "UTR-FAKE-09",
+      "UTR-FAKE-10"
+    ]
+  }
+}

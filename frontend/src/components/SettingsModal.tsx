@@ -431,6 +431,7 @@ export default function SettingsModal({
               </button>
               <button
                 type="button"
+                onClick={() => window.open('https://github.com/Nex-AGI/NexAU/issues', '_blank')}
                 className="w-full text-left px-3 py-1.5 text-[12px] text-zinc-500 dark:text-[#71717a] hover:text-zinc-800 dark:hover:text-zinc-300 transition-colors cursor-pointer"
               >
                 Provide Feedback

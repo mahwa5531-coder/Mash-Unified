@@ -1,0 +1,382 @@
+[
+  {
+    "benchmark_name": "sequential_n_1",
+    "timestamp": "2026-08-24T14:49:03Z",
+    "model": "gemini-3.5-flash-lite",
+    "provider": "google_gemini_rest",
+    "llm_calls": 3,
+    "tool_calls": 2,
+    "wall_clock_seconds": 10.6,
+    "max_observed_concurrency": 1,
+    "input_tokens": 70696,
+    "cached_input_tokens": 48838,
+    "uncached_input_tokens": 21858,
+    "output_tokens": 118,
+    "uncached_cost_usd": 0.001639,
+    "cached_cost_usd": 0.001831,
+    "output_cost_usd": 3.5e-05,
+    "total_cost_usd": 0.003506,
+    "extra": {
+      "n": 1,
+      "response": "I have successfully executed the requested sequential dependent step using `benchmark_chained_tool` with an input value of 10. \n\n- **Step 1 Input**: `10`\n- **Result**: `180`"
+    },
+    "raw_llm_calls": [
+      {
+        "call_id": "llm_call_1",
+        "timestamp": 1787582937.4133072,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23480,
+        "cached_input_tokens": 16286,
+        "uncached_input_tokens": 7194,
+        "output_tokens": 23,
+        "latency_ms": 3884.97,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='benchmark_chained_tool', parameters={'step': 1, 'input_value': 10}, raw_content='{\"step\": 1, \"input_value\": 10}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 3
+      },
+      {
+        "call_id": "llm_call_2",
+        "timestamp": 1787582940.2703366,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23563,
+        "cached_input_tokens": 16279,
+        "uncached_input_tokens": 7284,
+        "output_tokens": 46,
+        "latency_ms": 2306.52,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='complete_task', parameters={'result': 'Successfully executed the sequential dependent step using benchmark_chained_tool with input_value=10. Result from step 1: 180.'}, raw_content='{\"result\": \"Successfully executed the sequential dependent step using benchmark_chained_tool with input_value=10. Result from step 1: 180.\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 5
+      },
+      {
+        "call_id": "llm_call_3",
+        "timestamp": 1787582943.6065066,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23653,
+        "cached_input_tokens": 16273,
+        "uncached_input_tokens": 7380,
+        "output_tokens": 49,
+        "latency_ms": 3324.02,
+        "finish_reason": "stop",
+        "tool_calls_emitted": [],
+        "message_count": 7
+      }
+    ],
+    "raw_tool_calls": [
+      {
+        "tool_call_id": "tool_call_1",
+        "timestamp_start": 988668.4521124,
+        "timestamp_end": 988668.45658,
+        "duration_ms": 4.47,
+        "tool_name": "benchmark_chained_tool",
+        "arguments_size": 30,
+        "result_size": 73,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_2",
+        "timestamp_start": 988670.7775062,
+        "timestamp_end": 988670.7790082,
+        "duration_ms": 1.5,
+        "tool_name": "complete_task",
+        "arguments_size": 140,
+        "result_size": 134,
+        "success": true
+      }
+    ]
+  },
+  {
+    "benchmark_name": "sequential_n_2",
+    "timestamp": "2026-08-24T14:49:18Z",
+    "model": "gemini-3.5-flash-lite",
+    "provider": "google_gemini_rest",
+    "llm_calls": 4,
+    "tool_calls": 3,
+    "wall_clock_seconds": 11.07,
+    "max_observed_concurrency": 1,
+    "input_tokens": 94448,
+    "cached_input_tokens": 65104,
+    "uncached_input_tokens": 29344,
+    "output_tokens": 181,
+    "uncached_cost_usd": 0.002201,
+    "cached_cost_usd": 0.002441,
+    "output_cost_usd": 5.4e-05,
+    "total_cost_usd": 0.004696,
+    "extra": {
+      "n": 2,
+      "response": "I have successfully executed the two sequential dependent steps using `benchmark_chained_tool`:\n\n1. **Step 1** (input value `10`): Output result was `180`.\n2. **Step 2** (input value `180`): Output re"
+    },
+    "raw_llm_calls": [
+      {
+        "call_id": "llm_call_1",
+        "timestamp": 1787582950.8719022,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23480,
+        "cached_input_tokens": 16286,
+        "uncached_input_tokens": 7194,
+        "output_tokens": 23,
+        "latency_ms": 2563.16,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='benchmark_chained_tool', parameters={'input_value': 10, 'step': 1}, raw_content='{\"input_value\": 10, \"step\": 1}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 3
+      },
+      {
+        "call_id": "llm_call_2",
+        "timestamp": 1787582953.773195,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23563,
+        "cached_input_tokens": 16279,
+        "uncached_input_tokens": 7284,
+        "output_tokens": 24,
+        "latency_ms": 2359.09,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='benchmark_chained_tool', parameters={'step': 2, 'input_value': 180}, raw_content='{\"step\": 2, \"input_value\": 180}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 5
+      },
+      {
+        "call_id": "llm_call_3",
+        "timestamp": 1787582956.2393293,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23646,
+        "cached_input_tokens": 16273,
+        "uncached_input_tokens": 7373,
+        "output_tokens": 69,
+        "latency_ms": 2456.19,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='complete_task', parameters={'result': 'Successfully executed 2 sequential dependent steps using benchmark_chained_tool:\\n- Step 1 (input_value = 10): Result = 180\\n- Step 2 (input_value = 180): Result = 70'}, raw_content='{\"result\": \"Successfully executed 2 sequential dependent steps using benchmark_chained_tool:\\\\n- Step 1 (input_value = 10): Result = 180\\\\n- Step 2 (input_value = 180): Result = 70\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 7
+      },
+      {
+        "call_id": "llm_call_4",
+        "timestamp": 1787582958.8413343,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23759,
+        "cached_input_tokens": 16266,
+        "uncached_input_tokens": 7493,
+        "output_tokens": 65,
+        "latency_ms": 2592.42,
+        "finish_reason": "stop",
+        "tool_calls_emitted": [],
+        "message_count": 9
+      }
+    ],
+    "raw_tool_calls": [
+      {
+        "tool_call_id": "tool_call_1",
+        "timestamp_start": 988681.9085159,
+        "timestamp_end": 988681.9128405,
+        "duration_ms": 4.32,
+        "tool_name": "benchmark_chained_tool",
+        "arguments_size": 30,
+        "result_size": 73,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_2",
+        "timestamp_start": 988684.2797638,
+        "timestamp_end": 988684.2824791,
+        "duration_ms": 2.72,
+        "tool_name": "benchmark_chained_tool",
+        "arguments_size": 31,
+        "result_size": 72,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_3",
+        "timestamp_start": 988686.746318,
+        "timestamp_end": 988686.7473985,
+        "duration_ms": 1.08,
+        "tool_name": "complete_task",
+        "arguments_size": 180,
+        "result_size": 134,
+        "success": true
+      }
+    ]
+  },
+  {
+    "benchmark_name": "sequential_n_4",
+    "timestamp": "2026-08-24T14:49:38Z",
+    "model": "gemini-3.5-flash-lite",
+    "provider": "google_gemini_rest",
+    "llm_calls": 6,
+    "tool_calls": 5,
+    "wall_clock_seconds": 15.42,
+    "max_observed_concurrency": 1,
+    "input_tokens": 142210,
+    "cached_input_tokens": 97618,
+    "uncached_input_tokens": 44592,
+    "output_tokens": 326,
+    "uncached_cost_usd": 0.003344,
+    "cached_cost_usd": 0.003661,
+    "output_cost_usd": 9.8e-05,
+    "total_cost_usd": 0.007103,
+    "extra": {
+      "n": 4,
+      "response": "I have successfully executed the 4 sequential dependent steps using `benchmark_chained_tool`:\n\n1. **Step 1** (input: `10`): Result = `180`\n2. **Step 2** (input: `180`): Result = `70`\n3. **Step 3** (in"
+    },
+    "raw_llm_calls": [
+      {
+        "call_id": "llm_call_1",
+        "timestamp": 1787582966.010806,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23480,
+        "cached_input_tokens": 16286,
+        "uncached_input_tokens": 7194,
+        "output_tokens": 23,
+        "latency_ms": 2460.39,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='benchmark_chained_tool', parameters={'input_value': 10, 'step': 1}, raw_content='{\"input_value\": 10, \"step\": 1}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 3
+      },
+      {
+        "call_id": "llm_call_2",
+        "timestamp": 1787582968.8895464,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23563,
+        "cached_input_tokens": 16279,
+        "uncached_input_tokens": 7284,
+        "output_tokens": 24,
+        "latency_ms": 2343.17,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='benchmark_chained_tool', parameters={'input_value': 180, 'step': 2}, raw_content='{\"input_value\": 180, \"step\": 2}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 5
+      },
+      {
+        "call_id": "llm_call_3",
+        "timestamp": 1787582971.1922297,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23646,
+        "cached_input_tokens": 16273,
+        "uncached_input_tokens": 7373,
+        "output_tokens": 23,
+        "latency_ms": 2290.91,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='benchmark_chained_tool', parameters={'input_value': 70, 'step': 3}, raw_content='{\"input_value\": 70, \"step\": 3}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 7
+      },
+      {
+        "call_id": "llm_call_4",
+        "timestamp": 1787582973.1934092,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23729,
+        "cached_input_tokens": 16266,
+        "uncached_input_tokens": 7463,
+        "output_tokens": 24,
+        "latency_ms": 1990.45,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='benchmark_chained_tool', parameters={'input_value': 200, 'step': 4}, raw_content='{\"input_value\": 200, \"step\": 4}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 9
+      },
+      {
+        "call_id": "llm_call_5",
+        "timestamp": 1787582975.8929996,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23814,
+        "cached_input_tokens": 16260,
+        "uncached_input_tokens": 7554,
+        "output_tokens": 120,
+        "latency_ms": 2685.79,
+        "finish_reason": "tool_calls",
+        "tool_calls_emitted": [
+          "ToolCall(tool_name='complete_task', parameters={'result': 'The four sequential dependent steps have been successfully executed starting with input_value = 10:\\n\\n1. **Step 1** (input: 10): Result = 180\\n2. **Step 2** (input: 180): Result = 70\\n3. **Step 3** (input: 70): Result = 200\\n4. **Step 4** (input: 200): Final Result = 410'}, raw_content='{\"result\": \"The four sequential dependent steps have been successfully executed starting with input_value = 10:\\\\n\\\\n1. **Step 1** (input: 10): Result = 180\\\\n2. **Step 2** (input: 180): Result = 70\\\\n3. **Step 3** (input: 70): Result = 200\\\\n4. **Step 4** (input: 200): Final Result = 410\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+        ],
+        "message_count": 11
+      },
+      {
+        "call_id": "llm_call_6",
+        "timestamp": 1787582978.4675853,
+        "model": "gemini-3.5-flash-lite",
+        "provider": "google_gemini_rest",
+        "input_tokens": 23978,
+        "cached_input_tokens": 16254,
+        "uncached_input_tokens": 7724,
+        "output_tokens": 112,
+        "latency_ms": 2565.05,
+        "finish_reason": "stop",
+        "tool_calls_emitted": [],
+        "message_count": 13
+      }
+    ],
+    "raw_tool_calls": [
+      {
+        "tool_call_id": "tool_call_1",
+        "timestamp_start": 988697.0380513,
+        "timestamp_end": 988697.0432315,
+        "duration_ms": 5.18,
+        "tool_name": "benchmark_chained_tool",
+        "arguments_size": 30,
+        "result_size": 73,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_2",
+        "timestamp_start": 988699.3964211,
+        "timestamp_end": 988699.3994757,
+        "duration_ms": 3.05,
+        "tool_name": "benchmark_chained_tool",
+        "arguments_size": 31,
+        "result_size": 72,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_3",
+        "timestamp_start": 988701.6989991,
+        "timestamp_end": 988701.701925,
+        "duration_ms": 2.93,
+        "tool_name": "benchmark_chained_tool",
+        "arguments_size": 30,
+        "result_size": 73,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_4",
+        "timestamp_start": 988703.7001339,
+        "timestamp_end": 988703.7036065,
+        "duration_ms": 3.47,
+        "tool_name": "benchmark_chained_tool",
+        "arguments_size": 31,
+        "result_size": 74,
+        "success": true
+      },
+      {
+        "tool_call_id": "tool_call_5",
+        "timestamp_start": 988706.3995962,
+        "timestamp_end": 988706.4004158,
+        "duration_ms": 0.82,
+        "tool_name": "complete_task",
+        "arguments_size": 286,
+        "result_size": 134,
+        "success": true
+      }
+    ]
+  }
+]

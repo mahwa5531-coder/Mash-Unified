@@ -250,6 +250,7 @@ async def list_sessions(
 
             result.append({
                 "session_id": sid,
+                "project_id": ctx.get("project_id"),
                 "title": generate_clean_session_title(ctx.get("title") or ctx.get("custom_title") or f"Session {sid[:8]}", sid),
                 "custom_title": ctx.get("custom_title"),
                 "workspace_uri": workspace_uri,
@@ -284,26 +285,41 @@ async def create_session(
     engine: DatabaseEngineDep,
 ):
     eng = _get_engine(engine)
+    project = None
     if request.project_id:
         project = await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("id", request.project_id))
+        if not project:
+            project = await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("name", request.project_id))
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
 
     session_id = request.session_id or generate_session_id()
     from nexau.archs.platform.path_helpers import scaffold_session_storage
-    brain_path = scaffold_session_storage(session_id, request.project_id)
+    brain_path = scaffold_session_storage(session_id, project.id if project else request.project_id)
 
-    section = request.section or ("workspace" if request.workspace_uri not in ("No Repo", "", None) or request.project_id else "conversation")
-    workspace_uri = request.workspace_uri or ("Mash" if request.project_id else "No Repo")
+    section = request.section or ("workspace" if request.workspace_uri not in ("No Repo", "", None) or project or request.project_id else "conversation")
+    workspace_uri = request.workspace_uri or (project.name if project else "No Repo")
+    working_directory = project.local_folder_path if project else (workspace_uri if workspace_uri != "No Repo" else None)
+
+    # Ensure deliverables folder exists inside project directory
+    if working_directory and os.path.exists(working_directory):
+        deliverables_dir = os.path.join(working_directory, "Audit_Deliverables")
+        legacy_dir = os.path.join(working_directory, "NexAU_Outputs")
+        outputs_dir = legacy_dir if (os.path.exists(legacy_dir) and not os.path.exists(deliverables_dir)) else deliverables_dir
+        try:
+            os.makedirs(outputs_dir, exist_ok=True)
+        except Exception:
+            pass
 
     session = SessionModel(
         user_id=request.user_id,
         session_id=session_id,
         context={
-            "project_id": request.project_id,
+            "project_id": project.id if project else request.project_id,
             "title": request.title,
             "custom_title": request.title,
             "workspace_uri": workspace_uri,
+            "working_directory": working_directory,
             "section": section,
             "brain_directory": str(brain_path),
             "scratch_directory": str(brain_path / "scratch"),
@@ -323,8 +339,19 @@ async def list_sessions_by_project(
     engine: DatabaseEngineDep,
 ):
     eng = _get_engine(engine)
+    project = await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("id", project_id))
+    if not project:
+        project = await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("name", project_id))
+    target_id = project.id if project else project_id
+    target_name = (project.name if project else project_id).lower()
+
     all_sessions = await eng.find_many(SessionModel)
-    matching = [s for s in all_sessions if (s.context or {}).get("project_id") == project_id]
+    matching = [
+        s for s in all_sessions 
+        if (s.context or {}).get("project_id") == target_id 
+        or ((s.context or {}).get("project_id") and str((s.context or {}).get("project_id")).lower() == target_name)
+        or ((s.context or {}).get("workspace_uri", "").lower() == target_name)
+    ]
     return {"sessions": matching}
 
 

@@ -171,7 +171,7 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
     activeSessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  const [selectedModel, setSelectedModel] = useState<string>('default');
+  const DEFAULT_MODEL = 'default';
   const [thinkingBudget, setThinkingBudget] = useState<string>('high');
   const lastModelRef = useRef<{ model: string; effort: string }>({ model: 'default', effort: 'high' });
 
@@ -324,12 +324,22 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
   // Background tasks polling
   useEffect(() => {
     const checkTasks = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       const tasks = await fetchBackgroundTasks();
       setBackgroundTasks(tasks.filter(t => t.status === 'running'));
     };
     checkTasks();
     const interval = setInterval(checkTasks, 3500);
-    return () => clearInterval(interval);
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        checkTasks();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, []);
 
   // Session switching: 0ms instantaneous read from in-memory sessionStore cache!
@@ -516,10 +526,11 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
       setQueuedMessage(null);
     }
     notifyStoreListeners();
-    await handleSendMessage(selectedModel, thinkingBudget, msgToInject, false, activeSid, true);
+    await handleSendMessage(DEFAULT_MODEL, thinkingBudget, msgToInject, false, activeSid, true);
   };
 
   const handleKillTask = async (pid: number) => {
+    setBackgroundTasks((prev) => prev.filter(t => t.pid !== pid));
     await killBackgroundTask(pid);
     const tasks = await fetchBackgroundTasks();
     setBackgroundTasks(tasks.filter(t => t.status === 'running'));
@@ -534,7 +545,7 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
     isImmediate: boolean = false
   ) => {
     // ponytail: support both send(text) and send(model, effort, text) flexibly
-    let model = selectedModel;
+    let model = DEFAULT_MODEL;
     let thinkingEffort = thinkingBudget;
     let textToSend = explicitText;
 
@@ -828,18 +839,8 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
                 });
               }
 
-              // ponytail: intermediate commentary emitted before/between tool calls belongs in
-              // currentSteps (in TaskWorkLogAccordion). Clear next[idx].content so the final
-              // markdown message bubble streams purely the post-tool summary.
-              let nextContent = next[idx].content;
-              const hasTextSteps = currentSteps.some((st) => st.type === 'text');
-              if (hasTextSteps) {
-                nextContent = '';
-              }
-
               next[idx] = {
                 ...next[idx],
-                content: nextContent,
                 tools: existingTools,
                 steps: currentSteps,
                 thinkingDurationSeconds: s.thinkingDuration ?? next[idx].thinkingDurationSeconds,
@@ -996,14 +997,14 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
             setQueuedMessage(null);
           }
           setTimeout(() => {
-            handleSendMessage(selectedModel, thinkingBudget, queuedToRun, false, activeSid);
+            handleSendMessage(DEFAULT_MODEL, thinkingBudget, queuedToRun, false, activeSid);
           }, 100);
         } else {
           fetchSessionQueue(activeSid).then((data) => {
             if (data && data.count > 0 && data.queued.length > 0) {
               const pendingInstruction = data.queued[0];
               setTimeout(() => {
-                handleSendMessage(selectedModel, thinkingBudget, pendingInstruction, false, activeSid);
+                handleSendMessage(DEFAULT_MODEL, thinkingBudget, pendingInstruction, false, activeSid);
               }, 100);
             }
           }).catch(() => {});
@@ -1161,9 +1162,6 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
     queuedMessage,
     backgroundTasks,
     showTasksBar,
-    setShowTasksBar,
-    selectedModel,
-    setSelectedModel,
     scrollRef,
     handleScroll,
     turns,

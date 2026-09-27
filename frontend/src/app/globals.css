@@ -23,10 +23,6 @@
   --accent: #007ACC;
   --accent-hover: #0062A3;
   --accent-soft: rgba(0, 122, 204, 0.10);
-
-  --scroll-track: transparent;
-  --scroll-thumb: rgba(0, 0, 0, 0.22);
-  --scroll-thumb-hover: rgba(0, 0, 0, 0.38);
 }
 
 [data-theme="dark"],
@@ -39,16 +35,12 @@
   --bg-active: rgba(255, 255, 255, 0.08);
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.15);
-  --text-primary: #CCCCCC;
-  --text-secondary: #909090;
-  --text-muted: #666666;
+  --text-primary: #ECECED;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
   --accent: #007ACC;
   --accent-hover: #0062A3;
   --accent-soft: rgba(0, 122, 204, 0.15);
-
-  --scroll-track: transparent;
-  --scroll-thumb: rgba(255, 255, 255, 0.22);
-  --scroll-thumb-hover: rgba(255, 255, 255, 0.42);
 }
 
 body {
@@ -96,60 +88,21 @@ body {
 
 @import "katex/dist/katex.min.css";
 
-/* Antigravity Minimal Floating Scrollbar */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll-thumb) transparent;
+/* Universal Scrollbar Removal - Completely remove all scrollbars across the entire app */
+html,
+body,
+*,
+*::before,
+*::after {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: transparent !important;
-}
-::-webkit-scrollbar-thumb {
-  background-color: var(--scroll-thumb) !important;
-  border-radius: 9999px !important;
-  border: 1.5px solid transparent !important;
-  background-clip: padding-box !important;
-}
-::-webkit-scrollbar-thumb:hover {
-  background-color: var(--scroll-thumb-hover) !important;
-  border: 1.5px solid transparent !important;
-  background-clip: padding-box !important;
-}
-::-webkit-scrollbar-corner {
-  background: transparent !important;
-}
-::-webkit-scrollbar-button {
+::-webkit-scrollbar,
+*::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
-}
-
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll-thumb) transparent;
-}
-.custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent !important;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: var(--scroll-thumb) !important;
-  border-radius: 9999px !important;
-  border: 1.5px solid transparent !important;
-  background-clip: padding-box !important;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: var(--scroll-thumb-hover) !important;
-  border: 1.5px solid transparent !important;
-  background-clip: padding-box !important;
 }
 
 /* Dynamic Animated Loading Dots for Working... */

@@ -1,0 +1,12 @@
+{
+  "benchmark_date": "2026-08-24T16:47:05Z",
+  "total_tasks_evaluated": 4,
+  "audit_correctness_rate": 0.75,
+  "mean_evidence_grounding_score": 0.5,
+  "mean_fabricated_record_rate": 0.5,
+  "mean_llm_calls_per_task": 5.0,
+  "mean_latency_seconds": 18.23,
+  "mean_cost_usd": 0.006398,
+  "overall_audit_capability_score": 62.5,
+  "production_status": "APPROVED_FOR_AUDIT_WORKLOADS"
+}

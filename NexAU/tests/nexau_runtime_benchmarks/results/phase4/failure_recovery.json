@@ -1,0 +1,117 @@
+{
+  "benchmark_name": "failure_recovery_test",
+  "timestamp": "2026-08-24T15:47:44Z",
+  "llm_calls": 4,
+  "tool_calls": 3,
+  "wall_clock_seconds": 15.72,
+  "max_concurrency": 1,
+  "input_tokens": 95746,
+  "cached_input_tokens": 48825,
+  "uncached_input_tokens": 46921,
+  "output_tokens": 337,
+  "uncached_cost_usd": 0.003519,
+  "cached_cost_usd": 0.001831,
+  "output_cost_usd": 0.000101,
+  "total_cost_usd": 0.005451,
+  "extra": {
+    "failure_injected": "INVALID_SQL_SYNTAX",
+    "recovered_successfully": true,
+    "response": "The initial query with an invalid column and table reference (`dataset`) raised a `CatalogException`. \n\nWe recovered successfully by querying the valid columns (`transaction_id`, `amount`) using the physical file path, yielding the top row:\n\n- **tran"
+  },
+  "raw_llm_calls": [
+    {
+      "call_id": "llm_1",
+      "timestamp": 1787586453.0651152,
+      "model": "gemini-3.5-flash-lite",
+      "provider": "google_gemini_rest",
+      "input_tokens": 23531,
+      "cached_input_tokens": 0,
+      "uncached_input_tokens": 23531,
+      "output_tokens": 67,
+      "latency_ms": 3361.19,
+      "finish_reason": "tool_calls",
+      "tool_calls_emitted": [
+        "ToolCall(tool_name='prototype_query_dataframe', parameters={'sql_query': 'SELECT non_existent_column FROM dataset', 'dataset_path': 'C:\\\\Users\\\\rama\\\\Downloads\\\\Mash\\\\NexAU\\\\tests\\\\nexau_runtime_benchmarks\\\\phase4_data\\\\general_ledger.parquet'}, raw_content='{\"sql_query\": \"SELECT non_existent_column FROM dataset\", \"dataset_path\": \"C:\\\\\\\\Users\\\\\\\\rama\\\\\\\\Downloads\\\\\\\\Mash\\\\\\\\NexAU\\\\\\\\tests\\\\\\\\nexau_runtime_benchmarks\\\\\\\\phase4_data\\\\\\\\general_ledger.parquet\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+      ],
+      "message_count": 3
+    },
+    {
+      "call_id": "llm_2",
+      "timestamp": 1787586458.0596852,
+      "model": "gemini-3.5-flash-lite",
+      "provider": "google_gemini_rest",
+      "input_tokens": 23878,
+      "cached_input_tokens": 16281,
+      "uncached_input_tokens": 7597,
+      "output_tokens": 104,
+      "latency_ms": 3522.39,
+      "finish_reason": "tool_calls",
+      "tool_calls_emitted": [
+        "ToolCall(tool_name='prototype_query_dataframe', parameters={'dataset_path': 'C:\\\\Users\\\\rama\\\\Downloads\\\\Mash\\\\NexAU\\\\tests\\\\nexau_runtime_benchmarks\\\\phase4_data\\\\general_ledger.parquet', 'sql_query': \"SELECT transaction_id, amount FROM 'C:\\\\Users\\\\rama\\\\Downloads\\\\Mash\\\\NexAU\\\\tests\\\\nexau_runtime_benchmarks\\\\phase4_data\\\\general_ledger.parquet' LIMIT 1\"}, raw_content='{\"dataset_path\": \"C:\\\\\\\\Users\\\\\\\\rama\\\\\\\\Downloads\\\\\\\\Mash\\\\\\\\NexAU\\\\\\\\tests\\\\\\\\nexau_runtime_benchmarks\\\\\\\\phase4_data\\\\\\\\general_ledger.parquet\", \"sql_query\": \"SELECT transaction_id, amount FROM \\'C:\\\\\\\\Users\\\\\\\\rama\\\\\\\\Downloads\\\\\\\\Mash\\\\\\\\NexAU\\\\\\\\tests\\\\\\\\nexau_runtime_benchmarks\\\\\\\\phase4_data\\\\\\\\general_ledger.parquet\\' LIMIT 1\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+      ],
+      "message_count": 5
+    },
+    {
+      "call_id": "llm_3",
+      "timestamp": 1787586461.2244568,
+      "model": "gemini-3.5-flash-lite",
+      "provider": "google_gemini_rest",
+      "input_tokens": 24103,
+      "cached_input_tokens": 16275,
+      "uncached_input_tokens": 7828,
+      "output_tokens": 87,
+      "latency_ms": 3081.69,
+      "finish_reason": "tool_calls",
+      "tool_calls_emitted": [
+        "ToolCall(tool_name='complete_task', parameters={'result': \"The initial query with invalid column and table reference raised a CatalogException. Recovered successfully by querying valid columns ('transaction_id', 'amount') directly from the parquet file path, returning the top row:\\n\\n- **transaction_id**: `GL-10001`\\n- **amount**: `70139.63`\"}, raw_content='{\"result\": \"The initial query with invalid column and table reference raised a CatalogException. Recovered successfully by querying valid columns (\\'transaction_id\\', \\'amount\\') directly from the parquet file path, returning the top row:\\\\n\\\\n- **transaction_id**: `GL-10001`\\\\n- **amount**: `70139.63`\"}', tool_call_id='gemini_tc_0', source='structured', parallel_execution_id=None)"
+      ],
+      "message_count": 7
+    },
+    {
+      "call_id": "llm_4",
+      "timestamp": 1787586464.5837076,
+      "model": "gemini-3.5-flash-lite",
+      "provider": "google_gemini_rest",
+      "input_tokens": 24234,
+      "cached_input_tokens": 16269,
+      "uncached_input_tokens": 7965,
+      "output_tokens": 79,
+      "latency_ms": 3343.78,
+      "finish_reason": "stop",
+      "tool_calls_emitted": [],
+      "message_count": 9
+    }
+  ],
+  "raw_tool_calls": [
+    {
+      "tool_id": "tool_1",
+      "timestamp_start": 992184.9011876,
+      "timestamp_end": 992185.0262831,
+      "duration_ms": 125.1,
+      "tool_name": "prototype_query_dataframe",
+      "arguments_size": 185,
+      "result_size": 942,
+      "success": true
+    },
+    {
+      "tool_id": "tool_2",
+      "timestamp_start": 992188.5671801,
+      "timestamp_end": 992188.6344074,
+      "duration_ms": 67.23,
+      "tool_name": "prototype_query_dataframe",
+      "arguments_size": 300,
+      "result_size": 175,
+      "success": true
+    },
+    {
+      "tool_id": "tool_3",
+      "timestamp_start": 992191.7317562,
+      "timestamp_end": 992191.7327022,
+      "duration_ms": 0.95,
+      "tool_name": "complete_task",
+      "arguments_size": 298,
+      "result_size": 134,
+      "success": true
+    }
+  ]
+}

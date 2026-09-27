@@ -1,44 +1,78 @@
 import { Message, ArtifactItem, EditedFileItem } from '@/lib/types';
+import { BASE_URL } from '@/utils/apiClient';
 
 // ----------------------------------------------------------------------
-// Helper to extract and format Artifact cards (Walkthrough, Plan only)
-// Code files and scripts are clickable in chat text only, not bottom cards
+// Helper to extract and format Artifact cards (Documentation, Spreadsheets, Visual Charts)
 // ----------------------------------------------------------------------
 export function extractArtifacts(msg: Message): ArtifactItem[] {
   const artifacts: ArtifactItem[] = [];
   const seenPaths = new Set<string>();
 
-  // ONLY extract documentation artifacts (Walkthrough, Implementation Plan)
-  const isDocArtifactPath = (p: string) => {
-    const lower = p.toLowerCase();
-    const isCode = /\.(py|ts|tsx|js|jsx|json|sql|csv|xlsx|parquet|sh|bat)$/i.test(lower);
-    if (isCode) return false;
-    return lower.includes('walkthrough') || lower.includes('implementation_plan') || lower.endsWith('.md');
+  const classifyArtifact = (p: string): { isArtifact: boolean; type: 'plan' | 'walkthrough' | 'doc' | 'spreadsheet' | 'chart' } => {
+    const lower = p.toLowerCase().replace(/\\/g, '/');
+    if (/\.(xlsx|xls|csv)$/i.test(lower)) {
+      return { isArtifact: true, type: 'spreadsheet' };
+    }
+    if (/\.(png|jpe?g|svg|webp)$/i.test(lower)) {
+      return { isArtifact: true, type: 'chart' };
+    }
+    if (lower.includes('implementation_plan') || lower.includes('plan.md')) {
+      return { isArtifact: true, type: 'plan' };
+    }
+    if (lower.includes('walkthrough')) {
+      return { isArtifact: true, type: 'walkthrough' };
+    }
+    if (lower.endsWith('.md')) {
+      return { isArtifact: true, type: 'doc' };
+    }
+    return { isArtifact: false, type: 'doc' };
   };
 
-  // 1. Check tools for explicit walkthrough or implementation plan
+  // 1. Check tools for created artifacts (plans, walkthroughs, spreadsheets, visual charts)
   if (msg.tools && msg.tools.length > 0) {
     for (const t of msg.tools) {
       let args = t.args || {};
       if (typeof args === 'string') {
         try { args = JSON.parse(args); } catch { args = {}; }
       }
-      const p = args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.target_file || args.filepath;
-      if (p && isDocArtifactPath(String(p))) {
-        const pathStr = String(p);
-        if (!seenPaths.has(pathStr)) {
+      const rawPath = args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.target_file || args.filepath || args.ImageName;
+      if (rawPath) {
+        const pathStr = String(rawPath);
+        const { isArtifact, type } = classifyArtifact(pathStr);
+        if (isArtifact && !seenPaths.has(pathStr)) {
           seenPaths.add(pathStr);
-          const rawTitle = pathStr.split(/[/\\]/).pop()?.replace(/\.[^/.]+$/, '') || 'Walkthrough';
-          const friendlyTitle = rawTitle.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+          const rawFilename = pathStr.split(/[/\\]/).pop() || '';
+          const rawExt = rawFilename.split('.').pop() || '';
+          const rawTitle = rawFilename.replace(/\.[^/.]+$/, '') || 'Artifact';
+          const friendlyTitle = rawTitle.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
           const meta = args.ArtifactMetadata || args.artifact_metadata;
-          const summary = meta?.Summary || meta?.summary || `${friendlyTitle} documenting analysis and verification results.`;
-          const isPlanFile = pathStr.toLowerCase().includes('implementation_plan') || pathStr.toLowerCase().includes('plan.md');
+
+          // Dynamic summaries derived from file type and context (zero hardcoded static boilerplate)
+          let dynamicSummary = meta?.Summary || meta?.summary;
+          if (!dynamicSummary) {
+            if (type === 'spreadsheet') {
+              dynamicSummary = `Financial spreadsheet deliverable (${rawExt.toUpperCase()})`;
+            } else if (type === 'chart') {
+              dynamicSummary = `Visual data chart generated for reporting analysis (${rawExt.toUpperCase()})`;
+            } else if (type === 'plan') {
+              dynamicSummary = `Implementation plan for review and execution verification`;
+            } else {
+              dynamicSummary = `${friendlyTitle} documentation and analysis findings`;
+            }
+          }
+
           const isFeedbackRequested = Boolean(meta?.RequestFeedback ?? meta?.requestFeedback);
+          const thumbnailUrl = type === 'chart' 
+            ? `${BASE_URL}/files/content?path=${encodeURIComponent(pathStr)}${msg.sessionId ? `&session_id=${encodeURIComponent(msg.sessionId)}` : ''}`
+            : undefined;
+
           artifacts.push({
             id: pathStr,
             title: friendlyTitle,
-            summary,
+            summary: dynamicSummary,
             filePath: pathStr,
+            type,
+            thumbnailUrl,
             requestFeedback: isFeedbackRequested,
           });
         }
@@ -46,33 +80,45 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
     }
   }
 
-  // 2. Strict Fallback: Check markdown text ONLY if the message had no tool calls
-  // (e.g. initial turn when plan was output directly in text without tool execution)
-  // Never create bottom cards from casual prose mentions in messages that executed other work
+  // 2. Strict Fallback: Check markdown text ONLY if no tool calls created cards
   if (artifacts.length === 0 && (!msg.tools || msg.tools.length === 0) && msg.content) {
-    const linkRegex = /\[([^\]]+)\]\((file:\/\/\/[^)]+|(?:[a-zA-Z]:[/\\]|\/|\.\/)[^)]+\.(?:md))\)/gi;
+    const linkRegex = /\[([^\]]+)\]\((file:\/\/\/[^)]+|(?:[a-zA-Z]:[/\\]|\/|\.\/|NexAU_Outputs\/|Audit_Deliverables\/|working_papers\/|scratch\/)[^)]+\.(?:md|xlsx?|csv|png|jpe?g|svg))\)/gi;
     let match;
     while ((match = linkRegex.exec(msg.content)) !== null) {
       const linkText = match[1];
       let linkPath = match[2].replace(/^file:\/\/\/?/, '');
       linkPath = linkPath.replace(/^\/([a-zA-Z]:)/, '$1');
 
-      if (isDocArtifactPath(linkPath) || isDocArtifactPath(linkText)) {
-        if (!seenPaths.has(linkPath)) {
-          seenPaths.add(linkPath);
-          const rawTitle = linkPath.split(/[/\\]/).pop()?.replace(/\.[^/.]+$/, '') || linkText;
-          const friendlyTitle = rawTitle.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-          const beforeText = msg.content.slice(0, match.index).trim();
-          const lastSentence = beforeText.split('\n').pop() || '';
-          const summary = lastSentence.replace(/^#+\s*/, '').trim() || `${friendlyTitle} documenting analysis and verification.`;
-          artifacts.push({
-            id: linkPath,
-            title: friendlyTitle,
-            summary,
-            filePath: linkPath,
-            requestFeedback: false,
-          });
+      const { isArtifact, type } = classifyArtifact(linkPath);
+      if (isArtifact && !seenPaths.has(linkPath)) {
+        seenPaths.add(linkPath);
+        const rawFilename = linkPath.split(/[/\\]/).pop() || '';
+        const rawExt = rawFilename.split('.').pop() || '';
+        const rawTitle = rawFilename.replace(/\.[^/.]+$/, '') || linkText;
+        const friendlyTitle = rawTitle.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        const beforeText = msg.content.slice(0, match.index).trim();
+        const lastSentence = beforeText.split('\n').pop() || '';
+        
+        let dynamicSummary = lastSentence.replace(/^#+\s*/, '').trim();
+        if (!dynamicSummary) {
+          if (type === 'spreadsheet') dynamicSummary = `Financial spreadsheet deliverable (${rawExt.toUpperCase()})`;
+          else if (type === 'chart') dynamicSummary = `Visual data chart (${rawExt.toUpperCase()})`;
+          else dynamicSummary = `${friendlyTitle} documentation`;
         }
+
+        const thumbnailUrl = type === 'chart' 
+          ? `${BASE_URL}/files/content?path=${encodeURIComponent(linkPath)}${msg.sessionId ? `&session_id=${encodeURIComponent(msg.sessionId)}` : ''}`
+          : undefined;
+
+        artifacts.push({
+          id: linkPath,
+          title: friendlyTitle,
+          summary: dynamicSummary,
+          filePath: linkPath,
+          type,
+          thumbnailUrl,
+          requestFeedback: false,
+        });
       }
     }
   }

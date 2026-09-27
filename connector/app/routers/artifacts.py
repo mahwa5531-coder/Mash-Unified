@@ -63,12 +63,11 @@ async def list_artifacts(
         if b_dir.is_dir():
             found_brain_dir = str(b_dir)
             try:
-                SYSTEM_DOCS = {
-                    "implementation_plan.md", "walkthrough.md", "scratch", 
-                    ".user_uploaded", ".system_generated", "media"
+                SYSTEM_IGNORE = {
+                    "scratch", "working_papers", ".user_uploaded", ".system_generated", "media", "cache"
                 }
                 for f in os.listdir(b_dir):
-                    if f.startswith(".") or f.endswith(".metadata.json") or f in SYSTEM_DOCS:
+                    if f.startswith(".") or f.endswith(".metadata.json") or f in SYSTEM_IGNORE:
                         continue
                     full_p = b_dir / f
                     if full_p.is_file() and f not in seen_files:
@@ -76,6 +75,20 @@ async def list_artifacts(
                         files_with_mtime.append((f, full_p.stat().st_mtime))
             except Exception:
                 pass
+
+            wp_p = b_dir / "working_papers"
+            if wp_p.is_dir():
+                try:
+                    for f in os.listdir(wp_p):
+                        if f.startswith(".") or f.endswith(".metadata.json"):
+                            continue
+                        rel_f = f"working_papers/{f}"
+                        full_p = wp_p / f
+                        if full_p.is_file() and rel_f not in seen_files:
+                            seen_files.add(rel_f)
+                            files_with_mtime.append((rel_f, full_p.stat().st_mtime))
+                except Exception:
+                    pass
 
             scratch_p = b_dir / "scratch"
             if scratch_p.is_dir():
@@ -91,19 +104,28 @@ async def list_artifacts(
                 except Exception:
                     pass
 
+    # Include deliverables from project Audit_Deliverables and NexAU_Outputs folders
+    project_dir = None
+    try:
+        ws = await resolve_session_workspace(eng, session_id)
+        if ws and ws.is_dir():
+            project_dir = str(ws)
+            for folder_name in ("Audit_Deliverables", "NexAU_Outputs"):
+                outputs_dir = ws / folder_name
+                if outputs_dir.is_dir():
+                    for f in os.listdir(outputs_dir):
+                        if f.startswith("."):
+                            continue
+                        full_p = outputs_dir / f
+                        rel_f = f"{folder_name}/{f}"
+                        if full_p.is_file() and rel_f not in seen_files:
+                            seen_files.add(rel_f)
+                            files_with_mtime.append((rel_f, full_p.stat().st_mtime))
+    except Exception:
+        pass
+
     files_with_mtime.sort(key=lambda x: x[1], reverse=True)
     files = [x[0] for x in files_with_mtime]
-
-    # Also include project files if inside a project
-    project_dir = None
-    if session and (session.context or {}).get("project_id") and eng:
-        from app.models.project import ProjectModel
-        project = await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("id", session.context["project_id"]))
-        if project and os.path.isdir(project.local_folder_path):
-            project_dir = project.local_folder_path
-            for f in os.listdir(project_dir):
-                if os.path.isfile(os.path.join(project_dir, f)) and f not in files:
-                    files.append(f)
 
     return {
         "files": files,
@@ -137,6 +159,7 @@ async def get_artifact(
         b_res = b_dir.resolve()
         candidate_paths = [
             (b_dir / filename).resolve(),
+            (b_dir / "working_papers" / filename).resolve(),
             (b_dir / "scratch" / filename).resolve(),
         ]
         for cp in candidate_paths:
@@ -146,18 +169,27 @@ async def get_artifact(
             except ValueError:
                 continue
 
-    # Check in project directory if exists
-    if session and (session.context or {}).get("project_id") and eng:
-        from app.models.project import ProjectModel
-        project = await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("id", session.context["project_id"]))
-        if project and project.local_folder_path:
-            proj_root = Path(project.local_folder_path).resolve()
-            proj_path = (proj_root / filename).resolve()
-            try:
-                if proj_path.is_file() and proj_path.is_relative_to(proj_root):
-                    return FileResponse(str(proj_path))
-            except ValueError:
-                pass
+    # Check in project / workspace directory and deliverables (Audit_Deliverables & NexAU_Outputs)
+    try:
+        ws = await resolve_session_workspace(eng, session_id)
+        if ws and ws.is_dir():
+            ws_root = ws.resolve()
+            clean_sub = filename.replace("NexAU_Outputs/", "").replace("NexAU_Outputs\\", "").replace("Audit_Deliverables/", "").replace("Audit_Deliverables\\", "")
+            ws_candidates = [
+                (ws_root / filename).resolve(),
+                (ws_root / "Audit_Deliverables" / filename).resolve(),
+                (ws_root / "Audit_Deliverables" / clean_sub).resolve(),
+                (ws_root / "NexAU_Outputs" / filename).resolve(),
+                (ws_root / "NexAU_Outputs" / clean_sub).resolve(),
+            ]
+            for cp in ws_candidates:
+                try:
+                    if cp.is_file() and cp.is_relative_to(ws_root):
+                        return FileResponse(str(cp))
+                except ValueError:
+                    continue
+    except Exception:
+        pass
 
     raise HTTPException(status_code=404, detail=f"Artifact file '{filename}' not found")
 
@@ -197,6 +229,8 @@ async def get_file_content(
                     candidates.extend([
                         s_dir / clean_path,
                         s_dir / f"{clean_path}.md",
+                        s_dir / "working_papers" / clean_path,
+                        s_dir / "working_papers" / f"{clean_path}.md",
                         s_dir / "scratch" / clean_path,
                         s_dir / ".system_generated" / "tasks" / clean_path,
                         s_dir / ".system_generated" / "logs" / clean_path,
@@ -204,7 +238,14 @@ async def get_file_content(
             try:
                 ws = await resolve_session_workspace(eng, session_id)
                 if ws and ws.is_dir():
-                    candidates.append(ws / clean_path)
+                    clean_sub = clean_path.replace("NexAU_Outputs/", "").replace("NexAU_Outputs\\", "").replace("Audit_Deliverables/", "").replace("Audit_Deliverables\\", "")
+                    candidates.extend([
+                        ws / clean_path,
+                        ws / "Audit_Deliverables" / clean_path,
+                        ws / "Audit_Deliverables" / clean_sub,
+                        ws / "NexAU_Outputs" / clean_path,
+                        ws / "NexAU_Outputs" / clean_sub,
+                    ])
             except Exception:
                 pass
         candidates.extend([
@@ -226,16 +267,13 @@ async def get_file_content(
         raise HTTPException(status_code=403, detail="Access denied: Path is outside authorized workspace directories.")
 
     eng = _get_engine(engine)
-    # ponytail: VS Code behavior for local desktop auditor app — allow opening any valid file on local disk referenced by chat/user.
-    # In strict remote multi-tenant mode (MASH_STRICT_WORKSPACE=1), verify workspace boundary.
-    if os.getenv("MASH_STRICT_WORKSPACE") == "1":
-        if not is_path_in_base_roots(p):
-            allowed_roots = await get_allowed_file_roots(eng)
-            if not any(p == root or p.is_relative_to(root) for root in allowed_roots):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Access denied: Path is outside authorized workspace directories."
-                )
+    if not is_path_in_base_roots(p):
+        allowed_roots = await get_allowed_file_roots(eng)
+        if not any(p == root or p.is_relative_to(root) for root in allowed_roots):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Path is outside authorized workspace directories."
+            )
 
     if raw:
         return FileResponse(p, filename=p.name)
@@ -252,21 +290,19 @@ async def get_file_content(
     if ext in unsupported_binary_exts:
         return FileResponse(p, filename=p.name)
 
-    # High-Performance Rust Excel Reader via Calamine or Univer IWorkbookData
-    if ext in (".xlsx", ".xls", ".xlsm", ".xltx", ".xltm", ".xlsb", ".ods"):
-        # High-Fidelity Univer Canvas Format with Rust/wolfxl styles extraction
-        if format == "univer" or (ext in (".xlsx", ".xlsm") and format != "raw_table"):
-            try:
-                from app.services.excel_univer import parse_excel_to_univer
-                univer_wb = await asyncio.to_thread(parse_excel_to_univer, p)
-                return {
-                    "type": "univer",
-                    "filename": p.name,
-                    "path": str(p),
-                    "workbook": univer_wb,
-                }
-            except Exception as u_err:
-                logger.warning(f"Univer parser fallback for {p}: {u_err}")
+    # High-Performance Unified Spreadsheet Parser (Excel .xlsx, .xlsm, .xls, .xlsb, .ods and CSV)
+    if ext in (".xlsx", ".xls", ".xlsm", ".xltx", ".xltm", ".xlsb", ".ods", ".csv"):
+        try:
+            from app.services.excel_univer import parse_excel_to_univer
+            univer_wb = await asyncio.to_thread(parse_excel_to_univer, p)
+            return {
+                "type": "univer",
+                "filename": p.name,
+                "path": str(p),
+                "workbook": univer_wb,
+            }
+        except Exception as u_err:
+            logger.warning(f"Univer parser fallback for {p}: {u_err}")
 
         try:
             import fastexcel
@@ -361,17 +397,25 @@ async def get_file_content(
         try:
             safe_page_size = max(10, min(page_size, 1000))
             safe_page = max(0, page)
-            all_rows = []
+            skip = safe_page * safe_page_size
+            paged_rows = []
+            header_row = []
+            total_rows = 0
+            total_cols = 0
+
+            # ponytail: Stream CSV line-by-line without allocating 100MB+ in memory
             with open(p, mode="r", encoding="utf-8", errors="replace") as f:
                 csv_reader = csv.reader(f)
-                for r in csv_reader:
-                    all_rows.append(r)
-            total_rows = len(all_rows)
-            total_cols = max((len(r) for r in all_rows), default=0)
+                for idx, r in enumerate(csv_reader):
+                    total_rows += 1
+                    if idx == 0:
+                        header_row = r
+                    if len(r) > total_cols:
+                        total_cols = len(r)
+                    if skip <= idx < skip + safe_page_size:
+                        paged_rows.append(r)
+
             total_pages = max(1, (total_rows + safe_page_size - 1) // safe_page_size) if total_rows > 0 else 1
-            header_row = all_rows[0] if all_rows else []
-            skip = safe_page * safe_page_size
-            paged_rows = all_rows[skip : skip + safe_page_size]
             col_names = [f"Col_{i+1}" for i in range(total_cols)]
             if header_row and len(header_row) == total_cols:
                 col_names = header_row
@@ -398,6 +442,27 @@ async def get_file_content(
                 return {"content": f"Error loading CSV file '{p.name}': {csv_err}", "error": str(csv_err)}
 
     try:
+        file_size = p.stat().st_size
+        MAX_SAFE_PREVIEW_BYTES = 1_500_000  # 1.5 MB safe preview chunk
+        if file_size > MAX_SAFE_PREVIEW_BYTES:
+            with open(p, "rb") as f:
+                raw_chunk = f.read(MAX_SAFE_PREVIEW_BYTES)
+            text_chunk = raw_chunk.decode("utf-8", errors="replace")
+            last_nl = text_chunk.rfind("\n")
+            if last_nl > 0:
+                text_chunk = text_chunk[:last_nl]
+            size_mb = round(file_size / (1024 * 1024), 1)
+            comment_prefix = "-- " if p.suffix.lower() == ".sql" else "# " if p.suffix.lower() in (".py", ".sh", ".yaml", ".yml") else "// "
+            preview_banner = f"{comment_prefix}[MASH SAFE PREVIEW: Large file ({size_mb} MB). Displaying initial schema and records to protect system memory. Use 3-dots menu to download full file.]\n\n"
+            return {
+                "type": "text",
+                "filename": p.name,
+                "path": str(p),
+                "content": preview_banner + text_chunk,
+                "is_truncated": True,
+                "total_bytes": file_size,
+                "preview_bytes": len(text_chunk.encode("utf-8")),
+            }
         return {"content": p.read_text(encoding="utf-8", errors="replace")}
     except Exception as e:
         return {"content": f"Error reading file: {e}"}

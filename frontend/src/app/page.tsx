@@ -23,9 +23,17 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 
+const DEFAULT_LOCAL_USER: AuthUser = {
+  authenticated: true,
+  email: 'auditor@mash.local',
+  name: 'Audit Lead',
+  plan: 'enterprise',
+  credits_remaining: 999999,
+};
+
 export default function Home() {
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(DEFAULT_LOCAL_USER);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedSessionTitle, setSelectedSessionTitle] = useState<string>('New Conversation');
   const [selectedSessionRepo, setSelectedSessionRepo] = useState<string>('No Repo');
@@ -48,13 +56,13 @@ export default function Home() {
         if (user && user.authenticated) {
           setAuthUser(user);
         } else {
-          setAuthUser(null);
+          setAuthUser(DEFAULT_LOCAL_USER);
         }
         setIsAuthLoading(false);
       }
     }).catch(() => {
       if (isMounted) {
-        setAuthUser(null);
+        setAuthUser(DEFAULT_LOCAL_USER);
         setIsAuthLoading(false);
       }
     });
@@ -164,22 +172,36 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <button 
             type="button"
+            onClick={() => setIsSidebarOpen((v) => !v)}
             className="w-4 h-4 rounded flex items-center justify-center hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-            title="Minimize"
+            title="Toggle sidebar"
+            aria-label="Toggle sidebar"
           >
             <Minus size={11} />
           </button>
           <button 
             type="button"
+            onClick={() => {
+              if (typeof document !== 'undefined') {
+                if (document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+                } else {
+                  document.documentElement.requestFullscreen().catch(() => {});
+                }
+              }
+            }}
             className="w-4 h-4 rounded flex items-center justify-center hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-            title="Maximize"
+            title="Toggle fullscreen"
+            aria-label="Toggle fullscreen"
           >
             <Square size={10} />
           </button>
           <button 
             type="button"
+            onClick={() => handleNewSession('No Repo')}
             className="w-4 h-4 rounded flex items-center justify-center hover:bg-red-500/80 hover:text-white text-zinc-400 transition-colors cursor-pointer"
-            title="Close"
+            title="Reset / New session"
+            aria-label="Reset / New session"
           >
             <X size={11} />
           </button>
@@ -247,15 +269,19 @@ export default function Home() {
                       </button>
                       <button 
                         type="button" 
-                        className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" 
+                        onClick={() => window.history.back()}
+                        className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer" 
                         title="Back"
+                        aria-label="Back"
                       >
                         <ArrowLeft size={13} />
                       </button>
                       <button 
                         type="button" 
-                        className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" 
+                        onClick={() => window.history.forward()}
+                        className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer" 
                         title="Forward"
+                        aria-label="Forward"
                       >
                         <ArrowRight size={13} />
                       </button>

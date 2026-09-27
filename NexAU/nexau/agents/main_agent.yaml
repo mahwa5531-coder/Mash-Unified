@@ -1,0 +1,73 @@
+type: agent
+name: nexau_main_auditor
+tool_call_mode: structured
+max_iterations: ${env.AGENT_MAX_ITERATIONS:-0}
+max_context_tokens: ${env.LLM_MAX_CONTEXT_TOKENS:-131072}
+
+llm_config:
+  model: ${env.LLM_MODEL:-google/gemini-2.5-flash}
+  base_url: ${env.LLM_BASE_URL:-https://openrouter.ai/api/v1}
+  api_key: ${env.LLM_API_KEY:-sk-local-test}
+  api_type: ${env.LLM_API_TYPE:-openai_chat_completion}
+
+tools:
+  - name: view_file
+    yaml_path: ../archs/tool/builtin/schemas/view_file.tool.yaml
+    binding: nexau.archs.tool.builtin:view_file
+
+  - name: write_file
+    yaml_path: ../archs/tool/builtin/schemas/write_file.tool.yaml
+    binding: nexau.archs.tool.builtin:write_file
+
+  - name: replace_file_content
+    yaml_path: ../archs/tool/builtin/schemas/replace_file_content.tool.yaml
+    binding: nexau.archs.tool.builtin:replace_file_content
+
+  - name: search_file_content
+    yaml_path: ../archs/tool/builtin/schemas/search_file_content.tool.yaml
+    binding: nexau.archs.tool.builtin:search_file_content
+
+  - name: glob
+    yaml_path: ../archs/tool/builtin/schemas/glob.tool.yaml
+    binding: nexau.archs.tool.builtin:glob
+
+  - name: run_shell_command
+    yaml_path: ../archs/tool/builtin/schemas/run_shell_command.tool.yaml
+    binding: nexau.archs.tool.builtin:run_shell_command
+
+  - name: web_search
+    yaml_path: ../archs/tool/builtin/schemas/web_search.tool.yaml
+    binding: nexau.archs.tool.builtin:google_web_search
+
+  - name: web_fetch
+    yaml_path: ../archs/tool/builtin/schemas/web_fetch.tool.yaml
+    binding: nexau.archs.tool.builtin:web_fetch
+
+  - name: background_task_manage_tool
+    yaml_path: ../archs/tool/builtin/schemas/background_task_manage_tool.tool.yaml
+    binding: nexau.archs.tool.builtin:background_task_manage_tool
+
+  - name: audit_skill_tool
+    yaml_path: ../archs/tool/builtin/schemas/audit_skill_tool.tool.yaml
+    binding: nexau.archs.tool.builtin:audit_skill_tool
+
+middlewares:
+  - import: nexau.archs.main_sub.execution.middleware.context_compaction:ContextCompactionMiddleware
+    params:
+      auto_compact: true
+      compaction_strategy: "llm_summary"
+      keep_user_rounds: ${env.COMPACTION_KEEP_USER_ROUNDS:-5}
+      threshold: ${env.COMPACTION_THRESHOLD:-0.75}
+      emergency_compact_enabled: true
+  - import: nexau.archs.main_sub.execution.middleware.long_tool_output:LongToolOutputMiddleware
+    params:
+      max_output_chars: 10000
+      head_lines: 50
+      tail_lines: 30
+      bypass_tool_names:
+        - run_shell_command
+  - import: nexau.archs.main_sub.execution.middleware.round_and_token_reminder:RoundAndTokenReminderMiddleware
+    params:
+      desired_max_tokens: 16384
+      enable_routine_reminders: false
+      enable_iteration_warnings: false

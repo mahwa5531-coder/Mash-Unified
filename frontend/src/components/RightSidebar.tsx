@@ -12,6 +12,7 @@ import {
   PanelRight, FileCode, Menu
 } from 'lucide-react';
 import SafeFileViewer from './SafeFileViewer';
+import FileIcon from './common/FileIcon';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -53,7 +54,7 @@ interface TabItem {
 }
 
 function formatArtifactTitle(name: string): string {
-  const clean = name.replace(/^scratch\//i, '').replace(/\.(md|markdown|txt|py|ts|tsx|js|json|sql|sh)$/i, '');
+  const clean = name.replace(/^(scratch|nexau_outputs|audit_deliverables|working_papers)\//i, '').replace(/\.(md|markdown|txt|py|ts|tsx|js|json|sql|sh|xlsx?|csv|xlsm|pdf|png|jpe?g|svg|webp)$/i, '');
   const words = clean.replace(/[_-]+/g, ' ').trim();
   return words.replace(/\b\w/g, (c) => c.toUpperCase()) || name;
 }
@@ -72,12 +73,37 @@ function getArtifactIcon(item: ArtifactFileItem) {
     return <FileSpreadsheet size={14} className="text-emerald-400 group-hover:text-emerald-300 shrink-0" />;
   }
   if (lower.includes('walkthrough')) {
-    return <BookOpen size={14} className="text-muted-foreground group-hover:text-foreground shrink-0" />;
+    return <BookOpen size={14} className="text-blue-400 group-hover:text-blue-300 shrink-0" />;
+  }
+  if (lower.includes('plan')) {
+    return <Code size={14} className="text-sky-400 group-hover:text-sky-300 shrink-0" />;
   }
   if (/\.(py|ts|tsx|js|sql|sh|ps1)$/.test(lower) || item.type === 'code' || item.name.startsWith('scratch/')) {
     return <Code size={14} className="text-muted-foreground group-hover:text-foreground shrink-0" />;
   }
   return <FileText size={14} className="text-muted-foreground group-hover:text-foreground shrink-0" />;
+}
+
+function getArtifactExtensionBadge(item: ArtifactFileItem) {
+  const ext = item.name.split('.').pop()?.toUpperCase() || 'FILE';
+  const lower = ext.toLowerCase();
+  let style = 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-white/[0.08]';
+  if (lower === 'xlsx' || lower === 'xls' || lower === 'xlsm') {
+    style = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
+  } else if (lower === 'csv') {
+    style = 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20';
+  } else if (lower === 'pdf') {
+    style = 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
+  } else if (lower === 'md') {
+    style = 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20';
+  } else if (['png', 'jpg', 'jpeg', 'svg', 'webp'].includes(lower)) {
+    style = 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20';
+  }
+  return (
+    <span className={`px-1 py-0.2 rounded text-[9.5px] font-mono font-medium border ${style} shrink-0`}>
+      {ext}
+    </span>
+  );
 }
 
 interface CollapsibleSectionProps {
@@ -150,10 +176,10 @@ export default function RightSidebar({
   isMaximized: controlledIsMaximized,
   onToggleMaximize
 }: RightSidebarProps) {
-  // Accordion Sections State
+  // Accordion Sections State (backgroundTasks defaults to collapsed to minimize distraction for auditors)
   const [openSections, setOpenSections] = useState({
     artifacts: true,
-    backgroundTasks: true,
+    backgroundTasks: false,
   });
 
   // Expanded items state ("See all")
@@ -275,19 +301,33 @@ export default function RightSidebar({
   }, [loadArtifacts, loadTasks]);
 
   useEffect(() => {
-    const interval = setInterval(loadTasks, 2500);
-    return () => clearInterval(interval);
-  }, [loadTasks]);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadTasks();
+    }, 3000);
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        loadTasks();
+        loadArtifacts();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [loadTasks, loadArtifacts]);
 
-  // Active background tasks
+  // Active background tasks - ponytail: only show live running tasks, not completed historical commands
   const effectiveTasks = useMemo(() => {
-    return backgroundTasks;
+    return backgroundTasks.filter(t => t.status === 'running');
   }, [backgroundTasks]);
 
   // Kill individual task
   const handleKillTask = async (e: ReactMouseEvent, pid: number) => {
     e.stopPropagation();
     try {
+      setBackgroundTasks((prev) => prev.filter(t => t.pid !== pid));
       await killBackgroundTask(pid);
       loadTasks();
     } catch (err) {
@@ -299,13 +339,14 @@ export default function RightSidebar({
   const handleKillAllTasks = async (e: ReactMouseEvent) => {
     e.stopPropagation();
     const running = effectiveTasks.filter(t => t.status === 'running');
+    setBackgroundTasks((prev) => prev.filter(t => t.status !== 'running'));
     for (const t of running) {
       await killBackgroundTask(t.pid);
     }
     loadTasks();
   };
 
-  // Drag Resizing logic
+  // Drag Resizing logic with rAF throttling & iframe pointer-events shield
   const sidebarRef = useRef<HTMLDivElement>(null);
   const widthRef = useRef(DEFAULT_WIDTH);
 
@@ -315,6 +356,8 @@ export default function RightSidebar({
   }, []);
 
   useEffect(() => {
+    let resizeRaf: number | null = null;
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing || isMaximized) return;
       let newWidth = window.innerWidth - e.clientX;
@@ -322,12 +365,23 @@ export default function RightSidebar({
       const safeMax = Math.max(MIN_WIDTH, window.innerWidth - 420);
       if (newWidth > Math.min(MAX_WIDTH, safeMax)) newWidth = Math.min(MAX_WIDTH, safeMax);
       widthRef.current = newWidth;
-      if (sidebarRef.current) {
-        sidebarRef.current.style.width = `${newWidth}px`;
+
+      // rAF debouncing keeps drag butter-smooth at 120 FPS even with 1000Hz gaming mice
+      if (resizeRaf === null) {
+        resizeRaf = requestAnimationFrame(() => {
+          resizeRaf = null;
+          if (sidebarRef.current) {
+            sidebarRef.current.style.width = `${widthRef.current}px`;
+          }
+        });
       }
     };
 
     const handleMouseUp = () => {
+      if (resizeRaf !== null) {
+        cancelAnimationFrame(resizeRaf);
+        resizeRaf = null;
+      }
       if (isResizing) {
         setWidth(widthRef.current);
       }
@@ -335,11 +389,27 @@ export default function RightSidebar({
     };
 
     if (isResizing) {
+      // Prevent text selection across the page during fast mouse movements
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+      // Shield against PDF embeds/iframes swallowing mouse events
+      const iframes = document.querySelectorAll('iframe, embed, object');
+      iframes.forEach((el) => ((el as HTMLElement).style.pointerEvents = 'none'));
+
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     }
 
     return () => {
+      if (resizeRaf !== null) {
+        cancelAnimationFrame(resizeRaf);
+        resizeRaf = null;
+      }
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      const iframes = document.querySelectorAll('iframe, embed, object');
+      iframes.forEach((el) => ((el as HTMLElement).style.pointerEvents = ''));
+
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -445,6 +515,14 @@ export default function RightSidebar({
   // Tab Close
   const handleCloseTab = useCallback((e: ReactMouseEvent, tabId: string) => {
     e.stopPropagation();
+    // Evict closed tab content immediately so V8 garbage collection can reclaim memory
+    setTabContent(prev => {
+      if (!(tabId in prev)) return prev;
+      const next = { ...prev };
+      delete next[tabId];
+      return next;
+    });
+
     setOpenTabs(prev => {
       const targetIndex = prev.findIndex(t => t.id === tabId);
       if (targetIndex === -1) return prev;
@@ -463,6 +541,29 @@ export default function RightSidebar({
   }, [activeTabId]);
 
   const activeTab = useMemo(() => openTabs.find(t => t.id === activeTabId), [openTabs, activeTabId]);
+
+  // ponytail: Parse active tab path into hierarchical breadcrumb segments with horizontal scroll
+  const breadcrumbs = useMemo(() => {
+    if (!activeTab) return [{ label: 'Overview', isLast: true }];
+    if (activeTab.type === 'terminal') {
+      return [{ label: 'Terminal', isLast: false }, { label: activeTab.title, isLast: true }];
+    }
+    const rawPath = activeTab.path || activeTab.title || '';
+    let clean = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
+    clean = clean.replace(/^[a-zA-Z]:\/?/, '');
+    const mashIdx = clean.toLowerCase().indexOf('mash/');
+    if (mashIdx !== -1) {
+      clean = clean.substring(mashIdx + 5);
+    }
+    const parts = clean.split('/').filter(Boolean);
+    if (parts.length === 0) {
+      return [{ label: activeTab.title, isLast: true }];
+    }
+    return parts.map((part, idx) => ({
+      label: part,
+      isLast: idx === parts.length - 1,
+    }));
+  }, [activeTab]);
 
   // Automatically hydrate content for active file tab from cache or backend
   useEffect(() => {
@@ -493,12 +594,16 @@ export default function RightSidebar({
   }, [activeTab, tabContent, sessionId]);
 
   const [terminalStatuses, setTerminalStatuses] = useState<Record<string, 'running' | 'completed' | 'failed'>>({});
-  const terminalPreRef = useRef<HTMLPreElement>(null);
+  const terminalPreRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll terminal on new streamed output
+  // Auto-scroll terminal on new streamed output only if user is already near bottom (preserves scroll position when reading history)
   useEffect(() => {
     if (activeTab?.type === 'terminal' && terminalPreRef.current) {
-      terminalPreRef.current.scrollTop = terminalPreRef.current.scrollHeight;
+      const el = terminalPreRef.current;
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+      if (isNearBottom) {
+        el.scrollTop = el.scrollHeight;
+      }
     }
   }, [activeTab, tabContent]);
 
@@ -579,12 +684,13 @@ export default function RightSidebar({
     }
   }, [viewMode, activeTab]);
 
+
   // Breadcrumbs
   const breadcrumbParts = useMemo(() => {
     if (!activeTab) return [];
-    if (activeTab.type === 'terminal') return ['Terminal', activeTab.title];
-    if (activeTab.type === 'image') return ['Uploads', activeTab.title];
-    return ['Artifacts', formatArtifactTitle(activeTab.title)];
+    if (activeTab.type === 'terminal') return ['Procedures', activeTab.title];
+    if (activeTab.type === 'image') return ['Evidence', activeTab.title];
+    return ['Working Papers', formatArtifactTitle(activeTab.title)];
   }, [activeTab]);
 
   // Filtered lists for inline search
@@ -635,7 +741,7 @@ export default function RightSidebar({
       <div className="h-9 bg-[#121214] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center justify-between px-2 shrink-0 w-full overflow-hidden select-none">
         {/* Left: Quick Navigation Icons + Divider */}
         <div className="flex items-center space-x-1 shrink-0 mr-1.5">
-          {/* Artifacts & Overview Icon */}
+          {/* Audit Workpapers & Overview Icon */}
           <button
             type="button"
             onClick={() => {
@@ -647,12 +753,12 @@ export default function RightSidebar({
                 ? 'text-zinc-100 bg-white/[0.08]' 
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
             }`}
-            title="Artifacts & Files"
+            title="Audit Workpapers & Schedules"
           >
-            <FileText size={14} />
+            <FolderKanban size={14} />
           </button>
 
-          {/* Documents / Code Editor Switch Icon */}
+          {/* Workpaper Viewer Switch Icon */}
           <button
             type="button"
             onClick={() => {
@@ -665,59 +771,46 @@ export default function RightSidebar({
                 ? 'text-zinc-100 bg-white/[0.08]' 
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
             }`}
-            title="Code / Document Viewer"
+            title="Workpaper Viewer"
           >
-            <FileCode size={14} />
-          </button>
-
-          {/* Terminal Icon */}
-          <button
-            type="button"
-            onClick={() => {
-              if (effectiveTasks.length > 0) {
-                const t = effectiveTasks[0];
-                openTerminalTab(String(t.pid), t.command || 'Terminal');
-              } else {
-                openTerminalTab('active', 'Terminal');
-              }
-            }}
-            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-              activeTab?.type === 'terminal' && viewMode === 'editor'
-                ? 'text-zinc-100 bg-white/[0.08]' 
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
-            }`}
-            title="Terminal"
-          >
-            <Terminal size={14} />
+            <BookOpen size={14} />
           </button>
 
           {/* Vertical subtle divider */}
           <div className="h-3.5 w-[1px] bg-zinc-700/60 mx-1 shrink-0" />
         </div>
 
-        {/* Center: Open File Tabs (Pill style with X close button) */}
-        <div className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar h-full shrink min-w-0 py-1">
+        {/* Center: Open File Tabs (Clean pill style with logo, filename, and X close button) */}
+        <div className="flex-1 flex items-center gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar h-full shrink min-w-0 py-1">
           {openTabs.map(tab => {
             const isActive = activeTabId === tab.id && viewMode === 'editor';
+            const rawName = tab.title || tab.path || '';
+            const fileName = tab.type === 'terminal' 
+              ? (tab.title || 'Terminal') 
+              : (rawName.split(/[/\\]/).pop() || rawName);
             return (
               <div 
                 key={tab.id}
                 onClick={() => { setActiveTabId(tab.id); setViewMode('editor'); }}
-                className={`flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-md text-[11.5px] transition-all cursor-pointer select-none max-w-[220px] shrink-0 font-medium group/tab ${
+                className={`flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-md text-[11.5px] transition-all cursor-pointer select-none max-w-[200px] shrink-0 font-medium group/tab ${
                   isActive 
                     ? 'bg-zinc-800 text-zinc-100 border border-white/[0.08] shadow-xs' 
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'
                 }`}
+                title={tab.path || fileName}
               >
-                {/* Logo / M symbol icon matching image: M with arrow down */}
-                <span className="text-[11px] font-bold text-sky-400 shrink-0 select-none">M↓</span>
-                <span className="truncate italic font-medium flex-1">{formatArtifactTitle(tab.title)}</span>
+                {tab.type === 'terminal' ? (
+                  <Terminal size={13} className="shrink-0 text-amber-400" />
+                ) : (
+                  <FileIcon filename={fileName} size={13} className="shrink-0" />
+                )}
+                <span className="truncate font-medium flex-1">{fileName}</span>
                 <button
                   type="button"
                   onClick={(e) => handleCloseTab(e, tab.id)}
                   className="p-0.5 ml-0.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-white/10 opacity-70 group-hover/tab:opacity-100 transition-opacity cursor-pointer shrink-0"
                   title="Close tab"
-                  aria-label={`Close ${tab.title}`}
+                  aria-label={`Close ${fileName}`}
                 >
                   <X size={11} />
                 </button>
@@ -759,9 +852,9 @@ export default function RightSidebar({
       {viewMode === 'explorer' ? (
         <div className="flex-1 py-3 px-3 flex flex-col overflow-y-auto custom-scrollbar bg-card">
           
-          {/* Section 1: Artifacts */}
+          {/* Section 1: Working Papers */}
           <CollapsibleSection 
-            title="Artifacts" 
+            title="Working Papers" 
             count={artifacts.length} 
             isOpen={openSections.artifacts} 
             onToggle={() => toggleSection('artifacts')}
@@ -774,7 +867,7 @@ export default function RightSidebar({
                   type="text"
                   value={artifactFilter}
                   onChange={(e) => setArtifactFilter(e.target.value)}
-                  placeholder="Filter artifacts..."
+                  placeholder="Filter working papers..."
                   className="h-7 pl-8 pr-7 text-xs bg-muted/40 border border-zinc-200/70 dark:border-white/[0.06] focus-visible:bg-background"
                 />
                 {artifactFilter && (
@@ -790,42 +883,30 @@ export default function RightSidebar({
             )}
 
             {displayedArtifacts.length === 0 ? (
-              <div className="text-[12px] text-muted-foreground py-1.5 px-2 italic">
-                {artifactFilter ? 'No matching artifacts' : 'No artifacts generated yet'}
+              <div className="text-[12px] text-muted-foreground py-2 px-2 italic text-center">
+                {artifactFilter 
+                  ? 'No matching working papers' 
+                  : 'No working papers generated yet. Generated files will appear here.'}
               </div>
             ) : (
               <>
-                {displayedArtifacts.map((item, idx) => {
-                  const isExcel = /\.(xlsx|xls|csv|xlsm)$/i.test(item.name);
-                  return (
-                    <div 
-                      key={idx}
-                      onClick={() => openFileTab(item.name, item.path)}
-                      className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/60 cursor-pointer text-muted-foreground hover:text-foreground transition-colors text-[13px] font-normal group"
-                      title={item.path || item.name}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        {getArtifactIcon(item)}
-                        <span className="truncate font-normal flex-1">{formatArtifactTitle(item.name)}</span>
-                      </div>
-                      {isExcel && (
-                        <a
-                          href={`${BASE_URL}/files/content?path=${encodeURIComponent(item.path || item.name)}&raw=true`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-emerald-500 transition-opacity p-0.5"
-                          title="Download spreadsheet to open in Microsoft Excel"
-                        >
-                          <Download size={12} />
-                        </a>
-                      )}
+                {displayedArtifacts.map((item, idx) => (
+                  <div 
+                    key={idx}
+                    onClick={() => openFileTab(item.name, item.path)}
+                    className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/60 cursor-pointer text-muted-foreground hover:text-foreground transition-colors text-[13px] font-normal group"
+                    title={item.path || item.name}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                      {getArtifactIcon(item)}
+                      <span className="truncate font-normal flex-1">{formatArtifactTitle(item.name)}</span>
                     </div>
-                  );
-                })}
+                    {getArtifactExtensionBadge(item)}
+                  </div>
+                ))}
 
                 {/* See all (N) link */}
-                {artifacts.length > 5 && (
+                {filteredArtifacts.length > 5 && (
                   <button
                     type="button"
                     onClick={() => {
@@ -834,128 +915,125 @@ export default function RightSidebar({
                     }}
                     className="py-1.5 px-2 text-[12px] text-muted-foreground hover:text-foreground text-left transition-colors font-normal select-none"
                   >
-                    {expandedSection.artifacts ? 'Show less' : `See all (${artifacts.length})`}
+                    {expandedSection.artifacts ? 'Show less' : `See all (${filteredArtifacts.length})`}
                   </button>
                 )}
               </>
             )}
           </CollapsibleSection>
 
-          {/* Section 2: Background Tasks */}
-          <CollapsibleSection 
-            title="Background Tasks" 
-            count={effectiveTasks.length} 
-            isOpen={openSections.backgroundTasks} 
-            onToggle={() => toggleSection('backgroundTasks')}
-            rightAction={
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleKillAllTasks}
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                  >
-                    <StopCircle className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="left" className="text-xs">
-                  Stop all tasks
-                </TooltipContent>
-              </Tooltip>
-            }
-          >
-            {/* Inline search filter when expanded */}
-            {expandedSection.tasks && effectiveTasks.length > 5 && (
-              <div className="relative mb-1.5 px-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                <Input
-                  type="text"
-                  value={taskFilter}
-                  onChange={(e) => setTaskFilter(e.target.value)}
-                  placeholder="Filter tasks..."
-                  className="h-7 pl-8 pr-7 text-xs bg-muted/40 border border-zinc-200/70 dark:border-white/[0.06] focus-visible:bg-background"
-                />
-                {taskFilter && (
-                  <button 
-                    type="button" 
-                    onClick={() => setTaskFilter('')} 
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            )}
-
-            {displayedTasks.length === 0 ? (
-              <div className="text-[12px] text-muted-foreground py-1.5 px-2 italic">
-                {taskFilter ? 'No matching tasks' : 'No background tasks'}
-              </div>
-            ) : (
-              <>
-                {displayedTasks.map((t) => {
-                  const isRunning = t.status === 'running';
-                  const isTimer = t.command.toLowerCase().startsWith('timer');
-                  return (
-                    <div 
-                      key={t.pid}
-                      onClick={() => openTerminalTab(t.pid.toString(), t.command || `Task ${t.pid}`)}
-                      className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/60 transition-colors cursor-pointer group"
+          {/* Section 2: Audit Procedures (Only displayed when background verification/analysis is active) */}
+          {effectiveTasks.length > 0 && (
+            <CollapsibleSection 
+              title="Audit Procedures in Progress" 
+              count={effectiveTasks.length} 
+              isOpen={openSections.backgroundTasks} 
+              onToggle={() => toggleSection('backgroundTasks')}
+              rightAction={
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleKillAllTasks}
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
                     >
-                      <div className="flex items-center min-w-0 flex-1 mr-2">
-                        {isRunning ? (
-                          <Loader2 size={14} className="mr-2.5 animate-spin text-muted-foreground shrink-0" />
-                        ) : isTimer ? (
-                          <Clock size={14} className="mr-2.5 text-muted-foreground shrink-0" />
-                        ) : (
-                          <CheckCircle2 size={14} className="mr-2.5 text-muted-foreground shrink-0" />
-                        )}
-                        <span className={`font-mono text-[12.5px] truncate ${
-                          isRunning ? 'text-foreground font-medium' : 'text-muted-foreground font-normal group-hover:text-foreground'
-                        }`}>
-                          {t.command || `Task ${t.pid}`}
-                        </span>
-                      </div>
-                      <div className="shrink-0">
-                        {isRunning && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => handleKillTask(e, t.pid)}
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                              >
-                                <StopCircle className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="left" className="text-xs">
-                              Kill task
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                      <StopCircle className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="text-xs">
+                    Cancel all procedures
+                  </TooltipContent>
+                </Tooltip>
+              }
+            >
+              {/* Inline search filter when expanded */}
+              {expandedSection.tasks && effectiveTasks.length > 5 && (
+                <div className="relative mb-1.5 px-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    type="text"
+                    value={taskFilter}
+                    onChange={(e) => setTaskFilter(e.target.value)}
+                    placeholder="Filter procedures..."
+                    className="h-7 pl-8 pr-7 text-xs bg-muted/40 border border-zinc-200/70 dark:border-white/[0.06] focus-visible:bg-background"
+                  />
+                  {taskFilter && (
+                    <button 
+                      type="button" 
+                      onClick={() => setTaskFilter('')} 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              )}
 
-                {/* See all (N) link */}
-                {effectiveTasks.length > 5 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExpandedSection(prev => ({ ...prev, tasks: !prev.tasks }));
-                      if (expandedSection.tasks) setTaskFilter('');
-                    }}
-                    className="py-1.5 px-2 text-[12px] text-muted-foreground hover:text-foreground text-left transition-colors font-normal select-none"
+              {displayedTasks.map((t) => {
+                const isRunning = t.status === 'running';
+                const isTimer = t.command.toLowerCase().startsWith('timer');
+                const procedureName = isTimer 
+                  ? 'Verification Procedure Timer' 
+                  : (t.command ? t.command.replace(/^(python|bash|sh|node)\s+/, '') : `Audit Procedure ${t.pid}`);
+                return (
+                  <div 
+                    key={t.pid}
+                    onClick={() => openTerminalTab(t.pid.toString(), procedureName)}
+                    className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/60 transition-colors cursor-pointer group"
                   >
-                    {expandedSection.tasks ? 'Show less' : `See all (${effectiveTasks.length})`}
-                  </button>
-                )}
-              </>
-            )}
-          </CollapsibleSection>
+                    <div className="flex items-center min-w-0 flex-1 mr-2">
+                      {isRunning ? (
+                        <Loader2 size={14} className="mr-2.5 animate-spin text-muted-foreground shrink-0" />
+                      ) : isTimer ? (
+                        <Clock size={14} className="mr-2.5 text-muted-foreground shrink-0" />
+                      ) : (
+                        <CheckCircle2 size={14} className="mr-2.5 text-muted-foreground shrink-0" />
+                      )}
+                      <span className={`font-mono text-[12.5px] truncate ${
+                        isRunning ? 'text-foreground font-medium' : 'text-muted-foreground font-normal group-hover:text-foreground'
+                      }`}>
+                        {procedureName}
+                      </span>
+                    </div>
+                    <div className="shrink-0">
+                      {isRunning && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => handleKillTask(e, t.pid)}
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            >
+                              <StopCircle className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="text-xs">
+                            Cancel procedure
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* See all (N) link */}
+              {effectiveTasks.length > 5 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpandedSection(prev => ({ ...prev, tasks: !prev.tasks }));
+                    if (expandedSection.tasks) setTaskFilter('');
+                  }}
+                  className="py-1.5 px-2 text-[12px] text-muted-foreground hover:text-foreground text-left transition-colors font-normal select-none"
+                >
+                  {expandedSection.tasks ? 'Show less' : `See all (${effectiveTasks.length})`}
+                </button>
+              )}
+            </CollapsibleSection>
+          )}
 
         </div>
       ) : !activeTab ? (
@@ -964,9 +1042,9 @@ export default function RightSidebar({
           <div className="w-10 h-10 rounded-xl bg-muted/50 border border-border/40 flex items-center justify-center mb-3 text-muted-foreground shadow-2xs">
             <FileText size={18} />
           </div>
-          <div className="text-xs font-medium text-foreground mb-1">No file selected</div>
-          <p className="text-[11.5px] text-muted-foreground max-w-[220px] mb-4 leading-relaxed">
-            Select an artifact or click a file link in chat to preview here.
+          <div className="text-xs font-medium text-foreground mb-1">No workpaper selected</div>
+          <p className="text-[11.5px] text-muted-foreground max-w-[240px] mb-4 leading-relaxed">
+            Select an audit workpaper or click any document reference in the chat to inspect here.
           </p>
           <Button
             variant="outline"
@@ -974,27 +1052,50 @@ export default function RightSidebar({
             onClick={() => setViewMode('explorer')}
             className="h-7 text-xs border-border/60 hover:bg-muted/60"
           >
-            Browse Artifacts & Tasks
+            Browse Workpapers
           </Button>
         </div>
       ) : (
         /* Editor / Viewer View (SafeFileViewer / Terminal / Image Preview) */
         <div className="flex-1 overflow-hidden flex flex-col bg-card text-card-foreground">
-          {/* Row 2: Sub-header Toolbar (Breadcrumb until half + Preview/Raw sliding pill + 3-dots + Menu) */}
-          <div className="h-8 bg-zinc-900/30 border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center justify-between px-3 select-none shrink-0 text-xs">
-            {/* Left: Breadcrumb (until half) */}
-            <div className="flex items-center gap-1.5 min-w-0 max-w-[50%] overflow-hidden text-zinc-400 text-[11.5px]">
-              <span 
+          {/* Row 2: Sub-header Toolbar (Horizontally Scrollable Breadcrumb + Preview/Raw sliding pill + 3-dots + Menu) */}
+          <div className="h-8 bg-zinc-900/30 border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center justify-between px-3 select-none shrink-0 text-xs gap-2">
+            {/* Left: Horizontally Scrollable Breadcrumb */}
+            <div 
+              onWheel={(e) => {
+                if (e.deltaY !== 0) {
+                  e.currentTarget.scrollLeft += e.deltaY;
+                }
+              }}
+              className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap text-zinc-400 text-[11.5px] py-1"
+            >
+              <button 
+                type="button"
                 onClick={() => setViewMode('explorer')}
-                className="hover:text-zinc-200 cursor-pointer shrink-0"
+                className="hover:text-zinc-200 cursor-pointer shrink-0 transition-colors font-medium flex items-center gap-1"
+                title="Return to Explorer"
               >
-                Mash
-              </span>
-              <span className="text-zinc-600 shrink-0">&gt;</span>
-              <span className="text-[11px] font-bold text-sky-400 shrink-0 select-none">M↓</span>
-              <span className="text-zinc-200 font-medium truncate">
-                {activeTab ? activeTab.title : 'Overview'}
-              </span>
+                <span>Mash</span>
+              </button>
+
+              {breadcrumbs.map((crumb, idx) => (
+                <React.Fragment key={idx}>
+                  <ChevronRight size={11} className="text-zinc-600 shrink-0 select-none" />
+                  {crumb.isLast ? (
+                    <span 
+                      className="text-zinc-100 font-medium shrink-0 flex items-center gap-1 bg-zinc-800/40 px-1.5 py-0.5 rounded border border-white/[0.04] max-w-[220px] truncate" 
+                      title={crumb.label}
+                    >
+                      {activeTab?.type === 'image' && <ImageIcon size={11} className="text-purple-400 shrink-0" />}
+                      {crumb.label}
+                    </span>
+                  ) : (
+                    <span className="hover:text-zinc-300 transition-colors shrink-0">
+                      {crumb.label}
+                    </span>
+                  )}
+                </React.Fragment>
+              ))}
             </div>
 
             {/* Right: Preview / Raw sliding pill + 3 dots menu + list icon */}
@@ -1104,26 +1205,64 @@ export default function RightSidebar({
 
           {/* Safe File Viewer Body */}
           <div className="flex-1 overflow-hidden bg-card">
-            {activeTab?.type === 'terminal' ? (
-              <div className="flex flex-col h-full bg-zinc-950 overflow-hidden text-zinc-100">
-                <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-950 text-[11px] font-mono text-zinc-400 flex items-center justify-between">
-                  <span>Terminal Process Output</span>
-                  <span className={`flex items-center gap-1.5 ${
-                    (terminalStatuses[activeTab.id] || 'running') === 'running' 
-                      ? 'text-emerald-400' 
-                      : (terminalStatuses[activeTab.id] === 'failed' ? 'text-red-400' : 'text-zinc-400')
-                  }`}>
-                    {(terminalStatuses[activeTab.id] || 'running') === 'running' && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            {activeTab?.type === 'terminal' ? (() => {
+              const currentPid = parseInt(activeTab.id.replace('terminal-', ''), 10);
+              const isRunning = (terminalStatuses[activeTab.id] || 'running') === 'running';
+              const rawLog = tabContent[activeTab?.id || ''] || '// Waiting for process output...';
+              const logLines = rawLog.split('\n');
+
+              return (
+                <div className="flex flex-col h-full bg-[#121214] overflow-hidden text-zinc-100 select-text">
+                  {/* Top Task Header Bar (styled cleanly after Image 4) */}
+                  <div className="px-3.5 py-2.5 border-b border-zinc-800/80 bg-[#161619] flex items-center justify-between shrink-0">
+                    <div className="flex flex-col min-w-0 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold tracking-wide text-zinc-200">Background Task Output</span>
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium ${
+                          isRunning 
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                            : (terminalStatuses[activeTab.id] === 'failed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700/60')
+                        }`}>
+                          {isRunning && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                          {isRunning ? 'RUNNING' : (terminalStatuses[activeTab.id] === 'failed' ? 'FAILED' : 'COMPLETED')}
+                        </span>
+                      </div>
+                      <span className="font-mono text-[12px] text-sky-400 dark:text-sky-300 truncate mt-0.5" title={activeTab.title}>
+                        {activeTab.title}
+                      </span>
+                    </div>
+
+                    {/* Prominent Stop / Cancel Button */}
+                    {isRunning && !isNaN(currentPid) && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={(e) => handleKillTask(e, currentPid)}
+                        className="h-6 px-2.5 text-[11px] flex items-center gap-1 font-sans cursor-pointer shrink-0 bg-red-600/90 hover:bg-red-600 text-white shadow-xs"
+                        title="Cancel or stop this background task immediately"
+                      >
+                        <StopCircle className="h-3 w-3" />
+                        <span>Cancel Task</span>
+                      </Button>
                     )}
-                    {(terminalStatuses[activeTab.id] || 'running') === 'running' ? 'Running' : (terminalStatuses[activeTab.id] === 'failed' ? 'Failed' : 'Completed')}
-                  </span>
+                  </div>
+
+                  {/* Clean Monospace Terminal Log with Line Numbers (matching Image 4) */}
+                  <div ref={terminalPreRef} className="p-3 overflow-auto custom-scrollbar font-mono text-[11.5px] leading-relaxed text-zinc-300 flex-1 bg-[#0d0d0f]">
+                    {logLines.map((line, idx) => (
+                      <div key={idx} className="flex hover:bg-white/[0.02] py-0.5 px-1 rounded-sm">
+                        <span className="select-none text-zinc-600 w-9 text-right pr-3.5 shrink-0 tabular-nums font-mono text-[11px]">
+                          {idx + 1}
+                        </span>
+                        <span className="flex-1 whitespace-pre-wrap break-all text-zinc-200">
+                          {line}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <pre ref={terminalPreRef} className="p-4 overflow-auto custom-scrollbar font-mono text-[12px] leading-relaxed text-zinc-300 whitespace-pre flex-1">
-                  {tabContent[activeTab?.id || ''] || '// Waiting for process output...'}
-                </pre>
-              </div>
-            ) : (
+              );
+            })() : (
               <ErrorBoundary scope="safe-file-viewer">
                 <SafeFileViewer
                   filename={activeTab?.title || ''}

@@ -116,8 +116,8 @@ export async function fetchWorkspaceTree(sessionId?: string): Promise<WorkspaceT
   }
 }
 
-// ponytail: Client-side in-memory cache with LRU eviction (cap at 50) and in-flight fetch deduplication for 0ms instant file views
-const MAX_FILE_CACHE_SIZE = 50;
+// Client-side in-memory cache with LRU eviction: keeps active working-set tabs instantly accessible with 0ms network latency
+const MAX_FILE_CACHE_SIZE = 25;
 const fileContentMemoryCache = new Map<string, string>();
 const inFlightFileFetches = new Map<string, Promise<string>>();
 
@@ -372,6 +372,7 @@ export async function streamQuery(
   // Track raw argument buffers per tool_call_id
   const toolArgBuffers: Record<string, string> = {};
   const toolCallNames: Record<string, string> = {};
+  let isStalled = false;
 
   try {
     const response = await fetch(`${BASE_URL}/stream`, {
@@ -404,7 +405,7 @@ export async function streamQuery(
     // Server emits SSE : keepalive comments every 15s; this watchdog only trips if the link is truly dead.
     const STREAM_IDLE_TIMEOUT_MS = 300000;
     let stallTimer: ReturnType<typeof setTimeout> | null = null;
-    let isStalled = false;
+    isStalled = false;
 
     const resetStallWatchdog = () => {
       if (stallTimer !== null) clearTimeout(stallTimer);
@@ -561,15 +562,30 @@ export async function streamQuery(
   }
 
   if (isStalled) {
-    throw new Error("Stream connection timed out: no data received from server for 45 seconds.");
+    throw new Error("Stream connection timed out: no data received from server. Network link may have been interrupted.");
   }
 } catch (err: any) {
     if (signal?.aborted) return; // User stopped the stream intentionally
     console.warn("Error streaming query:", err);
-    const isConnErr = err?.name === "TypeError" || String(err?.message || "").toLowerCase().includes("failed to fetch");
-    const formatted = isConnErr
-      ? "Unable to connect to local backend server. Please verify the backend service is running."
-      : formatErrorMessage(err?.message || String(err));
+
+    // ponytail: Detect WiFi / network disconnection with clear status messages
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    const isFetchErr = err?.name === "TypeError" || 
+      String(err?.message || "").toLowerCase().includes("failed to fetch") ||
+      String(err?.message || "").toLowerCase().includes("networkerror");
+
+    let formatted: string;
+
+    if (isOffline) {
+      formatted = "Network connection lost (WiFi disconnected). Reconnection timed out. Agent execution terminated.";
+    } else if (isFetchErr) {
+      formatted = "Network connection interrupted or backend server unreachable. Could not reconnect within time. Agent execution terminated.";
+    } else if (isStalled) {
+      formatted = "Stream connection timed out: no response from server within timeout. Agent execution terminated.";
+    } else {
+      formatted = formatErrorMessage(err?.message || String(err));
+    }
+
     if (onError) {
       onError(formatted);
     } else {
@@ -810,6 +826,21 @@ export async function fetchProjects(): Promise<ProjectItem[]> {
     return data.projects || [];
   } catch {
     return [];
+  }
+}
+
+export async function createProject(name: string, localFolderPath: string): Promise<ProjectItem | null> {
+  try {
+    const res = await safeFetch(`${BASE_URL}/api/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, local_folder_path: localFolderPath }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn("Failed to create project:", err);
+    return null;
   }
 }
 

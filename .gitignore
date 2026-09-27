@@ -1,0 +1,30 @@
+# Dependencies & Build
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Python & testing caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+.env
+.env.backup
+.env.local
+.env.*.local
+!.env.example
+.venv/
+venv/
+scratch/
+.hypothesis/
+*.db
+.openclaw*
+frontend/.openclaw*
+test_workspaces/
+connector/test_scratch_project/
+nexau.egg-info/

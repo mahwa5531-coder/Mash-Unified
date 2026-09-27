@@ -1,0 +1,125 @@
+{
+  "dataset_seed": 101,
+  "companies": [
+    "Company_A",
+    "Company_B",
+    "Company_C"
+  ],
+  "periods": [
+    "FY2023",
+    "FY2024",
+    "FY2025"
+  ],
+  "true_anomalies": {
+    "A007": {
+      "id": "A007",
+      "company": "Company_A",
+      "category": "DUPLICATE_GSTIN",
+      "severity": "material",
+      "target_id": "V-COMA-199",
+      "is_true_positive": true
+    },
+    "A001": {
+      "id": "A001",
+      "company": "Company_A",
+      "period": "FY2025",
+      "category": "DUPLICATE_INVOICE",
+      "severity": "material",
+      "target_id": "INV-PUR-COMA-FY2025-9010",
+      "is_true_positive": true
+    },
+    "A005": {
+      "id": "A005",
+      "company": "Company_A",
+      "period": "FY2025",
+      "category": "HIGH_VALUE_UNAPPROVED",
+      "severity": "critical",
+      "target_id": "GL-COMA-FY2025-9999",
+      "is_true_positive": true
+    },
+    "A010": {
+      "id": "A010",
+      "category": "INTERCOMPANY_MISMATCH",
+      "severity": "material",
+      "expected_difference": 50000.0,
+      "is_true_positive": true
+    }
+  },
+  "legitimate_controls": {
+    "LEGIT_002": {
+      "id": "LEGIT_002",
+      "company": "Company_A",
+      "period": "FY2025",
+      "target_id": "GL-COMA-FY2025-LEGIT-100",
+      "is_true_positive": false
+    }
+  },
+  "negative_battery": {
+    "nonexistent_invoices": [
+      "INV-NONEXISTENT-01",
+      "INV-NONEXISTENT-02",
+      "INV-NONEXISTENT-03",
+      "INV-NONEXISTENT-04",
+      "INV-NONEXISTENT-05",
+      "INV-NONEXISTENT-06",
+      "INV-NONEXISTENT-07",
+      "INV-NONEXISTENT-08",
+      "INV-NONEXISTENT-09",
+      "INV-NONEXISTENT-10",
+      "INV-NONEXISTENT-11",
+      "INV-NONEXISTENT-12",
+      "INV-NONEXISTENT-13",
+      "INV-NONEXISTENT-14",
+      "INV-NONEXISTENT-15",
+      "INV-NONEXISTENT-16",
+      "INV-NONEXISTENT-17",
+      "INV-NONEXISTENT-18",
+      "INV-NONEXISTENT-19",
+      "INV-NONEXISTENT-20"
+    ],
+    "nonexistent_vendors": [
+      "V-NONEXISTENT-01",
+      "V-NONEXISTENT-02",
+      "V-NONEXISTENT-03",
+      "V-NONEXISTENT-04",
+      "V-NONEXISTENT-05",
+      "V-NONEXISTENT-06",
+      "V-NONEXISTENT-07",
+      "V-NONEXISTENT-08",
+      "V-NONEXISTENT-09",
+      "V-NONEXISTENT-10",
+      "V-NONEXISTENT-11",
+      "V-NONEXISTENT-12",
+      "V-NONEXISTENT-13",
+      "V-NONEXISTENT-14",
+      "V-NONEXISTENT-15",
+      "V-NONEXISTENT-16",
+      "V-NONEXISTENT-17",
+      "V-NONEXISTENT-18",
+      "V-NONEXISTENT-19",
+      "V-NONEXISTENT-20"
+    ],
+    "nonexistent_txns": [
+      "GL-NONEXISTENT-01",
+      "GL-NONEXISTENT-02",
+      "GL-NONEXISTENT-03",
+      "GL-NONEXISTENT-04",
+      "GL-NONEXISTENT-05",
+      "GL-NONEXISTENT-06",
+      "GL-NONEXISTENT-07",
+      "GL-NONEXISTENT-08",
+      "GL-NONEXISTENT-09",
+      "GL-NONEXISTENT-10",
+      "GL-NONEXISTENT-11",
+      "GL-NONEXISTENT-12",
+      "GL-NONEXISTENT-13",
+      "GL-NONEXISTENT-14",
+      "GL-NONEXISTENT-15",
+      "GL-NONEXISTENT-16",
+      "GL-NONEXISTENT-17",
+      "GL-NONEXISTENT-18",
+      "GL-NONEXISTENT-19",
+      "GL-NONEXISTENT-20"
+    ]
+  }
+}

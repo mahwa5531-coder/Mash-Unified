@@ -1,0 +1,13 @@
+{
+  "benchmark_date": "2026-08-24T17:07:44Z",
+  "total_tasks_evaluated": 2,
+  "correct_tasks_count": 2,
+  "audit_correctness_rate": 1.0,
+  "mean_evidence_grounding_score": 1.0,
+  "mean_fabricated_record_rate": 0.0,
+  "cost_per_correct_audit_task_usd": 0.008526,
+  "mean_llm_calls_per_task": 6.5,
+  "mean_latency_seconds": 20.29,
+  "overall_production_readiness_score": 100.0,
+  "production_status": "NEEDS_REVIEW"
+}
