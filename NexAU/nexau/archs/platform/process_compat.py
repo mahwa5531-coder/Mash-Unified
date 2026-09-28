@@ -114,19 +114,6 @@ class WindowsProcessCompat:
     """Windows process lifecycle implementation using stdlib primitives first."""
 
     def graceful_kill(self, process: ProcessHandle, grace_period: float) -> None:
-        # ponytail: On Windows, terminating a parent shell (powershell/cmd) leaves child
-        # worker processes (e.g. python, node) orphaned. taskkill /F /T kills the entire tree.
-        try:
-            subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=False,
-                timeout=5,
-            )
-        except Exception:
-            pass
-
         try:
             process.terminate()
         except OSError:
@@ -135,7 +122,7 @@ class WindowsProcessCompat:
         try:
             process.wait(timeout=grace_period)
             return
-        except (subprocess.TimeoutExpired, Exception):
+        except subprocess.TimeoutExpired:
             pass
 
         try:
@@ -144,7 +131,7 @@ class WindowsProcessCompat:
             pass
 
         try:
-            process.wait(timeout=5)
+            process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             pass
 

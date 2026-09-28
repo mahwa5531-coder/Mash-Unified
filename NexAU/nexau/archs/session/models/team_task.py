@@ -18,7 +18,7 @@ Stores team tasks with priority, dependencies, and assignment.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import JSON
 from sqlmodel import Column, Field, SQLModel
@@ -64,5 +64,5 @@ class TeamTaskModel(SQLModel, table=True):
     deliverable_path: str | None = Field(default=None)
     created_by: str = ""
 
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

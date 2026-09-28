@@ -138,6 +138,58 @@ def _ensure_tool_use_paired(messages: list[Message]) -> list[Message]:
     return out
 
 
+def reduce_actions_stream(actions: list[AgentRunActionModel]) -> list[AgentRunActionModel]:
+    """Apply RFC-0022 event-sourcing reduction to a list of actions.
+
+    1. Truncates before the latest REPLACE anchor (compaction boundary).
+    2. Resolves UNDO targets and excludes actions with created_at_ns >= cutoff_ns.
+    3. Excludes UNDO marker records from the returned stream.
+    4. Returns active actions in chronological order.
+    """
+    if not actions:
+        return []
+
+    sorted_actions = sorted(actions, key=lambda a: getattr(a, "created_at_ns", 0) or 0)
+
+    replace_idx = -1
+    for idx, action in enumerate(sorted_actions):
+        act_type = getattr(action, "action_type", "")
+        act_type_str = act_type.value if hasattr(act_type, "value") else str(act_type)
+        if act_type_str == "replace":
+            replace_idx = idx
+
+    actions_slice = sorted_actions[replace_idx:] if replace_idx >= 0 else sorted_actions
+
+    first_ns_by_run: dict[str, int] = {}
+    for a in actions_slice:
+        rid = getattr(a, "run_id", "")
+        ns = getattr(a, "created_at_ns", 0) or 0
+        if rid and ns and (rid not in first_ns_by_run or ns < first_ns_by_run[rid]):
+            first_ns_by_run[rid] = ns
+
+    cutoff_ns: int | None = None
+    actions_to_process: list[AgentRunActionModel] = []
+    for a in reversed(actions_slice):
+        act_type = getattr(a, "action_type", "")
+        act_type_str = act_type.value if hasattr(act_type, "value") else str(act_type)
+        ns = getattr(a, "created_at_ns", 0) or 0
+
+        if cutoff_ns is not None and ns >= cutoff_ns:
+            continue
+
+        if act_type_str == "undo":
+            target_rid = getattr(a, "undo_before_run_id", None)
+            if target_rid and target_rid in first_ns_by_run:
+                target_ns = first_ns_by_run[target_rid]
+                cutoff_ns = target_ns if cutoff_ns is None else min(cutoff_ns, target_ns)
+            continue
+
+        actions_to_process.append(a)
+
+    actions_to_process.reverse()
+    return actions_to_process
+
+
 class AgentRunActionKey(NamedTuple):
     """Key for identifying agent run actions."""
 

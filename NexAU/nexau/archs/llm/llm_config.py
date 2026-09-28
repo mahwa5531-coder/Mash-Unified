@@ -108,6 +108,10 @@ class LLMConfig:
         self.tool_streaming = tool_streaming
         self.allow_unsigned_thinking = allow_unsigned_thinking
 
+        # tool_streaming Anthropic
+        if tool_streaming is not True and api_type != "anthropic_chat_completion":
+            raise ValueError("tool_streaming is only supported for api_type='anthropic_chat_completion'")
+
         # Store additional parameters
         self.extra_params = kwargs
 

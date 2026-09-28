@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlmodel import Field, SQLModel
 
@@ -28,4 +28,4 @@ class PermissionRuleModel(SQLModel, table=True):
     rule_content: str = Field(primary_key=True)
     behavior: str = Field(primary_key=True)
     source: str = Field(default="config")
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

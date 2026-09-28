@@ -254,14 +254,11 @@ class ModelResponse:
     """Gemini-specific thought signature for preserving reasoning context across turns."""
     usage: TokenUsage = field(default_factory=TokenUsage)
     """Canonical token usage information for the model response."""
-    ordered_blocks: list[Any] = field(default_factory=list)
-    """Native sequence of blocks (ReasoningBlock, TextBlock, ToolUseBlock) preserving execution order."""
 
     def __post_init__(self) -> None:
         self.tool_calls = list(self.tool_calls)
         self.response_items = list(self.response_items)
         self.output_token_ids = [int(token) for token in self.output_token_ids]
-        self.ordered_blocks = list(self.ordered_blocks)
         usage = cast(TokenUsage | None, self.usage)
         if usage is None:
             self.usage = TokenUsage()
@@ -425,15 +422,33 @@ class ModelResponse:
             if block_type == "text":
                 if isinstance(text_val, str):
                     text_parts.append(text_val)
-                    from nexau.core.messages import TextBlock
-                    ordered_blocks.append(TextBlock(text=text_val))
             elif block_type == "thinking":
                 if isinstance(thinking_val, str):
                     reasoning_parts.append(thinking_val)
+                # Empty signature == "no signature_delta arrived" (orphan
+                # thinking_delta, sometimes seen on Bedrock claude-opus-4.x
+                # for short / interrupted reasoning). The Anthropic SDK's
+                # ThinkingBlock requires `signature: str` so the aggregator
+                # pre-allocates `signature=""` and updates it on SignatureDelta;
+                # when SignatureDelta never arrives, the empty string leaks
+                # through to UMP `ReasoningBlock.signature=""` and is
+                # persisted as such. Downstream
+                # `serialize_ump_to_anthropic_messages_payload` then runs
+                # `if block.signature:` (falsy), falls past the proper
+                # thinking-block branch, and demotes the reasoning content
+                # to a plain `text` block - user-visible "thinking content
+                # leaked into the assistant reply" symptom. Coerce empty
+                # string to None at this UMP boundary so persistence carries
+                # the canonical "unsigned" signal.
                 if isinstance(signature_val, str) and signature_val:
                     thinking_signature = signature_val
                 elif isinstance(signature_val, str):
+                    # Empty-string signature observed - record for forensics.
+                    # Tier-1+2 observability (PR #554): log + trace-attribute
+                    # so we can later answer "how often does this fire, on
+                    # which model / agent / gateway".
                     from nexau.archs.main_sub.execution.llm_caller import record_thinking_signature_event
+
                     model_attr: Any = getattr(message_obj, "model", None)
                     id_attr: Any = getattr(message_obj, "id", None)
                     record_thinking_signature_event(
@@ -442,48 +457,11 @@ class ModelResponse:
                         thinking_len=len(thinking_val) if isinstance(thinking_val, str) else 0,
                         raw_message_id=str(id_attr) if id_attr is not None else None,
                     )
-                from nexau.core.messages import ReasoningBlock
-                ordered_blocks.append(
-                    ReasoningBlock(
-                        text=thinking_val or "",
-                        signature=thinking_signature,
-                        redacted_data=redacted_thinking_data,
-                    )
-                )
             elif block_type == "redacted_thinking":
                 if isinstance(redacted_thinking_val, str):
                     redacted_thinking_data = redacted_thinking_val
-                    from nexau.core.messages import ReasoningBlock
-                    ordered_blocks.append(
-                        ReasoningBlock(
-                            text="",
-                            redacted_data=redacted_thinking_val,
-                        )
-                    )
             elif block_type == "tool_use":
                 raw_tool_calls.append(block)
-                if isinstance(block, dict):
-                    call_dict = cast(JsonDict, block)
-                    call_id_val = call_dict.get("id")
-                    call_id = str(call_id_val) if call_id_val is not None else None
-                    name = call_dict.get("name")
-                    arguments_raw: Any = call_dict.get("input", {}) or {}
-                else:
-                    call_id_attr = getattr(block, "id", None)
-                    call_id = str(call_id_attr) if call_id_attr is not None else None
-                    name = getattr(block, "name", None)
-                    arguments_raw = getattr(block, "input", {}) or {}
-
-                arguments_dict = cast(JsonDict, arguments_raw) if isinstance(arguments_raw, dict) else {"input": arguments_raw}
-                from nexau.core.messages import ToolUseBlock
-                ordered_blocks.append(
-                    ToolUseBlock(
-                        id=call_id or "tool_call",
-                        name=str(name) if name else "",
-                        input=arguments_dict,
-                        raw_input=json.dumps(arguments_dict, ensure_ascii=False),
-                    )
-                )
 
         content = "\n".join(text_parts) if text_parts else ""
         reasoning_content = "\n".join(reasoning_parts) if reasoning_parts else None
@@ -541,7 +519,6 @@ class ModelResponse:
             reasoning_signature=thinking_signature,
             reasoning_redacted_data=redacted_thinking_data,
             usage=_normalize_usage(final_usage, "anthropic_chat_completion"),
-            ordered_blocks=ordered_blocks,
         )
 
     @classmethod
@@ -860,31 +837,28 @@ class ModelResponse:
 
         blocks: list[Any] = []
 
-        if getattr(self, "ordered_blocks", None):
-            blocks = list(self.ordered_blocks)
-        else:
-            # Insert reasoning block BEFORE text content (Anthropic requires thinking first)
-            if self.reasoning_content is not None:
-                blocks.append(
-                    ReasoningBlock(
-                        text=self.reasoning_content,
-                        signature=self.reasoning_signature,
-                        redacted_data=self.reasoning_redacted_data,
-                    )
+        # Insert reasoning block BEFORE text content (Anthropic requires thinking first)
+        if self.reasoning_content is not None:
+            blocks.append(
+                ReasoningBlock(
+                    text=self.reasoning_content,
+                    signature=self.reasoning_signature,
+                    redacted_data=self.reasoning_redacted_data,
                 )
+            )
 
-            if self.content:
-                blocks.append(TextBlock(text=self.content))
+        if self.content:
+            blocks.append(TextBlock(text=self.content))
 
-            for call in self.tool_calls:
-                blocks.append(
-                    ToolUseBlock(
-                        id=call.call_id or "tool_call",
-                        name=call.name,
-                        input=call.arguments,
-                        raw_input=call.raw_arguments,
-                    ),
-                )
+        for call in self.tool_calls:
+            blocks.append(
+                ToolUseBlock(
+                    id=call.call_id or "tool_call",
+                    name=call.name,
+                    input=call.arguments,
+                    raw_input=call.raw_arguments,
+                ),
+            )
 
         # micro-compact: created_at, TimeBasedTrigger
         from datetime import UTC, datetime

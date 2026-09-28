@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import JSON, Column
@@ -60,8 +60,8 @@ class SessionModel(SQLModel, table=True):
     session_id: str = Field(primary_key=True)
 
     # Timestamps (using Field with default_factory for mutable defaults)
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Session-level runtime context (shared across all Agents)
     # e.g., working_directory, username, date, etc.

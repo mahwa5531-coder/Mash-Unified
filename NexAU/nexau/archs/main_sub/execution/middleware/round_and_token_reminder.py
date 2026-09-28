@@ -32,7 +32,6 @@ class RoundAndTokenReminderMiddleware(Middleware):
         max_context_tokens: int | None = None,
         desired_max_tokens: int = 16384,
         enable_routine_reminders: bool = True,
-        enable_iteration_warnings: bool = True,
         token_counter: TokenCounter | None = None,
     ) -> None:
         """Configure the reminder middleware.
@@ -41,14 +40,13 @@ class RoundAndTokenReminderMiddleware(Middleware):
             max_context_tokens: Context window size; if None, inherited dynamically from AgentConfig.
             desired_max_tokens: Preferred response size for token hint messaging.
             enable_routine_reminders: When False, suppress routine iteration/token
-                counter spam on normal turns.
-            enable_iteration_warnings: When False, completely silence iteration limit countdown warnings.
+                counter spam on normal turns. Urgent reminders (remaining iterations <= 1 or low tokens)
+                and steering messages are always delivered. Defaults to True for backward compatibility.
             token_counter: Optional shared TokenCounter instance to reuse.
         """
         self.max_context_tokens = max_context_tokens
         self.desired_max_tokens = desired_max_tokens
         self.enable_routine_reminders = enable_routine_reminders
-        self.enable_iteration_warnings = enable_iteration_warnings
         self.token_counter = token_counter or TokenCounter()
 
     def set_llm_runtime(
@@ -128,10 +126,7 @@ class RoundAndTokenReminderMiddleware(Middleware):
         remaining_tokens = max((self.max_context_tokens or 0) - current_tokens, 0)
         warning_threshold = min(3 * self.desired_max_tokens, max(1, int((self.max_context_tokens or 0) * 0.20))) if (self.max_context_tokens or 0) > 0 else 3 * self.desired_max_tokens
 
-        has_finite_limit = hook_input.max_iterations is not None and hook_input.max_iterations > 0
-        is_iter_urgent = has_finite_limit and (remaining_iterations <= 1) and self.enable_iteration_warnings
-        is_token_urgent = (remaining_tokens < warning_threshold) and (self.max_context_tokens is not None and self.max_context_tokens > 0)
-        is_urgent = is_iter_urgent or is_token_urgent
+        is_urgent = (remaining_iterations <= 1) or (remaining_tokens < warning_threshold)
 
         # On routine turns without urgent conditions, suppress reminder noise unless explicitly enabled
         if not self.enable_routine_reminders and not is_urgent:
@@ -140,14 +135,14 @@ class RoundAndTokenReminderMiddleware(Middleware):
             return HookResult.no_changes()
 
         hints = []
-        if (self.enable_routine_reminders or is_iter_urgent) and has_finite_limit and self.enable_iteration_warnings:
+        if self.enable_routine_reminders or remaining_iterations <= 1:
             hints.append(self._build_iteration_hint(
                 hook_input.current_iteration,
                 hook_input.max_iterations,
                 remaining_iterations,
             ))
 
-        if self.enable_routine_reminders or is_token_urgent:
+        if self.enable_routine_reminders or remaining_tokens < warning_threshold:
             hints.append(self._build_token_limit_hint(
                 current_prompt_tokens=current_tokens,
                 max_tokens=self.max_context_tokens or 0,
@@ -187,9 +182,8 @@ class RoundAndTokenReminderMiddleware(Middleware):
         max_iterations: int,
         remaining_iterations: int,
     ) -> str:
-        """Build progress hint if enabled."""
-        if not max_iterations or max_iterations <= 0:
-            return f"🔄 iteration {current_iteration} - Continue if more tool calls are needed."
+        """Match the iteration hint semantics used in executor loop."""
+
         if remaining_iterations <= 1:
             return (
                 f"⚠️ WARNING: This is iteration {current_iteration}/{max_iterations}. "

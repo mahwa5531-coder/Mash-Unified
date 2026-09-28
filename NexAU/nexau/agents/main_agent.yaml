@@ -1,7 +1,7 @@
 type: agent
 name: nexau_main_auditor
 tool_call_mode: structured
-max_iterations: ${env.AGENT_MAX_ITERATIONS:-0}
+max_iterations: ${env.AGENT_MAX_ITERATIONS:-100}
 max_context_tokens: ${env.LLM_MAX_CONTEXT_TOKENS:-131072}
 
 llm_config:
@@ -70,4 +70,3 @@ middlewares:
     params:
       desired_max_tokens: 16384
       enable_routine_reminders: false
-      enable_iteration_warnings: false

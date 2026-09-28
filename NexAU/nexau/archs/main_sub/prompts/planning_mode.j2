@@ -21,7 +21,7 @@ Read and use the retrieved skill as the professional methodology reference, incl
 Map that generalized methodology to the user's actual engagement, available evidence, data, scope, and objectives. Identify applicable steps, missing inputs, dependencies, assumptions, and required tools.
 Create/update {{ brain_directory }}/implementation_plan.md with the resulting engagement-specific plan and verification approach.
 MANDATORY EXECUTION: You MUST call the `write_file` tool to save `implementation_plan.md` to disk during THIS turn. Never stop or conclude your turn without executing `write_file` to save the plan.
-Once the plan is written, finish your turn directing the user to review the plan. Do not execute substantive testing or generate deliverables until explicit user approval is granted (e.g. clicking 'Proceed').
+Once the plan is written, finish your turn directing the user to review the plan. Do not execute code changes until explicit user approval is granted (e.g. clicking 'Proceed').
 Execute the approved plan autonomously after approval.
 Verify the result against the request, evidence, applicable methodology, and planned verification criteria.
 
@@ -48,35 +48,33 @@ Provide a brief description of the objective, background context, and what the e
 
 ## User Review Required
 
-Document anything that requires user review or feedback, for example, procedural deviations, material exceptions, or significant judgment decisions. Use GitHub alerts (> [!IMPORTANT], > [!WARNING], > [!CAUTION]) to highlight critical items.
+Document anything that requires user review or feedback, for example, breaking changes, procedural deviations, or significant decisions. Use GitHub alerts (> [!IMPORTANT], > [!WARNING], > [!CAUTION]) to highlight critical items.
 
 ## Open Questions
 
 Any clarifying questions for the user that will impact the plan. Use GitHub alerts to highlight blockers.
 
-## Audit Scope & Affected Lead Schedules
+## Proposed Changes
 
-Specify the audit cycles, account heads, and assertions undergoing evaluation (e.g., Revenue Recognition per Ind AS 115, Procurement 3-Way Match, Depreciation per Schedule II).
+Group files by component (e.g., package, module, schedule, or workflow layer) and order logically (dependencies first). Separate components with horizontal rules for visual clarity.
 
-### Planned Audit Deliverables & Working Papers (`NexAU_Outputs/`)
+### [Component / Domain Area]
 
-List the exact audit working papers, lead schedules, and memos to be generated in `NexAU_Outputs/`:
+Summary of what will change in this component, separated by files. Use [NEW], [MODIFY], and [DELETE] to demarcate files:
 
-- `[NEW WORKING PAPER]` `[WP-REV-01_Revenue_Reconciliation.xlsx](file:///path/to/NexAU_Outputs/WP-REV-01_Revenue_Reconciliation.xlsx)`: Formatted multi-tab spreadsheet.
-- `[AUDIT MEMO]` `[Engagement_Strategy_Memo.md](file:///path/to/NexAU_Outputs/Engagement_Strategy_Memo.md)`: Substantive audit memo with statutory citations.
+#### [MODIFY] [file basename](file:///absolute/path/to/modifiedfile)
+#### [NEW] [file basename](file:///absolute/path/to/newfile)
+#### [DELETE] [file basename](file:///absolute/path/to/deletedfile)
 
-*(Strict Evidence Law: Client raw records, trial balances, invoices, and ledgers are immutable audit evidence and are NEVER modified.)*
+## Verification Plan
 
-## Substantive Analytical Procedures & Verification Plan
+Summary of how you will verify that your changes or computations have the desired effects with 0 errors.
 
-Summary of the analytical tests, reconciliation models, sampling methodology (SA 530), and deterministic calculations to be performed.
+### Automated Tests
+- The exact commands and test scripts you will run (e.g. `python {{ scratch_directory }}/test_audit.py`).
 
-### Deterministic Scratch Verification Scripts
-- The exact Python/DuckDB scripts run in `<scratch_directory>/` (e.g. `python {{ scratch_directory }}/reconcile_sales.py`).
-
-### Audit Verification Criteria & Tolerances
-- Reconciled variance tolerance: ₹0 (or within tolerable trivial threshold per SA 320/450).
-- Statutory compliance checks (e.g. Section 188 approval, GST GSTR-2B matching, TDS Section 194C rates).
+### Manual Verification
+- Output validation steps, lead schedule reconciliation, and sanity checks.
 ```
 
 # Walkthrough

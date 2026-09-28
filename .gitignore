@@ -1,6 +1,3 @@
-# Sub-repositories (tracked in its own git repo)
-NexAU/
-
 # Dependencies & Build
 node_modules/
 .next/

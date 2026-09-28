@@ -18,7 +18,7 @@ from nexau.archs.sandbox import BaseSandbox, CommandResult, SandboxStatus
 from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 
 # Configuration constants (matching Antigravity / modern agent limits)
-DEFAULT_TIMEOUT_MS = 600000  # 10 minutes default timeout (allows long test suites and builds to finish)
+DEFAULT_TIMEOUT_MS = 120000  # 2 minutes default timeout (prevents hanging runaway scripts)
 TRUNCATE_OUTPUT_THRESHOLD = 48_000  # Truncate when output exceeds 48KB (~12,000 tokens)
 TRUNCATE_OUTPUT_LINES = 200  # Keep last 200 lines when truncating
 MAX_TRUNCATED_LINE_WIDTH = 500  # Max chars per line in truncated output
@@ -93,9 +93,8 @@ def _execute_foreground_command(
     timeout_ms: int | None,
     execution: ExecutionAPI | None = None,
     cwd: str | None = None,
-    wait_ms_before_async: int | None = None,
 ) -> CommandResult:
-    """Execute a foreground shell command via background task polling, supporting synchronous wait window."""
+    """Execute a foreground shell command via background task polling."""
     start_time = time.monotonic()
     start_result = sandbox.execute_shell(command, timeout=timeout_ms, background=True, cwd=cwd)
     background_pid = start_result.background_pid
@@ -103,15 +102,7 @@ def _execute_foreground_command(
     if background_pid is None:
         return start_result
 
-    # If wait_ms_before_async is 0, detach immediately
-    if wait_ms_before_async is not None and wait_ms_before_async <= 0:
-        return start_result
-
-    latest_result: CommandResult = start_result
-    poll_interval = FOREGROUND_COMMAND_POLL_INTERVAL_SECONDS
-    if wait_ms_before_async is not None and wait_ms_before_async < 1000:
-        poll_interval = min(0.05, max(0.01, wait_ms_before_async / 1000.0))
-
+    latest_result: CommandResult | None = None
     while True:
         if execution is not None and execution.is_shutting_down():
             sandbox.kill_background_task(background_pid)
@@ -128,24 +119,17 @@ def _execute_foreground_command(
             return current_result
 
         latest_result = current_result
-        elapsed_ms = int((time.monotonic() - start_time) * 1000)
-
-        # If synchronous wait window elapsed without task finishing, leave running in background
-        if wait_ms_before_async is not None and elapsed_ms >= wait_ms_before_async:
-            if latest_result.background_pid is None:
-                latest_result.background_pid = background_pid
-            return latest_result
-
-        if timeout_ms is not None and elapsed_ms >= timeout_ms:
+        if timeout_ms is not None and int((time.monotonic() - start_time) * 1000) >= timeout_ms:
             sandbox.kill_background_task(background_pid)
+            duration_ms = int((time.monotonic() - start_time) * 1000)
             return _build_terminal_command_result(
                 status=SandboxStatus.TIMEOUT,
-                duration_ms=elapsed_ms,
+                duration_ms=duration_ms,
                 error_message=f"Command timed out after {timeout_ms}ms",
                 latest_result=latest_result,
             )
 
-        time.sleep(poll_interval)
+        time.sleep(FOREGROUND_COMMAND_POLL_INTERVAL_SECONDS)
 
 
 def run_shell_command(
@@ -202,6 +186,8 @@ def run_shell_command(
         description = toolSummary or toolAction or description
     if IsDaemon is not None or "is_background" in kwargs:
         is_background = IsDaemon if IsDaemon is not None else bool(kwargs.get("is_background", False))
+    if WaitMsBeforeAsync is not None and WaitMsBeforeAsync > 0 and WaitMsBeforeAsync < 1000:
+        is_background = True
 
     # Normalize timeout / timer parameter
     for t_alias in ("timeout_ms", "timeout", "timer", "timeout_seconds", "timeout_sec"):
@@ -266,23 +252,16 @@ def run_shell_command(
             duration_ms = int((time.time() - start) * 1000)
             bg_pid = cmd_result.background_pid
             if bg_pid is not None:
-                log_path = cmd_result.stdout_file or (f"{cmd_result.output_dir}/stdout.txt" if cmd_result.output_dir else "")
-                log_uri = f"file:///{log_path.replace(chr(92), '/')}" if log_path else ""
                 llm_content = (
                     f"Background task started (pid: {bg_pid}). "
                     f"Use `background_task_manage_tool` with action='status' and pid={bg_pid} to check output."
                 )
-                if log_uri:
-                    llm_content += f"\n\nTask logs are available at: {log_uri}"
                 bg_result: dict[str, Any] = {
                     "content": llm_content,
                     "returnDisplay": f"Background task started (pid: {bg_pid})",
                     "duration_ms": duration_ms,
                     "backgroundPids": [bg_pid],
-                    "task_id": f"task-{bg_pid}",
                 }
-                if log_uri:
-                    bg_result["task_log_uri"] = log_uri
                 if cmd_result.output_dir:
                     bg_result["output_dir"] = cmd_result.output_dir
                     bg_result["stdout_file"] = cmd_result.stdout_file
@@ -327,35 +306,8 @@ def run_shell_command(
             timeout_ms=timeout_arg,
             execution=execution,
             cwd=cwd,
-            wait_ms_before_async=WaitMsBeforeAsync,
         )
         duration_ms = int((time.time() - start) * 1000)
-
-        # If synchronous wait window elapsed without task finishing, command continues in background
-        if cmd_result.status == SandboxStatus.RUNNING and cmd_result.background_pid is not None:
-            bg_pid = cmd_result.background_pid
-            log_path = cmd_result.stdout_file or (f"{cmd_result.output_dir}/stdout.txt" if cmd_result.output_dir else "")
-            log_uri = f"file:///{log_path.replace(chr(92), '/')}" if log_path else ""
-            msg = (
-                f"Command was sent to the background as task-{bg_pid}. The command is still running.\n"
-                f"You will receive a notification when it finishes, or you can check status using `background_task_manage_tool` (action='status', pid={bg_pid})."
-            )
-            if log_uri:
-                msg += f"\n\nTask logs are available at: {log_uri}"
-            res: dict[str, Any] = {
-                "content": msg,
-                "returnDisplay": f"Command sent to background (pid: {bg_pid})",
-                "duration_ms": duration_ms,
-                "backgroundPids": [bg_pid],
-                "task_id": f"task-{bg_pid}",
-            }
-            if log_uri:
-                res["task_log_uri"] = log_uri
-            if cmd_result.output_dir:
-                res["output_dir"] = cmd_result.output_dir
-                res["stdout_file"] = cmd_result.stdout_file
-                res["stderr_file"] = cmd_result.stderr_file
-            return res
 
         stdout = cmd_result.stdout or ""
         stderr = cmd_result.stderr or ""
@@ -421,15 +373,6 @@ def run_shell_command(
             result["truncated"] = True
             result["original_stdout_length"] = cmd_result.original_stdout_length
             result["original_stderr_length"] = cmd_result.original_stderr_length
-            # Append task log link so LLM and UI can access the full untruncated output
-            if cmd_result.stdout_file:
-                log_uri = f"file:///{cmd_result.stdout_file.replace(chr(92), '/')}"
-                log_line = f"\n\nTask logs are available at: {log_uri}"
-                llm_content += log_line
-                return_display += log_line
-                result["content"] = llm_content
-                result["returnDisplay"] = return_display
-                result["task_log_uri"] = log_uri
 
         if error_message or cmd_result.status in (
             SandboxStatus.ERROR,

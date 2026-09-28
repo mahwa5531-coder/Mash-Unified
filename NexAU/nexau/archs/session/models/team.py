@@ -19,7 +19,7 @@ and max teammate limits.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import JSON
 from sqlmodel import Column, Field, SQLModel
@@ -51,5 +51,5 @@ class TeamModel(SQLModel, table=True):
     candidates: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
     max_teammates: int = Field(default=10)
 
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -19,7 +19,7 @@ direct messages and broadcasts.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlmodel import Field, SQLModel
 
@@ -57,4 +57,4 @@ class TeamMessageModel(SQLModel, table=True):
     delivered: bool = Field(default=False)
     delivered_at: datetime | None = Field(default=None)
 
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

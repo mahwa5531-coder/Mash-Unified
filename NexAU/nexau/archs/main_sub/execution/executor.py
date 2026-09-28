@@ -237,7 +237,7 @@ class Executor:
         openai_client: Any,
         llm_config: LLMConfig,
         async_openai_client: Any | None = None,
-        max_iterations: int = 0,
+        max_iterations: int = 100,
         max_context_tokens: int = 1048576,
         max_running_subagents: int = 5,
         retry_attempts: int = 5,
@@ -761,16 +761,14 @@ class Executor:
             # Loop until no more tool calls or sub-agent calls are made
             iteration = 0
             final_response = ""
-            recent_tool_signatures: list[str] = []
 
             logger.info(
                 f"🔄 Starting iterative execution loop for agent '{self.agent_name}'",
             )
 
-            while self.max_iterations is None or self.max_iterations <= 0 or iteration < self.max_iterations:
-                iter_label = f"{iteration + 1}/{self.max_iterations}" if self.max_iterations and self.max_iterations > 0 else f"{iteration + 1}"
+            while iteration < self.max_iterations:
                 logger.info(
-                    f"🔄 Iteration {iter_label} for agent '{self.agent_name}'",
+                    f"🔄 Iteration {iteration + 1}/{self.max_iterations} for agent '{self.agent_name}'",
                 )
 
                 logger.info(
@@ -889,7 +887,7 @@ class Executor:
                         available_tokens,
                     )
 
-                if self.max_iterations and self.max_iterations > 0 and iteration == self.max_iterations - 2:
+                if iteration == self.max_iterations - 2:
                     messages.append(
                         Message.user(
                             "[SYSTEM NOTICE: You have 2 operational turns remaining in your turn budget. "
@@ -897,7 +895,7 @@ class Executor:
                         )
                     )
 
-                if self.max_iterations and self.max_iterations > 0 and iteration == self.max_iterations - 1:
+                if iteration == self.max_iterations - 1:
                     logger.info(
                         "🏁 Final synthesis iteration reached. Forcing text synthesis without tools.",
                     )
@@ -1050,24 +1048,13 @@ class Executor:
                     ).strip()
 
                 if tool_results:
-                    # Hallucination / infinite loop detector: stop repeating identical actions cleanly
-                    if execution_feedbacks:
-                        current_sig_parts = []
-                        for fb in execution_feedbacks:
-                            c = fb.get("call")
-                            c_name = getattr(c, "tool_name", getattr(c, "name", str(type(c))))
-                            c_args = str(getattr(c, "tool_arguments", getattr(c, "arguments", "")))
-                            current_sig_parts.append(f"{c_name}:{c_args}")
-                        if current_sig_parts:
-                            call_sig = "||".join(current_sig_parts)
-                            recent_tool_signatures.append(call_sig)
-                            if len(recent_tool_signatures) >= 4 and all(s == call_sig for s in recent_tool_signatures[-4:]):
-                                logger.warning(
-                                    f"Loop detector: Agent executed identical tool call 4 times consecutively. Cleanly returning.",
-                                )
-                                force_stop_reason = AgentStopReason.NO_MORE_TOOL_CALLS
-                                final_response = processed_response or "Cleanly completed (no further state progression)."
-                                break
+                    # ponytail: Graceful last-turn wrap-up reminder. Prevents harsh max_iterations guillotine.
+                    if iteration >= self.max_iterations - 2:
+                        tool_results += (
+                            "\n\n[SYSTEM NOTICE: You are on your final turns of your turn budget. "
+                            "On your next turn, you MUST synthesize all findings collected so far and output "
+                            "your final answer/report. Do NOT call any more tools.]"
+                        )
 
                     # micro-compact: created_at
                     from datetime import UTC, datetime
@@ -1177,10 +1164,10 @@ class Executor:
                     self._consecutive_text_only_count = 0
                 iteration += 1
 
-            # Add note if finite max iterations reached
-            if self.max_iterations and self.max_iterations > 0 and iteration >= self.max_iterations:
+            # Add note if max iterations reached
+            if iteration >= self.max_iterations:
                 force_stop_reason = AgentStopReason.MAX_ITERATIONS_REACHED
-                final_response += "\n\n[Note: Maximum iteration limit reached]"
+                final_response += "\\n\\n[Note: Maximum iteration limit reached]"
 
             final_response, messages = self._apply_after_agent_hooks(
                 agent_state=agent_state,
@@ -1313,7 +1300,7 @@ class Executor:
             await self._prepare_async_execution(state)
 
             # 3.
-            while self.max_iterations is None or self.max_iterations <= 0 or state.iteration < self.max_iterations:
+            while state.iteration < self.max_iterations:
                 if self.stop_signal:
                     stop_response = "Stop signal received."
                     stop_response, state.messages = await asyncio.to_thread(
@@ -1330,7 +1317,7 @@ class Executor:
                     break
 
             # 4.
-            if self.max_iterations and self.max_iterations > 0 and state.iteration >= self.max_iterations:
+            if state.iteration >= self.max_iterations:
                 state.force_stop_reason = AgentStopReason.MAX_ITERATIONS_REACHED
                 state.final_response += "\\n\\n[Note: Maximum iteration limit reached]"
 
@@ -1522,7 +1509,7 @@ class Executor:
         desired_max_tokens = self.llm_config.max_tokens or 65536
         _ = max(1, min(desired_max_tokens, available_tokens))  # calculated_max_tokens (reserved for future use)
 
-        if self.max_iterations and self.max_iterations > 0 and state.iteration == self.max_iterations - 2:
+        if state.iteration == self.max_iterations - 2:
             state.messages.append(
                 Message.user(
                     "[SYSTEM NOTICE: You have 2 operational turns remaining in your turn budget. "
@@ -1530,7 +1517,7 @@ class Executor:
                 )
             )
 
-        if self.max_iterations and self.max_iterations > 0 and state.iteration == self.max_iterations - 1:
+        if state.iteration == self.max_iterations - 1:
             logger.info("🏁 Final synthesis iteration reached. Forcing text synthesis without tools.")
             tools_payload = None
             state.force_stop_reason = AgentStopReason.SUCCESS

@@ -21,10 +21,6 @@ input_schema:
     query:
       type: string
       description: Search query string
-    domain:
-      type: string
-      default: ""
-      description: Optional domain to restrict results to.
     num_results:
       type: integer
       default: 10

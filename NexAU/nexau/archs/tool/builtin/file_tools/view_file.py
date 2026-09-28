@@ -12,16 +12,13 @@ Directly composes:
 """
 
 import base64
-import hashlib
 import logging
 import os
-import re
 import mimetypes
 from pathlib import Path
 from typing import Any
 
 from nexau.archs.main_sub.agent_state import AgentState
-from nexau.archs.platform.path_helpers import get_session_brain_dir, get_project_cache_dir
 from nexau.archs.sandbox import BaseSandbox, SandboxStatus
 from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 from nexau.archs.tool.builtin.file_tools.list_directory import list_directory
@@ -44,95 +41,6 @@ VISUAL_EXTENSIONS = {
 
 def _is_visual_file(file_path: str) -> bool:
     return Path(file_path).suffix.lower() in VISUAL_EXTENSIONS
-
-
-def _format_tabular_output(
-    parsed_md: str,
-    target_path: str,
-    ext: str,
-    start: int | None = None,
-    end: int | None = None,
-    agent_state: AgentState | None = None,
-) -> dict[str, Any]:
-    """
-    Format tabular markdown output.
-    - If output fits within MAX_BYTES_PER_VIEW and no slicing requested: return directly (no truncation, 0 disk files).
-    - If output exceeds MAX_BYTES_PER_VIEW: keep beginning intact from line 1, truncate only the tail,
-      save the complete parsed markdown to cache, and append the clickable file link at the end.
-    """
-    lines = parsed_md.splitlines(keepends=True)
-    total_lines = len(lines)
-    total_chars = len(parsed_md)
-
-    # Normal case: content fits comfortably within limits and no specific window requested
-    if total_chars <= MAX_BYTES_PER_VIEW and start is None and end is None:
-        return {
-            "content": parsed_md,
-            "returnDisplay": f"Read {ext.upper().lstrip('.')} dataset: {Path(target_path).name} ({total_lines} lines)",
-        }
-
-    # Line window resolution
-    req_start = max(1, start) if start is not None else 1
-    req_end = min(total_lines, end) if end is not None else total_lines
-
-    # Build output from req_start without truncating the beginning
-    accumulated_lines = []
-    accumulated_chars = 0
-    SAFE_CHAR_CEILING = MAX_BYTES_PER_VIEW - 350  # reserve space for notice and link
-
-    last_idx = req_start - 1
-    for idx in range(req_start - 1, req_end):
-        line = lines[idx]
-        if (accumulated_chars + len(line)) > SAFE_CHAR_CEILING and accumulated_lines:
-            break
-        accumulated_lines.append(line)
-        accumulated_chars += len(line)
-        last_idx = idx
-
-    output_body = "".join(accumulated_lines)
-    is_truncated = (last_idx < total_lines - 1)
-
-    # When output is huge and truncated, save full un-truncated file to cache and provide clickable link
-    if is_truncated:
-        path_obj = Path(target_path)
-        stem = path_obj.stem
-        path_hash = hashlib.sha256(str(path_obj.resolve()).lower().encode()).hexdigest()[:8]
-        bundle_name = f"{stem}_{path_hash}_fast_bundle"
-
-        session_id = None
-        project_id = None
-        if agent_state and getattr(agent_state, "context", None):
-            ctx = getattr(agent_state, "context", None)
-            ctx_dict = getattr(ctx, "context", None) or (ctx if isinstance(ctx, dict) else {})
-            session_id = ctx_dict.get("session_id")
-            project_id = ctx_dict.get("project_id")
-
-        if session_id:
-            cache_dir = get_session_brain_dir(session_id, None) / "cache" / bundle_name
-        elif project_id:
-            cache_dir = get_project_cache_dir(project_id) / bundle_name
-        else:
-            cache_dir = Path.home() / ".nexau" / "cache" / bundle_name
-
-        try:
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            clean_stem = re.sub(r"[^\w\-]", "_", stem)
-            full_md_path = cache_dir / f"{clean_stem}_full_parsed.md"
-            full_md_path.write_text(parsed_md, encoding="utf-8")
-            full_md_uri = f"file:///{str(full_md_path).replace(chr(92), '/')}"
-            next_start = last_idx + 2
-            output_body += (
-                f"\n\n[Content truncated at {accumulated_chars:,} characters ({last_idx + 1}/{total_lines} lines). "
-                f"Full parsed file available at: {full_md_uri}\n"
-                f"To view next window, specify StartLine={next_start}, or open the cached file directly.]"
-            )
-        except Exception as e:
-            logger.debug("Failed to cache full parsed markdown: %s", e)
-
-    return {
-        "content": output_body,
-        "returnDisplay": f"Read {ext.upper().lstrip('.')} dataset: {Path(target_path).name} (lines {req_start}-{last_idx + 1} of {total_lines})",
-    }
 
 
 def view_file(
@@ -213,7 +121,10 @@ def view_file(
             session_id=sess_id,
             sheet_name=sheet_name,
         )
-        return _format_tabular_output(parsed_md, target_path, ext, start, end, agent_state=agent_state)
+        return {
+            "content": parsed_md,
+            "returnDisplay": f"Read Excel workbook ({ext}): {Path(target_path).name}",
+        }
 
     if ext in [".csv", ".tsv"]:
         from nexau.ingestion_pipeline.csv_to_md_parquet import parse_csv_to_markdown
@@ -232,7 +143,10 @@ def view_file(
             project_id=proj_id,
             session_id=sess_id,
         )
-        return _format_tabular_output(parsed_md, target_path, ext, start, end, agent_state=agent_state)
+        return {
+            "content": parsed_md,
+            "returnDisplay": f"Read CSV dataset ({ext}): {Path(target_path).name}",
+        }
 
     # 4. Antigravity & Gemini CLI-Grade Native PDF Ingestion Engine
     if ext == ".pdf":

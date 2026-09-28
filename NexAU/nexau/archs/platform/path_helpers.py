@@ -142,16 +142,18 @@ def scaffold_session_storage(session_id: str, project_id: str | None = None) -> 
     ~/.nexau/brain/<session_id>/
       ├── .system_generated/
       │   ├── logs/
-      │   └── tasks/
+      │   ├── tasks/
+      │   └── messages/
       ├── .user_uploaded/
-      ├── working_papers/
+      ├── media/
       └── scratch/
     """
     brain_dir = get_session_brain_dir(session_id, project_id)
     (brain_dir / ".system_generated" / "logs").mkdir(parents=True, exist_ok=True)
     (brain_dir / ".system_generated" / "tasks").mkdir(parents=True, exist_ok=True)
+    (brain_dir / ".system_generated" / "messages").mkdir(parents=True, exist_ok=True)
     (brain_dir / ".user_uploaded").mkdir(parents=True, exist_ok=True)
-    (brain_dir / "working_papers").mkdir(parents=True, exist_ok=True)
+    (brain_dir / "media").mkdir(parents=True, exist_ok=True)
     (brain_dir / "scratch").mkdir(parents=True, exist_ok=True)
     (brain_dir / "cache").mkdir(parents=True, exist_ok=True)
     return brain_dir
@@ -217,3 +219,40 @@ def native_path_to_shell_path(path: str | Path) -> str:
         return f"/{drive.lower()}"
 
     return raw.replace("\\", "/")
+
+
+def resolve_deliverables_dir(
+    working_directory: str | Path | None = None,
+    brain_directory: str | Path | None = None,
+) -> Path:
+    """Resolve and scaffold the visible deliverables directory for reports, working papers, and proofs.
+    If working_directory exists: <working_directory>/Audit_Deliverables (or legacy NexAU_Outputs).
+    Else: <brain_directory>/working_papers.
+    """
+    if working_directory and str(working_directory) != "No Repo" and Path(working_directory).exists():
+        deliverables_dir = Path(working_directory) / "Audit_Deliverables"
+        legacy_dir = Path(working_directory) / "NexAU_Outputs"
+        out_dir = legacy_dir if (legacy_dir.exists() and not deliverables_dir.exists()) else deliverables_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
+    if brain_directory:
+        wp_dir = Path(brain_directory) / "working_papers"
+        wp_dir.mkdir(parents=True, exist_ok=True)
+        return wp_dir
+    fallback = get_nexau_home() / "outputs"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+
+def resolve_sandbox_work_dir(
+    working_directory: str | Path | None = None,
+    scratch_directory: str | Path | None = None,
+    brain_directory: str | Path | None = None,
+) -> str:
+    """Resolve the sandbox execution directory: workspace root if valid, else session scratch/brain."""
+    if working_directory and str(working_directory) != "No Repo" and Path(working_directory).exists():
+        return str(Path(working_directory).resolve())
+    for fallback in [scratch_directory, brain_directory]:
+        if fallback and Path(fallback).exists():
+            return str(Path(fallback).resolve())
+    return str(Path.cwd().resolve())

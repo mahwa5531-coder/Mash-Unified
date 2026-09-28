@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from nexau.archs.main_sub.agent_context import GlobalStorage
@@ -232,7 +232,7 @@ class SessionManager:
 
         if agent_name is not None:
             agent.agent_name = agent_name
-        agent.last_updated = datetime.now()
+        agent.last_updated = datetime.now(timezone.utc)
         return await self._engine.update(agent)
 
     # Initialization
@@ -277,7 +277,7 @@ class SessionManager:
         merged_context = dict(session.context or {})
         merged_context.update(context)
         session.context = merged_context
-        session.updated_at = datetime.now()
+        session.updated_at = datetime.now(timezone.utc)
         return await self._update_session(session)
 
     async def update_session_storage(
@@ -299,7 +299,7 @@ class SessionManager:
         """
         session = await self._get_or_create_session(user_id=user_id, session_id=session_id)
         session.storage = storage
-        session.updated_at = datetime.now()
+        session.updated_at = datetime.now(timezone.utc)
         return await self._update_session(session)
 
     async def update_session_sandbox(
@@ -311,7 +311,7 @@ class SessionManager:
     ) -> SessionModel:
         session = await self._get_or_create_session(user_id=user_id, session_id=session_id)
         session.sandbox_state = sandbox_state
-        session.updated_at = datetime.now()
+        session.updated_at = datetime.now(timezone.utc)
         return await self._update_session(session)
 
     async def update_session_state(
@@ -342,7 +342,7 @@ class SessionManager:
         merged_context.update(context)
         session.context = merged_context
         session.storage = storage
-        session.updated_at = datetime.now()
+        session.updated_at = datetime.now(timezone.utc)
         return await self._update_session(session)
 
     # -----------------------------------------------------------------------
@@ -470,5 +470,5 @@ class SessionManager:
         """
         session = await self._get_or_create_session(user_id=user_id, session_id=session_id)
         session.pending_tool_calls = pending_tool_calls
-        session.updated_at = datetime.now()
+        session.updated_at = datetime.now(timezone.utc)
         return await self._update_session(session)

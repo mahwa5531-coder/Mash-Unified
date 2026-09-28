@@ -97,5 +97,5 @@ def parse_csv_to_markdown(
             f"> To analyze or query this full {total_rows}-row dataset, run Python with polars (or write a Python script):\n"
             f"> `python -c \"import polars as pl; df = pl.read_parquet(r'{parquet_path}'); print(df.describe())\"`\n"
         )
-
+        
     return "\n".join(output_parts)

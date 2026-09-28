@@ -49,7 +49,7 @@ _GREP_LINE_PATTERN: re.Pattern[str] = re.compile(r":(\d+):(.*)$")
 _WINDOWS_DRIVE_PATH_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z]:[\\/]")
 
 
-def _find_rg_executable() -> str | None:
+def _find_rg_executable() -> str:
     """Locate ripgrep executable: bundled with app or on system PATH."""
     rg_in_path = shutil.which("rg")
     if rg_in_path:
@@ -60,7 +60,7 @@ def _find_rg_executable() -> str | None:
     exe_name = "rg.exe" if is_win else "rg"
     candidates = [
         here.parents[4] / "bin" / exe_name,
-        here.parents[5] / "connector" / "bin" / exe_name,
+        here.parents[5] / "backend" / "bin" / exe_name,
         here.parents[5] / "NexAU" / "bin" / exe_name,
         Path(sys.prefix) / "Scripts" / exe_name,
         Path(sys.prefix) / "bin" / exe_name,
@@ -68,14 +68,12 @@ def _find_rg_executable() -> str | None:
     for c in candidates:
         if c.exists() and c.is_file():
             return str(c)
-    return None
+    return "rg"
 
 
 def _rg_available(sandbox: BaseSandbox) -> bool:
     """Check if ripgrep (rg) is available inside the sandbox or bundled."""
     exe = _find_rg_executable()
-    if not exe:
-        return False
     prefix = "& " if sys.platform == "win32" else ""
     try:
         res = sandbox.execute_shell(f'{prefix}"{exe}" --version', timeout=5000)
@@ -190,71 +188,6 @@ def _rg_grep(
             matches.append(parsed)
             if len(matches) >= max_matches:
                 break
-    return matches
-
-
-def _python_grep(
-    pattern: str,
-    search_path: str,
-    include: str | None,
-    max_matches: int,
-    excludes: list[str],
-    sandbox: BaseSandbox,
-) -> list[dict[str, Any]]:
-    """Pure Python grep implementation as fallback when rg is not available."""
-    import os, fnmatch
-    matches: list[dict[str, Any]] = []
-
-    try:
-        regex = re.compile(pattern, re.IGNORECASE)
-    except re.error:
-        return matches
-
-    def should_exclude(path: str) -> bool:
-        parts = Path(path).parts
-        for part in parts:
-            for exclude in excludes:
-                if fnmatch.fnmatch(part, exclude):
-                    return True
-        return False
-
-    def matches_include(filename: str) -> bool:
-        if not include:
-            return True
-        return fnmatch.fnmatch(filename, include)
-
-    for root, dirnames, filenames in os.walk(search_path):
-        dirnames[:] = [d for d in dirnames if not any(fnmatch.fnmatch(d, ex) for ex in excludes)]
-        for fname in filenames:
-            ext = Path(fname).suffix.lower()
-            if ext in BINARY_EXTENSIONS:
-                continue
-            if include and not matches_include(fname):
-                continue
-            full_path = os.path.join(root, fname)
-            try:
-                rel_path = os.path.relpath(full_path, search_path)
-            except Exception:
-                rel_path = full_path
-            if should_exclude(rel_path):
-                continue
-            try:
-                with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
-                    for line_num, line in enumerate(f, 1):
-                        if regex.search(line):
-                            matches.append(
-                                {
-                                    "filePath": rel_path.replace("\\", "/"),
-                                    "lineNumber": line_num,
-                                    "line": line.rstrip("\n\r"),
-                                    "lineContent": line.rstrip("\n\r"),
-                                }
-                            )
-                            if len(matches) >= max_matches:
-                                return matches
-            except Exception:
-                continue
-
     return matches
 
 
@@ -374,39 +307,28 @@ def search_file_content(
 
         search_dir_display = dir_path or "."
 
-        # Execute ripgrep (system or bundled), with pure Python fallback
+        # Execute ripgrep (bundled or system)
         max_matches = DEFAULT_TOTAL_MAX_MATCHES
-        if _rg_available(sandbox):
-            try:
-                matches = _rg_grep(
-                    pattern=pattern,
-                    search_path=search_path,
-                    include=include,
-                    max_matches=max_matches,
-                    excludes=DEFAULT_EXCLUDES,
-                    sandbox=sandbox,
-                )
-                strategy_used = "ripgrep"
-            except Exception:
-                matches = _python_grep(
-                    pattern=pattern,
-                    search_path=search_path,
-                    include=include,
-                    max_matches=max_matches,
-                    excludes=DEFAULT_EXCLUDES,
-                    sandbox=sandbox,
-                )
-                strategy_used = "python fallback"
-        else:
-            matches = _python_grep(
-                pattern=pattern,
-                search_path=search_path,
-                include=include,
-                max_matches=max_matches,
-                excludes=DEFAULT_EXCLUDES,
-                sandbox=sandbox,
-            )
-            strategy_used = "python fallback"
+        if not _rg_available(sandbox):
+            error_msg = "ripgrep (rg) binary is required for search_file_content and could not be executed."
+            return {
+                "content": f"Error: {error_msg}",
+                "returnDisplay": "Error: ripgrep unavailable",
+                "error": {
+                    "message": error_msg,
+                    "type": "RIPGREP_UNAVAILABLE",
+                },
+            }
+
+        matches = _rg_grep(
+            pattern=pattern,
+            search_path=search_path,
+            include=include,
+            max_matches=max_matches,
+            excludes=DEFAULT_EXCLUDES,
+            sandbox=sandbox,
+        )
+        strategy_used = "ripgrep"
 
         # Build location description
         search_location = f'in path "{search_dir_display}"'

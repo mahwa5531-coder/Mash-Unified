@@ -17,98 +17,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
-import httpx
-import logging
 
 from nexau.archs.permissions.helpers import check_url_permission
 from nexau.archs.permissions.types import AskPermission, PermissionDenied
 
-logger = logging.getLogger(__name__)
-
-MAX_WEB_CONTENT_LENGTH = 64 * 1024  # 64KB
-
-
-def web_read(
-    url: str,
-    timeout: int = 100,
-    use_html_parser: bool = False,
-) -> dict[str, Any]:
-    """Fetch and read content from a web URL directly via HTTP without legacy parsers."""
-    try:
-        user_agent = "NexAU-Bot/1.0 (Mozilla/5.0 (Windows NT 10.0; Win64; x64))"
-        headers = {
-            "User-Agent": user_agent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-        }
-
-        with httpx.Client(timeout=timeout) as client:
-            response = client.get(url, headers=headers)
-            response.raise_for_status()
-
-        content = response.text
-        content_type = response.headers.get("content-type", "")
-
-        result: dict[str, Any] = {
-            "status": "success",
-            "url": url,
-            "status_code": response.status_code,
-            "content_type": content_type,
-            "content_length": len(content),
-            "method": "direct_http",
-        }
-
-        if "html" in content_type.lower():
-            try:
-                from bs4 import BeautifulSoup
-                import markdownify
-
-                soup = BeautifulSoup(content, "html.parser")
-                for tag in soup(["script", "style", "noscript", "svg"]):
-                    tag.decompose()
-
-                md_text = markdownify.markdownify(str(soup), heading_style="ATX")
-                cleaned_lines = []
-                prev_empty = False
-                for line in md_text.splitlines():
-                    stripped = line.strip()
-                    if not stripped:
-                        if not prev_empty:
-                            cleaned_lines.append("")
-                            prev_empty = True
-                    else:
-                        cleaned_lines.append(line)
-                        prev_empty = False
-                text = "\n".join(cleaned_lines).strip()
-
-                MAX_CAP = 32 * 1024
-                text_bytes = text.encode("utf-8")
-                if len(text_bytes) > MAX_CAP:
-                    text = text_bytes[:MAX_CAP].decode("utf-8", errors="ignore") + "\n\n... [Content truncated at 32KB to prevent context bloat.]"
-                    result["text_truncated"] = True
-
-                result["extracted_text"] = text
-                result["title"] = soup.title.string.strip() if soup.title and soup.title.string else ""
-            except Exception as e:
-                result["text_extraction_error"] = str(e)
-        else:
-            content_bytes = content.encode("utf-8")
-            if len(content_bytes) > MAX_WEB_CONTENT_LENGTH:
-                result["content"] = content_bytes[:MAX_WEB_CONTENT_LENGTH].decode("utf-8", errors="ignore") + "..."
-                result["content_truncated"] = True
-            else:
-                result["content"] = content
-
-        return result
-    except httpx.TimeoutException:
-        return {"status": "error", "error": f"Request timed out after {timeout} seconds", "url": url, "error_type": "timeout"}
-    except httpx.HTTPStatusError as e:
-        return {"status": "error", "error": f"HTTP {e.response.status_code}: {str(e)}", "url": url, "error_type": "http_error", "status_code": e.response.status_code}
-    except Exception as e:
-        return {"status": "error", "error": str(e), "error_type": type(e).__name__, "url": url}
-
-
-_web_read = web_read
+from .web_tool import web_read as _web_read
 
 if TYPE_CHECKING:
     from nexau.archs.main_sub.framework_context import FrameworkContext

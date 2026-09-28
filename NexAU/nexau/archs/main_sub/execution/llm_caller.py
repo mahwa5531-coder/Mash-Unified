@@ -16,7 +16,7 @@ RFC-0006: structured tool calling  provider
 module,  ``llm_config.api_type``  neutral structured
 tool definitions  OpenAI / Anthropic / Gemini  provider schema. 
 """
-import os
+
 import asyncio
 import contextvars
 import functools
@@ -34,25 +34,24 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 if TYPE_CHECKING:
     from nexau.archs.main_sub.framework_context import FrameworkContext
 
-import uuid
+import anthropic
 import httpx
 import openai
+import requests
+try:
+    from google import genai
+    from google.genai import types as genai_types
+except (ImportError, AttributeError):
+    genai = None  # type: ignore[assignment]
+    genai_types = None  # type: ignore[assignment]
 from openai import AsyncStream, Stream
-from openai.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
-from openai.types.chat.chat_completion import Choice as ChatCompletionChoice
-from openai.types.chat.chat_completion_chunk import (
-    Choice as ChatCompletionChunkChoice,
-    ChoiceDelta,
-    ChoiceDeltaToolCall,
-    ChoiceDeltaToolCallFunction,
-)
-from openai.types.chat.chat_completion_message_tool_call import (
-    ChatCompletionMessageToolCall,
-    Function,
-)
+from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 from nexau.archs.llm.llm_aggregators import (
+    AnthropicEventAggregator,
+    GeminiRestEventAggregator,
     OpenAIChatCompletionAggregator,
+    OpenAIResponsesAggregator,
 )
 from nexau.archs.llm.llm_aggregators.events import Event
 from nexau.archs.llm.llm_config import LLMConfig
@@ -60,12 +59,17 @@ from nexau.archs.main_sub.token_trace_session import TokenTraceSession
 from nexau.archs.tool.tool import (
     StructuredToolDefinitionLike,
     normalize_structured_tool_definition,
+    structured_tool_definition_to_anthropic,
     structured_tool_definition_to_openai,
 )
 from nexau.archs.tracer.context import TraceContext, get_current_span
 from nexau.archs.tracer.core import BaseTracer, SpanType
 from nexau.core.messages import Message, Role, ToolResultBlock, ToolUseBlock
 from nexau.core.serializers.openai_chat import serialize_ump_to_openai_chat_payload
+from nexau.core.serializers.openai_responses import (
+    normalize_openai_responses_api_tools,
+    prepare_openai_responses_api_input,
+)
 
 from ..agent_state import AgentState
 from ..tool_call_modes import (
@@ -158,6 +162,109 @@ def _log_llm_debug_request(messages: Sequence[Message]) -> None:
 
 def _log_llm_debug_response(model_response: ModelResponse) -> None:
     logger.info(f"🐛 [DEBUG] LLM Response: {model_response.render_text()}")
+
+
+# Layer 4: catch `400 Invalid signature in thinking block` (legacy rows
+# whose signature is non-empty but invalid - corrupted / model-version
+# stale / cross-gateway), strip all ReasoningBlock signatures, retry once.
+# Layer 3's default unsigned-thinking-drop branch then handles the
+# stripped messages naturally. See commit f8e6faa5 / PR #554 for the
+# full bug story.
+
+
+_THINKING_SIGNATURE_ERROR_MARKERS = (
+    "invalid `signature` in `thinking`",
+    "invalid signature in thinking",
+    'invalid "signature" in "thinking"',
+)
+
+
+def record_thinking_signature_event(layer: str, **fields: Any) -> None:
+    """Tier-1+2 observability for the orphan-thinking-signature defense.
+
+    Emits a structured log line AND attaches counters + context fields to
+    the currently-active trace span (if any). Each defense layer (L1
+    write-boundary coerce / L3 outbound drop / L4 400-retry) calls this
+    when its branch fires, so production has a queryable trail:
+
+      - Log aggregation (Loki / ELK): grep for ``thinking_signature.layer1``
+        to count occurrences by model / agent / time.
+      - Langfuse traces: filter by attribute
+        ``thinking_signature.layerN`` to see the full conversation that
+        triggered it.
+
+    Safe to call when no tracer is active (span attrs become a no-op).
+    """
+    logger.warning("thinking_signature.%s", layer, extra={"orphan_thinking_event": True, **fields})
+    span = get_current_span()
+    if span is None:
+        return
+    key = f"thinking_signature.{layer}"
+    span.attributes[key] = int(span.attributes.get(key, 0)) + 1
+    for k, v in fields.items():
+        span.attributes[f"{key}.{k}"] = v
+
+
+def _is_thinking_signature_error(exc: BaseException) -> bool:
+    """True iff `exc` is Anthropic's `400 Invalid signature in thinking block`.
+
+    The status-extraction logic duplicates `llm_failover._extract_status_code`
+    by a few lines, but that helper is module-private (pyright forbids the
+    cross-module use). Promoting it to a shared module is a refactor for
+    another PR.
+    """
+    if not isinstance(exc, anthropic.APIStatusError) or exc.status_code != 400:
+        return False
+    blob_lower = (str(getattr(exc, "message", "") or "") + " " + str(exc)).lower()
+    return any(marker in blob_lower for marker in _THINKING_SIGNATURE_ERROR_MARKERS)
+
+
+def _strip_or_raise_on_signature_error(
+    exc: BaseException,
+    params: "ModelCallParams | None",
+    label: str,
+) -> "ModelCallParams":
+    """If `exc` is the Anthropic invalid-signature 400, log + return
+    `params` with all ReasoningBlock signatures stripped (ready for
+    one-shot retry). Otherwise re-raise so unrelated errors propagate.
+
+    Called from inside an `except anthropic.APIStatusError` block of each
+    of the 4 Anthropic call paths (sync × async × stream × non-stream).
+    """
+    if not _is_thinking_signature_error(exc):
+        raise exc
+    assert params is not None, "Layer 4 retry requires a ModelCallParams"
+    record_thinking_signature_event(
+        "layer4_retry",
+        path=label,
+        error_message=str(getattr(exc, "message", "") or "")[:200],
+        run_id=getattr(params.agent_state, "run_id", None) if params.agent_state else None,
+    )
+    return replace(params, messages=_strip_thinking_signatures(params.messages))
+
+
+def _strip_thinking_signatures(messages: list[Message]) -> list[Message]:
+    """Return a shallow-cloned UMP history with every ReasoningBlock's
+    signature cleared to None.
+
+    Used by Layer 4's retry path: after Anthropic rejects a request with
+    "Invalid signature in thinking block", we don't know which block has
+    the bad signature, so we clear them all. The existing serializer
+    (Layer 3) then drops the now-unsigned reasoning blocks via its default
+    branch - no new parameter through the adapter/serializer chain.
+    """
+    from nexau.core.messages import ReasoningBlock
+
+    out: list[Message] = []
+    for msg in messages:
+        new_content: list[Any] = []
+        for block in msg.content:
+            if isinstance(block, ReasoningBlock) and block.signature is not None:
+                new_content.append(block.model_copy(update={"signature": None}))
+            else:
+                new_content.append(block)
+        out.append(msg.model_copy(update={"content": new_content}))
+    return out
 
 
 class StreamIdleTimeoutError(Exception):
@@ -1006,10 +1113,6 @@ class LLMCaller:
                     return None
 
                 err_str = str(e).lower()
-                if "after shutdown" in err_str or "cannot schedule new futures" in err_str:
-                    logger.warning("🛑 LLM call failed due to thread pool shutdown: %s; aborting retries immediately", e)
-                    return None
-
                 if "requires more credits" in err_str or "fewer max_tokens" in err_str or "402" in err_str:
                     import re
                     afford_match = re.search(r"can only afford (\d+)", err_str)
@@ -1043,21 +1146,6 @@ class LLMCaller:
                 backoff = min(backoff * 2, self.retry_backoff_max_seconds)
         return None
 
-    def _get_llm_thread_pool(self) -> ThreadPoolExecutor:
-        """Get or lazily recreate the dedicated LLM thread pool.
-
-        ponytail: If the pool was shut down by a previous interrupt, stop,
-        or cleanup cycle, re-instantiate it on demand so subsequent turns
-        and sub-calls do not fail with 'cannot schedule new futures after shutdown'.
-        """
-        pool = getattr(self, "_llm_thread_pool", None)
-        if pool is None or getattr(pool, "_shutdown", False):
-            self._llm_thread_pool = ThreadPoolExecutor(
-                max_workers=4,
-                thread_name_prefix="llm-call",
-            )
-        return self._llm_thread_pool
-
     async def _run_sync_in_llm_pool(
         self,
         func: Any,
@@ -1074,8 +1162,7 @@ class LLMCaller:
         loop = asyncio.get_running_loop()
         ctx = contextvars.copy_context()
         func_call = functools.partial(ctx.run, func, *args)
-        pool = self._get_llm_thread_pool()
-        return await loop.run_in_executor(pool, func_call)
+        return await loop.run_in_executor(self._llm_thread_pool, func_call)
 
     def shutdown_thread_pool(self) -> None:
         """Shut down the dedicated LLM thread pool without waiting.
@@ -1083,13 +1170,7 @@ class LLMCaller:
         Called by Executor.cleanup() during force stop to release
         middleware-path worker threads immediately.
         """
-        pool = getattr(self, "_llm_thread_pool", None)
-        if pool is not None:
-            try:
-                pool.shutdown(wait=False, cancel_futures=True)
-            except Exception:
-                pass
-            self._llm_thread_pool = None
+        self._llm_thread_pool.shutdown(wait=False, cancel_futures=True)
 
     async def _call_once_async_cancellable(
         self,
@@ -1146,8 +1227,43 @@ def call_llm_with_different_client(
     tracer: BaseTracer | None = None,
 ) -> ModelResponse:
     """Call LLM with the given messages and return response content."""
-    # ponytail: Bifrost standardizes all LLM traffic into OpenAI chat completion
-    if llm_config.api_type == "generate_with_token":
+    if llm_config.api_type == "anthropic_chat_completion":
+        return call_llm_with_anthropic_chat_completion(
+            client,
+            kwargs,
+            middleware_manager=middleware_manager,
+            model_call_params=model_call_params,
+            llm_config=llm_config,
+            tracer=tracer,
+            cache_control_ttl=llm_config.cache_control_ttl,
+        )
+    elif llm_config.api_type == "openai_responses":
+        return call_llm_with_openai_responses(
+            client,
+            kwargs,
+            middleware_manager=middleware_manager,
+            model_call_params=model_call_params,
+            llm_config=llm_config,
+            tracer=tracer,
+        )
+    elif llm_config.api_type == "openai_chat_completion":
+        return call_llm_with_openai_chat_completion(
+            client,
+            kwargs,
+            middleware_manager=middleware_manager,
+            model_call_params=model_call_params,
+            llm_config=llm_config,
+            tracer=tracer,
+        )
+    elif llm_config.api_type in ("gemini_rest", "google_genai"):
+        return call_llm_with_google_genai(
+            kwargs,
+            middleware_manager=middleware_manager,
+            model_call_params=model_call_params,
+            llm_config=llm_config,
+            tracer=tracer,
+        )
+    elif llm_config.api_type == "generate_with_token":
         return call_llm_with_generate_with_token(
             client,
             kwargs,
@@ -1155,14 +1271,8 @@ def call_llm_with_different_client(
             llm_config=llm_config,
             tracer=tracer,
         )
-    return call_llm_with_openai_chat_completion(
-        client,
-        kwargs,
-        middleware_manager=middleware_manager,
-        model_call_params=model_call_params,
-        llm_config=llm_config,
-        tracer=tracer,
-    )
+    else:
+        raise ValueError(f"Invalid API type: {llm_config.api_type}")
 
 
 def _safe_int(value: Any) -> int:
@@ -1419,306 +1529,245 @@ def call_llm_with_generate_with_token(
 
 def _adapt_structured_tools_for_provider(
     tools: Sequence[StructuredToolDefinitionLike] | None,
-    provider_target: StructuredProviderTarget = "openai",
+    provider_target: StructuredProviderTarget,
     *,
     tool_streaming: bool = True,
     strict: bool = False,
 ) -> list[Mapping[str, object]] | None:
-    """Adapt neutral structured tools for OpenAI / Bifrost gateway."""
+    """Adapt neutral structured tools for the selected provider.
+
+    RFC-0006: Provider 
+
+     neutral / compatibility definition, 
+    provider  schema; Gemini  neutral definition  adapter. 
+
+    Parameters
+    ----------
+    tool_streaming:
+        Forwarded to :func:`structured_tool_definition_to_anthropic`.  When
+        *False*, ``eager_input_streaming`` is omitted from the Anthropic tool
+        schema so that providers rejecting unknown fields are not affected.
+    strict:
+        When *True*, enforce OpenAI Structured Outputs schema constraints (strict: true).
+    """
+
     if not tools:
         return None
 
     adapted_tools: list[Mapping[str, object]] = []
     for tool in tools:
         normalized = normalize_structured_tool_definition(tool)
-        adapted_tools.append(structured_tool_definition_to_openai(normalized, strict=strict))
+        if provider_target == "openai":
+            adapted_tools.append(structured_tool_definition_to_openai(normalized, strict=strict))
+        elif provider_target == "anthropic":
+            adapted_tools.append(structured_tool_definition_to_anthropic(normalized, tool_streaming=tool_streaming))
+        elif provider_target == "gemini":
+            adapted_tools.append(normalized)
+        else:  # pragma: no cover - guarded by provider target resolution
+            raise ValueError(f"Unsupported structured provider target: {provider_target}")
 
     return adapted_tools
 
 
-# ponytail: Bifrost Cloud Gateway + Mock LLM Test Engine
-def _build_bifrost_headers(
-    llm_config: LLMConfig | None,
+def _strip_responses_api_artifacts(messages: list[Any]) -> list[Any]:
+    """Remove Responses API-only artifacts from generic chat messages."""
+
+    sanitized: list[Any] = []
+
+    for message in messages or []:
+        if not isinstance(message, Mapping):
+            sanitized.append(message)
+            continue
+
+        message_mapping = cast(Mapping[str, Any], message)
+        cleaned: dict[str, Any] = dict(message_mapping)
+        cleaned.pop("response_items", None)
+        cleaned.pop("reasoning", None)
+        sanitized.append(cleaned)
+
+    return sanitized
+
+
+# Anthropic rejects requests carrying more than four ``cache_control``
+# breakpoints with a 400 error. We allocate them prefix-first (system blocks
+# before the trailing user block) so the largest stable prefix stays cached.
+_MAX_CACHE_CONTROL_BREAKPOINTS = 4
+
+
+def _apply_anthropic_cache_control(
+    system_messages: list[dict[str, Any]],
+    user_messages: list[dict[str, Any]],
+    build_cache_control: Callable[[], dict[str, str]],
+) -> None:
+    """Apply Anthropic ``cache_control`` to system and user message blocks.
+
+    System blocks carry a ``_cache`` flag from ``SystemPromptBlock``
+    configuration; when absent the default is to cache. The total number of
+    breakpoints is clamped to :data:`_MAX_CACHE_CONTROL_BREAKPOINTS` because
+    Anthropic returns a 400 error when a request exceeds four. Breakpoints are
+    assigned prefix-first so the longest stable prefix remains cacheable.
+    """
+    remaining = _MAX_CACHE_CONTROL_BREAKPOINTS
+
+    for sys_block in system_messages:
+        should_cache = sys_block.pop("_cache", True)
+        if should_cache and remaining > 0:
+            sys_block["cache_control"] = build_cache_control()
+            remaining -= 1
+
+    if remaining > 0 and user_messages and user_messages[-1].get("content"):
+        content = cast(list[dict[str, Any]] | str | None, user_messages[-1].get("content"))
+        if isinstance(content, list) and content:
+            # RFC-0014: thinking/redacted_thinking blocks cache_control
+            no_cache_types = {"thinking", "redacted_thinking"}
+            for block in content:
+                if block.get("type") not in no_cache_types:
+                    block["cache_control"] = build_cache_control()
+                    break
+
+
+def call_llm_with_anthropic_chat_completion(
+    client: Any,
+    kwargs: dict[str, Any],
+    *,
+    middleware_manager: MiddlewareManager | None = None,
     model_call_params: ModelCallParams | None = None,
-) -> dict[str, str]:
-    """Build telemetry and session headers for Bifrost / Cloud Gateway."""
-    headers: dict[str, str] = {}
-    try:
-        from nexau.archs.platform.crypto_vault import get_auth_metadata
-        from nexau.archs.platform.path_helpers import get_installation_id
+    llm_config: LLMConfig | None = None,
+    tracer: BaseTracer | None = None,
+    cache_control_ttl: str | None = None,
+) -> ModelResponse:
+    """Call Anthropic chat completion with the given messages and return response content."""
+    stream_requested = bool(kwargs.pop("stream", False))
 
-        meta = get_auth_metadata()
-        headers["X-Machine-ID"] = get_installation_id()
-        headers["X-Client-Version"] = "Mash-Desktop/1.0.0"
-        if meta.get("email"):
-            headers["X-User-ID"] = str(meta["email"])
-    except Exception:
-        pass
+    # Check if tracing is active (there's a current span and we have a tracer)
+    should_trace = tracer is not None and get_current_span() is not None
 
-    session_id: str | None = None
-    if model_call_params:
-        if getattr(model_call_params, "session_id", None):
-            session_id = str(model_call_params.session_id)
-        elif getattr(model_call_params, "agent_state", None) and getattr(model_call_params.agent_state, "session_id", None):
-            session_id = str(model_call_params.agent_state.session_id)
-        elif getattr(model_call_params, "token_trace_session", None) and getattr(model_call_params.token_trace_session, "session_id", None):
-            session_id = str(model_call_params.token_trace_session.session_id)
+    def _build_cache_control() -> dict[str, str]:
+        cc: dict[str, str] = {"type": "ephemeral"}
+        if cache_control_ttl:
+            cc["ttl"] = cache_control_ttl
+        return cc
 
-    if llm_config:
-        if not session_id and hasattr(llm_config, "session_id") and llm_config.session_id:
-            session_id = str(llm_config.session_id)
-        if not session_id and hasattr(llm_config, "extra_params") and isinstance(llm_config.extra_params, dict):
-            extra = llm_config.extra_params
-            session_id = str(extra.get("session_id") or (extra.get("extra_params") or {}).get("session_id") or "") or None
+    def _apply_cache_control(
+        system_messages: list[dict[str, Any]],
+        user_messages: list[dict[str, Any]],
+    ) -> None:
+        _apply_anthropic_cache_control(system_messages, user_messages, _build_cache_control)
 
-        if hasattr(llm_config, "default_headers") and llm_config.default_headers:
-            headers.update(llm_config.default_headers)
+    def _build_anthropic_messages() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        if type(model_call_params) is not ModelCallParams:
+            raise ValueError("Anthropic calls require explicit ModelCallParams with UMP messages")
 
-    if session_id:
-        headers["X-Session-ID"] = session_id
+        from nexau.core.adapters.anthropic_messages import AnthropicMessagesAdapter
 
-    return headers
+        return AnthropicMessagesAdapter(
+            allow_unsigned_thinking=bool(llm_config and llm_config.allow_unsigned_thinking),
+        ).to_vendor_format(model_call_params.messages)
 
+    def llm_call() -> Any:
+        # Anthropic
+        system_messages, user_messages = _build_anthropic_messages()
+        _apply_cache_control(system_messages, user_messages)
 
-def _is_mock_llm(llm_config: LLMConfig | None) -> bool:
-    """Check if offline mock mode is active for testing without Bifrost."""
-    if os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes"):
-        return True
-    if os.getenv("BIFROST_MOCK", "").lower() in ("true", "1", "yes"):
-        return True
-    if llm_config:
-        key = (llm_config.api_key or "").strip().lower()
-        if key in ("mock", "test", "none") or key.startswith("mock-"):
-            return True
-        if (llm_config.base_url or "").strip().lower() in ("mock", "http://mock"):
-            return True
-    return False
+        new_kwargs = kwargs.copy()
+        new_kwargs.pop("messages", None)
+        new_kwargs.pop("anthropic_cache_control_ttl", None)
 
+        # Build the exact kwargs for tracing
+        api_kwargs: dict[str, Any] = {"system": system_messages, "messages": user_messages, **new_kwargs}
 
-def _generate_mock_completion_chunks(
-    messages: list[Any],
-    tools: list[Any] | None = None,
-    model_name: str = "mock-bifrost",
-) -> list[ChatCompletionChunk]:
-    """Generate simulated chunks for offline testing without hitting network/Bifrost."""
-    last_text = ""
-    is_tool_result = False
-    for msg in reversed(messages or []):
-        if isinstance(msg, dict):
-            r = msg.get("role")
-            if r == "tool":
-                is_tool_result = True
-                break
-            if r == "user":
-                last_text = str(msg.get("content") or "")
-                break
-        elif hasattr(msg, "role"):
-            r = str(getattr(msg, "role", ""))
-            if "tool" in r.lower():
-                is_tool_result = True
-                break
-            if "user" in r.lower():
-                last_text = str(getattr(msg, "content", ""))
-                break
+        if should_trace and tracer is not None:
+            trace_ctx = TraceContext(tracer, "Anthropic messages.create", SpanType.LLM, inputs=api_kwargs)
+            with trace_ctx:
+                resp = client.messages.create(**api_kwargs)
+                trace_ctx.set_outputs(_to_serializable_dict(resp))
+                return resp
+        else:
+            resp = client.messages.create(**api_kwargs)
+            return resp
 
-    cmpl_id = f"mock-cmpl-{uuid.uuid4().hex[:8]}"
-    created = int(time.time())
+    if not stream_requested:
+        try:
+            response = llm_call()
+        except anthropic.APIStatusError as exc:
+            model_call_params = _strip_or_raise_on_signature_error(exc, model_call_params, "non-stream")
+            response = llm_call()
+        return ModelResponse.from_anthropic_message(response)
 
-    if is_tool_result:
-        return [
-            ChatCompletionChunk(
-                id=cmpl_id,
-                choices=[ChatCompletionChunkChoice(
-                    index=0,
-                    delta=ChoiceDelta(role="assistant", content="Tool execution completed. Offline test verification successful."),
-                    finish_reason=None,
-                )],
-                created=created,
-                model=model_name,
-                object="chat.completion.chunk",
-            ),
-            ChatCompletionChunk(
-                id=cmpl_id,
-                choices=[ChatCompletionChunkChoice(index=0, delta=ChoiceDelta(), finish_reason="stop")],
-                created=created,
-                model=model_name,
-                object="chat.completion.chunk",
-            ),
-        ]
+    def llm_stream_call() -> ModelResponse:
+        system_messages, user_messages = _build_anthropic_messages()
+        _apply_cache_control(system_messages, user_messages)
 
-    lower_text = last_text.lower()
-    if ("[test_tool]" in lower_text or "test tool" in lower_text) and tools:
-        first_tool = tools[0]
-        tool_name = "view_file"
-        tool_args = "{}"
-        if isinstance(first_tool, dict):
-            fn = first_tool.get("function", {})
-            tool_name = fn.get("name", "view_file")
-        return [
-            ChatCompletionChunk(
-                id=cmpl_id,
-                choices=[ChatCompletionChunkChoice(
-                    index=0,
-                    delta=ChoiceDelta(
-                        role="assistant",
-                        tool_calls=[ChoiceDeltaToolCall(
-                            index=0,
-                            id=f"mock_call_{uuid.uuid4().hex[:6]}",
-                            type="function",
-                            function=ChoiceDeltaToolCallFunction(name=tool_name, arguments=tool_args),
-                        )],
-                    ),
-                    finish_reason="tool_calls",
-                )],
-                created=created,
-                model=model_name,
-                object="chat.completion.chunk",
+        new_kwargs: dict[str, Any] = kwargs.copy()
+        new_kwargs.pop("messages", None)
+        new_kwargs.pop("anthropic_cache_control_ttl", None)
+
+        # Build the exact kwargs for tracing
+        api_kwargs: dict[str, Any] = {"system": system_messages, "messages": user_messages, **new_kwargs}
+
+        # RFC-0023 § ③ - Set A is the single canonical aggregator. It
+        # emits AG-UI events through ``emitter`` (the middleware's on_event
+        # sink) and yields a typed ``AnthropicMessage`` via ``build``.
+        run_id = _resolve_run_id(model_call_params)
+        emitter = _get_event_emitter(middleware_manager)
+        aggregator = AnthropicEventAggregator(on_event=emitter, run_id=run_id)
+
+        try:
+            if should_trace and tracer is not None:
+                trace_ctx = TraceContext(tracer, "Anthropic messages.stream", SpanType.LLM, inputs=api_kwargs)
+                with trace_ctx:
+                    start_time = time.time()
+                    first_token_time = None
+                    # RFC-0001: shutdown_event
+                    _shutdown_ev = model_call_params.shutdown_event if model_call_params else None
+                    with client.messages.create(**api_kwargs, stream=True) as stream:
+                        for event in stream:
+                            if _shutdown_ev is not None and _shutdown_ev.is_set():
+                                logger.info("🛑 Shutdown event detected during Anthropic streaming, finalizing partial response")
+                                break
+                            if first_token_time is None:
+                                first_token_time = time.time()
+                            processed_event = _process_stream_chunk(event, middleware_manager, model_call_params)
+                            if processed_event is None:
+                                continue
+                            aggregator.aggregate(processed_event)
+                    message = aggregator.build()
+                    trace_ctx.set_outputs(_to_serializable_dict(message))
+                    if first_token_time is not None:
+                        trace_ctx.set_attributes(
+                            {
+                                "time_to_first_token_ms": (first_token_time - start_time) * 1000,
+                            }
+                        )
+                    return ModelResponse.from_anthropic_message(message)
+
+            # RFC-0001: shutdown_event
+            _shutdown_ev = model_call_params.shutdown_event if model_call_params else None
+            with client.messages.create(**api_kwargs, stream=True) as stream:
+                for event in stream:
+                    if _shutdown_ev is not None and _shutdown_ev.is_set():
+                        logger.info("🛑 Shutdown event detected during Anthropic streaming, finalizing partial response")
+                        break
+                    processed_event = _process_stream_chunk(event, middleware_manager, model_call_params)
+                    if processed_event is None:
+                        continue
+                    aggregator.aggregate(processed_event)
+            return ModelResponse.from_anthropic_message(aggregator.build())
+        except Exception as exc:
+            wrapped_error = _maybe_wrap_stream_idle_timeout(
+                exc,
+                transport_name="anthropic stream",
+                llm_config=llm_config,
             )
-        ]
+            if wrapped_error is not None:
+                raise wrapped_error from exc
+            raise
 
-    clean_snippet = last_text[:60].replace("\n", " ").strip()
-    return [
-        ChatCompletionChunk(
-            id=cmpl_id,
-            choices=[ChatCompletionChunkChoice(
-                index=0,
-                delta=ChoiceDelta(role="assistant", reasoning_content="Offline mock reasoning: Analyzing user request."),
-                finish_reason=None,
-            )],
-            created=created,
-            model=model_name,
-            object="chat.completion.chunk",
-        ),
-        ChatCompletionChunk(
-            id=cmpl_id,
-            choices=[ChatCompletionChunkChoice(
-                index=0,
-                delta=ChoiceDelta(content="Hello! "),
-                finish_reason=None,
-            )],
-            created=created,
-            model=model_name,
-            object="chat.completion.chunk",
-        ),
-        ChatCompletionChunk(
-            id=cmpl_id,
-            choices=[ChatCompletionChunkChoice(
-                index=0,
-                delta=ChoiceDelta(content=f"Received: '{clean_snippet}'. " if clean_snippet else "Offline test mode active. "),
-                finish_reason=None,
-            )],
-            created=created,
-            model=model_name,
-            object="chat.completion.chunk",
-        ),
-        ChatCompletionChunk(
-            id=cmpl_id,
-            choices=[ChatCompletionChunkChoice(
-                index=0,
-                delta=ChoiceDelta(content="Agent runtime and streaming are operating properly without Bifrost."),
-                finish_reason=None,
-            )],
-            created=created,
-            model=model_name,
-            object="chat.completion.chunk",
-        ),
-        ChatCompletionChunk(
-            id=cmpl_id,
-            choices=[ChatCompletionChunkChoice(index=0, delta=ChoiceDelta(), finish_reason="stop")],
-            created=created,
-            model=model_name,
-            object="chat.completion.chunk",
-        ),
-    ]
-
-
-def _generate_mock_chat_completion(
-    messages: list[Any],
-    tools: list[Any] | None = None,
-    model_name: str = "mock-bifrost",
-) -> ChatCompletion:
-    """Generate a non-streaming mock completion for offline testing."""
-    last_text = ""
-    is_tool_result = False
-    for msg in reversed(messages or []):
-        if isinstance(msg, dict):
-            r = msg.get("role")
-            if r == "tool":
-                is_tool_result = True
-                break
-            if r == "user":
-                last_text = str(msg.get("content") or "")
-                break
-        elif hasattr(msg, "role"):
-            r = str(getattr(msg, "role", ""))
-            if "tool" in r.lower():
-                is_tool_result = True
-                break
-            if "user" in r.lower():
-                last_text = str(getattr(msg, "content", ""))
-                break
-
-    cmpl_id = f"mock-cmpl-{uuid.uuid4().hex[:8]}"
-    created = int(time.time())
-
-    if is_tool_result:
-        return ChatCompletion(
-            id=cmpl_id,
-            choices=[ChatCompletionChoice(
-                finish_reason="stop",
-                index=0,
-                message=ChatCompletionMessage(
-                    role="assistant",
-                    content="Tool execution completed. Offline test verification successful.",
-                ),
-            )],
-            created=created,
-            model=model_name,
-            object="chat.completion",
-        )
-
-    lower_text = last_text.lower()
-    if ("[test_tool]" in lower_text or "test tool" in lower_text) and tools:
-        first_tool = tools[0]
-        tool_name = "view_file"
-        tool_args = "{}"
-        if isinstance(first_tool, dict):
-            fn = first_tool.get("function", {})
-            tool_name = fn.get("name", "view_file")
-        return ChatCompletion(
-            id=cmpl_id,
-            choices=[ChatCompletionChoice(
-                finish_reason="tool_calls",
-                index=0,
-                message=ChatCompletionMessage(
-                    role="assistant",
-                    tool_calls=[ChatCompletionMessageToolCall(
-                        id=f"mock_call_{uuid.uuid4().hex[:6]}",
-                        type="function",
-                        function=Function(name=tool_name, arguments=tool_args),
-                    )],
-                ),
-            )],
-            created=created,
-            model=model_name,
-            object="chat.completion",
-        )
-
-    clean_snippet = last_text[:60].replace("\n", " ").strip()
-    return ChatCompletion(
-        id=cmpl_id,
-        choices=[ChatCompletionChoice(
-            finish_reason="stop",
-            index=0,
-            message=ChatCompletionMessage(
-                role="assistant",
-                content=f"Hello! Offline test mode active. Received: '{clean_snippet}'. Agent runtime operating without Bifrost." if clean_snippet else "Hello! Offline test mode active. Agent runtime operating without Bifrost.",
-            ),
-        )],
-        created=created,
-        model=model_name,
-        object="chat.completion",
-    )
+    try:
+        return llm_stream_call()
+    except anthropic.APIStatusError as exc:
+        model_call_params = _strip_or_raise_on_signature_error(exc, model_call_params, "stream")
+        return llm_stream_call()
 
 
 def call_llm_with_openai_chat_completion(
@@ -1732,7 +1781,7 @@ def call_llm_with_openai_chat_completion(
 ) -> ModelResponse:
     """Call OpenAI chat completion with the given messages and return response content."""
 
-    messages = list(kwargs.get("messages", []))
+    messages = _strip_responses_api_artifacts(kwargs.get("messages", []))
     # Some providers (eg. AWS Bedrock) reject assistant messages where content is an empty string.
     # Only strip content from assistant messages with tool_calls, where content is optional.
     for msg in messages:
@@ -1760,36 +1809,6 @@ def call_llm_with_openai_chat_completion(
         if isinstance(r, dict) and "effort" in r and "max_tokens" in r:
             r.pop("max_tokens", None)
     stream_requested = bool(kwargs.pop("stream", False) or getattr(llm_config, "stream", False))
-
-    bifrost_headers = _build_bifrost_headers(llm_config, model_call_params)
-    if bifrost_headers:
-        extra_headers = dict(kwargs.get("extra_headers") or {})
-        extra_headers.update(bifrost_headers)
-        kwargs["extra_headers"] = extra_headers
-
-    if _is_mock_llm(llm_config):
-        if stream_requested:
-            run_id = _resolve_run_id(model_call_params)
-            emitter = _get_event_emitter(middleware_manager)
-            aggregator = OpenAIChatCompletionAggregator(on_event=emitter, run_id=run_id)
-            mock_chunks = _generate_mock_completion_chunks(
-                kwargs.get("messages", []),
-                kwargs.get("tools"),
-                model_name=str(kwargs.get("model", "mock-bifrost")),
-            )
-            for chunk in mock_chunks:
-                processed_chunk = _process_stream_chunk(chunk, middleware_manager, model_call_params)
-                if processed_chunk is not None:
-                    aggregator.aggregate(processed_chunk)
-            completion = aggregator.build()
-            return _chat_completion_to_model_response(completion)
-        else:
-            mock_completion = _generate_mock_chat_completion(
-                kwargs.get("messages", []),
-                kwargs.get("tools"),
-                model_name=str(kwargs.get("model", "mock-bifrost")),
-            )
-            return _chat_completion_to_model_response(mock_completion)
 
     # Check if tracing is active (there's a current span and we have a tracer)
     should_trace = tracer is not None and get_current_span() is not None
@@ -1901,11 +1920,155 @@ def call_llm_with_openai_chat_completion(
     return ModelResponse.from_openai_message(response_message, usage=usage)
 
 
-# Backward compatibility aliases for Bifrost
-call_llm_with_anthropic_chat_completion = call_llm_with_openai_chat_completion
-call_llm_with_openai_responses = call_llm_with_openai_chat_completion
-call_llm_with_google_genai = call_llm_with_openai_chat_completion
-call_llm_with_gemini_rest = call_llm_with_openai_chat_completion
+def call_llm_with_openai_responses(
+    client: Any,
+    kwargs: dict[str, Any],
+    *,
+    middleware_manager: MiddlewareManager | None = None,
+    model_call_params: ModelCallParams | None = None,
+    llm_config: LLMConfig | None = None,
+    tracer: BaseTracer | None = None,
+) -> ModelResponse:
+    """Call OpenAI Responses API and normalize the outcome."""
+
+    request_payload = kwargs.copy()
+
+    messages = request_payload.pop("messages", None)
+    if messages is not None:
+        response_items, instructions = prepare_openai_responses_api_input(messages)
+        if response_items:
+            request_payload.setdefault("input", response_items)
+        if instructions:
+            existing_instructions = request_payload.get("instructions")
+            if existing_instructions:
+                combined_instructions = f"{existing_instructions.rstrip()}\n\n{instructions}"
+            else:
+                combined_instructions = instructions
+            request_payload["instructions"] = combined_instructions.strip()
+
+    # Responses API uses max_output_tokens instead of max_tokens
+    max_tokens = request_payload.pop("max_tokens", None)
+    if max_tokens is not None:
+        request_payload.setdefault("max_output_tokens", max_tokens)
+
+    tools = request_payload.get("tools")
+    if tools:
+        request_payload["tools"] = normalize_openai_responses_api_tools(tools)
+
+    stream_requested = bool(request_payload.pop("stream", False) or getattr(llm_config, "stream", False))
+
+    request_payload.pop("store", None)
+
+    # default parallel_tool_calls; LLMConfig.extra_kwargs, configuration.
+    request_payload.setdefault("parallel_tool_calls", _default_openai_responses_parallel_tool_calls(llm_config))
+
+    # default detailed reasoning summary, reasoning item package.
+    # summary, "detailed".
+    reasoning_param = request_payload.get("reasoning")
+    if isinstance(reasoning_param, dict) and "summary" not in reasoning_param:
+        reasoning_param["summary"] = "detailed"
+
+    # Always request encrypted reasoning content so that reasoning items can be
+    # passed back in subsequent conversation turns (required for stateless / ZDR mode).
+    include_value = request_payload.get("include")
+    include_list: list[str] = []
+    if isinstance(include_value, (list, tuple)):
+        include_items = cast(list[object] | tuple[object, ...], include_value)
+        include_list = [item for item in include_items if isinstance(item, str)]
+    request_payload["include"] = include_list
+    if "reasoning.encrypted_content" not in include_list:
+        include_list.append("reasoning.encrypted_content")
+
+    # ( prompt_cache_key) extra_body
+    # OpenAI SDK v2+ kwargs.
+    extra_body: dict[str, Any] = request_payload.pop("extra_body", None) or {}
+    prompt_cache_key = request_payload.pop("prompt_cache_key", None)
+    if prompt_cache_key is not None:
+        extra_body["prompt_cache_key"] = prompt_cache_key
+    final_prompt_cache_key = extra_body.get("prompt_cache_key")
+    if isinstance(final_prompt_cache_key, str):
+        extra_body["prompt_cache_key"] = _bound_openai_prompt_cache_key(final_prompt_cache_key)
+    if extra_body:
+        request_payload["extra_body"] = extra_body
+
+    # Check if tracing is active (there's a current span and we have a tracer)
+    should_trace = tracer is not None and get_current_span() is not None
+
+    def call_llm(api_payload: dict[str, Any]) -> Any:
+        if should_trace and tracer is not None:
+            trace_ctx = TraceContext(tracer, "OpenAI responses.create", SpanType.LLM, inputs=api_payload)
+            with trace_ctx:
+                response = client.responses.create(**api_payload)
+                trace_ctx.set_outputs(_to_serializable_dict(response))
+                return response
+        else:
+            response = client.responses.create(**api_payload)
+            return response
+
+    if not stream_requested:
+        return ModelResponse.from_openai_response(call_llm(request_payload))
+
+    def call_llm_stream(payload: dict[str, Any]) -> ModelResponse:
+        run_id = _resolve_run_id(model_call_params)
+        emitter = _get_event_emitter(middleware_manager)
+        aggregator = OpenAIResponsesAggregator(on_event=emitter, run_id=run_id)
+        # RFC-0001: shutdown_event
+        _shutdown_ev = model_call_params.shutdown_event if model_call_params else None
+
+        try:
+            if should_trace and tracer is not None:
+                trace_ctx = TraceContext(tracer, "OpenAI responses.stream", SpanType.LLM, inputs=payload)
+                start_time = time.time()
+                first_token_time = None
+                with trace_ctx:
+                    with client.responses.stream(**payload) as stream:
+                        for event in stream:
+                            if _shutdown_ev is not None and _shutdown_ev.is_set():
+                                logger.info("🛑 Shutdown event detected during OpenAI Responses streaming, finalizing partial response")
+                                break
+                            if first_token_time is None:
+                                first_token_time = time.time()
+                            processed_event = _process_stream_chunk(event, middleware_manager, model_call_params)
+                            if processed_event is None:
+                                continue
+                            aggregator.aggregate(processed_event)
+                    response = aggregator.build()
+                    trace_ctx.set_outputs(_to_serializable_dict(response))
+                    if first_token_time is not None:
+                        trace_ctx.set_attributes(
+                            {
+                                "time_to_first_token_ms": (first_token_time - start_time) * 1000,
+                            }
+                        )
+                    return ModelResponse.from_openai_response(response)
+
+            with client.responses.stream(**payload) as stream:
+                for event in stream:
+                    if _shutdown_ev is not None and _shutdown_ev.is_set():
+                        logger.info("🛑 Shutdown event detected during OpenAI Responses streaming, finalizing partial response")
+                        break
+                    processed_event = _process_stream_chunk(event, middleware_manager, model_call_params)
+                    if processed_event is None:
+                        continue
+                    aggregator.aggregate(processed_event)
+            return ModelResponse.from_openai_response(aggregator.build())
+        except Exception as exc:
+            wrapped_error = _maybe_wrap_stream_idle_timeout(
+                exc,
+                transport_name="openai responses stream",
+                llm_config=llm_config,
+            )
+            if wrapped_error is not None:
+                raise wrapped_error from exc
+            raise
+
+    return call_llm_stream(request_payload)
+
+
+# ── Async LLM call functions ────────────────────────────────────────
+# async/sync: AsyncOpenAI / AsyncAnthropic / httpx.AsyncClient
+# async, to_thread .
+# force stop asyncio cancellation, .
 
 
 async def call_llm_with_different_client_async(
@@ -1917,16 +2080,45 @@ async def call_llm_with_different_client_async(
     model_call_params: ModelCallParams | None = None,
     tracer: BaseTracer | None = None,
 ) -> ModelResponse:
-    """Async dispatcher — routes to OpenAI chat completion (Bifrost gateway)."""
-    # ponytail: Bifrost standardizes all LLM traffic into OpenAI chat completion
-    return await call_llm_with_openai_chat_completion_async(
-        client,
-        kwargs,
-        middleware_manager=middleware_manager,
-        model_call_params=model_call_params,
-        llm_config=llm_config,
-        tracer=tracer,
-    )
+    """Async dispatcher — routes to the correct async provider function."""
+    if llm_config.api_type == "anthropic_chat_completion":
+        return await call_llm_with_anthropic_chat_completion_async(
+            client,
+            kwargs,
+            middleware_manager=middleware_manager,
+            model_call_params=model_call_params,
+            llm_config=llm_config,
+            tracer=tracer,
+            cache_control_ttl=llm_config.cache_control_ttl,
+        )
+    elif llm_config.api_type == "openai_responses":
+        return await call_llm_with_openai_responses_async(
+            client,
+            kwargs,
+            middleware_manager=middleware_manager,
+            model_call_params=model_call_params,
+            llm_config=llm_config,
+            tracer=tracer,
+        )
+    elif llm_config.api_type == "openai_chat_completion":
+        return await call_llm_with_openai_chat_completion_async(
+            client,
+            kwargs,
+            middleware_manager=middleware_manager,
+            model_call_params=model_call_params,
+            llm_config=llm_config,
+            tracer=tracer,
+        )
+    elif llm_config.api_type in ("gemini_rest", "google_genai"):
+        return await call_llm_with_google_genai_async(
+            kwargs,
+            middleware_manager=middleware_manager,
+            model_call_params=model_call_params,
+            llm_config=llm_config,
+            tracer=tracer,
+        )
+    else:
+        raise ValueError(f"Invalid API type for async call: {llm_config.api_type}")
 
 
 async def call_llm_with_openai_chat_completion_async(
@@ -1940,7 +2132,7 @@ async def call_llm_with_openai_chat_completion_async(
 ) -> ModelResponse:
     """Async OpenAI chat completion — mirrors sync version with await."""
 
-    messages = list(kwargs.get("messages", []))
+    messages = _strip_responses_api_artifacts(kwargs.get("messages", []))
     for msg in messages:
         if isinstance(msg, dict):
             typed_msg = cast(dict[str, object], msg)
@@ -1962,40 +2154,6 @@ async def call_llm_with_openai_chat_completion_async(
         if isinstance(r, dict) and "effort" in r and "max_tokens" in r:
             r.pop("max_tokens", None)
     stream_requested = bool(kwargs.pop("stream", False) or getattr(llm_config, "stream", False))
-
-    bifrost_headers = _build_bifrost_headers(llm_config, model_call_params)
-    if bifrost_headers:
-        extra_headers = dict(kwargs.get("extra_headers") or {})
-        extra_headers.update(bifrost_headers)
-        kwargs["extra_headers"] = extra_headers
-
-    if _is_mock_llm(llm_config):
-        if stream_requested:
-            run_id = _resolve_run_id(model_call_params)
-            emitter = _get_event_emitter(middleware_manager)
-            aggregator = OpenAIChatCompletionAggregator(on_event=emitter, run_id=run_id)
-            mock_chunks = _generate_mock_completion_chunks(
-                kwargs.get("messages", []),
-                kwargs.get("tools"),
-                model_name=str(kwargs.get("model", "mock-bifrost")),
-            )
-            _shutdown_ev = model_call_params.shutdown_event if model_call_params else None
-            for chunk in mock_chunks:
-                if _shutdown_ev is not None and _shutdown_ev.is_set():
-                    break
-                processed_chunk = _process_stream_chunk(chunk, middleware_manager, model_call_params)
-                if processed_chunk is not None:
-                    aggregator.aggregate(processed_chunk)
-                await asyncio.sleep(0.02)
-            completion = aggregator.build()
-            return _chat_completion_to_model_response(completion)
-        else:
-            mock_completion = _generate_mock_chat_completion(
-                kwargs.get("messages", []),
-                kwargs.get("tools"),
-                model_name=str(kwargs.get("model", "mock-bifrost")),
-            )
-            return _chat_completion_to_model_response(mock_completion)
 
     should_trace = tracer is not None and get_current_span() is not None
 
@@ -2079,12 +2237,256 @@ async def call_llm_with_openai_chat_completion_async(
     return ModelResponse.from_openai_message(response_message, usage=usage)
 
 
-call_llm_with_anthropic_chat_completion_async = call_llm_with_openai_chat_completion_async
+async def call_llm_with_anthropic_chat_completion_async(
+    client: Any,
+    kwargs: dict[str, Any],
+    *,
+    middleware_manager: MiddlewareManager | None = None,
+    model_call_params: ModelCallParams | None = None,
+    llm_config: LLMConfig | None = None,
+    tracer: BaseTracer | None = None,
+    cache_control_ttl: str | None = None,
+) -> ModelResponse:
+    """Async Anthropic chat completion — mirrors sync version with await."""
+    stream_requested = bool(kwargs.pop("stream", False))
+    should_trace = tracer is not None and get_current_span() is not None
+
+    def _build_cache_control() -> dict[str, str]:
+        cc: dict[str, str] = {"type": "ephemeral"}
+        if cache_control_ttl:
+            cc["ttl"] = cache_control_ttl
+        return cc
+
+    def _apply_cache_control(
+        system_messages: list[dict[str, Any]],
+        user_messages: list[dict[str, Any]],
+    ) -> None:
+        _apply_anthropic_cache_control(system_messages, user_messages, _build_cache_control)
+
+    def _build_anthropic_messages() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        if type(model_call_params) is not ModelCallParams:
+            raise ValueError("Anthropic calls require explicit ModelCallParams with UMP messages")
+
+        from nexau.core.adapters.anthropic_messages import AnthropicMessagesAdapter
+
+        return AnthropicMessagesAdapter(
+            allow_unsigned_thinking=bool(llm_config and llm_config.allow_unsigned_thinking),
+        ).to_vendor_format(model_call_params.messages)
+
+    def _build_api_kwargs() -> dict[str, Any]:
+        # 1. ( sync )
+        system_messages, user_messages = _build_anthropic_messages()
+        _apply_cache_control(system_messages, user_messages)
+
+        new_kwargs = kwargs.copy()
+        new_kwargs.pop("messages", None)
+        new_kwargs.pop("anthropic_cache_control_ttl", None)
+        return {"system": system_messages, "messages": user_messages, **new_kwargs}
+
+    if not stream_requested:
+        # 2.
+        async def _invoke_non_stream() -> Any:
+            api_kwargs_local = _build_api_kwargs()
+            if should_trace and tracer is not None:
+                trace_ctx = TraceContext(tracer, "Anthropic messages.create (async)", SpanType.LLM, inputs=api_kwargs_local)
+                with trace_ctx:
+                    resp_local = await client.messages.create(**api_kwargs_local)
+                    trace_ctx.set_outputs(_to_serializable_dict(resp_local))
+                    return resp_local
+            return await client.messages.create(**api_kwargs_local)
+
+        try:
+            resp = await _invoke_non_stream()
+        except anthropic.APIStatusError as exc:
+            model_call_params = _strip_or_raise_on_signature_error(exc, model_call_params, "async non-stream")
+            resp = await _invoke_non_stream()
+        return ModelResponse.from_anthropic_message(resp)
+
+    # 3.
+    async def _invoke_stream() -> Any:
+        api_kwargs_local = _build_api_kwargs()
+        run_id = _resolve_run_id(model_call_params)
+        emitter = _get_event_emitter(middleware_manager)
+        aggregator = AnthropicEventAggregator(on_event=emitter, run_id=run_id)
+        _shutdown_ev = model_call_params.shutdown_event if model_call_params else None
+
+        if should_trace and tracer is not None:
+            trace_ctx_s = TraceContext(tracer, "Anthropic messages.stream (async)", SpanType.LLM, inputs=api_kwargs_local)
+            with trace_ctx_s:
+                start_time = time.time()
+                first_token_time = None
+                async with client.messages.stream(**api_kwargs_local) as stream:
+                    async for event in stream:
+                        if _shutdown_ev is not None and _shutdown_ev.is_set():
+                            logger.info("🛑 Shutdown event detected during async Anthropic streaming")
+                            break
+                        if first_token_time is None:
+                            first_token_time = time.time()
+                        processed_event = _process_stream_chunk(event, middleware_manager, model_call_params)
+                        if processed_event is None:
+                            continue
+                        aggregator.aggregate(processed_event)
+                msg_local = aggregator.build()
+                trace_ctx_s.set_outputs(_to_serializable_dict(msg_local))
+                if first_token_time is not None:
+                    trace_ctx_s.set_attributes({"time_to_first_token_ms": (first_token_time - start_time) * 1000})
+                return msg_local
+        else:
+            async with client.messages.stream(**api_kwargs_local) as stream:
+                async for event in stream:
+                    if _shutdown_ev is not None and _shutdown_ev.is_set():
+                        logger.info("🛑 Shutdown event detected during async Anthropic streaming")
+                        break
+                    processed_event = _process_stream_chunk(event, middleware_manager, model_call_params)
+                    if processed_event is None:
+                        continue
+                    aggregator.aggregate(processed_event)
+            return aggregator.build()
+
+    try:
+        try:
+            message = await _invoke_stream()
+        except anthropic.APIStatusError as exc:
+            model_call_params = _strip_or_raise_on_signature_error(exc, model_call_params, "async stream")
+            message = await _invoke_stream()
+    except Exception as exc:
+        wrapped_error = _maybe_wrap_stream_idle_timeout(
+            exc,
+            transport_name="anthropic stream",
+            llm_config=llm_config,
+        )
+        if wrapped_error is not None:
+            raise wrapped_error from exc
+        raise
+
+    return ModelResponse.from_anthropic_message(message)
 
 
-call_llm_with_openai_responses_async = call_llm_with_openai_chat_completion_async
-call_llm_with_google_genai_async = call_llm_with_openai_chat_completion_async
-call_llm_with_gemini_rest_async = call_llm_with_openai_chat_completion_async
+async def call_llm_with_openai_responses_async(
+    client: Any,
+    kwargs: dict[str, Any],
+    *,
+    middleware_manager: MiddlewareManager | None = None,
+    model_call_params: ModelCallParams | None = None,
+    llm_config: LLMConfig | None = None,
+    tracer: BaseTracer | None = None,
+) -> ModelResponse:
+    """Async OpenAI Responses API — mirrors sync version with await."""
+
+    request_payload = kwargs.copy()
+
+    messages = request_payload.pop("messages", None)
+    if messages is not None:
+        response_items, instructions = prepare_openai_responses_api_input(messages)
+        if response_items:
+            request_payload.setdefault("input", response_items)
+        if instructions:
+            existing_instructions = request_payload.get("instructions")
+            if existing_instructions:
+                combined_instructions = f"{existing_instructions.rstrip()}\n\n{instructions}"
+            else:
+                combined_instructions = instructions
+            request_payload["instructions"] = combined_instructions.strip()
+
+    max_tokens = request_payload.pop("max_tokens", None)
+    if max_tokens is not None:
+        request_payload.setdefault("max_output_tokens", max_tokens)
+
+    tools = request_payload.get("tools")
+    if tools:
+        request_payload["tools"] = normalize_openai_responses_api_tools(tools)
+
+    stream_requested = bool(request_payload.pop("stream", False) or getattr(llm_config, "stream", False))
+
+    request_payload.pop("store", None)
+
+    # default parallel_tool_calls; LLMConfig.extra_kwargs, configuration.
+    request_payload.setdefault("parallel_tool_calls", _default_openai_responses_parallel_tool_calls(llm_config))
+
+    # default detailed reasoning summary, reasoning item package.
+    reasoning_param = request_payload.get("reasoning")
+    if isinstance(reasoning_param, dict) and "summary" not in reasoning_param:
+        reasoning_param["summary"] = "detailed"
+
+    include_value = request_payload.get("include")
+    include_list: list[str] = []
+    if isinstance(include_value, (list, tuple)):
+        include_items = cast(list[object] | tuple[object, ...], include_value)
+        include_list = [item for item in include_items if isinstance(item, str)]
+    request_payload["include"] = include_list
+    if "reasoning.encrypted_content" not in include_list:
+        include_list.append("reasoning.encrypted_content")
+
+    extra_body: dict[str, Any] = request_payload.pop("extra_body", None) or {}
+    prompt_cache_key = request_payload.pop("prompt_cache_key", None)
+    if prompt_cache_key is not None:
+        extra_body["prompt_cache_key"] = prompt_cache_key
+    final_prompt_cache_key = extra_body.get("prompt_cache_key")
+    if isinstance(final_prompt_cache_key, str):
+        extra_body["prompt_cache_key"] = _bound_openai_prompt_cache_key(final_prompt_cache_key)
+    if extra_body:
+        request_payload["extra_body"] = extra_body
+
+    should_trace = tracer is not None and get_current_span() is not None
+
+    if not stream_requested:
+        if should_trace and tracer is not None:
+            trace_ctx = TraceContext(tracer, "OpenAI responses.create (async)", SpanType.LLM, inputs=request_payload)
+            with trace_ctx:
+                response = await client.responses.create(**request_payload)
+                trace_ctx.set_outputs(_to_serializable_dict(response))
+        else:
+            response = await client.responses.create(**request_payload)
+        return ModelResponse.from_openai_response(response)
+
+    run_id = _resolve_run_id(model_call_params)
+    emitter = _get_event_emitter(middleware_manager)
+    aggregator = OpenAIResponsesAggregator(on_event=emitter, run_id=run_id)
+    _shutdown_ev = model_call_params.shutdown_event if model_call_params else None
+
+    try:
+        if should_trace and tracer is not None:
+            trace_ctx_s = TraceContext(tracer, "OpenAI responses.stream (async)", SpanType.LLM, inputs=request_payload)
+            start_time = time.time()
+            first_token_time = None
+            with trace_ctx_s:
+                async with client.responses.stream(**request_payload) as stream:
+                    async for event in stream:
+                        if _shutdown_ev is not None and _shutdown_ev.is_set():
+                            logger.info("🛑 Shutdown event detected during async OpenAI Responses streaming")
+                            break
+                        if first_token_time is None:
+                            first_token_time = time.time()
+                        processed_event = _process_stream_chunk(event, middleware_manager, model_call_params)
+                        if processed_event is None:
+                            continue
+                        aggregator.aggregate(processed_event)
+                response_obj = aggregator.build()
+                trace_ctx_s.set_outputs(_to_serializable_dict(response_obj))
+                if first_token_time is not None:
+                    trace_ctx_s.set_attributes({"time_to_first_token_ms": (first_token_time - start_time) * 1000})
+        else:
+            async with client.responses.stream(**request_payload) as stream:
+                async for event in stream:
+                    if _shutdown_ev is not None and _shutdown_ev.is_set():
+                        logger.info("🛑 Shutdown event detected during async OpenAI Responses streaming")
+                        break
+                    processed_event = _process_stream_chunk(event, middleware_manager, model_call_params)
+                    if processed_event is None:
+                        continue
+                    aggregator.aggregate(processed_event)
+            response_obj = aggregator.build()
+    except Exception as exc:
+        wrapped_error = _maybe_wrap_stream_idle_timeout(
+            exc,
+            transport_name="openai responses stream",
+            llm_config=llm_config,
+        )
+        if wrapped_error is not None:
+            raise wrapped_error from exc
+        raise
+
+    return ModelResponse.from_openai_response(response_obj)
 
 
 def _process_stream_chunk(
@@ -2153,3 +2555,400 @@ def _to_serializable_dict(payload: Any) -> dict[str, Any]:
             continue
         result[attr] = value
     return result
+
+
+def _enrich_gemini_trace_outputs(
+    output: dict[str, Any],
+    model_name: str,
+) -> dict[str, Any]:
+    """Enrich Gemini REST trace output with model and usage for Langfuse.
+
+    Gemini REST  modelVersion / usageMetadata,  Langfuse tracer
+     end_span  output dict  model / usage  generation 
+    model  token . function. 
+    """
+    enriched = dict(output)
+    # 1. model (Langfuse generation )
+    enriched["model"] = model_name
+    # 2. usageMetadata Langfuse usage
+    # Langfuse _sanitize_usage int value, int.
+    usage_meta = output.get("usageMetadata")
+    if isinstance(usage_meta, dict):
+        meta: dict[str, object] = cast(dict[str, object], usage_meta)
+
+        def _int_field(key: str) -> int:
+            val = meta.get(key, 0)
+            return int(val) if isinstance(val, int) else 0
+
+        usage: dict[str, int] = {
+            "input_tokens": _int_field("promptTokenCount"),
+            "output_tokens": _int_field("candidatesTokenCount"),
+            "total_tokens": _int_field("totalTokenCount"),
+        }
+        # token -, Langfuse
+        cached = _int_field("cachedContentTokenCount")
+        if cached > 0:
+            usage["cached_tokens"] = cached
+        thoughts = _int_field("thoughtsTokenCount")
+        if thoughts > 0:
+            usage["reasoning_tokens"] = thoughts
+        enriched["usage"] = usage
+    return enriched
+
+
+
+def _gemini_sanitize_parameters(params: dict[str, object]) -> dict[str, object]:
+    """Recursively sanitize schema for Gemini (strip $schema, additionalProperties, etc.)."""
+    allowed = {"type", "properties", "required", "description", "enum", "items", "format", "nullable"}
+    sanitized: dict[str, object] = {}
+    for k, v in params.items():
+        if k not in allowed:
+            continue
+        if k == "properties" and isinstance(v, dict):
+            v_dict = cast(dict[str, object], v)
+            sanitized[k] = {
+                pk: _gemini_sanitize_parameters(cast(dict[str, object], pv)) for pk, pv in v_dict.items() if isinstance(pv, dict)
+            }
+        elif k == "items" and isinstance(v, dict):
+            sanitized[k] = _gemini_sanitize_parameters(cast(dict[str, object], v))
+        else:
+            sanitized[k] = v
+    return sanitized
+
+
+def convert_tools_to_gemini(
+    tools: Sequence[StructuredToolDefinitionLike],
+) -> list[dict[str, Any]]:
+    """Convert structured tool definitions to Gemini function declarations.
+
+    RFC-0006: Gemini  structured tool adapter
+
+    Gemini  neutral structured definition 
+    ``functionDeclarations``,  OpenAI schema . 
+    """
+
+    gemini_tools: list[dict[str, Any]] = []
+    for tool in tools:
+        if hasattr(tool, "to_structured_definition"):
+            tool = tool.to_structured_definition()
+        try:
+            normalized = normalize_structured_tool_definition(tool)
+        except ValueError:
+            if isinstance(tool, dict) and tool.get("type") != "function":
+                continue
+            raise
+
+        gemini_tools.append(
+            {
+                "name": normalized["name"],
+                "description": normalized["description"],
+                "parameters": _gemini_sanitize_parameters(
+                    cast(dict[str, object], normalized["input_schema"]),
+                ),
+            }
+        )
+    return gemini_tools
+
+
+def _build_bifrost_headers(
+    llm_config: LLMConfig,
+    model_call_params: ModelCallParams | None = None,
+) -> dict[str, str]:
+    """Build telemetry and session headers for Bifrost / Cloud Gateway."""
+    headers: dict[str, str] = {}
+    try:
+        from nexau.archs.platform.crypto_vault import get_auth_metadata
+        from nexau.archs.platform.path_helpers import get_installation_id
+
+        meta = get_auth_metadata()
+        headers["X-Machine-ID"] = get_installation_id()
+        headers["X-Client-Version"] = "Mash-Desktop/1.0.0"
+        if meta.get("email"):
+            headers["X-User-ID"] = str(meta["email"])
+    except Exception:
+        pass
+
+    # Extract session ID from model_call_params or llm_config
+    session_id: str | None = None
+    if model_call_params:
+        if getattr(model_call_params, "session_id", None):
+            session_id = str(model_call_params.session_id)
+        elif getattr(model_call_params, "agent_state", None) and getattr(model_call_params.agent_state, "session_id", None):
+            session_id = str(model_call_params.agent_state.session_id)
+        elif getattr(model_call_params, "token_trace_session", None) and getattr(model_call_params.token_trace_session, "session_id", None):
+            session_id = str(model_call_params.token_trace_session.session_id)
+
+    if not session_id and hasattr(llm_config, "session_id") and llm_config.session_id:
+        session_id = str(llm_config.session_id)
+    if not session_id and hasattr(llm_config, "extra_params") and isinstance(llm_config.extra_params, dict):
+        extra = llm_config.extra_params
+        session_id = str(extra.get("session_id") or (extra.get("extra_params") or {}).get("session_id") or "") or None
+
+    if session_id:
+        headers["X-Session-ID"] = session_id
+
+    if hasattr(llm_config, "default_headers") and llm_config.default_headers:
+        headers.update(llm_config.default_headers)
+    return headers
+
+
+def _build_google_genai_client(
+    llm_config: LLMConfig,
+    model_call_params: ModelCallParams | None = None,
+) -> genai.Client:
+    """Initialize a production-grade google-genai Client with Bifrost-first headers."""
+    if genai is None:
+        raise ImportError("google-genai is not installed. Install via `pip install google-genai`.")
+    http_opts: dict[str, Any] = {}
+    base_url = (llm_config.base_url or "").rstrip("/")
+    if base_url:
+        if base_url.endswith("/v1beta"):
+            http_opts["base_url"] = base_url[:-7]
+            http_opts["api_version"] = "v1beta"
+        elif base_url.endswith("/v1"):
+            http_opts["base_url"] = base_url[:-3]
+            http_opts["api_version"] = "v1"
+        else:
+            http_opts["base_url"] = base_url
+
+    headers = _build_bifrost_headers(llm_config, model_call_params)
+    if headers:
+        http_opts["headers"] = headers
+
+    if llm_config.timeout:
+        http_opts["timeout"] = float(llm_config.timeout)
+
+    api_key = llm_config.api_key or "bifrost-gateway"
+    return genai.Client(
+        api_key=api_key,
+        http_options=http_opts if http_opts else None,
+    )
+
+
+def _build_google_genai_config(
+    llm_config: LLMConfig,
+    system_instruction: Any,
+    gemini_tools: list[dict[str, Any]] | None,
+) -> genai_types.GenerateContentConfig:
+    """Build typed GenerateContentConfig for Google GenAI SDK."""
+    extra = llm_config.extra_params or {}
+    nested = extra.get("extra_params") if isinstance(extra.get("extra_params"), dict) else {}
+    thinking_config = (
+        extra.get("thinkingConfig")
+        or extra.get("thinking_config")
+        or nested.get("thinkingConfig")
+        or nested.get("thinking_config")
+    )
+    if thinking_config:
+        if isinstance(thinking_config, dict):
+            tc = dict(thinking_config)
+            if "includeThoughts" not in tc and "include_thoughts" not in tc:
+                tc["include_thoughts"] = True
+            thinking_cfg = tc
+        else:
+            thinking_cfg = thinking_config
+    else:
+        thinking_cfg = None
+
+    top_k_val: int | None = None
+    top_k = extra.get("top_k") or nested.get("top_k")
+    if top_k is not None:
+        try:
+            top_k_val = int(top_k)
+        except (TypeError, ValueError):
+            pass
+
+    sdk_tools = [{"function_declarations": gemini_tools}] if gemini_tools else None
+
+    return genai_types.GenerateContentConfig(
+        temperature=llm_config.temperature if llm_config.temperature is not None else 0.7,
+        max_output_tokens=llm_config.max_tokens,
+        top_p=llm_config.top_p,
+        top_k=top_k_val,
+        system_instruction=system_instruction,
+        tools=sdk_tools,
+        automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
+        thinking_config=thinking_cfg,
+    )
+
+
+def call_llm_with_google_genai(
+    kwargs: dict[str, Any],
+    *,
+    middleware_manager: MiddlewareManager | None = None,
+    model_call_params: ModelCallParams | None = None,
+    llm_config: LLMConfig | None = None,
+    tracer: BaseTracer | None = None,
+) -> ModelResponse:
+    """Call Google GenAI API directly via the official google-genai SDK.
+
+    Bifrost-first architecture: telemetry headers and proxy URL are mapped directly
+    into genai.Client(http_options=...). Streaming responses yield typed
+    GenerateContentResponse chunks aggregated natively into ModelResponse.
+    """
+    if not llm_config:
+        raise ValueError("llm_config is required for google_genai call")
+    if model_call_params is None:
+        raise ValueError("Google GenAI calls require explicit ModelCallParams with UMP messages")
+
+    from nexau.archs.llm.llm_aggregators.gemini_rest.gemini_rest_event_aggregator import GeminiResponse
+    from nexau.core.adapters.gemini_messages import GeminiMessagesAdapter
+
+    contents, system_instruction = GeminiMessagesAdapter().to_vendor_format(model_call_params.messages)
+    tools = kwargs.get("tools")
+    gemini_tools = convert_tools_to_gemini(tools) if tools else []
+
+    client = _build_google_genai_client(llm_config, model_call_params)
+    config = _build_google_genai_config(llm_config, system_instruction, gemini_tools)
+
+    stream_requested = bool(kwargs.pop("stream", False) or getattr(llm_config, "stream", False))
+    should_trace = tracer is not None and get_current_span() is not None
+    trace_inputs = {"contents": contents, "model": llm_config.model}
+
+    if stream_requested:
+        run_id = _resolve_run_id(model_call_params)
+        emitter = _get_event_emitter(middleware_manager)
+        aggregator = GeminiRestEventAggregator(on_event=emitter, run_id=run_id)
+        shutdown_ev = model_call_params.shutdown_event if model_call_params else None
+
+        trace_ctx = TraceContext(tracer, "Google GenAI streamGenerateContent", SpanType.LLM, inputs=trace_inputs) if should_trace and tracer is not None else None
+        start_time = time.time()
+        first_token_time = None
+
+        try:
+            stream = client.models.generate_content_stream(
+                model=llm_config.model,
+                contents=contents,
+                config=config,
+            )
+            for chunk in stream:
+                if shutdown_ev is not None and shutdown_ev.is_set():
+                    logger.info("🛑 Shutdown event detected during Google GenAI streaming")
+                    break
+                if first_token_time is None:
+                    first_token_time = time.time()
+                chunk_json = chunk.model_dump(by_alias=True, mode="json", exclude_none=True)
+                processed_chunk = _process_stream_chunk(chunk_json, middleware_manager, model_call_params)
+                if processed_chunk is not None:
+                    aggregator.aggregate(cast(GeminiResponse, processed_chunk))
+
+            res = cast(dict[str, Any], aggregator.build())
+            if trace_ctx is not None:
+                with trace_ctx:
+                    trace_ctx.set_outputs(_enrich_gemini_trace_outputs(res, llm_config.model))
+                    if first_token_time is not None:
+                        trace_ctx.set_attributes({"time_to_first_token_ms": (first_token_time - start_time) * 1000})
+            return ModelResponse.from_gemini_rest(res)
+        except Exception as exc:
+            wrapped_error = _maybe_wrap_stream_idle_timeout(exc, transport_name="google_genai stream", llm_config=llm_config)
+            if wrapped_error is not None:
+                raise wrapped_error from exc
+            raise
+
+    # Non-streaming path
+    trace_ctx = TraceContext(tracer, "Google GenAI generateContent", SpanType.LLM, inputs=trace_inputs) if should_trace and tracer is not None else None
+    try:
+        response = client.models.generate_content(
+            model=llm_config.model,
+            contents=contents,
+            config=config,
+        )
+        response_json = response.model_dump(by_alias=True, mode="json", exclude_none=True)
+        if trace_ctx is not None:
+            with trace_ctx:
+                trace_ctx.set_outputs(_enrich_gemini_trace_outputs(_to_serializable_dict(response_json), llm_config.model))
+        return ModelResponse.from_gemini_rest(response_json)
+    except Exception as exc:
+        logger.error(f"Google GenAI API call failed: {exc}")
+        raise
+
+
+async def call_llm_with_google_genai_async(
+    kwargs: dict[str, Any],
+    *,
+    middleware_manager: MiddlewareManager | None = None,
+    model_call_params: ModelCallParams | None = None,
+    llm_config: LLMConfig,
+    tracer: BaseTracer | None = None,
+) -> ModelResponse:
+    """Async version of call_llm_with_google_genai using client.aio."""
+    if model_call_params is None:
+        raise ValueError("Google GenAI calls require explicit ModelCallParams with UMP messages")
+
+    from nexau.archs.llm.llm_aggregators.gemini_rest.gemini_rest_event_aggregator import GeminiResponse
+    from nexau.core.adapters.gemini_messages import GeminiMessagesAdapter
+
+    contents, system_instruction = GeminiMessagesAdapter().to_vendor_format(model_call_params.messages)
+    tools = kwargs.get("tools")
+    gemini_tools = convert_tools_to_gemini(tools) if tools else []
+
+    client = _build_google_genai_client(llm_config, model_call_params)
+    config = _build_google_genai_config(llm_config, system_instruction, gemini_tools)
+
+    stream_requested = bool(kwargs.pop("stream", False) or getattr(llm_config, "stream", False))
+    should_trace = tracer is not None and get_current_span() is not None
+    trace_inputs = {"contents": contents, "model": llm_config.model}
+
+    if stream_requested:
+        run_id = _resolve_run_id(model_call_params)
+        emitter = _get_event_emitter(middleware_manager)
+        aggregator = GeminiRestEventAggregator(on_event=emitter, run_id=run_id)
+        shutdown_ev = model_call_params.shutdown_event if model_call_params else None
+
+        trace_ctx = TraceContext(tracer, "Google GenAI streamGenerateContent (async)", SpanType.LLM, inputs=trace_inputs) if should_trace and tracer is not None else None
+        start_time = time.time()
+        first_token_time = None
+
+        try:
+            stream_or_coro = client.aio.models.generate_content_stream(
+                model=llm_config.model,
+                contents=contents,
+                config=config,
+            )
+            stream = await stream_or_coro if inspect.isawaitable(stream_or_coro) else stream_or_coro
+            async for chunk in stream:
+                if shutdown_ev is not None and shutdown_ev.is_set():
+                    logger.info("🛑 Shutdown event detected during Google GenAI streaming (async)")
+                    break
+                if first_token_time is None:
+                    first_token_time = time.time()
+                chunk_json = chunk.model_dump(by_alias=True, mode="json", exclude_none=True)
+                processed_chunk = _process_stream_chunk(chunk_json, middleware_manager, model_call_params)
+                if processed_chunk is not None:
+                    aggregator.aggregate(cast(GeminiResponse, processed_chunk))
+
+            res = cast(dict[str, Any], aggregator.build())
+            if trace_ctx is not None:
+                with trace_ctx:
+                    trace_ctx.set_outputs(_enrich_gemini_trace_outputs(res, llm_config.model))
+                    if first_token_time is not None:
+                        trace_ctx.set_attributes({"time_to_first_token_ms": (first_token_time - start_time) * 1000})
+            return ModelResponse.from_gemini_rest(res)
+        except Exception as exc:
+            wrapped_error = _maybe_wrap_stream_idle_timeout(exc, transport_name="google_genai stream (async)", llm_config=llm_config)
+            if wrapped_error is not None:
+                raise wrapped_error from exc
+            raise
+
+    # Non-streaming async path
+    trace_ctx = TraceContext(tracer, "Google GenAI generateContent (async)", SpanType.LLM, inputs=trace_inputs) if should_trace and tracer is not None else None
+    try:
+        response_or_coro = client.aio.models.generate_content(
+            model=llm_config.model,
+            contents=contents,
+            config=config,
+        )
+        response = await response_or_coro if inspect.isawaitable(response_or_coro) else response_or_coro
+        response_json = response.model_dump(by_alias=True, mode="json", exclude_none=True)
+        if trace_ctx is not None:
+            with trace_ctx:
+                trace_ctx.set_outputs(_enrich_gemini_trace_outputs(_to_serializable_dict(response_json), llm_config.model))
+        return ModelResponse.from_gemini_rest(response_json)
+    except Exception as exc:
+        logger.error(f"Google GenAI API call failed (async): {exc}")
+        raise
+
+
+# Backward compatibility aliases
+call_llm_with_gemini_rest = call_llm_with_google_genai
+call_llm_with_gemini_rest_async = call_llm_with_google_genai_async

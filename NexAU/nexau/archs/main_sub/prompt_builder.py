@@ -253,7 +253,6 @@ class PromptBuilder:
                     "session_id": ctx.get("session_id", "None"),
                     "brain_directory": ctx.get("brain_directory", def_brain),
                     "scratch_directory": ctx.get("scratch_directory", str(Path(def_brain) / "scratch")),
-                    "cache_directory": ctx.get("cache_directory", str(Path(def_brain) / "cache")),
                     "outputs_directory": ctx.get("outputs_directory"),
                     "nexau_home": str(get_nexau_home()),
                     "tools": tools_list,
@@ -278,7 +277,10 @@ class PromptBuilder:
         if agent_config.system_prompt_suffix:
             extra += agent_config.system_prompt_suffix
 
-        # ponytail: NEXAU.md disabled - client audit workspaces should not contain developer instructions
+        nexau_md = self._load_nexau_md(agent_config, runtime_context)
+        if nexau_md:
+            extra += f"\n\n# Project Instructions (NEXAU.md)\n\n{nexau_md}"
+
         advanced_ctx = self._load_advanced_context(agent_config, runtime_context)
         if advanced_ctx:
             extra += f"\n\n{advanced_ctx}"

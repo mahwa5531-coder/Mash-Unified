@@ -43,7 +43,7 @@ DEFAULT_EXCLUDES = [
 MAX_GLOB_MATCHES = 100
 
 
-def _find_rg_executable() -> str | None:
+def _find_rg_executable() -> str:
     """Locate ripgrep executable: bundled with app or on system PATH."""
     rg_in_path = shutil.which("rg")
     if rg_in_path:
@@ -54,7 +54,7 @@ def _find_rg_executable() -> str | None:
     exe_name = "rg.exe" if is_win else "rg"
     candidates = [
         here.parents[4] / "bin" / exe_name,
-        here.parents[5] / "connector" / "bin" / exe_name,
+        here.parents[5] / "backend" / "bin" / exe_name,
         here.parents[5] / "NexAU" / "bin" / exe_name,
         Path(sys.prefix) / "Scripts" / exe_name,
         Path(sys.prefix) / "bin" / exe_name,
@@ -62,7 +62,7 @@ def _find_rg_executable() -> str | None:
     for c in candidates:
         if c.exists() and c.is_file():
             return str(c)
-    return None
+    return "rg"
 
 
 def _rg_glob(
@@ -205,24 +205,15 @@ def glob(
 
         matches: list[str] = []
         strategy = "rg"
-        exe = _find_rg_executable()
-        if exe:
-            try:
-                matches = _rg_glob(
-                    pattern=pattern,
-                    search_dir=search_dir,
-                    case_sensitive=case_sensitive,
-                    max_matches=MAX_GLOB_MATCHES,
-                    sandbox=sandbox,
-                )
-            except Exception:
-                strategy = "os.walk fallback"
-                matches = _python_glob(
-                    pattern=pattern,
-                    search_dir=search_dir,
-                    max_matches=MAX_GLOB_MATCHES,
-                )
-        else:
+        try:
+            matches = _rg_glob(
+                pattern=pattern,
+                search_dir=search_dir,
+                case_sensitive=case_sensitive,
+                max_matches=MAX_GLOB_MATCHES,
+                sandbox=sandbox,
+            )
+        except Exception:
             strategy = "os.walk fallback"
             matches = _python_glob(
                 pattern=pattern,

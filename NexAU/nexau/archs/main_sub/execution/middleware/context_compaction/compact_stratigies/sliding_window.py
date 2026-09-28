@@ -20,7 +20,7 @@ import openai
 
 from nexau.archs.llm.llm_config import LLMConfig
 from nexau.archs.main_sub.execution.llm_caller import LLMCaller
-from nexau.core.messages import Message, Role, TextBlock, ToolResultBlock, ToolUseBlock
+from nexau.core.messages import Message, Role, TextBlock, ToolUseBlock
 
 from .....utils.token_counter import TokenCounter
 from ..llm_config_utils import normalize_summary_llm_overrides, resolve_summary_llm_config
@@ -342,11 +342,8 @@ class SlidingWindowCompaction:
         # Generate summary safely (handles oversized input)
         summary = self._generate_summary_safe(all_compressed_messages)
 
-        # ponytail: Evict raw tool outputs from older completed rounds, keeping active round intact
-        retained_groups = self._evict_completed_tool_results(groups_to_keep)
-
         # Inject summary into the first USER message of kept groups
-        self._inject_summary(result, retained_groups, summary)
+        self._inject_summary(result, groups_to_keep, summary)
         input_tokens = self.token_counter.count_tokens(messages)
         summary_tokens = self.token_counter.count_tokens(result)
         logger.info(
@@ -414,10 +411,7 @@ class SlidingWindowCompaction:
 
         summary = await self._generate_summary_safe_async(all_compressed_messages)
 
-        # ponytail: Evict raw tool outputs from older completed rounds, keeping active round intact
-        retained_groups = self._evict_completed_tool_results(groups_to_keep)
-
-        self._inject_summary(result, retained_groups, summary)
+        self._inject_summary(result, groups_to_keep, summary)
         input_tokens = self.token_counter.count_tokens(messages)
         summary_tokens = self.token_counter.count_tokens(result)
         logger.info(
@@ -676,45 +670,6 @@ class SlidingWindowCompaction:
         )
         return fallback_text
 
-    def _evict_completed_tool_results(self, groups: list[list[Message]]) -> list[list[Message]]:
-        """Evict raw tool outputs from completed past rounds, keeping only the active round intact.
-
-        Matches OpenAI Codex CLI and Claude Code scratchpad eviction to eliminate context rot.
-        """
-        if len(groups) <= 1:
-            return groups
-
-        pruned_groups: list[list[Message]] = []
-        for group_msgs in groups[:-1]:
-            pruned_msgs: list[Message] = []
-            for msg in group_msgs:
-                content_list = getattr(msg, "content", [])
-                if isinstance(content_list, list) and (
-                    msg.role == Role.TOOL or any(isinstance(b, ToolResultBlock) for b in content_list)
-                ):
-                    new_blocks = []
-                    for b in content_list:
-                        if isinstance(b, ToolResultBlock):
-                            # Preserve tool_use_id and is_error for API validity; prune oversized raw content
-                            new_blocks.append(
-                                ToolResultBlock(
-                                    tool_use_id=b.tool_use_id,
-                                    content="[Tool execution completed: output evicted to save context]",
-                                    is_error=b.is_error,
-                                    raw_output=None,
-                                )
-                            )
-                        else:
-                            new_blocks.append(b)
-                    pruned_msgs.append(msg.model_copy(update={"content": new_blocks}))
-                else:
-                    pruned_msgs.append(msg)
-            pruned_groups.append(pruned_msgs)
-
-        # Last group is the active round - keep full tool outputs intact
-        pruned_groups.append(groups[-1])
-        return pruned_groups
-
     def _inject_summary(
         self,
         result: list[Message],
@@ -724,7 +679,7 @@ class SlidingWindowCompaction:
         """Inject summary into the message list, always near the beginning.
 
         When the first message of the kept groups is a USER message, the
-        summary is formatted into a <CONTEXT_SUMMARY> block and prepended.
+        summary is merged into it (preserving the original user content).
         Otherwise a standalone summary USER message is inserted before the
         kept groups so that the LLM always sees the context summary early in
         the conversation - not buried at the end after a long tool-call chain.
@@ -735,7 +690,6 @@ class SlidingWindowCompaction:
             summary: Summary text to inject.
         """
         summary_prefix = with_handoff_prefix(summary)
-        formatted_summary = f"<CONTEXT_SUMMARY>\n{summary_prefix}\n</CONTEXT_SUMMARY>"
 
         # 1. Check if first kept message is USER
         first_kept_msg: Message | None = None
@@ -749,7 +703,7 @@ class SlidingWindowCompaction:
                 for msg in group_msgs:
                     if msg is first_kept_msg and not merged:
                         original_content = msg.get_text_content()
-                        modified_content = f"{formatted_summary}\n\n{original_content}"
+                        modified_content = f"{summary_prefix} The user request for this round is: {original_content}"
                         modified_msg = msg.model_copy(update={"content": [TextBlock(text=modified_content)]})
                         modified_msg.metadata["isSummary"] = True
                         if self._session_id is not None:
@@ -760,7 +714,7 @@ class SlidingWindowCompaction:
                         result.append(msg)
         else:
             # 2b. ASSISTANT/TOOL present: prepend standalone summary
-            summary_msg = Message(role=Role.USER, content=[TextBlock(text=formatted_summary)])
+            summary_msg = Message(role=Role.USER, content=[TextBlock(text=summary_prefix)])
             summary_msg.metadata["isSummary"] = True
             if self._session_id is not None:
                 summary_msg.metadata["session_id"] = self._session_id

@@ -65,10 +65,6 @@ logger = logging.getLogger(__name__)
 _ENCODING_PROBE_MAX_BYTES = 64 * 1024
 
 
-# Shared registry so background daemons/dev servers persist and stay manageable across turns
-_SHARED_LOCAL_BACKGROUND_TASKS: dict[int, Any] = {}
-
-
 @dataclass(kw_only=True)
 class LocalSandbox(BaseSandbox):
     """
@@ -85,7 +81,6 @@ class LocalSandbox(BaseSandbox):
     def __post_init__(self) -> None:
         super().__post_init__()
         self._shell_backend = create_shell_backend()
-        self._background_tasks = _SHARED_LOCAL_BACKGROUND_TASKS
 
     def get_temp_dir(self) -> str:
         """Return the local host temp directory managed by NexAU."""
@@ -184,9 +179,9 @@ class LocalSandbox(BaseSandbox):
         command = re.sub(r"/mnt/([a-zA-Z])/", r"\1:/", command)
 
         # 2. Command chaining: PowerShell 5.1 does not support && or ||
-        # Emulate && (exit on failure before running next) and || (run next only if failed)
-        command = re.sub(r"\s+&&\s+", " ; if (-not $?) { exit $LASTEXITCODE } ; ", command)
-        command = re.sub(r"\s+\|\|\s+", " ; if ($?) { exit 0 } ; ", command)
+        # Replace && with ; and || with ; (when used as command separators)
+        command = re.sub(r"\s+&&\s+", " ; ", command)
+        command = re.sub(r"\s+\|\|\s+", " ; ", command)
 
         # 3. python3 alias -> python (avoids Windows Store stub crash on Windows)
         command = re.sub(r"\bpython3(\.exe)?\b", "python", command)
@@ -363,10 +358,10 @@ class LocalSandbox(BaseSandbox):
         start_time = time.time()
         work_dir = self._ensure_working_directory()
 
-        if timeout is None and not background:
-            timeout = 600000  # Default: 10 minutes for foreground commands
+        if timeout is None:
+            timeout = 120000  # Default: 2 minutes
 
-        timeout_seconds = (timeout / 1000.0) if timeout and timeout > 0 else None
+        timeout_seconds = timeout / 1000.0
 
         try:
             # 1. shell backend ( heredoc / PowerShell )
@@ -407,19 +402,12 @@ class LocalSandbox(BaseSandbox):
                     "stderr_file": ferr,
                 }
 
-                def _wait_process(proc: subprocess.Popen[bytes], info: dict[str, Any], timeout_sec: float | None) -> None:
+                def _wait_process(proc: subprocess.Popen[bytes], info: dict[str, Any]) -> None:
                     try:
-                        exit_code = proc.wait(timeout=timeout_sec)
+                        exit_code = proc.wait()
                         info["exit_code"] = exit_code
                         if exit_code != 0:
                             info["error"] = f"Command failed with exit code {exit_code}"
-                    except subprocess.TimeoutExpired:
-                        try:
-                            self.kill_background_task(proc.pid)
-                        except Exception:
-                            pass
-                        info["error"] = f"Command timed out after {int(timeout_sec * 1000) if timeout_sec else 0}ms"
-                        info["exit_code"] = -1
                     except Exception as exc:
                         info["error"] = str(exc)
                     finally:
@@ -440,7 +428,7 @@ class LocalSandbox(BaseSandbox):
                             except Exception:
                                 pass
 
-                wait_thread = threading.Thread(target=_wait_process, args=(process, task_info, timeout_seconds), daemon=True)
+                wait_thread = threading.Thread(target=_wait_process, args=(process, task_info), daemon=True)
                 wait_thread.start()
                 task_info["wait_thread"] = wait_thread
 
@@ -538,19 +526,6 @@ class LocalSandbox(BaseSandbox):
             stdout_raw = Path(stdout_path).read_bytes().decode("utf-8", errors="replace")
             stderr_raw = Path(stderr_path).read_bytes().decode("utf-8", errors="replace")
 
-            # Write full combined output to .system_generated/tasks/task-{pid}.log
-            # so run_shell_command can link it when truncation occurs.
-            task_log_path: str | None = None
-            try:
-                from nexau.archs.platform.path_helpers import get_brain_dir
-                tasks_dir = get_brain_dir(self.sandbox_id) / ".system_generated" / "tasks"
-                tasks_dir.mkdir(parents=True, exist_ok=True)
-                task_log_path = str(tasks_dir / f"task-{process.pid}.log")
-                combined = stdout_raw + ("\n" + stderr_raw if stderr_raw else "")
-                Path(task_log_path).write_text(combined, encoding="utf-8", errors="replace")
-            except Exception:
-                task_log_path = None
-
             t_stdout, t_stderr, was_truncated, orig_stdout_len, orig_stderr_len = smart_truncate_output(
                 stdout_raw,
                 stderr_raw,
@@ -571,7 +546,7 @@ class LocalSandbox(BaseSandbox):
                 original_stdout_length=orig_stdout_len,
                 original_stderr_length=orig_stderr_len,
                 output_dir=output_dir,
-                stdout_file=task_log_path or (f"{output_dir}/stdout.txt" if output_dir else None),
+                stdout_file=f"{output_dir}/stdout.txt" if output_dir else None,
                 stderr_file=f"{output_dir}/stderr.txt" if output_dir else None,
             )
 
