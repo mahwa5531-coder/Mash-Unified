@@ -3,7 +3,7 @@
 import React from 'react';
 import { MoreVertical, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import FileIcon from '@/components/common/FileIcon';
+import { FileIcon } from './FileIcon';
 
 export interface FileBreadcrumbBarProps {
   /** Complete path or filename (e.g. "workpapers/FY26/Trade_Payables.xlsx") */

@@ -14,6 +14,7 @@ import {
   FilePill, 
   AuditCallout, 
   FileTab, 
+  FileTabStrip,
   FileBreadcrumbBar, 
   FluentExcelLogo, 
   AdobePdfLogo, 
@@ -629,83 +630,29 @@ export default function DesignSystemPreviewPage() {
                 </button>
               </div>
 
-              {/* Row 1 Complete Header Bar (Exact RightSidebar Top Row Layout) */}
-              <div className="h-9 bg-[#121214] border border-zinc-200/70 dark:border-white/[0.08] rounded-lg flex items-center justify-between px-2 shrink-0 w-full overflow-hidden select-none">
-                {/* Left: Audit Workspaces Button Only (Executive Custom Logo) */}
-                <div className="flex items-center shrink-0 mr-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setLastClicked('Row 1: Clicked Audit Workspaces button')}
-                    className="p-1.5 rounded-md text-zinc-400 hover:text-white bg-transparent transition-colors cursor-pointer outline-none"
-                    title="Audit Workspaces"
-                    aria-label="Audit Workspaces"
-                  >
-                    <AuditWorkspacesLogo size={14} />
-                  </button>
-                </div>
-
-                {/* Center: Open File Tabs (<FileTab /> with sideways mousewheel scroll) */}
-                <div 
-                  onWheel={(e) => {
-                    if (e.deltaY !== 0) {
-                      e.currentTarget.scrollLeft += e.deltaY;
-                    }
-                  }}
-                  className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1"
-                >
-                  {demoTabs.map((tab) => (
-                    <FileTab
-                      key={tab.id}
-                      id={tab.id}
-                      title={tab.title}
-                      path={tab.path}
-                      type={tab.type}
-                      icon={tab.icon}
-                      isActive={activeDemoTabId === tab.id}
-                      onSelect={() => {
-                        setActiveDemoTabId(tab.id);
-                        setLastClicked(`Selected Tab: ${tab.title}`);
-                      }}
-                      onClose={() => {
-                        setLastClicked(`Closed Tab: ${tab.title}`);
-                        setDemoTabs((prev) => prev.filter((t) => t.id !== tab.id));
-                        if (activeDemoTabId === tab.id) {
-                          const remaining = demoTabs.filter((t) => t.id !== tab.id);
-                          if (remaining.length > 0) setActiveDemoTabId(remaining[0].id);
-                        }
-                      }}
-                    />
-                  ))}
-
-                  {demoTabs.length === 0 && (
-                    <span className="text-xs text-[var(--m-text-muted)] italic py-1">
-                      All tabs closed. Click "Reset Demo Tabs" above to restore.
-                    </span>
-                  )}
-                </div>
-
-                {/* Right: Maximize Button & Toggle Button Only */}
-                <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setLastClicked('Row 1: Clicked Maximize button')}
-                    className="p-1.5 rounded-md text-zinc-400 hover:text-white bg-transparent transition-colors cursor-pointer outline-none"
-                    title="Maximize sidebar"
-                    aria-label="Maximize sidebar"
-                  >
-                    <Maximize2 size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLastClicked('Row 1: Clicked Toggle Sidebar button')}
-                    className="p-1.5 rounded-md text-zinc-400 hover:text-white bg-transparent transition-colors cursor-pointer outline-none"
-                    title="Collapse sidebar"
-                    aria-label="Collapse sidebar"
-                  >
-                    <PanelRight size={15} />
-                  </button>
-                </div>
-              </div>
+              {/* Row 1 Complete Header Bar (Canonical FileTabStrip Primitive) */}
+              <FileTabStrip
+                className="rounded-lg border border-zinc-200/70 dark:border-white/[0.08]"
+                tabs={demoTabs}
+                activeTabId={activeDemoTabId}
+                onToggleExplorer={() => setLastClicked('Row 1: Clicked Audit Workspaces button')}
+                onSelectTab={(tabId) => {
+                  setActiveDemoTabId(tabId);
+                  const tab = demoTabs.find((t) => t.id === tabId);
+                  setLastClicked(`Selected Tab: ${tab?.title}`);
+                }}
+                onCloseTab={(_e, tabId) => {
+                  const tab = demoTabs.find((t) => t.id === tabId);
+                  setLastClicked(`Closed Tab: ${tab?.title}`);
+                  setDemoTabs((prev) => prev.filter((t) => t.id !== tabId));
+                  if (activeDemoTabId === tabId) {
+                    const remaining = demoTabs.filter((t) => t.id !== tabId);
+                    if (remaining.length > 0) setActiveDemoTabId(remaining[0].id);
+                  }
+                }}
+                onToggleMaximize={() => setLastClicked('Row 1: Clicked Maximize button')}
+                onToggleCollapse={() => setLastClicked('Row 1: Clicked Toggle Sidebar button')}
+              />
             </div>
 
             {/* Explanatory Feature Callout */}

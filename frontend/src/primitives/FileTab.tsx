@@ -3,7 +3,7 @@
 import React from 'react';
 import { X, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import FileIcon from '@/components/common/FileIcon';
+import { FileIcon } from './FileIcon';
 
 export interface FileTabProps {
   /** Unique tab ID */

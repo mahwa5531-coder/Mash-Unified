@@ -85,71 +85,22 @@ function formatFilePill(rawLabel: string, rawHref: string) {
   };
 }
 
-// ponytail: Detect full file paths vs bare symbols, functions, half paths, and bare extensions
-function isFullFilePath(raw: string): boolean {
+// ponytail: Detect if a string is a valid file path or standalone filename with recognized extension
+function isFilePathOrName(raw: string): boolean {
   if (!raw || typeof raw !== 'string') return false;
   const clean = raw.trim().replace(/^file:\/\/\/?/i, '').split('#')[0];
-  
-  if (
-    clean.includes(' ') || 
-    clean.includes('(') || 
-    clean.includes(')') || 
-    clean.includes('^') || 
-    clean.includes('$') || 
-    clean.includes('|') || 
-    clean.includes('*') || 
-    clean.includes('?') || 
-    clean.includes('<') || 
-    clean.includes('>') ||
-    clean.includes('{') ||
-    clean.includes('}') ||
-    clean.includes('`') ||
-    clean.includes('"') ||
-    clean.includes("'")
-  ) {
-    return false;
-  }
+  if (!clean || clean.includes(' ') || clean.includes('\n') || clean.includes('(') || clean.includes(')')) return false;
 
-  // 1. Bare file extensions (e.g. ".py", ".ts", ".json", ".md", ".css")
-  if (/^\.[a-zA-Z0-9]{1,10}$/.test(clean)) {
-    return false;
-  }
+  const FILE_EXT_REGEX = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|pyw|ipynb|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|db|sqlite|md|markdown|txt|log|html|css|scss|xml|xbrl|sh|bash|zsh|ps1|rs|go|c|cpp|h|java|zip|tar|gz|png|jpe?g|gif|svg|webp)$/i;
 
-  // 2. Ellipsis or partial paths (e.g. ".../validators.py")
-  if (clean.includes('...')) {
-    return false;
-  }
+  const parts = clean.split(/[/\\]/);
+  const filename = parts.pop() || '';
+  return FILE_EXT_REGEX.test(clean) && filename.length > 0 && !filename.startsWith('.');
+}
 
-  // 3. Directory paths ending in slash (e.g. "frontend/src/", "django/contrib/auth/")
-  if (clean.endsWith('/') || clean.endsWith('\\')) {
-    return false;
-  }
-
-  // 4. Absolute file paths (Windows drive C:\... or Unix /Users/... or file:// URIs)
-  if (raw.startsWith('file://')) return true;
-  if (/^[a-zA-Z]:[/\\]/.test(clean) && /\.[a-zA-Z0-9]+$/.test(clean)) return true;
-  if (/^\/(Users|home|tmp|var|etc|usr|opt|workspace|app)\//i.test(clean) && /\.[a-zA-Z0-9]+$/.test(clean)) return true;
-
-  // 5. Half filepaths / bare filenames without directory path
-  // E.g., "validators.py", "models.py", "App.tsx", "test.py"
-  // Without a directory separator ('/' or '\'), it is a bare filename / half thing, not a full path!
-  const hasSeparator = clean.includes('/') || clean.includes('\\');
-  if (!hasSeparator) {
-    return false;
-  }
-
-  // 6. Must have a valid known file extension
-  const FILE_EXT_REGEX = /\.(py|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|csv|xlsx?|md|markdown|txt|diff|patch|html|css|env|log|sh|bat|j2|jinja2?)$/i;
-  if (FILE_EXT_REGEX.test(clean)) {
-    const parts = clean.split(/[/\\]/);
-    const filename = parts.pop() || '';
-    // Must have a real filename (not just ".py")
-    if (filename.length > 0 && !filename.startsWith('.')) {
-      return true;
-    }
-  }
-
-  return false;
+// ponytail: Detect full file paths vs bare symbols, functions, half paths, and bare extensions
+function isFullFilePath(raw: string): boolean {
+  return isFilePathOrName(raw);
 }
 
 function renderFileButton(filePath: string, label?: string, onOpenFile?: (p: string) => void) {
@@ -227,6 +178,15 @@ function processTextNodesForBadges(children: any, onOpenFile?: (path: string) =>
         if (isInteractiveLink) {
           return c;
         }
+
+        // If c is a code element and its content is a file, unwrap and return FilePill directly without amber badge!
+        if (c.type === 'code') {
+          const codeText = extractChildText((c.props as any)?.children).trim();
+          if (isFilePathOrName(codeText)) {
+            return renderFileButton(codeText, codeText, onOpenFile);
+          }
+        }
+
         return React.cloneElement(c, { key: i } as any, processTextNodesForBadges((c.props as any)?.children, onOpenFile));
       }
       return c;
@@ -368,9 +328,15 @@ const AssistantMessage = memo(function AssistantMessage({
         return <CodeBlock language={lang || 'text'} code={content} isStreaming={isActivelyStreaming} />;
       }
 
-      // Check if inline code is a full file path -> render as interactive button!
-      if (isFullFilePath(content)) {
-        return renderFileButton(content, content, onOpenFile);
+      // If children is already a FilePill element, return it directly!
+      if (React.isValidElement(children) && ((children as any).type === FilePill || (children as any).props?.path)) {
+        return children;
+      }
+
+      // Check if inline code is a file path or filename -> render as interactive FilePill directly!
+      const plainCodeText = (extractChildText(children) || content).trim();
+      if (isFilePathOrName(plainCodeText)) {
+        return renderFileButton(plainCodeText, plainCodeText, onOpenFile);
       }
 
       // Inline code (symbols, functions, variables, regex) — distinct highlighted badge
@@ -433,7 +399,7 @@ const AssistantMessage = memo(function AssistantMessage({
       const isRelativeFile = /\.(xlsx?|xlsm|csv|json|md|markdown|txt|log|py|tsx?|jsx?|mjs|sql|ya?ml|toml|xml|env|html|css|pdf|png|jpe?g|svg|webp|gif|j2|jinja2?)$/i.test(href.split('#')[0]);
       const isLocalPath = (href.startsWith('/') || href.startsWith('./') || href.startsWith('../')) && isFullFilePath(href);
 
-      if (isFileUri || isWinPath || isRelativeFile || isLocalPath) {
+      if (isFileUri || isWinPath || isRelativeFile || isLocalPath || isFilePathOrName(href)) {
         const rawLabel = extractChildText(children);
         return renderFileButton(href, rawLabel, onOpenFile);
       }
