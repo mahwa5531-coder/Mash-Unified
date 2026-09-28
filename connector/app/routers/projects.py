@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -13,6 +14,41 @@ class CreateProjectRequest(BaseModel):
     user_id: str = "default_user"
     name: str
     local_folder_path: str
+
+
+class QuickProjectRequest(BaseModel):
+    user_id: str = "default_user"
+    name: str
+
+
+@router.post("/quick")
+async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEngineDep):
+    clean_name = request.name.strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="Project name cannot be empty")
+    
+    docs_dir = Path.home() / "Documents"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    target_dir = docs_dir / clean_name
+    target_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Subdirectories for outputs and deliverables
+    (target_dir / "Audit_Deliverables").mkdir(parents=True, exist_ok=True)
+    (target_dir / "NexAU_Outputs").mkdir(parents=True, exist_ok=True)
+    
+    normalized_path = os.path.normpath(str(target_dir)).replace("\\", "/")
+    
+    all_projects = await engine.find_many(ProjectModel)
+    for p in all_projects:
+        if p.name.strip().lower() == clean_name.lower():
+            p.local_folder_path = normalized_path
+            p.user_id = request.user_id
+            await engine.update(p)
+            return p
+            
+    project = ProjectModel(user_id=request.user_id, name=clean_name, local_folder_path=normalized_path)
+    await engine.create(project)
+    return project
 
 
 @router.post("")
