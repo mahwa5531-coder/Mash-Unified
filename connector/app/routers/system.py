@@ -81,23 +81,56 @@ class SelectFolderRequest(BaseModel):
 
 
 def _open_folder_dialog() -> str | None:
-    """Open native Windows Explorer folder selection dialog with rapid failover."""
+    """Open real native Windows File Explorer folder selection dialog with rapid failover."""
     import sys
     import subprocess
 
     if sys.platform == "win32":
-        # 1. PowerShell COM BrowseForFolder: Native Windows Shell dialog
-        ps_cmd = (
-            "$app = New-Object -ComObject Shell.Application; "
-            "$folder = $app.BrowseForFolder(0, 'Select Workspace Folder', 0x00000250, 0); "
-            "if ($folder) { $folder.Self.Path }"
+        # 1. Native IFileOpenDialog with FOS_PICKFOLDERS via native_picker.ps1 (Real modern File Explorer)
+        picker_script = Path(__file__).resolve().parent.parent / "native_picker.ps1"
+        if picker_script.exists():
+            try:
+                res = subprocess.run(
+                    [
+                        "powershell",
+                        "-STA",
+                        "-NoProfile",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                        str(picker_script),
+                        "-Title",
+                        "Select Workspace Folder",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                out = res.stdout.strip()
+                if out and Path(out).is_dir():
+                    return out
+            except Exception as e:
+                logger.warning(f"Native folder picker failed: {e}")
+
+        # 2. PowerShell OpenFileDialog fallback with folder selection (File Explorer window)
+        ps_fallback = (
+            "Add-Type -AssemblyName System.Windows.Forms; "
+            "$f = New-Object System.Windows.Forms.OpenFileDialog; "
+            "$f.ValidateNames = $false; "
+            "$f.CheckFileExists = $false; "
+            "$f.CheckPathExists = $true; "
+            "$f.FileName = 'Select Folder'; "
+            "$f.Title = 'Select Workspace Folder'; "
+            "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { "
+            "  [System.IO.Path]::GetDirectoryName($f.FileName) "
+            "}"
         )
         try:
             res = subprocess.run(
-                ["powershell", "-NoProfile", "-Command", ps_cmd],
+                ["powershell", "-STA", "-NoProfile", "-Command", ps_fallback],
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=60,
             )
             out = res.stdout.strip()
             if out and Path(out).is_dir():
@@ -105,7 +138,7 @@ def _open_folder_dialog() -> str | None:
         except Exception:
             pass
 
-    # 2. Tkinter fallback
+    # 3. Tkinter fallback
     script = (
         "import tkinter as tk\n"
         "from tkinter import filedialog\n"
@@ -123,7 +156,7 @@ def _open_folder_dialog() -> str | None:
             [sys.executable, "-c", script],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=60,
         )
         out = res.stdout.strip()
         if out and Path(out).is_dir():
