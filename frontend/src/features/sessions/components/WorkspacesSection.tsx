@@ -1,10 +1,16 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FilterBarsIcon, FolderPlusIcon, QuickStartFolderIcon } from './icons';
 import { WorkspaceFolderRow } from './WorkspaceFolderRow';
 import { SessionItem } from '@/services/sessions';
 import { ProjectItem } from '@/services/projects';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 
 export interface WorkspacesSectionProps {
   workspaceSessions: Record<string, SessionItem[]>;
@@ -13,7 +19,7 @@ export interface WorkspacesSectionProps {
   canScrollUp: boolean;
   onToggleFolder: (repoName: string) => void;
   onNewSession: (repoName?: string, folderPath?: string) => void;
-  onNewProject: () => void;
+  onOpenFolderPickerModal: () => void;
   onOpenQuickProjectModal: () => void;
   onDeleteProject: (e: React.MouseEvent, projectId?: string, projectName?: string) => void;
   renderSessionItem: (session: SessionItem) => React.ReactNode;
@@ -26,27 +32,13 @@ export function WorkspacesSection({
   canScrollUp,
   onToggleFolder,
   onNewSession,
-  onNewProject,
+  onOpenFolderPickerModal,
   onOpenQuickProjectModal,
   onDeleteProject,
   renderSessionItem,
 }: WorkspacesSectionProps) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [workspaceFilter, setWorkspaceFilter] = useState('');
-  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
-  const workspaceMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close workspace popover menu on click outside
-  useEffect(() => {
-    if (!isWorkspaceMenuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(e.target as Node)) {
-        setIsWorkspaceMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isWorkspaceMenuOpen]);
 
   const filteredEntries = Object.entries(workspaceSessions).filter(([repoName]) =>
     !workspaceFilter.trim() || repoName.toLowerCase().includes(workspaceFilter.trim().toLowerCase())
@@ -78,31 +70,27 @@ export function WorkspacesSection({
             <FilterBarsIcon size={14} />
           </button>
 
-          {/* Folder Plus button */}
-          <button
-            type="button"
-            onClick={() => setIsWorkspaceMenuOpen(prev => !prev)}
-            className={`cursor-pointer transition-colors p-1 rounded-md hover:bg-black/[0.05] dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white ${
-              isWorkspaceMenuOpen ? 'text-zinc-900 dark:text-white bg-black/[0.05] dark:bg-white/[0.06]' : 'text-zinc-500 dark:text-zinc-400'
-            }`}
-            title="Add workspace project"
-            aria-label="Add workspace project"
-          >
-            <FolderPlusIcon size={14} />
-          </button>
-
-          {/* Floating Popover Menu (New Project & Quick Start) positioned to the right */}
-          {isWorkspaceMenuOpen && (
-            <div 
-              ref={workspaceMenuRef}
-              className="absolute right-0 top-full mt-1.5 w-48 rounded-xl bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-white/[0.08] shadow-2xl p-1 z-50 select-none font-sans text-xs animate-in fade-in zoom-in-95"
-            >
+          {/* Add Workspace Project Popover (Radix Portal flying out to the right) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                onClick={() => {
-                  setIsWorkspaceMenuOpen(false);
-                  onNewProject();
-                }}
+                className="cursor-pointer transition-colors p-1 rounded-md hover:bg-black/[0.05] dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white text-zinc-500 dark:text-zinc-400"
+                title="Add workspace project"
+                aria-label="Add workspace project"
+              >
+                <FolderPlusIcon size={14} />
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent 
+              side="right"
+              align="start"
+              sideOffset={8}
+              className="w-52 rounded-xl bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-white/[0.08] shadow-2xl p-1 z-50 select-none font-sans text-xs"
+            >
+              <DropdownMenuItem
+                onClick={onOpenFolderPickerModal}
                 className="w-full text-left px-2.5 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white flex items-center gap-2.5 cursor-pointer rounded-lg transition-colors"
               >
                 <FolderPlusIcon size={14} className="text-zinc-400 shrink-0" />
@@ -110,14 +98,10 @@ export function WorkspacesSection({
                   <span className="font-medium text-[12.5px]">New Project</span>
                   <span className="text-[10.5px] text-zinc-400 dark:text-zinc-500">Select from computer</span>
                 </div>
-              </button>
+              </DropdownMenuItem>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsWorkspaceMenuOpen(false);
-                  onOpenQuickProjectModal();
-                }}
+              <DropdownMenuItem
+                onClick={onOpenQuickProjectModal}
                 className="w-full text-left px-2.5 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white flex items-center gap-2.5 cursor-pointer rounded-lg transition-colors"
               >
                 <QuickStartFolderIcon size={14} className="text-zinc-400 shrink-0" />
@@ -125,9 +109,9 @@ export function WorkspacesSection({
                   <span className="font-medium text-[12.5px]">Quick Start</span>
                   <span className="text-[10.5px] text-zinc-400 dark:text-zinc-500">Create in Documents</span>
                 </div>
-              </button>
-            </div>
-          )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

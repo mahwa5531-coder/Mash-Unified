@@ -2,7 +2,7 @@
 
 import { useEffect, useState, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
 import { fetchSessions, markSessionViewed, renameSession, deleteSession, SessionItem } from '@/services/sessions';
-import { fetchProjects, ProjectItem, selectFolder, getQuickstartFolder, resolveFolder, createProject, deleteProject } from '@/services/projects';
+import { fetchProjects, ProjectItem, deleteProject } from '@/services/projects';
 import { isSessionStreaming, subscribeToSessionStore, sessionStore } from '@/features/chat';
 import { SessionItemRow } from './SessionItemRow';
 import { SessionContextMenu } from './SessionContextMenu';
@@ -12,6 +12,7 @@ import { PinnedSection } from './PinnedSection';
 import { WorkspacesSection } from './WorkspacesSection';
 import { DirectConversationsSection } from './DirectConversationsSection';
 import { QuickProjectModal } from './QuickProjectModal';
+import { FolderPickerModal } from './FolderPickerModal';
 
 interface SidebarProps {
   selectedSessionId: string | null;
@@ -141,6 +142,8 @@ export default function Sidebar({
 
   // Quick Project Modal State
   const [isQuickProjectModalOpen, setIsQuickProjectModalOpen] = useState(false);
+  // In-App Folder Picker Modal State
+  const [isFolderPickerModalOpen, setIsFolderPickerModalOpen] = useState(false);
 
   // Resizing state
   const [internalWidth, setInternalWidth] = useState<number>(260);
@@ -370,24 +373,7 @@ export default function Sidebar({
     }
   };
 
-  const handleNewProject = async () => {
-    try {
-      const selected = await selectFolder();
-      if (selected && selected.folder_path) {
-        const folderPath = selected.folder_path;
-        const folderName = selected.folder_name || folderPath.split(/[/\\]/).filter(Boolean).pop() || folderPath;
-        const project = await createProject(folderName, folderPath);
-        if (project) {
-          refreshData();
-          onNewSession(project.name, project.local_folder_path);
-        }
-      }
-    } catch (err) {
-      console.warn("Folder picker canceled or failed:", err);
-    }
-  };
-
-  const handleQuickProjectCreated = (project: ProjectItem) => {
+  const handleProjectCreated = (project: ProjectItem) => {
     refreshData();
     onNewSession(project.name, project.local_folder_path);
   };
@@ -485,7 +471,7 @@ export default function Sidebar({
             canScrollUp={canScrollUp}
             onToggleFolder={toggleFolder}
             onNewSession={onNewSession}
-            onNewProject={handleNewProject}
+            onOpenFolderPickerModal={() => setIsFolderPickerModalOpen(true)}
             onOpenQuickProjectModal={() => setIsQuickProjectModalOpen(true)}
             onDeleteProject={handleDeleteProjectClick}
             renderSessionItem={renderSessionItem}
@@ -530,11 +516,18 @@ export default function Sidebar({
       {/* Fixed Footer - Settings */}
       <SidebarFooter onOpenSettings={onOpenSettings} />
 
+      {/* In-App Folder Picker Modal for selecting any directory on host */}
+      <FolderPickerModal
+        isOpen={isFolderPickerModalOpen}
+        onClose={() => setIsFolderPickerModalOpen(false)}
+        onProjectCreated={handleProjectCreated}
+      />
+
       {/* Quick Project Creation Modal (uses atomic Modal & Button primitives) */}
       <QuickProjectModal
         isOpen={isQuickProjectModalOpen}
         onClose={() => setIsQuickProjectModalOpen(false)}
-        onProjectCreated={handleQuickProjectCreated}
+        onProjectCreated={handleProjectCreated}
       />
     </div>
   );
