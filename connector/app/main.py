@@ -78,6 +78,7 @@ def _build_agent_config() -> AgentConfig:
     active_key = (
         custom_key
         or vault.get("api_key")
+        or vault.get("access_token")
         or ("sk-local-test" if custom_base_url else "")
     )
     active_model = custom_model or app_cfg.model.default_model or "google/gemini-2.5-flash"

@@ -127,8 +127,22 @@ async def list_artifacts(
     files_with_mtime.sort(key=lambda x: x[1], reverse=True)
     files = [x[0] for x in files_with_mtime]
 
+    items = []
+    for rel_f, mtime in files_with_mtime:
+        if (rel_f.startswith("Audit_Deliverables/") or rel_f.startswith("NexAU_Outputs/")) and project_dir:
+            full_path = str((Path(project_dir) / rel_f).resolve())
+        else:
+            full_path = str((Path(found_brain_dir) / rel_f).resolve())
+        items.append({
+            "name": Path(rel_f).name,
+            "rel_path": rel_f,
+            "path": full_path.replace("\\", "/"),
+            "mtime": mtime,
+        })
+
     return {
         "files": files,
+        "items": items,
         "brain_directory": found_brain_dir,
         "project_directory": project_dir,
     }

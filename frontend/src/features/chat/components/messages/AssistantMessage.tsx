@@ -471,7 +471,8 @@ const AssistantMessage = memo(function AssistantMessage({
           <ReactMarkdown
             remarkPlugins={REMARK_PLUGINS as any}
             rehypePlugins={REHYPE_PLUGINS as any}
-            urlTransform={(url) => url}
+            // ponytail: block javascript:/vbscript:/data: but allow file:// for local paths (M-11)
+            urlTransform={(url) => /^\s*(javascript|vbscript|data):/i.test(url) ? '' : url}
             components={markdownComponents}
           >
             {formattedContent}

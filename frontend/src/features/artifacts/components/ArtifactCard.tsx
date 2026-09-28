@@ -9,6 +9,7 @@ export type { ArtifactItem } from '@/types/artifacts';
 
 interface ArtifactCardProps {
   artifact: ArtifactItem;
+  sessionId?: string;
   onOpen: (path: string) => void;
   onProceed?: (path: string) => void;
   isLast?: boolean;
@@ -17,6 +18,7 @@ interface ArtifactCardProps {
 
 export default function ArtifactCard({ 
   artifact, 
+  sessionId,
   onOpen, 
   onProceed, 
   isLast = true, 
@@ -144,7 +146,7 @@ export default function ArtifactCard({
       <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
         {isExcel && (
           <a
-            href={`${BASE_URL}/files/content?path=${encodeURIComponent(artifact.filePath)}&raw=true`}
+            href={`${BASE_URL}/files/content?path=${encodeURIComponent(artifact.filePath)}&raw=true${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}`}
             target="_blank"
             rel="noopener noreferrer"
             className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors"

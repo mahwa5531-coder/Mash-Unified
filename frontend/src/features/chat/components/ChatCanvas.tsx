@@ -409,6 +409,7 @@ export default function ChatCanvas({
           )}
 
           <ChatComposer
+            key={sessionId || 'new-session'}
             sessionId={sessionId}
             inputPrompt={inputPrompt}
             setInputPrompt={setInputPrompt}

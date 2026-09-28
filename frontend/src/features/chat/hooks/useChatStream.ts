@@ -54,6 +54,8 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
   const [hasEarlierTurns, setHasEarlierTurns] = useState<boolean>(false);
   const [remainingEarlierCount, setRemainingEarlierCount] = useState<number>(0);
   const [isLoadingEarlier, setIsLoadingEarlier] = useState<boolean>(false);
+  // ponytail: nonce to force history reload effect to re-trigger (M-01)
+  const [historyRetryNonce, setHistoryRetryNonce] = useState(0);
   const fallbackScrollRef = useRef<HTMLDivElement>(null);
   const scrollRef = scrollContainerRef || fallbackScrollRef;
   const isAtBottomRef = useRef<boolean>(true);
@@ -317,7 +319,7 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
         }
       });
     }
-  }, [sessionId, scrollContainerRef, updatePaginationState]);
+  }, [sessionId, historyRetryNonce, scrollContainerRef, updatePaginationState]);
 
   // Load earlier turns via reverse scroll pagination
   const loadEarlierTurns = useCallback(async () => {
@@ -445,12 +447,14 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
     let activeSid = targetSessionId || activeSessionIdRef.current || sessionId;
     const title = generateCleanSessionTitle(userText, activeSid || '');
 
+    let isNewSession = false;
     if (!isRetry && !activeSid) {
       const randSuffix = typeof crypto !== 'undefined' && crypto.randomUUID 
         ? crypto.randomUUID().replace(/-/g, '').slice(0, 10)
         : Math.random().toString(36).slice(2, 10);
       activeSid = `sess_${Date.now().toString(36)}_${randSuffix}`;
       activeSessionIdRef.current = activeSid;
+      isNewSession = true;
       onSessionCreated(activeSid, title, sessionRepo);
       renameSession(activeSid, title).catch(() => {});
     }
@@ -755,8 +759,8 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
           workspace_uri: pendingWorkspacePath || sessionRepo || 'No Repo',
           working_directory: pendingWorkspacePath || sessionRepo || 'No Repo',
           section: (pendingWorkspacePath || (sessionRepo && sessionRepo !== 'No Repo')) ? 'workspace' : 'conversation',
-          title,
-          custom_title: title,
+          // ponytail: only send title on first message of a new session (C-06)
+          ...(isNewSession ? { title, custom_title: title } : {}),
           model,
           thinking_effort: thinkingEffort,
         },
@@ -1004,9 +1008,11 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
     if (s) {
       s.isHistoryLoaded = false;
       s.historyLoadError = false;
+      s.loadedRawCount = 0; // ponytail: reset so guard at line 268 doesn't bail (M-01)
     }
     setHistoryLoadError(false);
     setIsHistoryLoaded(false);
+    setHistoryRetryNonce(n => n + 1); // ponytail: bump nonce to re-trigger effect (M-01)
   }, [sessionId]);
 
   return {

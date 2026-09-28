@@ -40,61 +40,6 @@ async def list_active_tasks(session_id: str | None = None):
     except Exception:
         pass
 
-    # If session_id is provided, read recent tasks strictly from this session's transcript
-    if session_id:
-        from pathlib import Path
-        import json
-        candidate_dirs = [
-            Path.home() / ".nexau" / "brain" / session_id,
-            Path.home() / ".gemini" / "antigravity" / "brain" / session_id,
-        ]
-        for b_dir in candidate_dirs:
-            transcript_p = b_dir / ".system_generated" / "logs" / "transcript.jsonl"
-            if transcript_p.is_file():
-                try:
-                    lines = transcript_p.read_text(encoding="utf-8", errors="replace").splitlines()
-                    for line in reversed(lines[-200:]):
-                        if "run_command" not in line and "schedule" not in line:
-                            continue
-                        try:
-                            obj = json.loads(line)
-                            for call in obj.get("tool_calls", []):
-                                if call.get("name") == "run_command":
-                                    cmd = call.get("args", {}).get("CommandLine", "")
-                                    if cmd and cmd not in seen_commands:
-                                        seen_commands.add(cmd)
-                                        tasks_list.append({
-                                            "pid": abs(hash(cmd)) % 90000 + 10000,
-                                            "command": cmd,
-                                            "status": "completed",
-                                            "duration_ms": 1500,
-                                            "cwd": "",
-                                        })
-                                elif call.get("name") == "schedule":
-                                    args = call.get("args", {})
-                                    prompt_text = args.get("Prompt", "Timer")
-                                    dur = args.get("DurationSeconds", 10)
-                                    timer_str = f"Timer: {dur}s, Prompt: {prompt_text}"
-                                    if timer_str not in seen_commands:
-                                        seen_commands.add(timer_str)
-                                        tasks_list.append({
-                                            "pid": abs(hash(timer_str)) % 90000 + 10000,
-                                            "command": timer_str,
-                                            "status": "completed",
-                                            "duration_ms": int(dur) * 1000,
-                                            "cwd": "",
-                                        })
-                                if len(tasks_list) >= 15:
-                                    break
-                        except Exception:
-                            pass
-                        if len(tasks_list) >= 15:
-                            break
-                except Exception:
-                    pass
-                if len(tasks_list) > 0:
-                    break
-
     return {"tasks": tasks_list}
 
 

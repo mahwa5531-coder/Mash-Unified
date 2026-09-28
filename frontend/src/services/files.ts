@@ -27,12 +27,23 @@ export function setFileContentInCache(filePath: string, content: string): void {
   cacheFileContent(cleanKey, content);
 }
 
-export async function fetchFileContent(filePath: string, sessionId?: string): Promise<string> {
+export function invalidateFileCache(filePath?: string): void {
+  if (filePath) {
+    const cleanKey = decodeURIComponent((filePath || '').replace(/^file:\/\/\/?/i, '')).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\\/g, '/').split('#')[0];
+    fileContentMemoryCache.delete(cleanKey);
+    inFlightFileFetches.delete(cleanKey);
+  } else {
+    fileContentMemoryCache.clear();
+    inFlightFileFetches.clear();
+  }
+}
+
+export async function fetchFileContent(filePath: string, sessionId?: string, bypassCache: boolean = false): Promise<string> {
   const cleanKey = decodeURIComponent((filePath || '').replace(/^file:\/\/\/?/i, '')).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\\/g, '/').split('#')[0];
-  if (fileContentMemoryCache.has(cleanKey)) {
+  if (!bypassCache && fileContentMemoryCache.has(cleanKey)) {
     return fileContentMemoryCache.get(cleanKey)!;
   }
-  if (inFlightFileFetches.has(cleanKey)) {
+  if (!bypassCache && inFlightFileFetches.has(cleanKey)) {
     return inFlightFileFetches.get(cleanKey)!;
   }
 

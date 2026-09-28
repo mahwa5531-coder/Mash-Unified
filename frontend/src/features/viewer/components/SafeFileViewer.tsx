@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { 
-  Copy, Check, Download, AlertTriangle, 
-  FileJson, Eye, Code, Loader2, FileSpreadsheet, FileText, ExternalLink
+  Download, AlertTriangle, 
+  Loader2, FileSpreadsheet, FileText, ExternalLink
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -34,7 +34,7 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ),
 });
 
-interface SafeFileViewerProps {
+export interface SafeFileViewerProps {
   filename: string;
   path?: string;
   sessionId?: string;
@@ -45,11 +45,35 @@ interface SafeFileViewerProps {
   hideToolbar?: boolean;
 }
 
-const SAFE_LINE_LIMIT = 1000;
-const SAFE_SIZE_LIMIT = 200 * 1024; // 200 KB
-const MASSIVE_FILE_LIMIT = 1.5 * 1024 * 1024; // 1.5 MB: prevents browser thread freeze on huge files (e.g. 20MB JSON)
-const SYNTAX_HIGHLIGHT_LIMIT = 300 * 1024; // 300 KB: Prism tokenizer cap to maintain 60fps
-const PREVIEW_CHUNK_SIZE = 250 * 1024; // 250 KB
+const MASSIVE_FILE_LIMIT = 1.5 * 1024 * 1024; // 1.5 MB
+
+const EXT_LANG_MAP: Record<string, string> = {
+  py: 'python',
+  ts: 'typescript',
+  tsx: 'typescript',
+  js: 'javascript',
+  jsx: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  json: 'json',
+  html: 'html',
+  css: 'css',
+  scss: 'scss',
+  sql: 'sql',
+  sh: 'shell',
+  bash: 'shell',
+  ps1: 'powershell',
+  yaml: 'yaml',
+  yml: 'yaml',
+  rs: 'rust',
+  go: 'go',
+  java: 'java',
+  c: 'c',
+  cpp: 'cpp',
+  md: 'markdown',
+  xml: 'xml',
+  svg: 'xml',
+};
 
 export default function SafeFileViewer({ 
   filename, 
@@ -57,174 +81,34 @@ export default function SafeFileViewer({
   sessionId,
   content, 
   isLoading,
-  viewMode: controlledViewMode,
-  onViewModeChange,
-  hideToolbar = false
+  viewMode = 'preview',
 }: SafeFileViewerProps) {
-  const [showAll, setShowAll] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [internalViewMode, setInternalViewMode] = useState<'preview' | 'raw'>('preview');
-  const viewMode = controlledViewMode !== undefined ? controlledViewMode : internalViewMode;
-  const setViewMode = (mode: 'preview' | 'raw') => {
-    setInternalViewMode(mode);
-    onViewModeChange?.(mode);
-  };
-  const [formattedJson, setFormattedJson] = useState<string | null>(null);
-  const [wrapLines, setWrapLines] = useState(false);
   const [isOpeningSystem, setIsOpeningSystem] = useState(false);
   const isDark = useIsDarkMode();
 
   const cleanName = (path || filename || '').toLowerCase();
   const isImage = /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/.test(cleanName);
   const isMarkdown = /\.md$/i.test(cleanName);
-  const isJson = /\.json$/i.test(cleanName);
   const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods)$/i.test(cleanName);
-  const isCsv = /\.csv$/i.test(cleanName);
   const isPdf = /\.pdf$/i.test(cleanName);
   const isUnsupported = /\.(docx|doc|pptx|ppt|zip|tar|gz|7z|rar|exe|bin|iso|dmg|dll|so|dylib)$/i.test(cleanName);
 
-  const codeLang = useMemo(() => {
-    const ext = cleanName.split('.').pop() || '';
-    const map: Record<string, string> = {
-      py: 'python',
-      ts: 'typescript',
-      tsx: 'tsx',
-      js: 'javascript',
-      jsx: 'jsx',
-      mjs: 'javascript',
-      cjs: 'javascript',
-      json: 'json',
-      html: 'html',
-      css: 'css',
-      sql: 'sql',
-      sh: 'bash',
-      bash: 'bash',
-      yaml: 'yaml',
-      yml: 'yaml',
-      j2: 'django',
-      jinja: 'django',
-      jinja2: 'django',
-      rs: 'rust',
-      go: 'go',
-      java: 'java',
-      c: 'c',
-      cpp: 'cpp',
-      md: 'markdown',
-      xml: 'xml',
-      svg: 'xml',
-    };
-    return map[ext] || 'text';
-  }, [cleanName]);
-
   const monacoLang = useMemo(() => {
     const ext = cleanName.split('.').pop()?.toLowerCase() || '';
-    const map: Record<string, string> = {
-      py: 'python',
-      ts: 'typescript',
-      tsx: 'typescript',
-      js: 'javascript',
-      jsx: 'javascript',
-      mjs: 'javascript',
-      cjs: 'javascript',
-      json: 'json',
-      html: 'html',
-      css: 'css',
-      scss: 'scss',
-      sql: 'sql',
-      sh: 'shell',
-      bash: 'shell',
-      ps1: 'powershell',
-      yaml: 'yaml',
-      yml: 'yaml',
-      rs: 'rust',
-      go: 'go',
-      java: 'java',
-      c: 'c',
-      cpp: 'cpp',
-      md: 'markdown',
-      xml: 'xml',
-      svg: 'xml',
-    };
-    return map[ext] || 'plaintext';
+    return EXT_LANG_MAP[ext] || 'text';
   }, [cleanName]);
-
-  // Fast file size formatting without duplicate Blob allocation
-  const fileSizeStr = useMemo(() => {
-    const bytes = content ? content.length : 0;
-    if (bytes >= 1024 * 1024) {
-      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-    }
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }, [content]);
 
   const isMassiveFile = (content?.length || 0) > MASSIVE_FILE_LIMIT;
 
-  // Calculate lines efficiently on content slice
-  const totalLines = useMemo(() => {
-    if (!content) return 0;
-    let count = 1;
-    const sampleLimit = Math.min(content.length, 300000);
-    for (let i = 0; i < sampleLimit; i++) {
-      if (content.charCodeAt(i) === 10) count++;
-    }
-    if (content.length > sampleLimit) {
-      count = Math.round((count / sampleLimit) * content.length);
-    }
-    return count;
-  }, [content]);
-
-  // Sliced content for preview
   const displayedContent = useMemo(() => {
-    if (formattedJson !== null) return formattedJson;
     if (!content) return '// Empty file';
-    const safeFormatLine = (l: string) => (l.length > 5000 ? l.slice(0, 5000) + '... [line truncated for browser safety]' : l);
-    // Universal guard for minified single-line files
     if (content.length > 100_000 && !content.includes('\n')) {
-      return safeFormatLine(content);
+      return content.slice(0, 5000) + '... [line truncated for browser safety]';
     }
     return content;
-  }, [content, formattedJson]);
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback
-    }
   }, [content]);
 
-  const handleDownload = useCallback(() => {
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename || 'file.txt';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }, [content, filename]);
-
-  const handleToggleFormatJson = useCallback(() => {
-    if (formattedJson !== null) {
-      setFormattedJson(null);
-      return;
-    }
-    try {
-      // Safe guard: only format if under 300KB to prevent blocking UI
-      if (content.length > 300_000) {
-        alert(`File is ${fileSizeStr} — too large for in-browser JSON reformatting. Please view in Raw mode or download.`);
-        return;
-      }
-      const parsed = JSON.parse(content);
-      const formatted = JSON.stringify(parsed, null, 2);
-      setFormattedJson(formatted);
-    } catch (err: any) {
-      alert(`Invalid JSON format: ${err?.message || err}`);
-    }
-  }, [content, formattedJson, fileSizeStr]);
+  const sessionQuery = sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : '';
 
   if (isLoading) {
     return (
@@ -237,10 +121,11 @@ export default function SafeFileViewer({
 
   // Image Viewer
   if (isImage) {
-    const imgUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}`;
+    const imgUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}${sessionQuery}`;
     return (
       <div className="flex flex-col items-center justify-center p-6 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)]">
         <div className="max-w-full max-h-[500px] overflow-auto flex items-center justify-center bg-[var(--bg-app)]/50 p-4 rounded-lg border border-[var(--border-subtle)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img 
             src={imgUrl} 
             alt={filename}
@@ -262,8 +147,9 @@ export default function SafeFileViewer({
     );
   }
 
+  // Excel Viewer Fallback Card
   if (isBinaryExcel) {
-    const downloadUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}&raw=true`;
+    const downloadUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}&raw=true${sessionQuery}`;
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-zinc-50 dark:bg-[#141414] text-zinc-600 dark:text-zinc-400 select-none">
         <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800/60 flex items-center justify-center mb-4 text-emerald-600 dark:text-emerald-400 shadow-md">
@@ -273,7 +159,7 @@ export default function SafeFileViewer({
           {filename}
         </h3>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mb-5 leading-relaxed">
-          Excel Workbook · {fileSizeStr}
+          Excel Workbook
         </p>
 
         <div className="flex items-center gap-2.5">
@@ -306,10 +192,9 @@ export default function SafeFileViewer({
     );
   }
 
-
-  // Native High-Performance PDFium Viewer (0 KB JS overhead, 120 FPS hardware-accelerated rasterization)
+  // Native High-Performance PDFium Viewer
   if (isPdf) {
-    const rawPdfUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}&raw=true`;
+    const rawPdfUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}&raw=true${sessionQuery}`;
     const embedPdfUrl = `${rawPdfUrl}#view=FitH&toolbar=1&navpanes=0`;
     return (
       <div className="flex flex-col h-full w-full bg-zinc-100 dark:bg-[#141414] overflow-hidden select-none">
@@ -350,9 +235,8 @@ export default function SafeFileViewer({
   }
 
   // Fallback card for unsupported complex office documents and binary archives
-  // ponytail: clean download card avoids heavy/slow parsers (docx-preview, pptx) while keeping UI snappy & lightweight
   if (isUnsupported) {
-    const downloadUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}&raw=true`;
+    const downloadUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}&raw=true${sessionQuery}`;
     const extMatch = cleanName.match(/\.([a-z0-9]+)$/i);
     const ext = extMatch ? `.${extMatch[1]}` : '';
     return (
@@ -380,108 +264,23 @@ export default function SafeFileViewer({
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-app)] overflow-hidden">
-      {/* File Action Toolbar (Only when not hidden by host RightSidebar) */}
-      {!hideToolbar && (
-        <div className="h-9 px-3 border-b border-zinc-200/70 dark:border-white/[0.05] bg-zinc-50/50 dark:bg-[#121214] flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 select-none shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-[11.5px] text-zinc-600 dark:text-zinc-400 tracking-tight">
-              {totalLines.toLocaleString()} lines · {fileSizeStr}
-            </span>
-            <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800/90 rounded-md p-0.5 border border-zinc-300/80 dark:border-zinc-700/60 shadow-2xs">
-              <button
-                onClick={() => setViewMode('preview')}
-                className={`px-2.5 py-0.5 rounded text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                  viewMode === 'preview' 
-                    ? 'bg-white dark:bg-zinc-700/90 text-zinc-900 dark:text-zinc-100 shadow-xs' 
-                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
-                }`}
-              >
-                <Eye size={11} />
-                <span>Preview</span>
-              </button>
-              <button
-                onClick={() => setViewMode('raw')}
-                className={`px-2.5 py-0.5 rounded text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
-                  viewMode === 'raw' 
-                    ? 'bg-white dark:bg-zinc-700/90 text-zinc-900 dark:text-zinc-100 shadow-xs' 
-                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
-                }`}
-              >
-                <Code size={11} />
-                <span>Raw</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {isJson && (
-              <button
-                onClick={handleToggleFormatJson}
-                className={`px-2 py-0.5 rounded text-[11px] flex items-center gap-1 transition-colors hover:bg-zinc-200/60 dark:hover:bg-zinc-800/80 cursor-pointer ${formattedJson ? 'text-sky-500 font-medium' : 'text-zinc-500 dark:text-zinc-400'}`}
-                title="Prettify JSON with indentation"
-              >
-                <FileJson size={12} />
-                <span>{formattedJson ? 'Original JSON' : 'Format JSON'}</span>
-              </button>
-            )}
-
-            {isCsv && (
-              <button
-                type="button"
-                onClick={() => openSystemFile(path || filename, sessionId)}
-                className="px-2 py-0.5 rounded text-[11px] flex items-center gap-1 transition-colors text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer font-medium"
-                title="Open CSV in default spreadsheet application"
-              >
-                <ExternalLink size={11} />
-                <span>Open in Excel</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => setWrapLines(!wrapLines)}
-              className={`px-2 py-0.5 rounded text-[11.5px] font-normal transition-colors hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer ${
-                wrapLines ? 'text-sky-500 font-medium' : 'text-zinc-500 dark:text-zinc-400'
-              }`}
-              title="Toggle word wrapping"
-            >
-              Wrap
-            </button>
-
-            <button
-              onClick={handleCopy}
-              className="p-1 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/80 transition-colors cursor-pointer"
-              title="Copy full file"
-            >
-              {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
-            </button>
-
-            <button
-              onClick={handleDownload}
-              className="p-1 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/80 transition-colors cursor-pointer"
-              title="Download file"
-            >
-              <Download size={13} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Massive File Backend Truncation Shield (Only for files > 1.5MB capped by server) */}
+      {/* Massive File Backend Truncation Shield */}
       {isMassiveFile && (
         <div className="px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/25 flex items-center justify-between text-xs text-amber-600 dark:text-amber-400 select-none shrink-0 gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <AlertTriangle size={14} className="shrink-0 text-amber-500" />
             <span className="truncate">
-              <strong>Massive File ({fileSizeStr} • ~{totalLines.toLocaleString()} lines)</strong>: Displaying initial 1.5MB preview.
+              <strong>Massive File</strong>: Displaying initial 1.5MB preview.
             </span>
           </div>
-          <button
-            onClick={handleDownload}
+          <a
+            href={`${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}&raw=true${sessionQuery}`}
+            download={filename}
             className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-300 font-medium transition-colors cursor-pointer flex items-center gap-1 shrink-0"
           >
             <Download size={12} />
             <span>Download Full File</span>
-          </button>
+          </a>
         </div>
       )}
 
@@ -492,7 +291,7 @@ export default function SafeFileViewer({
             <ReactMarkdown 
               remarkPlugins={[remarkGfm]}
               components={{
-                code({node, inline, className, children, ...props}: any) {
+                code({inline, className, children, ...props}: any) {
                   const match = /language-(\w+)/.exec(className || '');
                   const lang = match ? match[1].toLowerCase() : '';
                   if (!inline && lang === 'mermaid') {
@@ -508,19 +307,20 @@ export default function SafeFileViewer({
                   let resolvedSrc = src;
                   if (resolvedSrc && (resolvedSrc.startsWith('file:///') || resolvedSrc.startsWith('file://') || resolvedSrc.startsWith('/'))) {
                     const clean = resolvedSrc.replace(/^file:\/\/\/?/, '');
-                    resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(clean)}`;
+                    resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(clean)}${sessionQuery}`;
                   }
                   return (
                     <div className="my-3 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-app)]/50 p-2 shadow-xs">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={resolvedSrc} alt={alt || 'Image'} className="max-w-full rounded object-contain max-h-[500px] mx-auto" {...props} />
                       {alt && <div className="text-center text-xs text-[var(--text-muted)] mt-1.5 font-mono">{alt}</div>}
                     </div>
                   );
                 },
-                table({node, children, ...props}: any) {
+                table({children}: any) {
                   return <TableContainer>{children}</TableContainer>;
                 },
-                blockquote({node, children, ...props}: any) {
+                blockquote({children}: any) {
                   return <CalloutBlockquote>{children}</CalloutBlockquote>;
                 },
                 td({children, ...props}: any) {
@@ -547,12 +347,11 @@ export default function SafeFileViewer({
             </ReactMarkdown>
           </div>
         ) : (
-          /* Code Viewer: Monaco Editor with Piece Table Virtualization & 60fps Scrolling, Raw mode fallback */
           <div className="flex-1 w-full h-full min-h-[350px] bg-white dark:bg-[#161616] text-[12.5px] leading-relaxed select-text flex flex-col overflow-hidden">
             {viewMode === 'raw' ? (
               <pre 
                 style={{ contentVisibility: 'auto', containIntrinsicSize: '0 500px' }}
-                className={`p-4 font-mono text-[12.5px] leading-relaxed select-text ${wrapLines ? 'whitespace-pre-wrap break-words' : 'whitespace-pre overflow-x-auto'} text-zinc-800 dark:text-zinc-200 h-full overflow-auto`}
+                className="p-4 font-mono text-[12.5px] leading-relaxed select-text whitespace-pre overflow-x-auto text-zinc-800 dark:text-zinc-200 h-full overflow-auto"
               >
                 {displayedContent}
               </pre>
@@ -565,14 +364,14 @@ export default function SafeFileViewer({
                 options={{
                   readOnly: true,
                   domReadOnly: true,
-                  minimap: { enabled: totalLines > 100 },
+                  minimap: { enabled: false },
                   fontSize: 12.5,
                   lineHeight: 1.6,
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
                   lineNumbers: 'on',
                   scrollBeyondLastLine: false,
                   automaticLayout: true,
-                  wordWrap: wrapLines ? 'on' : 'off',
+                  wordWrap: 'off',
                   renderLineHighlight: 'none',
                   contextmenu: true,
                   folding: true,

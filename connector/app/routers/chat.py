@@ -11,10 +11,12 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from nexau.archs.main_sub.context_value import ContextValue
+from nexau.archs.sandbox.base_sandbox import LocalSandboxConfig
 from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 from nexau.archs.session.id_generator import generate_session_id
 from nexau.archs.transports.http.sse_server import SSETransportServer
+from nexau.archs.platform.path_helpers import resolve_deliverables_dir, resolve_sandbox_work_dir
 from app.dependencies import get_engine
 from app.models.project import ProjectModel
 
@@ -144,29 +146,6 @@ async def _ensure_project_and_context(
         logger.warning("Session context enrichment error: %s", e)
 
 
-def _enrich_prompt_with_editor_context(user_prompt: str, context: dict) -> str:
-    """Attach editor context (active file, selected text) and live timestamp to prompt.
-    Placing the live timestamp at the tail (inside the user message) preserves 100% prefix
-    stability for the system prompt, enabling 90%+ prompt cache hits across conversation turns."""
-    parts = [user_prompt]
-    attachments = []
-    active_f = context.get("active_file") or context.get("active_file_path")
-    if active_f:
-        cursor = context.get("cursor_position") or context.get("cursor_line")
-        cursor_str = f" (Line {cursor})" if cursor else ""
-        attachments.append(f"[Active File: {active_f}{cursor_str}]")
-    if context.get("selected_text"):
-        attachments.append(f"[Selected Code]:\n```\n{context['selected_text']}\n```")
-    if attachments:
-        parts.append("\n".join(attachments))
-
-    # ponytail: Append live turn timestamp to user message tail (exact Antigravity convention)
-    now_iso = datetime.now().astimezone().strftime("%Y-%m-%dT%H:%M:%S%z")
-    parts.append(f"<ADDITIONAL_METADATA>\nThe current local time is: {now_iso}.\n</ADDITIONAL_METADATA>")
-
-    return "\n\n".join(parts)
-
-
 @router.post("/stream")
 @router.post("/api/chat/stream")
 @router.post("/api/chat/{path_session_id}/stream")
@@ -192,7 +171,8 @@ async def stream_query_bridge(
     await _ensure_project_and_context(eng, user_id, sid, resolved_context, workspace_target)
     resolved_context.pop("_raw_message", None)
 
-    user_prompt = _enrich_prompt_with_editor_context(payload.messages, resolved_context)
+    # Clean user prompt: keep raw message unmutated. Editor context is handled natively via Jinja system prompt.
+    user_prompt = payload.messages
 
     # Per-request model override (app-specific: frontend sends context.model)
     effective_agent_config = server._default_agent_config
@@ -203,44 +183,21 @@ async def stream_query_bridge(
             new_llm.model = requested_model
             effective_agent_config = effective_agent_config.model_copy(update={"llm_config": new_llm})
 
-    # Per-session sandbox work_dir binding (app-specific: per-workspace isolation)
-    target_work_dir = resolved_context.get("working_directory")
-    if target_work_dir and target_work_dir != "No Repo" and os.path.exists(target_work_dir):
-        # ponytail: Scaffold a visible deliverables folder for the Auditor to find generated proofs and working papers
-        # Standardize on Audit_Deliverables while smoothly supporting legacy NexAU_Outputs if existing
-        deliverables_dir = os.path.join(target_work_dir, "Audit_Deliverables")
-        legacy_dir = os.path.join(target_work_dir, "NexAU_Outputs")
-        outputs_dir = legacy_dir if (os.path.exists(legacy_dir) and not os.path.exists(deliverables_dir)) else deliverables_dir
-        try:
-            os.makedirs(outputs_dir, exist_ok=True)
-            resolved_context["outputs_directory"] = outputs_dir
-        except Exception as e:
-            logger.warning(f"Failed to create outputs directory: {e}")
-            
-        from nexau.archs.sandbox.base_sandbox import LocalSandboxConfig
-        cur_sb = getattr(effective_agent_config, "sandbox_config", None)
-        new_sb = cur_sb.model_copy(update={"work_dir": target_work_dir}) if cur_sb else LocalSandboxConfig(work_dir=target_work_dir)
-        effective_agent_config = effective_agent_config.model_copy(update={"sandbox_config": new_sb})
-    else:
-        # ponytail: Standalone individual session (not bound to any project workspace)
-        # Isolate sandbox work_dir to session scratch directory so the server root is protected
-        scratch_dir = resolved_context.get("scratch_directory")
-        brain_dir = resolved_context.get("brain_directory")
-        session_work_dir = scratch_dir or brain_dir
-        if session_work_dir and os.path.exists(session_work_dir):
-            from nexau.archs.sandbox.base_sandbox import LocalSandboxConfig
-            cur_sb = getattr(effective_agent_config, "sandbox_config", None)
-            new_sb = cur_sb.model_copy(update={"work_dir": session_work_dir}) if cur_sb else LocalSandboxConfig(work_dir=session_work_dir)
-            effective_agent_config = effective_agent_config.model_copy(update={"sandbox_config": new_sb})
-
-        # Deliverables directory for standalone individual session
-        wp_dir = os.path.join(brain_dir, "working_papers") if brain_dir else None
-        if wp_dir:
-            try:
-                os.makedirs(wp_dir, exist_ok=True)
-                resolved_context["outputs_directory"] = wp_dir
-            except Exception as e:
-                logger.warning(f"Failed to create standalone working_papers directory: {e}")
+    # Per-session sandbox work_dir & deliverables binding via NexAU path helpers
+    target_work_dir = resolve_sandbox_work_dir(
+        resolved_context.get("working_directory"),
+        resolved_context.get("scratch_directory"),
+        resolved_context.get("brain_directory"),
+    )
+    resolved_context["outputs_directory"] = str(
+        resolve_deliverables_dir(
+            resolved_context.get("working_directory"),
+            resolved_context.get("brain_directory"),
+        )
+    )
+    cur_sb = getattr(effective_agent_config, "sandbox_config", None)
+    new_sb = cur_sb.model_copy(update={"work_dir": target_work_dir}) if cur_sb else LocalSandboxConfig(work_dir=target_work_dir)
+    effective_agent_config = effective_agent_config.model_copy(update={"sandbox_config": new_sb})
 
     # ponytail: NexAU's handle_streaming_request already handles:
     # - Session creation (SessionManager._get_or_create_session)

@@ -15,9 +15,6 @@ export function WindowTitleBar({ onToggleSidebar, onToggleFullscreen, onResetSes
     <div className="h-7 bg-[#0d0d0f] flex items-center justify-between px-3 select-none shrink-0 text-xs text-zinc-400 z-50">
         <div className="flex items-center gap-4">
           <span className="font-semibold tracking-wider text-zinc-200 text-xs">MASH</span>
-          <span className="hover:text-zinc-200 cursor-pointer transition-colors text-[11.5px]">File</span>
-          <span className="hover:text-zinc-200 cursor-pointer transition-colors text-[11.5px]">View</span>
-          <span className="hover:text-zinc-200 cursor-pointer transition-colors text-[11.5px]">Window</span>
         </div>
         
         {/* Window Controls (Minimize, Maximize, Close) */}

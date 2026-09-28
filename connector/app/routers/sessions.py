@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from app.dependencies import DatabaseEngineDep, SessionManagerDep, get_engine, _engine
 from app.models.project import ProjectModel
 from nexau.archs.session import AgentRunActionKey, AgentRunActionService
+from nexau.archs.session.agent_run_action_service import reduce_actions_stream
 from nexau.archs.session.models import SessionModel, AgentRunActionModel
 from nexau.archs.session.orm import ComparisonFilter
 from nexau.archs.session.id_generator import generate_session_id, generate_run_id
@@ -59,91 +60,30 @@ def _get_engine(engine: Any = None):
     return global_eng
 
 
-TITLE_ACRONYMS = {
-    'MCP', 'API', 'PDF', 'CPA', 'DB', 'AI', 'UI', 'UX', 'JSON', 
-    'REST', 'SQL', 'AGI', 'LLM', 'OS', 'CLI', 'SDK', 'URL', 'HTTP', 'HTML', 'CSS', 'RAM', 'CPU', 'GPU'
-}
-
-TITLE_MINOR_WORDS = {
-    'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'in', 'nor', 'of', 'on', 'or', 'so', 'the', 'to', 'up', 'yet', 'with'
-}
-
-def to_title_case(s: str) -> str:
-    if not s:
-        return ""
-    if len(s) > 1 and s.isupper() and " " not in s:
-        return s
-    words = s.split()
-    res = []
-    for idx, word in enumerate(words):
-        clean_w = re.sub(r'[^a-zA-Z0-9_-]', '', word)
-        upper = clean_w.upper()
-        if upper in TITLE_ACRONYMS:
-            res.append(word.replace(clean_w, upper))
-        elif idx > 0 and clean_w.lower() in TITLE_MINOR_WORDS:
-            res.append(word.replace(clean_w, clean_w.lower()))
-        else:
-            res.append(word[:1].upper() + word[1:])
-    return " ".join(res)
-
-def truncate_at_word_boundary(s: str, max_len: int = 32) -> str:
-    if len(s) <= max_len:
-        return s
-    sliced = s[:max_len]
-    last_space = sliced.rfind(" ")
-    if last_space > 12:
-        return sliced[:last_space].rstrip() + "..."
-    return sliced.rstrip() + "..."
-
 def generate_clean_session_title(raw_text: str, sid: str = "") -> str:
-    """
-    ponytail: extracts clean, human-readable session titles from user prompts.
-    Formats in Title Case, preserves acronyms, and avoids cutting words in half.
-    """
+    """ponytail: concise session title generator without over-engineered regex soup."""
     if not raw_text or not isinstance(raw_text, str):
         return f"Session {sid[:8]}" if sid else "New Session"
-
     t = raw_text.strip().strip("\"'` \t\n\r")
     if not t:
         return f"Session {sid[:8]}" if sid else "New Session"
 
-    # 1. Detect leading file/folder path (Windows C:\... or Unix /...)
-    path_match = re.match(r'^([a-zA-Z]:[\\/][^"\'`\r\n]*|\/[^"\'`\r\n]+)', t)
-    if path_match:
-        raw_path = path_match.group(1).strip().strip("\"'")
-        remainder = t[len(path_match.group(0)):].lstrip("\"'` \t\n\r,:;-")
-        basename = Path(raw_path).name or raw_path.replace("\\", "/").rstrip("/").split("/")[-1] or raw_path
-
-        if remainder:
-            verb_match = re.match(r'^(?:please\s+|can you\s+|could you\s+|kindly\s+)?(analyse|analyze|review|fix|check|run|inspect|explain|read|summarize|test|process|plot|visualize|debug|load|parse|clean|convert)\b', remainder, re.IGNORECASE)
-            if verb_match:
-                verb = to_title_case(verb_match.group(1))
-                candidate = f"{verb} {to_title_case(basename)}"
-                return truncate_at_word_boundary(candidate, 34)
-
-            clean_rem = re.sub(r'^(?:please\s+|can you\s+|could you\s+|kindly\s+|help me\s+(?:to\s+)?|i want you to\s+|i want to\s+|i need to\s+)+', '', remainder, flags=re.IGNORECASE).strip()
-            if clean_rem:
-                clean_rem = to_title_case(clean_rem)
-                candidate = f"{truncate_at_word_boundary(clean_rem, 20)} ({basename})"
-                return truncate_at_word_boundary(candidate, 34)
-
-        return truncate_at_word_boundary(to_title_case(basename), 34)
-
-    # 2. Legacy paths stored in DB (e.g. "C:\Users\rama\Downloads\benchma...")
-    if "\\" in t or ("/" in t and len(t.split("/")) > 2):
+    # If starts with path or contains file separator, extract basename
+    if re.match(r'^([a-zA-Z]:[\\/]|/)', t) or "\\" in t:
         parts = [p for p in re.split(r'[\\/]', t) if p]
-        if len(parts) > 1:
-            last = parts[-1]
-            if len(last) > 2:
-                clean_last = last.rstrip(".")
-                return truncate_at_word_boundary(to_title_case(clean_last), 32)
+        if parts:
+            t = parts[-1].strip("\"'` \t\n\r,:;-")
 
-    # 3. Normal user message: strip polite opening filler and question fluff
-    t = re.sub(r'^(?:please\s+|can you\s+|could you\s+|kindly\s+|help me\s+(?:to\s+)?|i want you to\s+|i want to\s+|i need to\s+|tell me about\s+|tell me\s+|explain\s+|what do you know about\s+|what is\s+|how to\s+|how do i\s+|i think we have to\s+|look at this\s*[,:]?\s*)+', '', t, flags=re.IGNORECASE).strip()
+    # Strip conversational filler prefixes
+    t = re.sub(r'^(?:please\s+|can you\s+|could you\s+|kindly\s+|help me\s+(?:to\s+)?|i want to\s+|i need to\s+|tell me about\s+|what is\s+|how to\s+)+', '', t, flags=re.IGNORECASE).strip()
     t = re.sub(r'[?!.:;]+$', '', t).strip()
-    if t:
-        t = to_title_case(t)
-    return truncate_at_word_boundary(t, 32) or (f"Session {sid[:8]}" if sid else "New Session")
+    if not t:
+        return f"Session {sid[:8]}" if sid else "New Session"
+
+    if len(t) > 34:
+        sp = t[:34].rfind(" ")
+        t = (t[:sp] if sp > 12 else t[:34]).rstrip() + "..."
+    return t[:1].upper() + t[1:]
 
 
 def _parse_epoch_seconds(val: Any) -> float:
@@ -377,47 +317,7 @@ async def get_transcript(
             filters=ComparisonFilter.eq("session_id", session_id),
         )
 
-        actions = sorted(actions, key=lambda a: getattr(a, "created_at_ns", 0) or 0)
-
-        # Event-sourcing reduction (RFC-0022):
-        # 1. Respect REPLACE anchor (compaction boundary)
-        replace_idx = -1
-        for idx, action in enumerate(actions):
-            act_type = getattr(action, "action_type", "")
-            act_type_str = act_type.value if hasattr(act_type, "value") else str(act_type)
-            if act_type_str == "replace":
-                replace_idx = idx
-
-        actions_slice = actions[replace_idx:] if replace_idx >= 0 else actions
-
-        # 2. Respect UNDO actions: map run_id to earliest action timestamp, then filter undone runs
-        first_ns_by_run: dict[str, int] = {}
-        for a in actions_slice:
-            rid = getattr(a, "run_id", "")
-            ns = getattr(a, "created_at_ns", 0) or 0
-            if rid and ns and (rid not in first_ns_by_run or ns < first_ns_by_run[rid]):
-                first_ns_by_run[rid] = ns
-
-        cutoff_ns: int | None = None
-        actions_to_process: list[AgentRunActionModel] = []
-        for a in reversed(actions_slice):
-            act_type = getattr(a, "action_type", "")
-            act_type_str = act_type.value if hasattr(act_type, "value") else str(act_type)
-            ns = getattr(a, "created_at_ns", 0) or 0
-
-            if cutoff_ns is not None and ns >= cutoff_ns:
-                continue
-
-            if act_type_str == "undo":
-                target_rid = getattr(a, "undo_before_run_id", None)
-                if target_rid and target_rid in first_ns_by_run:
-                    target_ns = first_ns_by_run[target_rid]
-                    cutoff_ns = target_ns if cutoff_ns is None else min(cutoff_ns, target_ns)
-                continue
-
-            actions_to_process.append(a)
-
-        actions_to_process.reverse()
+        actions_to_process = reduce_actions_stream(actions)
 
         # Compute accurate run durations from agent_run_actions database timestamps
         run_starts: dict[str, int] = {}
@@ -781,9 +681,9 @@ async def get_history(
         AgentRunActionModel,
         filters=ComparisonFilter.eq("session_id", session_id),
     )
-    actions = sorted(actions, key=lambda a: getattr(a, "created_at_ns", 0) or 0)
+    reduced = reduce_actions_stream(actions)
     messages = []
-    for a in actions:
+    for a in reduced:
         if a.append_messages:
             messages.extend(a.append_messages)
     return {"messages": messages}
@@ -908,25 +808,8 @@ async def rename_session(
                 session.context = ctx
                 await eng.update(session)
             else:
-                new_session = SessionModel(
-                    session_id=session_id,
-                    user_id="default_user",
-                    context={
-                        "title": title_val,
-                        "custom_title": title_val,
-                    },
-                )
-                try:
-                    await eng.create(new_session)
-                except Exception:
-                    # Handle concurrent creation race condition gracefully
-                    existing = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
-                    if existing:
-                        ctx = dict(existing.context or {})
-                        ctx["custom_title"] = title_val
-                        ctx["title"] = title_val
-                        existing.context = ctx
-                        await eng.update(existing)
+                # ponytail: don't upsert phantom sessions on rename (C-07)
+                return {"status": "not_found", "message": f"Session {session_id} does not exist"}
         except Exception as e:
             logger.warning(f"Rename session error: {e}")
     return {"status": "success", "custom_title": payload.custom_title}

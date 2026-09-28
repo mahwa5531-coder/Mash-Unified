@@ -3,11 +3,6 @@ from fastapi import APIRouter
 router = APIRouter(prefix="/api", tags=["system"])
 
 
-@router.get("/subagents")
-async def list_subagents(session_id: str | None = None):
-    return {"subagents": [{"id": "agent-xyz-123", "role": "Frontend Developer", "state": "idle"}]}
-
-
 @router.get("/capabilities")
 async def list_capabilities():
     return {
@@ -241,8 +236,8 @@ async def resolve_folder_endpoint(request: ResolveFolderRequest):
             except Exception:
                 pass
 
-    fallback = (home / "Downloads" / name).resolve()
-    return {"status": "success", "folder_path": str(fallback), "folder_name": name}
+    # ponytail: do not fabricate phantom folder paths in Downloads (C-03)
+    return {"status": "error", "message": f"Folder '{name}' could not be resolved to an existing directory on disk."}
 
 
 @router.post("/system/quickstart-folder")
@@ -336,4 +331,49 @@ async def browse_directories(path: str | None = None):
         "shortcuts": shortcuts,
         "directories": directories,
     }
+
+
+class OpenFileRequest(BaseModel):
+    file_path: str
+    session_id: str | None = None
+
+
+@router.post("/system/open-file")
+@router.post("/api/system/open-file")
+async def open_system_file(request: OpenFileRequest):
+    """Open a local file or directory with the host operating system's registered application."""
+    import sys
+    import subprocess
+    import os
+    from urllib.parse import unquote
+    import re
+
+    clean_path = unquote(request.file_path).strip()
+    clean_path = re.sub(r"^file:///?", "", clean_path, flags=re.IGNORECASE)
+    clean_path = re.sub(r"^/([a-zA-Z]:)", r"\1", clean_path)
+    clean_path = clean_path.split("#")[0].strip()
+
+    p = Path(clean_path).expanduser()
+    if not p.exists() and request.session_id:
+        for b_base in [Path.home() / ".gemini" / "antigravity" / "brain", Path.home() / ".nexau" / "brain"]:
+            cand = b_base / request.session_id / clean_path
+            if cand.exists():
+                p = cand
+                break
+
+    p = p.resolve()
+    if not p.exists():
+        return {"status": "error", "message": f"Path '{clean_path}' does not exist on local disk."}
+
+    try:
+        if sys.platform == "win32":
+            os.startfile(str(p))
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(p)], check=False)
+        else:
+            subprocess.run(["xdg-open", str(p)], check=False)
+        return {"status": "success", "path": str(p)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 

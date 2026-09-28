@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { PanelLeft, ArrowLeft, ArrowRight, Plus, Clock } from 'lucide-react';
+import { PanelLeft, Plus, Clock } from 'lucide-react';
 
 export interface SidebarHeaderProps {
   onNewSession: (repoName?: string) => void;
@@ -30,24 +30,6 @@ export function SidebarHeader({
           title="Collapse sidebar"
         >
           <PanelLeft size={15} />
-        </button>
-        <button 
-          type="button" 
-          onClick={() => window.history.back()}
-          className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer" 
-          title="Back"
-          aria-label="Back"
-        >
-          <ArrowLeft size={13} />
-        </button>
-        <button 
-          type="button" 
-          onClick={() => window.history.forward()}
-          className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer" 
-          title="Forward"
-          aria-label="Forward"
-        >
-          <ArrowRight size={13} />
         </button>
       </div>
 

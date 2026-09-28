@@ -47,16 +47,16 @@ export default function ChatComposer({
     setLocalPrompt(inputPrompt);
   }, [inputPrompt]);
 
-  // Revoke any created blob preview URLs on unmount to prevent memory leaks
+  const createdBlobUrlsRef = useRef<Set<string>>(new Set());
+
+  // ponytail: revoke blob preview URLs only on unmount or explicit removal, not on attachment changes (M-04)
   useEffect(() => {
+    const urls = createdBlobUrlsRef.current;
     return () => {
-      attachedFiles.forEach(f => {
-        if (f.previewUrl && f.previewUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(f.previewUrl);
-        }
-      });
+      urls.forEach(url => URL.revokeObjectURL(url));
+      urls.clear();
     };
-  }, [attachedFiles]);
+  }, []);
 
   // Auto-resize textarea to fit content cleanly up to 220px
   useEffect(() => {
@@ -81,10 +81,15 @@ export default function ChatComposer({
         const res = await uploadSessionFile(sid, file);
         if (res && res.path) {
           const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(file.name);
+          let previewUrl: string | undefined = undefined;
+          if (isImg && typeof URL !== 'undefined' && URL.createObjectURL) {
+            previewUrl = URL.createObjectURL(file);
+            createdBlobUrlsRef.current.add(previewUrl);
+          }
           uploadedList.push({ 
             name: file.name, 
             path: res.path,
-            previewUrl: isImg && typeof URL !== 'undefined' && URL.createObjectURL ? URL.createObjectURL(file) : undefined,
+            previewUrl,
           });
         } else {
           setUploadError(`Failed to upload ${file.name}`);
@@ -128,6 +133,7 @@ export default function ChatComposer({
       const file = prev[idx];
       if (file?.previewUrl && file.previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(file.previewUrl);
+        createdBlobUrlsRef.current.delete(file.previewUrl);
       }
       return prev.filter((_, i) => i !== idx);
     });
@@ -203,6 +209,7 @@ export default function ChatComposer({
         {isUploading ? "Uploading files..." : uploadError ? uploadError : ""}
       </div>
 
+
       {/* Attached Files Chips */}
       {attachedFiles.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-1 pt-1 pb-0.5">
@@ -241,7 +248,10 @@ export default function ChatComposer({
       <textarea 
         ref={textareaRef}
         value={localPrompt}
-        onChange={(e) => setLocalPrompt(e.target.value)}
+        onChange={(e) => {
+          setLocalPrompt(e.target.value);
+          setInputPrompt?.(e.target.value);
+        }}
         onKeyDown={disabled ? undefined : handleKeyDown}
         onPaste={disabled ? undefined : handlePaste}
         disabled={disabled}

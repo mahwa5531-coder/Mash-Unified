@@ -3,7 +3,7 @@
 // Row-2 toolbar above the chat canvas: logo cluster (when sidebar closed),
 // back/forward, session breadcrumb, right-panel toggle.
 // Pure presentation — all behavior arrives via callbacks.
-import { PanelLeft, PanelRight, ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { PanelLeft, PanelRight, Sparkles } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -36,7 +36,7 @@ export function ChatToolbar({
   return (
     <div className="h-9 bg-[#121214] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center justify-between px-3 select-none shrink-0 z-40 transition-all">
                 <div className="flex items-center h-full min-w-0 flex-1">
-                  {/* When Left Sidebar is CLOSED: show Logo, PanelLeft, ArrowLeft, ArrowRight here */}
+                  {/* When Left Sidebar is CLOSED: show Logo and PanelLeft here */}
                   {!isSidebarOpen && (
                     <div className="flex items-center gap-1.5 shrink-0 mr-3">
                       <div className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-100 flex items-center justify-center font-bold text-[11px] shadow-xs select-none mr-1">
@@ -49,24 +49,6 @@ export function ChatToolbar({
                         title="Expand sidebar"
                       >
                         <PanelLeft size={15} />
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => window.history.back()}
-                        className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer" 
-                        title="Back"
-                        aria-label="Back"
-                      >
-                        <ArrowLeft size={13} />
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => window.history.forward()}
-                        className="p-1 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer" 
-                        title="Forward"
-                        aria-label="Forward"
-                      >
-                        <ArrowRight size={13} />
                       </button>
                     </div>
                   )}
