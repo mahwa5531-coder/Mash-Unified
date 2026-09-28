@@ -5,4 +5,6 @@ export * from './AuditCallout';
 export * from './FileTab';
 export * from './FileBreadcrumbBar';
 export * from './FileLogos';
+export * from './FileIcon';
+export * from './Modal';
 export * from './WebLink';
