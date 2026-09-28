@@ -9,11 +9,9 @@ import { ProjectItem } from '@/services/projects';
 export interface WorkspacesSectionProps {
   workspaceSessions: Record<string, SessionItem[]>;
   registeredProjects: ProjectItem[];
-  selectedSessionRepo?: string;
   openFolders: Record<string, boolean>;
   canScrollUp: boolean;
   onToggleFolder: (repoName: string) => void;
-  onSelectWorkspace: (repoName: string) => void;
   onNewSession: (repoName?: string, folderPath?: string) => void;
   onNewProject: () => void;
   onOpenQuickProjectModal: () => void;
@@ -24,11 +22,9 @@ export interface WorkspacesSectionProps {
 export function WorkspacesSection({
   workspaceSessions,
   registeredProjects,
-  selectedSessionRepo,
   openFolders,
   canScrollUp,
   onToggleFolder,
-  onSelectWorkspace,
   onNewSession,
   onNewProject,
   onOpenQuickProjectModal,
@@ -77,6 +73,7 @@ export function WorkspacesSection({
               isFilterOpen ? 'text-zinc-900 dark:text-white bg-black/[0.05] dark:bg-white/[0.06]' : 'text-zinc-500 dark:text-zinc-400'
             }`}
             title="Filter workspaces"
+            aria-label="Filter workspaces"
           >
             <FilterBarsIcon size={14} />
           </button>
@@ -89,11 +86,12 @@ export function WorkspacesSection({
               isWorkspaceMenuOpen ? 'text-zinc-900 dark:text-white bg-black/[0.05] dark:bg-white/[0.06]' : 'text-zinc-500 dark:text-zinc-400'
             }`}
             title="Add workspace project"
+            aria-label="Add workspace project"
           >
             <FolderPlusIcon size={14} />
           </button>
 
-          {/* Floating Popover Menu (New Project & Quick Start) */}
+          {/* Floating Popover Menu (New Project & Quick Start) positioned to the right */}
           {isWorkspaceMenuOpen && (
             <div 
               ref={workspaceMenuRef}
@@ -151,7 +149,6 @@ export function WorkspacesSection({
       <div className="flex flex-col space-y-0.5">
         {filteredEntries.map(([repoName, repoSessions]) => {
           const match = registeredProjects.find((p) => p.name === repoName);
-          const isWorkspaceActive = selectedSessionRepo === repoName;
           const folderOpen = Boolean(openFolders[repoName]);
 
           return (
@@ -160,10 +157,8 @@ export function WorkspacesSection({
               repoName={repoName}
               repoSessions={repoSessions}
               projectMatch={match}
-              isActive={isWorkspaceActive}
               isOpen={folderOpen}
               onToggle={() => onToggleFolder(repoName)}
-              onSelectWorkspace={() => onSelectWorkspace(repoName)}
               onNewSession={onNewSession}
               onDeleteProject={onDeleteProject}
               renderSessionItem={renderSessionItem}

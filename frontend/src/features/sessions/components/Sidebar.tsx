@@ -481,20 +481,9 @@ export default function Sidebar({
           <WorkspacesSection
             workspaceSessions={workspaceSessions}
             registeredProjects={registeredProjects}
-            selectedSessionRepo={selectedSessionRepo}
             openFolders={openFolders}
             canScrollUp={canScrollUp}
             onToggleFolder={toggleFolder}
-            onSelectWorkspace={(repoName) => {
-              setOpenFolders(prev => ({ ...prev, [repoName]: true }));
-              const sessionsInRepo = workspaceSessions[repoName];
-              if (sessionsInRepo && sessionsInRepo.length > 0) {
-                onSelectSession(sessionsInRepo[0].session_id, sessionsInRepo[0].title, repoName);
-              } else {
-                const match = registeredProjects.find(p => p.name === repoName);
-                onNewSession(repoName, match?.local_folder_path);
-              }
-            }}
             onNewSession={onNewSession}
             onNewProject={handleNewProject}
             onOpenQuickProjectModal={() => setIsQuickProjectModalOpen(true)}
@@ -507,6 +496,7 @@ export default function Sidebar({
             directConversations={directConversations}
             loading={loading}
             canScrollUp={canScrollUp}
+            onNewSession={onNewSession}
             renderSessionItem={renderSessionItem}
           />
         </div>

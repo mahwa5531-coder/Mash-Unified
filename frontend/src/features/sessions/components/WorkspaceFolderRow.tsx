@@ -1,8 +1,7 @@
 "use client";
 
 import React from 'react';
-import { ChevronDown, MoreHorizontal, Plus, ExternalLink, Trash2 } from 'lucide-react';
-import { ProjectFolderIcon } from './icons';
+import { Folder, FolderOpen, MoreVertical, Plus, ExternalLink, Trash2 } from 'lucide-react';
 import { SessionItem } from '@/services/sessions';
 import { ProjectItem } from '@/services/projects';
 import { openSystemFile } from '@/services/files';
@@ -18,10 +17,8 @@ export interface WorkspaceFolderRowProps {
   repoName: string;
   repoSessions: SessionItem[];
   projectMatch?: ProjectItem;
-  isActive: boolean;
   isOpen: boolean;
   onToggle: () => void;
-  onSelectWorkspace: () => void;
   onNewSession: (repoName?: string, folderPath?: string) => void;
   onDeleteProject: (e: React.MouseEvent, projectId?: string, projectName?: string) => void;
   renderSessionItem: (session: SessionItem) => React.ReactNode;
@@ -31,53 +28,57 @@ export function WorkspaceFolderRow({
   repoName,
   repoSessions,
   projectMatch,
-  isActive,
   isOpen,
   onToggle,
-  onSelectWorkspace,
   onNewSession,
   onDeleteProject,
   renderSessionItem,
 }: WorkspaceFolderRowProps) {
   return (
-    <div className="flex flex-col">
-      {/* Folder Row */}
+    <div className="flex flex-col select-none">
+      {/* Ghost Project Folder Row: Clean neutral text, outlined folder, right-aligned hover actions */}
       <div 
-        onClick={onSelectWorkspace}
-        className={`flex items-center justify-between px-2.5 py-1.5 rounded-md mx-1 cursor-pointer transition-colors group/folder select-none ${
-          isActive 
-            ? 'bg-zinc-200/90 dark:bg-white/[0.08] text-zinc-950 dark:text-white font-medium shadow-2xs' 
-            : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-white/[0.04]'
-        }`}
+        onClick={onToggle}
+        className="group/folder h-[30px] mx-1 px-2 rounded-md cursor-pointer flex items-center justify-between text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors"
       >
-        <div className="flex items-center overflow-hidden min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle();
-            }}
-            className="p-0.5 -ml-1 mr-0.5 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
-            title={isOpen ? "Collapse folder" : "Expand folder"}
-          >
-            <ChevronDown 
-              size={11} 
-              className={`transition-transform duration-150 ${isOpen ? '' : '-rotate-90'}`} 
-            />
-          </button>
-          <ProjectFolderIcon size={14} className="mr-2 text-zinc-500 dark:text-zinc-400 group-hover/folder:text-zinc-700 dark:group-hover/folder:text-zinc-200 transition-colors shrink-0" />
-          <span className="text-[13px] truncate transition-colors font-medium">{repoName}</span>
+        {/* Left: Outlined Folder Icon + Ghost Project Name */}
+        <div className="flex items-center min-w-0 flex-1 overflow-hidden">
+          {isOpen ? (
+            <FolderOpen size={14} className="mr-2 text-zinc-400 shrink-0 transition-colors" />
+          ) : (
+            <Folder size={14} className="mr-2 text-zinc-400 shrink-0 transition-colors" />
+          )}
+          <span className="text-[13px] truncate font-normal tracking-wide text-zinc-400 group-hover/folder:text-zinc-200 transition-colors">
+            {repoName}
+          </span>
         </div>
         
-        <div className="flex items-center opacity-0 group-hover/folder:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
+        {/* Right: Dynamic Hover Actions (+ New Conversation, Vertical 3-dots Menu) */}
+        <div 
+          className="flex items-center gap-0.5 opacity-0 group-hover/folder:opacity-100 transition-opacity shrink-0 ml-1" 
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Quick + button to create new session in this workspace */}
+          <button
+            type="button"
+            onClick={() => onNewSession(repoName, projectMatch?.local_folder_path)}
+            className="p-1 text-zinc-400 hover:text-white rounded hover:bg-white/[0.08] transition-colors cursor-pointer outline-none"
+            title="New conversation in project"
+            aria-label="New conversation in project"
+          >
+            <Plus size={13} />
+          </button>
+
+          {/* Vertical 3-dots Dropdown Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded hover:bg-zinc-300/50 dark:hover:bg-white/[0.1] transition-all cursor-pointer outline-none"
+                className="p-1 text-zinc-400 hover:text-white rounded hover:bg-white/[0.08] transition-colors cursor-pointer outline-none"
                 title="Project options"
+                aria-label="Project options"
               >
-                <MoreHorizontal size={13} />
+                <MoreVertical size={13} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent 
@@ -118,15 +119,16 @@ export function WorkspaceFolderRow({
         </div>
       </div>
       
+      {/* Nested Sessions under this Workspace Project */}
       {isOpen && (
-        <div className="flex flex-col pl-3">
+        <div className="flex flex-col pl-3 space-y-0.5 mt-0.5">
           {repoSessions.length === 0 ? (
             <button
               type="button"
               onClick={() => onNewSession(repoName, projectMatch?.local_folder_path)}
-              className="flex items-center gap-1.5 pl-6 py-1.5 text-[11.5px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors cursor-pointer text-left w-full rounded hover:bg-zinc-200/40 dark:hover:bg-white/[0.04]"
+              className="flex items-center gap-1.5 pl-6 py-1.5 text-[11.5px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer text-left w-full rounded hover:bg-white/[0.04]"
             >
-              <Plus size={11} className="text-zinc-400 shrink-0" />
+              <Plus size={11} className="text-zinc-500 shrink-0" />
               <span>Start conversation</span>
             </button>
           ) : (
