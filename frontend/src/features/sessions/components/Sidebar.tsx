@@ -11,6 +11,7 @@ import { SidebarFooter } from './SidebarFooter';
 import { PinnedSection } from './PinnedSection';
 import { WorkspacesSection } from './WorkspacesSection';
 import { DirectConversationsSection } from './DirectConversationsSection';
+import { QuickProjectModal } from './QuickProjectModal';
 
 interface SidebarProps {
   selectedSessionId: string | null;
@@ -137,6 +138,9 @@ export default function Sidebar({
   // In-line Renaming State
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [renameInput, setRenameInput] = useState<string>('');
+
+  // Quick Project Modal State
+  const [isQuickProjectModalOpen, setIsQuickProjectModalOpen] = useState(false);
 
   // Resizing state
   const [internalWidth, setInternalWidth] = useState<number>(260);
@@ -421,6 +425,14 @@ export default function Sidebar({
     }
   };
 
+  const handleNewProject = handleAddWorkspace;
+
+  const handleQuickProjectCreated = (project: ProjectItem) => {
+    refreshData();
+    setOpenFolders(prev => ({ ...prev, [project.name]: true }));
+    onNewSession(project.name, project.local_folder_path);
+  };
+
   // Group sessions by workspace and pinned status
   const visibleSessions = sessions.filter(s => !archivedIds.has(s.session_id));
   const pinnedSessions = visibleSessions.filter(s => pinnedSessionIds.has(s.session_id));
@@ -526,7 +538,8 @@ export default function Sidebar({
             canScrollUp={canScrollUp}
             onToggleFolder={toggleFolder}
             onNewSession={onNewSession}
-            onAddWorkspace={handleAddWorkspace}
+            onNewProject={handleNewProject}
+            onOpenQuickProjectModal={() => setIsQuickProjectModalOpen(true)}
             onDeleteProject={handleDeleteProjectClick}
             renderSessionItem={renderSessionItem}
           />
@@ -569,6 +582,13 @@ export default function Sidebar({
 
       {/* Fixed Footer - Settings */}
       <SidebarFooter onOpenSettings={onOpenSettings} />
+
+      {/* Quick Project Creation Modal */}
+      <QuickProjectModal
+        isOpen={isQuickProjectModalOpen}
+        onClose={() => setIsQuickProjectModalOpen(false)}
+        onProjectCreated={handleQuickProjectCreated}
+      />
     </div>
   );
 }
