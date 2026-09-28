@@ -12,6 +12,8 @@ export interface FileBreadcrumbBarProps {
   segments?: string[];
   /** File type (file, terminal, image) */
   type?: 'file' | 'terminal' | 'image';
+  /** Optional callback when a directory segment is clicked */
+  onSegmentClick?: (segment: string, index: number) => void;
   /** Optional custom menu action element or 3-dots callback */
   onMenuClick?: () => void;
   /** Custom action slot (e.g. DropdownMenu trigger or custom 3-dots menu) */
@@ -32,6 +34,7 @@ export function FileBreadcrumbBar({
   path = '',
   segments: customSegments,
   type = 'file',
+  onSegmentClick,
   onMenuClick,
   actions,
   className,
@@ -67,7 +70,11 @@ export function FileBreadcrumbBar({
         {directorySegments.map((segment, idx) => (
           <React.Fragment key={idx}>
             <span
-              className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors duration-100 shrink-0 cursor-default bg-transparent hover:bg-transparent"
+              onClick={onSegmentClick ? () => onSegmentClick(segment, idx) : undefined}
+              className={cn(
+                "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors duration-100 shrink-0 bg-transparent hover:bg-transparent",
+                onSegmentClick ? "cursor-pointer hover:underline" : "cursor-default"
+              )}
               title={segment}
             >
               {segment}

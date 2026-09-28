@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
-import { Settings, PanelLeft, ArrowLeft, ArrowRight, Plus, Clock, ChevronDown, ExternalLink, MoreHorizontal, Trash2, FolderOpen } from 'lucide-react';
+import { Settings, PanelLeft, ArrowLeft, ArrowRight, Plus, Clock, CalendarClock, ChevronDown, ExternalLink, MoreHorizontal, Trash2, FolderOpen } from 'lucide-react';
 import { fetchSessions, markSessionViewed, renameSession, deleteSession, SessionItem } from '@/services/sessions';
-import { fetchProjects, ProjectItem, selectFolder, getQuickstartFolder, resolveFolder, createProject, deleteProject } from '@/services/projects';
+import { fetchProjects, ProjectItem, selectFolder, getQuickstartFolder, resolveFolder, createProject, createQuickProject, deleteProject } from '@/services/projects';
 import { openSystemFile } from '@/services/files';
 import { formatRelativeTime } from '@/utils/formatting';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
@@ -332,6 +332,50 @@ export default function Sidebar({
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
   const [isWorkspacesOpen, setIsWorkspacesOpen] = useState(true);
   const [isConversationsOpen, setIsConversationsOpen] = useState(true);
+
+  // Workspace Popover Menu & Quick Project Dialog State
+  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
+  const workspaceMenuRef = useRef<HTMLDivElement>(null);
+  const [isQuickProjectModalOpen, setIsQuickProjectModalOpen] = useState(false);
+  const [quickProjectName, setQuickProjectName] = useState('');
+  const [quickProjectLoading, setQuickProjectLoading] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [workspaceFilter, setWorkspaceFilter] = useState('');
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(e.target as Node)) {
+        setIsWorkspaceMenuOpen(false);
+      }
+    };
+    if (isWorkspaceMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isWorkspaceMenuOpen]);
+
+  const handleQuickProjectSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanName = quickProjectName.trim() || `Project-${Date.now().toString().slice(-4)}`;
+    setQuickProjectLoading(true);
+    try {
+      const created = await createQuickProject(cleanName);
+      if (created && created.local_folder_path) {
+        addProjectOptimistic(created.name, created.local_folder_path);
+        loadSessionsList();
+        setIsQuickProjectModalOpen(false);
+        setQuickProjectName('');
+        onNewSession(created.name, created.local_folder_path);
+      } else {
+        await handleQuickStart();
+        setIsQuickProjectModalOpen(false);
+      }
+    } catch (err) {
+      console.warn('Failed to create quick project:', err);
+    } finally {
+      setQuickProjectLoading(false);
+    }
+  };
 
   // Live observer for scroll shading (dynamically hides bottom shadow when reaching bottom/setting frame)
   useEffect(() => {
@@ -718,6 +762,16 @@ export default function Sidebar({
           <Clock size={14} className="mr-2.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
           <span className="truncate">Conversation History</span>
         </button>
+
+        {/* Scheduled Tasks */}
+        <button
+          type="button"
+          onClick={() => {}}
+          className="w-full flex items-center text-[13px] py-1.5 px-3 rounded-lg cursor-pointer transition-colors select-none text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-white/[0.04] hover:text-zinc-900 dark:hover:text-zinc-200"
+        >
+          <CalendarClock size={14} className="mr-2.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+          <span className="truncate">Scheduled Tasks</span>
+        </button>
       </div>
 
       {/* Zone 3 & 4: Scrollable Content Area with Sliding Sticky Headers & Ambient Shading */}
@@ -759,33 +813,97 @@ export default function Sidebar({
           {/* 1. WORKSPACES SECTION */}
           <div className="relative pb-2">
             <div 
-              onClick={() => setIsWorkspacesOpen((prev) => !prev)}
-              className={`sticky top-0 z-20 bg-zinc-50 dark:bg-[#121214] px-3 pt-2 pb-1.5 flex justify-between items-center group cursor-pointer select-none text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors relative ${
+              className={`sticky top-0 z-20 bg-zinc-50 dark:bg-[#121214] px-3 pt-2 pb-1.5 flex justify-between items-center select-none text-zinc-500 dark:text-zinc-400 transition-colors relative ${
                 canScrollUp ? 'border-b border-zinc-200 dark:border-white/[0.04]' : ''
               }`}
             >
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200 transition-colors">Workspaces</span>
-                <ChevronDown 
-                  size={11} 
-                  className={`text-zinc-400 dark:text-zinc-500 transition-transform duration-200 ${isWorkspacesOpen ? '' : '-rotate-90'}`} 
-                />
-              </div>
-              <div className="flex items-center text-zinc-400" onClick={(e) => e.stopPropagation()}>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Workspaces
+              </span>
+
+              <div className="flex items-center gap-1 text-zinc-400 relative" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
-                  onClick={handleNewProject}
-                  className="cursor-pointer transition-colors p-1 rounded-md text-zinc-500 dark:text-zinc-400 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white"
-                  title="Open Workspace Folder from Computer"
+                  onClick={() => setIsFilterOpen(prev => !prev)}
+                  className={`cursor-pointer transition-colors p-1 rounded-md hover:bg-black/[0.05] dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white ${
+                    isFilterOpen ? 'text-zinc-900 dark:text-white bg-black/[0.05] dark:bg-white/[0.06]' : 'text-zinc-500 dark:text-zinc-400'
+                  }`}
+                  title="Filter workspaces"
+                >
+                  <FilterBarsIcon size={14} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsWorkspaceMenuOpen(prev => !prev)}
+                  className={`cursor-pointer transition-colors p-1 rounded-md hover:bg-black/[0.05] dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white ${
+                    isWorkspaceMenuOpen ? 'text-zinc-900 dark:text-white bg-black/[0.05] dark:bg-white/[0.06]' : 'text-zinc-500 dark:text-zinc-400'
+                  }`}
+                  title="Add workspace project"
                 >
                   <FolderPlusIcon size={14} />
                 </button>
+
+                {/* Floating Popover Menu (New Project & Quick Start) */}
+                {isWorkspaceMenuOpen && (
+                  <div 
+                    ref={workspaceMenuRef}
+                    className="absolute right-0 top-full mt-1.5 w-48 rounded-xl bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-white/[0.08] shadow-2xl p-1 z-50 select-none font-sans text-xs animate-in fade-in zoom-in-95"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsWorkspaceMenuOpen(false);
+                        handleNewProject();
+                      }}
+                      className="w-full text-left px-2.5 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white flex items-center gap-2.5 cursor-pointer rounded-lg transition-colors"
+                    >
+                      <FolderPlusIcon size={14} className="text-zinc-400 shrink-0" />
+                      <div className="flex flex-col">
+                        <span className="font-medium text-[12.5px]">New Project</span>
+                        <span className="text-[10.5px] text-zinc-400 dark:text-zinc-500">Select from computer</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsWorkspaceMenuOpen(false);
+                        setQuickProjectName(`Project-${Date.now().toString().slice(-4)}`);
+                        setIsQuickProjectModalOpen(true);
+                      }}
+                      className="w-full text-left px-2.5 py-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.06] hover:text-zinc-900 dark:hover:text-white flex items-center gap-2.5 cursor-pointer rounded-lg transition-colors"
+                    >
+                      <QuickStartFolderIcon size={14} className="text-zinc-400 shrink-0" />
+                      <div className="flex flex-col">
+                        <span className="font-medium text-[12.5px]">Quick Start</span>
+                        <span className="text-[10.5px] text-zinc-400 dark:text-zinc-500">Create in Documents</span>
+                      </div>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
+            {/* Inline Filter Input */}
+            {isFilterOpen && (
+              <div className="px-3 pt-1 pb-1.5">
+                <input
+                  type="text"
+                  value={workspaceFilter}
+                  onChange={(e) => setWorkspaceFilter(e.target.value)}
+                  placeholder="Filter workspaces..."
+                  autoFocus
+                  className="w-full text-[12px] bg-zinc-200/50 dark:bg-white/[0.04] border border-zinc-200 dark:border-white/[0.08] rounded-md px-2 py-1 text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 outline-none focus:ring-1 focus:ring-zinc-400"
+                />
+              </div>
+            )}
+
             {isWorkspacesOpen && (
               <div className="flex flex-col space-y-0.5">
-                {Object.entries(workspaceSessions).map(([repoName, repoSessions]) => {
+                {Object.entries(workspaceSessions)
+                  .filter(([repoName]) => !workspaceFilter.trim() || repoName.toLowerCase().includes(workspaceFilter.trim().toLowerCase()))
+                  .map(([repoName, repoSessions]) => {
                   const match = registeredProjects.find((p) => p.name === repoName);
                   const isWorkspaceActive = selectedSessionRepo === repoName;
                   const folderOpen = isFolderOpen(repoName);
@@ -804,7 +922,7 @@ export default function Sidebar({
                       {/* Folder Row */}
                       <div 
                         onClick={handleSelectWorkspace}
-                        className={`flex items-center justify-between px-2.5 py-1 rounded-md mx-1 cursor-pointer transition-colors group/folder select-none ${
+                        className={`flex items-center justify-between px-2.5 py-1.5 rounded-md mx-1 cursor-pointer transition-colors group/folder select-none ${
                           isWorkspaceActive 
                             ? 'bg-zinc-200/90 dark:bg-white/[0.08] text-zinc-950 dark:text-white font-medium shadow-2xs' 
                             : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/50 dark:hover:bg-white/[0.04]'
@@ -826,19 +944,10 @@ export default function Sidebar({
                             />
                           </button>
                           <ProjectFolderIcon size={14} className="mr-2 text-zinc-500 dark:text-zinc-400 group-hover/folder:text-zinc-700 dark:group-hover/folder:text-zinc-200 transition-colors shrink-0" />
-                          <span className="text-[13px] truncate transition-colors">{repoName}</span>
+                          <span className="text-[13px] truncate transition-colors font-medium">{repoName}</span>
                         </div>
                         
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover/folder:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={(e) => handleCreateNewInFolder(e, repoName)}
-                            className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded hover:bg-zinc-300/50 dark:hover:bg-white/[0.1] transition-all cursor-pointer"
-                            title={`New conversation in ${repoName}`}
-                          >
-                            <Plus size={13} />
-                          </button>
-
+                        <div className="flex items-center opacity-0 group-hover/folder:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button
@@ -990,6 +1099,63 @@ export default function Sidebar({
           <span>Settings</span>
         </button>
       </div>
+
+      {/* Quick Project Creation Modal */}
+      {isQuickProjectModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          onClick={() => setIsQuickProjectModalOpen(false)}
+        >
+          <div 
+            className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-white/[0.1] p-5 shadow-2xl font-sans"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="p-2 rounded-lg bg-zinc-100 dark:bg-white/[0.06] text-zinc-800 dark:text-zinc-200">
+                <QuickStartFolderIcon size={18} />
+              </div>
+              <div>
+                <h3 className="text-[14px] font-semibold text-zinc-900 dark:text-white">Create Quick Project</h3>
+                <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">Creates an empty folder in your Documents</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleQuickProjectSubmit} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">
+                  Project Name
+                </label>
+                <input
+                  type="text"
+                  value={quickProjectName}
+                  onChange={(e) => setQuickProjectName(e.target.value)}
+                  placeholder="e.g. Audit-Project-1"
+                  autoFocus
+                  required
+                  className="w-full px-3 py-1.5 rounded-lg text-[13px] bg-zinc-50 dark:bg-[#121214] border border-zinc-200 dark:border-white/[0.1] text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none focus:ring-1 focus:ring-sky-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickProjectModalOpen(false)}
+                  className="px-3 py-1.5 text-[12px] font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/[0.06] rounded-lg cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={quickProjectLoading}
+                  className="px-4 py-1.5 text-[12px] font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  {quickProjectLoading ? 'Creating...' : 'Create Project'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

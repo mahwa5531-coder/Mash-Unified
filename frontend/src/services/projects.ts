@@ -36,6 +36,21 @@ export async function createProject(name: string, localFolderPath: string): Prom
   }
 }
 
+export async function createQuickProject(name: string): Promise<ProjectItem | null> {
+  try {
+    const res = await safeFetch(`${BASE_URL}/api/projects/quick`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn("Failed to create quick project:", err);
+    return null;
+  }
+}
+
 export async function deleteProject(projectId: string): Promise<boolean> {
   try {
     const res = await safeFetch(`${BASE_URL}/api/projects/${projectId}`, {
