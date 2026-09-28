@@ -2,7 +2,7 @@
 
 import { useEffect, useState, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
 import { fetchSessions, markSessionViewed, renameSession, deleteSession, SessionItem } from '@/services/sessions';
-import { fetchProjects, ProjectItem, selectFolder, createProject, deleteProject } from '@/services/projects';
+import { fetchProjects, ProjectItem, selectFolder, resolveFolder, createProject, deleteProject } from '@/services/projects';
 import { isSessionStreaming, subscribeToSessionStore, sessionStore } from '@/features/chat';
 import { SessionItemRow } from './SessionItemRow';
 import { SessionContextMenu } from './SessionContextMenu';
@@ -346,10 +346,13 @@ export default function Sidebar({
   };
 
   const toggleFolder = (folderName: string) => {
-    setOpenFolders(prev => ({
-      ...prev,
-      [folderName]: prev[folderName] === undefined ? false : !prev[folderName]
-    }));
+    setOpenFolders(prev => {
+      const isCurrentlyOpen = prev[folderName] ?? true;
+      return {
+        ...prev,
+        [folderName]: !isCurrentlyOpen,
+      };
+    });
   };
 
   const handleDeleteProjectClick = async (e: React.MouseEvent, projectId?: string, projectName?: string) => {
@@ -367,6 +370,40 @@ export default function Sidebar({
   };
 
   const handleAddWorkspace = async () => {
+    // 1. In-browser native Directory Picker: Opens the exact "Open workspace / Select folder" native dialog
+    if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker({ mode: 'read' });
+        if (dirHandle && dirHandle.name) {
+          const folderName = dirHandle.name;
+          const sampleChildren: string[] = [];
+          try {
+            for await (const entry of (dirHandle as any).values()) {
+              sampleChildren.push(entry.name);
+              if (sampleChildren.length >= 10) break;
+            }
+          } catch {}
+
+          const resolved = await resolveFolder(folderName, sampleChildren);
+          const folderPath = resolved.folder_path || folderName;
+          const project = await createProject(folderName, folderPath);
+          if (project) {
+            refreshData();
+            setOpenFolders(prev => ({ ...prev, [project.name]: true }));
+            onNewSession(project.name, project.local_folder_path);
+            return;
+          }
+        }
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          // User canceled dialog
+          return;
+        }
+        console.warn("Browser showDirectoryPicker fallback:", err);
+      }
+    }
+
+    // 2. Fallback to native backend selectFolder
     try {
       const selected = await selectFolder();
       if (selected && selected.folder_path) {
@@ -375,6 +412,7 @@ export default function Sidebar({
         const project = await createProject(folderName, folderPath);
         if (project) {
           refreshData();
+          setOpenFolders(prev => ({ ...prev, [project.name]: true }));
           onNewSession(project.name, project.local_folder_path);
         }
       }
@@ -391,28 +429,40 @@ export default function Sidebar({
   const workspaceSessions: Record<string, SessionItem[]> = {};
   const directConversations: SessionItem[] = [];
 
-  unpinnedSessions.forEach(session => {
-    let repo = session.workspace_uri || 'No Repo';
-    if (repo !== 'No Repo' && repo.includes('/')) {
-      repo = repo.split('/').filter(Boolean).pop() || repo;
-    } else if (repo !== 'No Repo' && repo.includes('\\')) {
-      repo = repo.split('\\').filter(Boolean).pop() || repo;
-    }
-
-    if (repo === 'No Repo' || session.section === 'conversation') {
-      directConversations.push(session);
-    } else {
-      if (!workspaceSessions[repo]) {
-        workspaceSessions[repo] = [];
-      }
-      workspaceSessions[repo].push(session);
-    }
+  // Pre-populate all registered projects so they appear in Workspaces section
+  registeredProjects.forEach(p => {
+    workspaceSessions[p.name] = [];
   });
 
-  registeredProjects.forEach((p) => {
-    if (!workspaceSessions[p.name]) {
-      workspaceSessions[p.name] = [];
+  unpinnedSessions.forEach(session => {
+    const uri = session.workspace_uri;
+    if (!uri || uri === 'No Repo') {
+      directConversations.push(session);
+      return;
     }
+
+    // Match session to a registered project by path or name
+    const normUri = uri.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+    const matchedProject = registeredProjects.find(p => {
+      const normPath = p.local_folder_path ? p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() : '';
+      return (
+        normPath === normUri ||
+        p.name.toLowerCase() === uri.toLowerCase() ||
+        normPath.endsWith('/' + uri.toLowerCase()) ||
+        normUri.endsWith('/' + p.name.toLowerCase())
+      );
+    });
+
+    const targetGroupName = matchedProject ? matchedProject.name : (
+      uri.includes('/') || uri.includes('\\')
+        ? uri.split(/[/\\]/).filter(Boolean).pop() || uri
+        : uri
+    );
+
+    if (!workspaceSessions[targetGroupName]) {
+      workspaceSessions[targetGroupName] = [];
+    }
+    workspaceSessions[targetGroupName].push(session);
   });
 
   const renderSessionItem = (s: SessionItem, isPinnedContext: boolean = false) => {
