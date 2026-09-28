@@ -1,3 +1,6 @@
+# Sub-repositories (tracked in its own git repo)
+NexAU/
+
 # Dependencies & Build
 node_modules/
 .next/
@@ -5,26 +8,35 @@ out/
 build/
 dist/
 
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# Bifrost runtime logs and databases
+bifrost_data/logs.db
+bifrost_data/logs/
+quota_state.json
+
 # Python & testing caches
 __pycache__/
 *.pyc
 .pytest_cache/
-.ruff_cache/
 .coverage
 htmlcov/
 *.log
 .env
-.env.backup
-.env.local
-.env.*.local
-!.env.example
 .venv/
 venv/
 scratch/
 .hypothesis/
 *.db
 .openclaw*
+*.csv
+analyze_churn*.py
+check_gemini.py
+copy_csv.py
 frontend/.openclaw*
+nexau-cloud-api/**/*.exe
+antigravity_context_analysis.txt
+backup_frontend/
+antigravity/
 test_workspaces/
-connector/test_scratch_project/
-nexau.egg-info/

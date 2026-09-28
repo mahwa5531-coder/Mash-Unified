@@ -4,9 +4,9 @@ import {
   sessionStore, 
   clearSessionStore,
   SessionRuntimeState
-} from '../src/hooks/useChatStream';
-import { parseTranscriptLines, buildTurns } from '../src/lib/turns';
-import { Message } from '../src/lib/types';
+} from '../src/features/chat';
+import { parseTranscriptLines, buildTurns } from '../src/features/chat/utils/turns';
+import { Message } from '../src/types/chat';
 
 // Helper to assert conditions cleanly
 function assert(condition: boolean, message: string): asserts condition {

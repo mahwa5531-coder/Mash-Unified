@@ -1,34 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MASh Frontend — Refactored Architecture
 
-## Getting Started
+Next.js 16 + React 19 + Tailwind 4 chat workspace for the MASh statutory-audit agent.
 
-First, run the development server:
+> **About this folder** — the complete frontend after the behavior-preserving architecture
+> refactor. Same UI, same behavior, cleaner structure: feature-based folders
+> (`src/features/*`), split services (`src/services/*`), decomposed god files (largest
+> container is now 659 lines, down from 1279), dead code removed.
+>
+> **Verification** — TypeScript 0 errors · production build PASS · all 3 test suites PASS ·
+> visual parity confirmed on 6 before/after screens · full runtime QA against a scripted
+> backend (streaming turns, artifacts, Univer viewer, error/cancel states, settings,
+> light mode).
+>
+> **Original kept safe** — the untouched `frontend/` folder sits beside this one for
+> comparison. This folder is a drop-in replacement: swap whenever ready. The git branch
+> `refactor/frontend-architecture` carries the same content with the full phase-by-phase
+> commit history (10 commits, incl. a final hygiene pass: dead `apiClient.ts` deleted,
+> debug scripts removed, stale SSE comments corrected).
+
+- **Architecture** — read [`ARCHITECTURE.md`](./ARCHITECTURE.md) first: folder map, feature boundaries, dependency rules, how to add things.
+- **Conventions** — [`COMPONENT_GUIDELINES.md`](./COMPONENT_GUIDELINES.md): where new code goes, container/view split, naming, merge checklist.
+- **Refactor audit** — [`docs/refactor-audit.md`](./docs/refactor-audit.md): the pre-refactor analysis and phase log.
+
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # expects the connector backend on :8000 (NEXT_PUBLIC_API_URL to override)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Verify (all must pass before merge)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx tsc --noEmit
+npm run build
+node test_right_sidebar_logic.cjs
+node tests/test_chat_scenarios.mjs
+bun tests/fuzz_session_store.ts
+```

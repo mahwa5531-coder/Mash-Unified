@@ -1,46 +1,47 @@
 @import "tailwindcss";
+@import "../foundation/tokens.css";
 
 @custom-variant dark (&:where([data-theme="dark"], .dark, [data-theme="dark"] *, .dark *));
 
 @theme {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'Fira Code', Consolas, Menlo, Monaco, monospace;
-  --color-border: var(--border-subtle);
+  --color-border: var(--m-border-subtle);
 }
 
 :root {
-  /* Default Light Preset */
-  --border: #E5E7EB;
-  --bg-app: #F8F9FA;
-  --bg-surface: #FFFFFF;
-  --bg-hover: #F1F3F5;
-  --bg-active: #E9ECEF;
-  --border-subtle: #E5E7EB;
-  --border-strong: #D1D5DB;
-  --text-primary: #18181B;
-  --text-secondary: #52525B;
-  --text-muted: #71717A;
-  --accent: #007ACC;
-  --accent-hover: #0062A3;
-  --accent-soft: rgba(0, 122, 204, 0.10);
+  /* Legacy bridge mapped to official --m-* token system */
+  --border: var(--m-border-subtle);
+  --bg-app: var(--m-bg-app);
+  --bg-surface: var(--m-bg-surface);
+  --bg-hover: var(--m-bg-surface-hover);
+  --bg-active: var(--m-bg-surface-active);
+  --border-subtle: var(--m-border-subtle);
+  --border-strong: var(--m-border-strong);
+  --text-primary: var(--m-text-primary);
+  --text-secondary: var(--m-text-secondary);
+  --text-muted: var(--m-text-muted);
+  --accent: var(--m-accent);
+  --accent-hover: var(--m-accent-hover);
+  --accent-soft: var(--m-accent-soft);
 }
 
 [data-theme="dark"],
 .dark {
-  /* Default Dark Preset - matching Appearance Settings */
-  --border: rgba(255, 255, 255, 0.08);
-  --bg-app: #101010;
-  --bg-surface: #141416;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --bg-active: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.15);
-  --text-primary: #ECECED;
-  --text-secondary: #A1A1AA;
-  --text-muted: #71717A;
-  --accent: #007ACC;
-  --accent-hover: #0062A3;
-  --accent-soft: rgba(0, 122, 204, 0.15);
+  /* Legacy bridge automatically inherits from dark mode --m-* tokens */
+  --border: var(--m-border-subtle);
+  --bg-app: var(--m-bg-app);
+  --bg-surface: var(--m-bg-surface);
+  --bg-hover: var(--m-bg-surface-hover);
+  --bg-active: var(--m-bg-surface-active);
+  --border-subtle: var(--m-border-subtle);
+  --border-strong: var(--m-border-strong);
+  --text-primary: var(--m-text-primary);
+  --text-secondary: var(--m-text-secondary);
+  --text-muted: var(--m-text-muted);
+  --accent: var(--m-accent);
+  --accent-hover: var(--m-accent-hover);
+  --accent-soft: var(--m-accent-soft);
 }
 
 body {

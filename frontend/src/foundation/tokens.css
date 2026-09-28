@@ -1,0 +1,121 @@
+/**
+ * MASh Design Token Specification (Phase 1 Foundation)
+ * Sourced directly from MASh-Frontend-Research / 18-mash-design-tokens.md
+ * Single source of visual truth for color, radius, spacing, typography, and motion.
+ */
+
+:root {
+  /* Surface & Canvas (Light Theme) */
+  --m-bg-app: #F7F8F9;
+  --m-bg-surface: #FFFFFF;
+  --m-bg-surface-hover: #F1F3F5;
+  --m-bg-surface-active: #E9ECEF;
+  --m-bg-raised: #FFFFFF;
+  --m-bg-inset: #F1F3F5;
+  --m-bg-titlebar: #E8EAED;
+  --m-bg-toolbar: #F1F3F5;
+
+  /* Borders (Light Theme) */
+  --m-border-subtle: #E5E7EB;
+  --m-border: #D6D9DE;
+  --m-border-strong: #C7CBD1;
+
+  /* Text Contrast Hierarchy (Light Theme) */
+  --m-text-primary: #18181B;
+  --m-text-secondary: #4B4B52;
+  --m-text-muted: #5F5F66;
+
+  /* Interactive / Brand Accent (Light Theme) */
+  --m-accent: #007ACC;
+  --m-accent-hover: #0062A3;
+  --m-accent-soft: rgba(0, 122, 204, 0.10);
+  --m-accent-contrast: #FFFFFF;
+  --m-focus-ring: #007ACC;
+
+  /* Audit Semantic Colors (Light Theme) */
+  --m-success: #059669;
+  --m-success-soft: rgba(5, 150, 105, 0.10);
+  --m-warning: #B45309;
+  --m-warning-soft: rgba(180, 83, 9, 0.10);
+  --m-danger: #DC2626;
+  --m-danger-soft: rgba(220, 38, 38, 0.10);
+  --m-info: #0369A1;
+  --m-info-soft: rgba(3, 105, 161, 0.10);
+  --m-running: #0284C7;
+
+  /* Radii */
+  --m-radius-xs: 4px;
+  --m-radius-sm: 6px;
+  --m-radius-md: 8px;
+  --m-radius-lg: 12px;
+  --m-radius-xl: 16px;
+  --m-radius-full: 9999px;
+
+  /* Spacing Grid (4px Base) */
+  --m-space-1: 4px;
+  --m-space-2: 8px;
+  --m-space-3: 12px;
+  --m-space-4: 16px;
+  --m-space-5: 24px;
+  --m-space-6: 32px;
+  --m-space-7: 48px;
+
+  /* Elevation Shadows (Light) */
+  --m-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --m-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --m-shadow-lg: 0 25px 60px -15px rgba(0, 0, 0, 0.25);
+  --m-shadow-none: none;
+
+  /* Motion */
+  --m-motion-instant: 0ms;
+  --m-motion-fast: 120ms;
+  --m-motion-normal: 200ms;
+  --m-motion-slow: 300ms;
+  --m-ease-out: cubic-bezier(0, 0, 0.2, 1);
+}
+
+[data-theme="dark"],
+.dark {
+  /* Surface & Canvas (Dark Theme) */
+  --m-bg-app: #101012;
+  --m-bg-surface: #141416;
+  --m-bg-surface-hover: rgba(255, 255, 255, 0.05);
+  --m-bg-surface-active: rgba(255, 255, 255, 0.09);
+  --m-bg-raised: #1A1A1D;
+  --m-bg-inset: rgba(255, 255, 255, 0.03);
+  --m-bg-titlebar: #0D0D0F;
+  --m-bg-toolbar: #121214;
+
+  /* Borders (Dark Theme) */
+  --m-border-subtle: rgba(255, 255, 255, 0.08);
+  --m-border: rgba(255, 255, 255, 0.12);
+  --m-border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text Contrast Hierarchy (Dark Theme - WCAG AA) */
+  --m-text-primary: #ECECED;
+  --m-text-secondary: #A1A1AA;
+  --m-text-muted: #8E8E96;
+
+  /* Interactive / Brand Accent (Dark Theme - 4.6:1 contrast) */
+  --m-accent: #2F9BE8;
+  --m-accent-hover: #1F87D6;
+  --m-accent-soft: rgba(47, 155, 232, 0.14);
+  --m-accent-contrast: #FFFFFF;
+  --m-focus-ring: #2F9BE8;
+
+  /* Audit Semantic Colors (Dark Theme) */
+  --m-success: #34D399;
+  --m-success-soft: rgba(52, 211, 153, 0.12);
+  --m-warning: #FBBF24;
+  --m-warning-soft: rgba(251, 191, 36, 0.12);
+  --m-danger: #F87171;
+  --m-danger-soft: rgba(248, 113, 113, 0.12);
+  --m-info: #7DD3FC;
+  --m-info-soft: rgba(125, 211, 252, 0.12);
+  --m-running: #38BDF8;
+
+  /* Elevation Shadows (Dark) */
+  --m-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.55);
+  --m-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.60);
+  --m-shadow-lg: 0 25px 60px -15px rgba(0, 0, 0, 0.80);
+}
