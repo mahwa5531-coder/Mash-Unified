@@ -1,6 +1,7 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { FolderPlusIcon, QuickStartFolderIcon } from './icons';
 import { WorkspaceFolderRow } from './WorkspaceFolderRow';
 import { SessionItem } from '@/services/sessions';
@@ -37,19 +38,29 @@ export function WorkspacesSection({
   onDeleteProject,
   renderSessionItem,
 }: WorkspacesSectionProps) {
+  const [isSectionOpen, setIsSectionOpen] = useState(true);
   const entries = Object.entries(workspaceSessions);
 
   return (
     <div className="relative pb-2">
-      {/* Workspaces Sticky Header (No Filter button) */}
+      {/* Workspaces Sticky Header */}
       <div 
         className={`sticky top-0 z-20 bg-zinc-50 dark:bg-[#121214] px-3 pt-2 pb-1.5 flex justify-between items-center select-none text-zinc-500 dark:text-zinc-400 transition-colors relative ${
           canScrollUp ? 'border-b border-zinc-200 dark:border-white/[0.04]' : ''
         }`}
       >
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Workspaces
-        </span>
+        <div 
+          onClick={() => setIsSectionOpen(prev => !prev)}
+          className="flex items-center gap-1.5 cursor-pointer group hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
+        >
+          <ChevronDown 
+            size={12} 
+            className={`text-zinc-400 transition-transform duration-150 ${isSectionOpen ? '' : '-rotate-90'}`} 
+          />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Workspaces
+          </span>
+        </div>
 
         <div className="flex items-center gap-1 text-zinc-400 relative" onClick={(e) => e.stopPropagation()}>
           {/* Add Workspace: Opens Popover Menu (New Project & Quick Start) positioned to the right */}
@@ -98,27 +109,28 @@ export function WorkspacesSection({
       </div>
 
       {/* Workspaces List with Dropdown Accordion */}
-      <div className="flex flex-col space-y-0.5">
-        {entries.map(([repoName, repoSessions]) => {
-          const match = registeredProjects.find((p) => p.name === repoName);
-          // Default to open (true) unless explicitly collapsed by user
-          const folderOpen = openFolders[repoName] ?? true;
+      {isSectionOpen && (
+        <div className="flex flex-col space-y-0.5">
+          {entries.map(([repoName, repoSessions]) => {
+            const match = registeredProjects.find((p) => p.name === repoName);
+            const folderOpen = openFolders[repoName] ?? true;
 
-          return (
-            <WorkspaceFolderRow
-              key={repoName}
-              repoName={repoName}
-              repoSessions={repoSessions}
-              projectMatch={match}
-              isOpen={folderOpen}
-              onToggle={() => onToggleFolder(repoName)}
-              onNewSession={onNewSession}
-              onDeleteProject={onDeleteProject}
-              renderSessionItem={renderSessionItem}
-            />
-          );
-        })}
-      </div>
+            return (
+              <WorkspaceFolderRow
+                key={repoName}
+                repoName={repoName}
+                repoSessions={repoSessions}
+                projectMatch={match}
+                isOpen={folderOpen}
+                onToggle={() => onToggleFolder(repoName)}
+                onNewSession={onNewSession}
+                onDeleteProject={onDeleteProject}
+                renderSessionItem={renderSessionItem}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

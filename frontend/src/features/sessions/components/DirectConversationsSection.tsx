@@ -1,7 +1,7 @@
 "use client";
 
-import React from 'react';
-import { Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown, Plus } from 'lucide-react';
 import { SessionItem } from '@/services/sessions';
 
 export interface DirectConversationsSectionProps {
@@ -19,6 +19,8 @@ export function DirectConversationsSection({
   onNewSession,
   renderSessionItem,
 }: DirectConversationsSectionProps) {
+  const [isSectionOpen, setIsSectionOpen] = useState(true);
+
   return (
     <div className="relative pb-2">
       {/* Header: Conversations on left, + button on right */}
@@ -27,9 +29,18 @@ export function DirectConversationsSection({
           canScrollUp ? 'border-b border-zinc-200 dark:border-white/[0.04]' : ''
         }`}
       >
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Conversations
-        </span>
+        <div 
+          onClick={() => setIsSectionOpen(prev => !prev)}
+          className="flex items-center gap-1.5 cursor-pointer group hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
+        >
+          <ChevronDown 
+            size={12} 
+            className={`text-zinc-400 transition-transform duration-150 ${isSectionOpen ? '' : '-rotate-90'}`} 
+          />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Conversations
+          </span>
+        </div>
 
         {onNewSession && (
           <button
@@ -45,13 +56,15 @@ export function DirectConversationsSection({
       </div>
 
       {/* Conversations List */}
-      <div className="flex flex-col space-y-0.5">
-        {directConversations.length === 0 && !loading ? (
-          <div className="px-4 py-1 text-[12px] text-zinc-500 italic">No conversations</div>
-        ) : (
-          directConversations.map((s) => renderSessionItem(s))
-        )}
-      </div>
+      {isSectionOpen && (
+        <div className="flex flex-col space-y-0.5">
+          {directConversations.length === 0 && !loading ? (
+            <div className="px-4 py-1 text-[12px] text-zinc-500 italic">No conversations</div>
+          ) : (
+            directConversations.map((s) => renderSessionItem(s))
+          )}
+        </div>
+      )}
     </div>
   );
 }
