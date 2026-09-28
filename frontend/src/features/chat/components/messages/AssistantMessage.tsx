@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, memo } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useMemo, memo } from 'react';
 import dynamic from 'next/dynamic';
-import { RotateCcw, Copy, Check, ArrowUpRight, ChevronRight, BookOpen, AlertCircle, WifiOff, Play, X, ExternalLink } from 'lucide-react';
+import { ArrowUpRight, BookOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -22,6 +21,9 @@ import { ArtifactItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
 import { cn } from '@/lib/utils';
 import { FilePill } from '@/primitives';
+import { ExecutionStatusDisclosure } from './ExecutionStatusDisclosure';
+import { ImageLightboxModal, LightboxImageData } from './ImageLightboxModal';
+import { AssistantMessageFooter } from './AssistantMessageFooter';
 
 // ponytail: stable plugin array references — prevents ReactMarkdown from re-parsing on every streaming flush
 const REMARK_PLUGINS = [remarkGfm, remarkMath] as any;
@@ -261,20 +263,7 @@ const AssistantMessage = memo(function AssistantMessage({
   onRetry,
   onContinue,
 }: AssistantMessageProps) {
-  const [copied, setCopied] = useState(false);
-  const [errorOpen, setErrorOpen] = useState(false);
-  const [abortedOpen, setAbortedOpen] = useState(false);
-  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string; path?: string } | null>(null);
-
-  // Close lightbox modal on Escape key
-  useEffect(() => {
-    if (!lightboxImage) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setLightboxImage(null);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [lightboxImage]);
+  const [lightboxImage, setLightboxImage] = useState<LightboxImageData | null>(null);
 
   // Freeze fallback completion time once on mount so it never drifts with live clock
   const [latchedTime] = useState(() => 
@@ -480,122 +469,15 @@ const AssistantMessage = memo(function AssistantMessage({
         </div>
       )}
 
-      {/* 4. Execution Status Disclosure (Error / Interrupted / Network Disconnect) */}
-      {msg.error && (() => {
-        const lower = (msg.error || '').toLowerCase();
-        const isNetworkError = lower.includes('network') || lower.includes('wifi') || lower.includes('failed to fetch') || lower.includes('offline') || lower.includes('timed out');
-        return (
-          <div className="w-full min-w-0 text-[13px] font-sans my-1.5 select-text">
-            <button
-              type="button"
-              aria-expanded={errorOpen}
-              onClick={() => setErrorOpen((v) => !v)}
-              className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-[#8a8a8e] hover:text-zinc-900 dark:hover:text-zinc-200 font-normal py-0.5 px-1 -mx-1 rounded-[6px] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] transition-all cursor-pointer select-none my-0.5 w-fit group"
-            >
-              {isNetworkError ? (
-                <span className="text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 font-sans flex items-center gap-1">
-                  <WifiOff size={11} className="shrink-0" />
-                  <span>Disconnected</span>
-                </span>
-              ) : (
-                <span className="text-rose-500 dark:text-rose-400 group-hover:text-rose-600 dark:group-hover:text-rose-300 font-sans flex items-center gap-1">
-                  <AlertCircle size={11} className="shrink-0" />
-                  <span>Terminated</span>
-                </span>
-              )}
-              <span className="text-zinc-800 dark:text-zinc-200 font-medium font-sans">
-                {isNetworkError 
-                  ? 'Agent execution terminated: Network connection lost.' 
-                  : 'Agent execution terminated due to error.'}
-              </span>
-              <ChevronRight size={11} className={cn("text-zinc-400 dark:text-zinc-500 transition-transform ml-0.5", errorOpen && "rotate-90")} />
-            </button>
-
-            {/* Tool-Rendering Style Expandable Details Box */}
-            {errorOpen && (
-              <div className="w-full rounded-lg border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-100/40 dark:bg-white/[0.02] p-2.5 font-mono text-[11px] my-1 shadow-none transition-colors">
-                <div className="text-muted-foreground mb-1.5 flex items-center justify-between border-b border-zinc-200/60 dark:border-white/[0.05] pb-1.5 text-[10.5px]">
-                  <div className="flex items-center gap-1.5 truncate">
-                    {isNetworkError ? (
-                      <WifiOff size={12} className="text-amber-500 shrink-0" />
-                    ) : (
-                      <AlertCircle size={12} className="text-rose-500 shrink-0" />
-                    )}
-                    <span className="text-foreground/90 font-medium truncate text-[10.5px]">
-                      {isNetworkError ? 'Network Disconnection' : 'Execution Error'}
-                    </span>
-                    {msg.errorId && (
-                      <span className="text-muted-foreground/60 truncate text-[10px]">
-                        (ID: {msg.errorId})
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigator.clipboard.writeText(msg.error || '');
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 1500);
-                      }}
-                      className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
-                      title="Copy error details"
-                    >
-                      {copied ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
-                    </button>
-
-                    {(onContinue || onRetry) && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onContinue) {
-                            onContinue();
-                          } else if (onRetry) {
-                            onRetry();
-                          }
-                        }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-sky-500/15 hover:bg-sky-500/25 text-sky-600 dark:text-sky-300 font-sans font-medium transition-colors cursor-pointer text-[10.5px] border border-sky-500/25 shadow-2xs"
-                        title="Continue execution from where it was interrupted without repeating completed work"
-                      >
-                        <Play size={10} className="fill-current" />
-                        <span>Continue</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <pre className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto custom-scrollbar font-mono text-[10.5px]">
-                  {msg.error}
-                </pre>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* 4b. Sleek Execution Status Disclosure (Stopped / Aborted) */}
-      {msg.status === 'aborted' && !msg.error && (
-        <div className="w-full min-w-0 text-[13px] font-sans my-1 select-text">
-          <button
-            type="button"
-            aria-expanded={abortedOpen}
-            onClick={() => setAbortedOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-[#8a8a8e] hover:text-zinc-900 dark:hover:text-zinc-200 font-normal py-0.5 px-1 -mx-1 rounded-[6px] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] transition-all cursor-pointer select-none my-0.5 w-fit group"
-          >
-            <span className="text-zinc-500 dark:text-[#8a8a8e] group-hover:text-zinc-700 dark:group-hover:text-zinc-300 font-sans">Stopped</span>
-            <span className="text-zinc-800 dark:text-zinc-200 font-medium font-sans">Agent execution stopped.</span>
-            <ChevronRight size={11} className={cn("text-zinc-400 dark:text-zinc-500 transition-transform ml-0.5", abortedOpen && "rotate-90")} />
-          </button>
-          {abortedOpen && (
-            <div className="py-1 text-xs text-zinc-500 dark:text-[#8a8a8e] font-sans pl-1">
-              Execution was stopped by user{msg.totalDurationSeconds ? ` after ${msg.totalDurationSeconds}s` : ''}.
-            </div>
-          )}
-        </div>
-      )}
+      {/* 4. Execution Status Disclosure (Error / Interrupted / Network Disconnect / Aborted) */}
+      <ExecutionStatusDisclosure
+        status={msg.status}
+        error={msg.error}
+        errorId={msg.errorId}
+        totalDurationSeconds={msg.totalDurationSeconds}
+        onRetry={onRetry}
+        onContinue={onContinue}
+      />
 
       {/* 5. Bottom Artifact Cards (Walkthrough, Implementation Plan, etc.) */}
       {artifacts.length > 0 && (
@@ -626,95 +508,19 @@ const AssistantMessage = memo(function AssistantMessage({
 
       {/* Footer: timestamp on left, copy button on right — clean and symmetrical when turn is completed */}
       {!isActivelyStreaming && (
-        <div className={`flex items-center justify-between mt-3 pt-1 text-[var(--text-muted)] transition-opacity ${
-          formattedContent || artifacts.length > 0 || editedFilesData.files.length > 0
-            ? 'border-t border-zinc-200/70 dark:border-white/[0.04]'
-            : ''
-        }`}>
-          <span className="text-[11px] text-[var(--text-muted)] font-mono">
-            {displayTime}
-          </span>
-          <button
-            onClick={() => {
-              const textToCopy = rawText || (msg.thoughts && msg.thoughts.length > 0 ? msg.thoughts.join('\n\n') : '');
-              if (textToCopy) {
-                navigator.clipboard.writeText(textToCopy);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              }
-            }}
-            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-            title="Copy response"
-          >
-            {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-          </button>
-        </div>
+        <AssistantMessageFooter
+          displayTime={displayTime}
+          rawText={rawText || (msg.thoughts && msg.thoughts.length > 0 ? msg.thoughts.join('\n\n') : '')}
+          hasPrecedingContent={!!(formattedContent || artifacts.length > 0 || editedFilesData.files.length > 0)}
+        />
       )}
 
       {/* 7. Image Lightbox / Fullscreen Overlay on Top Screen */}
-      {lightboxImage && typeof document !== 'undefined' && createPortal(
-        <div 
-          className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-8 select-none animate-in fade-in duration-150"
-          onClick={() => setLightboxImage(null)}
-        >
-          {/* Top Floating Control Bar */}
-          <div 
-            className="absolute top-4 right-4 flex items-center gap-2 z-10"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {lightboxImage.path && onOpenFile && (
-              <button
-                type="button"
-                onClick={() => {
-                  onOpenFile(lightboxImage.path!);
-                  setLightboxImage(null);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium backdrop-blur-md transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
-                title="Open in Right Sidebar Viewer"
-              >
-                <span>Open in Sidebar</span>
-                <ArrowUpRight size={13} />
-              </button>
-            )}
-            <a
-              href={lightboxImage.src}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer shadow-sm"
-              title="Open full resolution in new tab"
-            >
-              <ExternalLink size={15} />
-            </a>
-            <button
-              type="button"
-              onClick={() => setLightboxImage(null)}
-              className="p-2 rounded-full bg-white/15 hover:bg-white/25 text-white/90 hover:text-white transition-colors cursor-pointer shadow-sm"
-              title="Close (Esc or click outside)"
-              aria-label="Close image preview"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Modal Center Image Box */}
-          <div 
-            className="max-w-[94vw] max-h-[88vh] flex flex-col items-center justify-center relative cursor-default"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img 
-              src={lightboxImage.src} 
-              alt={lightboxImage.alt || 'Visual Chart'} 
-              className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl border border-white/10 select-text"
-            />
-            {lightboxImage.alt && (
-              <div className="mt-3 px-4 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-white/90 text-xs font-medium text-center max-w-xl truncate border border-white/10 shadow-lg">
-                {lightboxImage.alt}
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
+      <ImageLightboxModal
+        image={lightboxImage}
+        onClose={() => setLightboxImage(null)}
+        onOpenFile={onOpenFile}
+      />
     </div>
   );
 }, (prev, next) => {
