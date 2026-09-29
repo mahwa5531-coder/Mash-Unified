@@ -40,6 +40,7 @@ import {
   ImageEvidenceLogo,
   MediaEvidenceLogo,
   WebLink,
+  QuotaBanner,
 } from '@/primitives';
 import { TurnFilesGenerated } from '@/features/artifacts';
 
@@ -307,6 +308,8 @@ export default function DesignSystemPreviewPage() {
     { id: '8', title: 'Terminal: python', path: 'terminal', type: 'terminal' as const, icon: <ConsoleTerminalLogo size={14} /> },
   ]);
   const [activeDemoTabId, setActiveDemoTabId] = useState('1');
+  const [quotaBannerOpen, setQuotaBannerOpen] = useState(true);
+  const [quotaBannerVariant, setQuotaBannerVariant] = useState<'warning' | 'danger' | 'info'>('warning');
 
   const toggleTheme = () => {
     const next = !isDark;
@@ -467,14 +470,14 @@ export default function DesignSystemPreviewPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-[var(--m-text-primary)] flex items-center gap-2">
               <span className="w-5 h-5 rounded-md bg-[var(--m-accent-soft)] text-[var(--m-accent)] flex items-center justify-center text-xs font-mono">3</span>
-              <span>Audit Blockquotes vs Inline Badges (`&lt;AuditCallout /&gt;`)</span>
+              <span>Executive Audit Observation Cards (`&lt;AuditCallout /&gt;`) — High Visibility</span>
             </h2>
             <span className="font-mono text-xs text-[var(--m-text-muted)]">`src/primitives/AuditCallout.tsx`</span>
           </div>
 
           <div className="p-5 rounded-xl border border-[var(--m-border)] bg-[var(--m-bg-surface)] space-y-5">
             <div className="text-xs text-[var(--m-text-secondary)] leading-relaxed">
-              <strong className="text-[var(--m-text-primary)]">Why Blockquotes beat Badges for Audit Findings:</strong> In statutory audit (ICFR, CARO 2020, PCAOB), an audit finding is an official observation of record (Condition, Criteria, Cause, Effect). A tiny 10px inline tag minimizes material issues. Callout Blockquotes provide proper visual authority, standard statutory citations, and full explanatory evidence.
+              <strong className="text-[var(--m-text-primary)]">Maximum Authority & Visibility for Audit Findings:</strong> Replaces outdated lopsided 2018 markdown blockquotes with fully rounded executive observation cards. Features severity-calibrated ambient washes, frosted icon anchors, uppercase statutory badges, bold finding headlines, and standard authority section (§) citations.
             </div>
 
             {/* Direct Comparison */}
@@ -493,7 +496,7 @@ export default function DesignSystemPreviewPage() {
               </div>
 
               <div>
-                <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--m-success)] block mb-1.5">✅ After: Authoritative Audit Blockquote</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--m-success)] block mb-1.5">✅ After: Modern Executive Observation Card</span>
                 <AuditCallout
                   status="MATERIAL WEAKNESS"
                   title="Fixed Asset Physical Discrepancy > 10%"
@@ -737,6 +740,103 @@ export default function DesignSystemPreviewPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* UNIT 4C: QuotaBanner Primitive (System & Quota Notifications) */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-[var(--m-text-primary)] flex items-center gap-2">
+              <span className="w-5 h-5 rounded-md bg-[var(--m-accent-soft)] text-[var(--m-accent)] flex items-center justify-center text-xs font-mono">4C</span>
+              <span>Quota & Rate Limit Banners (`&lt;QuotaBanner /&gt;`)</span>
+            </h2>
+            <span className="font-mono text-xs text-[var(--m-text-muted)]">`src/primitives/QuotaBanner.tsx`</span>
+          </div>
+
+          <div className="p-5 rounded-xl border border-[var(--m-border)] bg-[var(--m-bg-surface)] space-y-5">
+            <div className="text-xs text-[var(--m-text-secondary)] leading-relaxed space-y-1">
+              <p>
+                <strong className="text-[var(--m-text-primary)]">Chat UI Location & Trigger:</strong> The Quota Banner is mounted in <code className="bg-zinc-100 dark:bg-white/[0.06] text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-white/[0.08] px-1 py-0.5 rounded font-mono text-[11px]">ChatCanvas.tsx</code> directly above the bottom chat composer dock. It triggers automatically whenever the LLM or gateway returns a 429 rate limit or quota exhaustion event.
+              </p>
+            </div>
+
+            {/* Interactive Control Toolbar */}
+            <div className="flex flex-wrap gap-2.5 items-center p-3 rounded-lg bg-[var(--m-bg-app)] border border-[var(--m-border-subtle)] text-xs">
+              <span className="text-[11px] font-mono text-[var(--m-text-muted)] uppercase tracking-wider mr-1">Controls:</span>
+              <button
+                type="button"
+                onClick={() => setQuotaBannerOpen((v) => !v)}
+                className="px-2.5 py-1 rounded-md border border-[var(--m-border)] bg-[var(--m-bg-surface)] hover:bg-[var(--m-bg-surface-hover)] font-medium cursor-pointer transition-colors"
+              >
+                {quotaBannerOpen ? 'Hide Banner' : 'Show Banner'}
+              </button>
+              <div className="h-4 w-px bg-[var(--m-border)] mx-1" />
+              <button
+                type="button"
+                onClick={() => { setQuotaBannerVariant('warning'); setQuotaBannerOpen(true); }}
+                className={`px-2.5 py-1 rounded-md border text-xs font-medium cursor-pointer transition-colors ${quotaBannerVariant === 'warning' ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-[var(--m-border)] hover:bg-[var(--m-bg-surface)]'}`}
+              >
+                Warning Variant
+              </button>
+              <button
+                type="button"
+                onClick={() => { setQuotaBannerVariant('danger'); setQuotaBannerOpen(true); }}
+                className={`px-2.5 py-1 rounded-md border text-xs font-medium cursor-pointer transition-colors ${quotaBannerVariant === 'danger' ? 'border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400' : 'border-[var(--m-border)] hover:bg-[var(--m-bg-surface)]'}`}
+              >
+                Danger Variant
+              </button>
+              <button
+                type="button"
+                onClick={() => { setQuotaBannerVariant('info'); setQuotaBannerOpen(true); }}
+                className={`px-2.5 py-1 rounded-md border text-xs font-medium cursor-pointer transition-colors ${quotaBannerVariant === 'info' ? 'border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-400' : 'border-[var(--m-border)] hover:bg-[var(--m-bg-surface)]'}`}
+              >
+                Info Variant
+              </button>
+            </div>
+
+            {/* Live Interactive Banner Display */}
+            {quotaBannerOpen ? (
+              <div className="space-y-3">
+                <span className="text-[11px] font-mono text-[var(--m-text-muted)] uppercase tracking-wider block">
+                  Live Interactive Banner Preview (Active Variant: {quotaBannerVariant})
+                </span>
+                <QuotaBanner
+                  open={quotaBannerOpen}
+                  onOpenChange={setQuotaBannerOpen}
+                  variant={quotaBannerVariant}
+                  title={
+                    quotaBannerVariant === 'warning'
+                      ? "Baseline model quota reached"
+                      : quotaBannerVariant === 'danger'
+                      ? "Rate limit exceeded (Cooling Down)"
+                      : "Pro Workspace 1M Token Context Active"
+                  }
+                  description={
+                    quotaBannerVariant === 'warning'
+                      ? "Your plan's baseline quota has been reached for this billing period. To continue running substantive procedures, review your account or upgrade your workspace."
+                      : quotaBannerVariant === 'danger'
+                      ? "Provider API rate limits temporarily triggered. The connector will automatically resume procedure execution in 42 seconds."
+                      : "Extended 1,000,000 token context window enabled for deep multi-year general ledger analysis."
+                  }
+                  actionLabel={
+                    quotaBannerVariant === 'warning'
+                      ? "View Plans"
+                      : quotaBannerVariant === 'danger'
+                      ? "Retry Now"
+                      : "Documentation"
+                  }
+                  onAction={() => setLastClicked(`QuotaBanner: Clicked ${quotaBannerVariant} Action`)}
+                  onDismiss={() => {
+                    setQuotaBannerOpen(false);
+                    setLastClicked('QuotaBanner: Dismissed');
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl border border-dashed border-[var(--m-border)] text-center text-xs text-[var(--m-text-muted)]">
+                Banner is dismissed. Click &quot;Show Banner&quot; above to re-open.
+              </div>
+            )}
           </div>
         </section>
 

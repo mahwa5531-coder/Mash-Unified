@@ -60,54 +60,66 @@ const STATUS_VARIANT_MAP: Record<string, AuditCalloutVariant> = {
 };
 
 const VARIANT_CONFIG: Record<AuditCalloutVariant, {
-  borderColor: string;
-  titleColor: string;
+  containerClass: string;
+  badgeClass: string;
+  iconBoxClass: string;
   iconColor: string;
+  titleColor: string;
   defaultIcon: React.ReactElement;
 }> = {
   danger: {
-    borderColor: 'border-l-[var(--m-danger)]',
-    titleColor: 'text-[var(--m-danger)]',
-    iconColor: 'text-[var(--m-danger)]',
-    defaultIcon: <ShieldAlert size={16} className="shrink-0" />,
+    containerClass: 'bg-rose-50/80 dark:bg-[#1a1114] border-rose-200/90 dark:border-rose-900/50 shadow-[0_1px_3px_rgba(244,63,94,0.06)]',
+    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/25',
+    iconBoxClass: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30',
+    iconColor: 'text-rose-600 dark:text-rose-400',
+    titleColor: 'text-rose-950 dark:text-rose-100',
+    defaultIcon: <ShieldAlert size={14} className="shrink-0" />,
   },
   warning: {
-    borderColor: 'border-l-[var(--m-warning)]',
-    titleColor: 'text-[var(--m-warning)]',
-    iconColor: 'text-[var(--m-warning)]',
-    defaultIcon: <AlertTriangle size={16} className="shrink-0" />,
+    containerClass: 'bg-amber-50/80 dark:bg-[#1a1610] border-amber-200/90 dark:border-amber-900/50 shadow-[0_1px_3px_rgba(245,158,11,0.06)]',
+    badgeClass: 'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/25',
+    iconBoxClass: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    titleColor: 'text-amber-950 dark:text-amber-100',
+    defaultIcon: <AlertTriangle size={14} className="shrink-0" />,
   },
   success: {
-    borderColor: 'border-l-[var(--m-success)]',
-    titleColor: 'text-[var(--m-success)]',
-    iconColor: 'text-[var(--m-success)]',
-    defaultIcon: <CheckCircle2 size={16} className="shrink-0" />,
+    containerClass: 'bg-emerald-50/80 dark:bg-[#101914] border-emerald-200/90 dark:border-emerald-900/50 shadow-[0_1px_3px_rgba(16,185,129,0.06)]',
+    badgeClass: 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/25',
+    iconBoxClass: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    titleColor: 'text-emerald-950 dark:text-emerald-100',
+    defaultIcon: <CheckCircle2 size={14} className="shrink-0" />,
   },
   info: {
-    borderColor: 'border-l-[var(--m-info)]',
-    titleColor: 'text-[var(--m-info)]',
-    iconColor: 'text-[var(--m-info)]',
-    defaultIcon: <Info size={16} className="shrink-0" />,
+    containerClass: 'bg-sky-50/80 dark:bg-[#101620] border-sky-200/90 dark:border-sky-900/50 shadow-[0_1px_3px_rgba(14,165,233,0.06)]',
+    badgeClass: 'bg-sky-500/10 text-sky-800 dark:text-sky-400 border-sky-500/25',
+    iconBoxClass: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30',
+    iconColor: 'text-sky-600 dark:text-sky-400',
+    titleColor: 'text-sky-950 dark:text-sky-100',
+    defaultIcon: <Info size={14} className="shrink-0" />,
   },
   neutral: {
-    borderColor: 'border-l-[var(--m-border-strong)]',
-    titleColor: 'text-[var(--m-text-primary)]',
-    iconColor: 'text-[var(--m-text-secondary)]',
-    defaultIcon: <FileText size={16} className="shrink-0" />,
+    containerClass: 'bg-zinc-50/90 dark:bg-[#141416] border-zinc-200 dark:border-white/[0.08] shadow-xs',
+    badgeClass: 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/20',
+    iconBoxClass: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20',
+    iconColor: 'text-zinc-500 dark:text-zinc-400',
+    titleColor: 'text-zinc-900 dark:text-zinc-100',
+    defaultIcon: <FileText size={14} className="shrink-0" />,
   },
 };
 
 /**
  * AuditCallout Primitive
  * 
- * Replaces miniature status badges with authoritative, full-width callout blockquotes
- * tailored for statutory auditing (ICFR, CARO 2020, PCAOB, SA 315).
+ * Replaces outdated lopsided 2018 blockquotes with authoritative, full-width executive audit observation cards.
+ * Designed specifically for statutory auditing (ICFR, CARO 2020, PCAOB, SA 315).
  * 
  * Features:
- * - 3px semantic left accent border + subtle tinted background
- * - Icon + Status label + Finding Title in header
- * - Primary/Secondary readable prose container
- * - Statutory workpaper citation footer (`— SA 315 / Ind AS 115`)
+ * - Fully rounded-2xl container with high-visibility semantic ambient wash & subtle perimeter border
+ * - Executive header: Frosted icon box + Statutory Status Badge + Crisp Finding Title
+ * - Clear, readable body typography
+ * - Statutory Authority footer bar with section (§) citation
  */
 export function AuditCallout({
   status,
@@ -131,47 +143,68 @@ export function AuditCallout({
   return (
     <blockquote
       className={cn(
-        "my-3.5 pl-4 pr-4 py-3 rounded-r-xl border-l-[3.5px] transition-colors select-text font-sans text-sm",
-        "bg-[var(--m-bg-inset)]",
-        config.borderColor,
+        "my-3.5 p-4 rounded-2xl border transition-all select-text font-sans text-sm",
+        config.containerClass,
         className
       )}
       {...props}
     >
-      {/* Callout Header (Icon + Status + Title) */}
-      {(renderedIcon || status || title) && (
-        <div className="flex items-center gap-2 mb-1.5 font-medium leading-snug">
-          <span className={config.iconColor}>{renderedIcon}</span>
-          
-          {status && (
-            <span className={cn(
-              "font-mono text-[10.5px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded",
-              config.titleColor,
-              "bg-black/5 dark:bg-white/10"
+      {/* Callout Header (Icon + Status Badge + Title + Top Citation if present) */}
+      {(renderedIcon || status || title || cite) && (
+        <div className="flex items-start justify-between gap-3 mb-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+            {/* Frosted Icon Box */}
+            <div className={cn(
+              "w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 shadow-2xs",
+              config.iconBoxClass
             )}>
-              {status}
-            </span>
-          )}
+              {renderedIcon}
+            </div>
+            
+            {/* Status Badge */}
+            {status && (
+              <span className={cn(
+                "font-mono text-[10.5px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-md border shrink-0",
+                config.badgeClass
+              )}>
+                {status}
+              </span>
+            )}
 
-          {title && (
-            <span className="text-xs font-semibold tracking-tight text-[var(--m-text-primary)]">
-              {title}
+            {/* Finding Headline */}
+            {title && (
+              <span className={cn(
+                "text-[13.5px] font-semibold tracking-tight truncate",
+                config.titleColor
+              )}>
+                {title}
+              </span>
+            )}
+          </div>
+
+          {/* Top-Right Citation Tag (Compact Statutory Anchor) */}
+          {cite && (
+            <span className="shrink-0 hidden sm:inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 dark:text-zinc-400 bg-white/70 dark:bg-white/[0.04] px-2 py-0.5 rounded-md border border-zinc-200/70 dark:border-white/[0.06]">
+              <span className="text-zinc-400 dark:text-zinc-500 select-none">§</span>
+              <span>{cite}</span>
             </span>
           )}
         </div>
       )}
 
       {/* Observation Body Prose */}
-      <div className={cn("text-[13px] leading-relaxed text-[var(--m-text-secondary)] [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>p]:my-1")}>
+      <div className={cn(
+        "text-[13.5px] leading-[1.68] text-zinc-700 dark:text-zinc-300 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>p]:my-1.5"
+      )}>
         {children}
       </div>
 
-      {/* Statutory Authority / Citation Footer */}
+      {/* Mobile or Full Statutory Authority Footer */}
       {cite && (
-        <footer className="mt-2 text-xs text-[var(--m-text-muted)] not-italic select-text flex items-center gap-1.5 pt-1.5 border-t border-black/5 dark:border-white/5">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--m-text-muted)]">Authority:</span>
-          <cite className="not-italic font-medium text-[var(--m-text-primary)] font-mono text-[11px]">
-            {cite}
+        <footer className="mt-3 sm:hidden text-xs text-zinc-500 dark:text-zinc-400 not-italic select-text flex items-center gap-1.5 pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Authority:</span>
+          <cite className="not-italic font-medium text-zinc-800 dark:text-zinc-200 font-mono text-[11px]">
+            § {cite}
           </cite>
         </footer>
       )}
