@@ -34,7 +34,7 @@ export function ChatToolbar({
   sessionTitle,
   selectedSessionId,
 }: ChatToolbarProps) {
-  const isProjectSession = Boolean(sessionRepo && sessionRepo !== 'No Repo' && sessionRepo !== 'Mash');
+  const isProjectSession = Boolean(sessionRepo && sessionRepo !== 'No Repo');
   const cleanTitle = selectedSessionId
     ? generateCleanSessionTitle(sessionTitle || '', selectedSessionId)
     : (sessionTitle || 'New Conversation');

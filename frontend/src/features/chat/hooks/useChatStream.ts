@@ -756,8 +756,8 @@ export function useChatStream({ sessionId, sessionRepo, pendingWorkspacePath, on
           },
         },
         {
-          workspace_uri: pendingWorkspacePath || sessionRepo || 'No Repo',
-          working_directory: pendingWorkspacePath || sessionRepo || 'No Repo',
+          workspace_uri: pendingWorkspacePath || (sessionRepo && sessionRepo !== 'No Repo' ? sessionRepo : 'No Repo'),
+          working_directory: pendingWorkspacePath || (sessionRepo && sessionRepo !== 'No Repo' ? sessionRepo : 'No Repo'),
           section: (pendingWorkspacePath || (sessionRepo && sessionRepo !== 'No Repo')) ? 'workspace' : 'conversation',
           // ponytail: only send title on first message of a new session (C-06)
           ...(isNewSession ? { title, custom_title: title } : {}),

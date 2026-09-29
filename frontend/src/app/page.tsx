@@ -98,7 +98,7 @@ export default function Home() {
   const handleSelectSession = useCallback((sessionId: string, title?: string, repoName?: string) => {
     setSelectedSessionId(sessionId);
     if (title) setSelectedSessionTitle(title);
-    if (repoName) setSelectedSessionRepo(repoName);
+    setSelectedSessionRepo(repoName || 'No Repo');
     setPendingWorkspacePath(null);
     setIsHistoryActive(false);
   }, []);
@@ -106,7 +106,7 @@ export default function Home() {
   const handleNewSession = useCallback((repoName: string = 'No Repo', folderPath?: string) => {
     setSelectedSessionId(null);
     setSelectedSessionTitle('New Conversation');
-    setSelectedSessionRepo(repoName);
+    setSelectedSessionRepo(repoName || 'No Repo');
     setPendingWorkspacePath(folderPath || null);
     setIsHistoryActive(false);
   }, []);
@@ -258,9 +258,10 @@ export default function Home() {
                     sessionTitle={selectedSessionTitle}
                     sessionRepo={selectedSessionRepo}
                     pendingWorkspacePath={pendingWorkspacePath}
-                    onSessionCreated={(id, title) => {
+                    onSessionCreated={(id, title, repo) => {
                       setSelectedSessionId(id);
                       if (title) setSelectedSessionTitle(title);
+                      if (repo) setSelectedSessionRepo(repo);
                       setPendingWorkspacePath(null);
                     }}
                     onToggleRightSidebar={() => setIsRightSidebarOpen(prev => !prev)}

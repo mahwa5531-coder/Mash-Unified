@@ -207,10 +207,13 @@ export default function ConversationHistory({
             </div>
           ) : (
             displayedSessions.map((session) => {
-              const isWorkspace = session.section === 'workspace' && session.workspace_uri && session.workspace_uri !== 'No Repo';
-              let repoName = session.workspace_uri || 'No Repo';
-              if (repoName.includes('/') || repoName.includes('\\')) {
-                repoName = repoName.split(/[\\/]/).filter(Boolean).pop() || repoName;
+              const isWorkspace = session.section === 'workspace' && Boolean(session.workspace_uri && session.workspace_uri !== 'No Repo');
+              let repoName = 'No Repo';
+              if (isWorkspace && session.workspace_uri) {
+                repoName = session.workspace_uri;
+                if (repoName.includes('/') || repoName.includes('\\')) {
+                  repoName = repoName.split(/[\\/]/).filter(Boolean).pop() || repoName;
+                }
               }
 
               const cleanTitle = generateCleanSessionTitle(

@@ -235,7 +235,6 @@ export default function Sidebar({
               return {
                 ...s,
                 title: selectedSessionTitle || s.title,
-                workspace_uri: selectedSessionRepo !== undefined ? selectedSessionRepo : s.workspace_uri
               };
             }
             return s;
@@ -269,11 +268,26 @@ export default function Sidebar({
   const handleSessionClick = async (session: SessionItem) => {
     const title = generateCleanSessionTitle(session.custom_title || session.title || '', session.session_id);
     
-    let repo = session.workspace_uri || 'No Repo';
-    if (repo !== 'No Repo' && repo.includes('/')) {
-        repo = repo.split('/').filter(Boolean).pop() || repo;
-    } else if (repo !== 'No Repo' && repo.includes('\\')) {
-        repo = repo.split('\\').filter(Boolean).pop() || repo;
+    // Check if session belongs to a project/workspace
+    const isDirectConversation = session.section === 'conversation' || !session.workspace_uri || session.workspace_uri === 'No Repo';
+    let repo = 'No Repo';
+    if (!isDirectConversation) {
+      const uri = session.workspace_uri;
+      const normUri = uri.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+      const matchedProject = registeredProjects.find(p => {
+        const normPath = p.local_folder_path ? p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() : '';
+        return (
+          normPath === normUri ||
+          p.name.toLowerCase() === uri.toLowerCase() ||
+          normPath.endsWith('/' + uri.toLowerCase()) ||
+          normUri.endsWith('/' + p.name.toLowerCase())
+        );
+      });
+      repo = matchedProject ? matchedProject.name : (
+        uri.includes('/') || uri.includes('\\')
+          ? uri.split(/[/\\]/).filter(Boolean).pop() || uri
+          : uri
+      );
     }
 
     if (selectedSessionId && selectedSessionId !== session.session_id) {
