@@ -19,7 +19,7 @@ import { Message } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
 import { cn } from '@/lib/utils';
-import { FilePill, AuditBadge, WebLink } from '@/primitives';
+import { FilePill, PathPill, ExtensionBadge, AuditBadge, WebLink } from '@/primitives';
 import { ExecutionStatusDisclosure } from './ExecutionStatusDisclosure';
 import { ImageLightboxModal, LightboxImageData } from './ImageLightboxModal';
 import { AssistantMessageFooter } from './AssistantMessageFooter';
@@ -97,6 +97,29 @@ function isFilePathOrName(raw: string): boolean {
   const parts = clean.split(/[/\\]/);
   const filename = parts.pop() || '';
   return FILE_EXT_REGEX.test(clean) && filename.length > 0 && !filename.startsWith('.');
+}
+
+// ponytail: Detect if a string is a standalone file extension (e.g. .xlsx, .pdf, .md, .csv)
+function isFileExtension(raw: string): boolean {
+  if (!raw || typeof raw !== 'string') return false;
+  const clean = raw.trim();
+  return /^\.(xlsx?|xlsm|xlsb|ods|csv|tsv|pdf|docx?|pptx?|py|ipynb|tsx?|jsx?|json|ya?ml|toml|sql|md|markdown|txt|log|xml|xbrl|zip|tar|gz|png|jpe?g|svg)$/i.test(clean);
+}
+
+// ponytail: Detect if a string is a directory or partial folder path (e.g. `workpapers/FY26/`, `src/features/`)
+function isDirectoryPath(raw: string): boolean {
+  if (!raw || typeof raw !== 'string') return false;
+  const clean = raw.trim();
+  if (clean.includes(' ') || clean.includes('\n') || clean.includes('(') || clean.includes(')')) return false;
+  const hasSlash = clean.includes('/') || clean.includes('\\');
+  const endsWithSlash = clean.endsWith('/') || clean.endsWith('\\');
+  const isLikelyFolder = (
+    clean.startsWith('./') ||
+    clean.startsWith('../') ||
+    clean.startsWith('/') ||
+    /^(workpapers|working_papers|audit_deliverables|deliverables|src|features|components|tests|scratch|docs|models|views|controllers)\//i.test(clean)
+  );
+  return (endsWithSlash || isLikelyFolder) && hasSlash && !isFilePathOrName(clean);
 }
 
 // ponytail: Detect full file paths vs bare symbols, functions, half paths, and bare extensions
@@ -299,15 +322,26 @@ const AssistantMessage = memo(function AssistantMessage({
         return children;
       }
 
-      // Check if inline code is a file path or filename -> render as interactive FilePill directly!
       const plainCodeText = (extractChildText(children) || content).trim();
+
+      // 1. Valid file path or filename -> render interactive FilePill
       if (isFilePathOrName(plainCodeText)) {
         return renderFileButton(plainCodeText, plainCodeText, onOpenFile);
       }
 
-      // Inline code (symbols, functions, variables, regex) — distinct highlighted badge
+      // 2. Standalone file extension -> render ExtensionBadge with authentic vector logo
+      if (isFileExtension(plainCodeText)) {
+        return <ExtensionBadge extension={plainCodeText} />;
+      }
+
+      // 3. Directory or partial folder path -> render PathPill
+      if (isDirectoryPath(plainCodeText)) {
+        return <PathPill path={plainCodeText} onOpenFolder={onOpenFile} />;
+      }
+
+      // 4. General inline code (symbols, clauses, parameters) — calm executive neutral (NO jarring yellow/amber)
       return (
-        <code {...props} className="bg-amber-500/10 dark:bg-amber-400/[0.08] text-amber-800 dark:text-amber-200 border border-amber-500/20 dark:border-amber-400/20 px-1.5 py-0.5 mx-0.5 rounded-[5px] font-mono text-[12px] font-medium break-all select-text align-baseline">
+        <code {...props} className="bg-zinc-100 dark:bg-white/[0.06] text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-white/[0.08] px-1.5 py-0.5 mx-0.5 rounded-[4px] font-mono text-[11.5px] font-medium break-all select-text align-baseline">
           {children}
         </code>
       );
