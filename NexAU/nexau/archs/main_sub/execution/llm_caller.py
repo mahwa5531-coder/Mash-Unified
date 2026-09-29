@@ -479,7 +479,7 @@ class LLMCaller:
         self,
         openai_client: Any,
         llm_config: LLMConfig,
-        retry_attempts: int = 5,
+        retry_attempts: int = 6,
         *,
         retry_backoff_max_seconds: int = 30,
         on_retry: OnRetryCallback | None = None,

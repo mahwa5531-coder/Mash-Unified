@@ -118,6 +118,22 @@ function ColorField({
   );
 }
 
+interface AuditSettings {
+  auditorName: string;
+  firmName: string;
+  currency: string;
+  dateFormat: string;
+  autoSaveWorkingPapers: boolean;
+}
+
+const DEFAULT_AUDIT_SETTINGS: AuditSettings = {
+  auditorName: 'Audit Lead',
+  firmName: 'Audit & Assurance Practice',
+  currency: '₹ (INR)',
+  dateFormat: 'DD/MM/YYYY',
+  autoSaveWorkingPapers: true,
+};
+
 export default function SettingsModal({
   isOpen,
   onClose,
@@ -130,6 +146,7 @@ export default function SettingsModal({
   const [mounted, setMounted] = useState(false);
   const [selectedNav, setSelectedNav] = useState<string>(initialTab);
   const [theme, setTheme] = useState<ThemeConfig>(DEFAULT_THEME_CONFIG);
+  const [auditSettings, setAuditSettings] = useState<AuditSettings>(DEFAULT_AUDIT_SETTINGS);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [showAllProjects, setShowAllProjects] = useState(false);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
@@ -168,6 +185,10 @@ export default function SettingsModal({
       if (saved) {
         setTheme(sanitizeThemeConfig(JSON.parse(saved)));
       }
+      const auditSaved = localStorage.getItem('mash_audit_settings');
+      if (auditSaved) {
+        setAuditSettings({ ...DEFAULT_AUDIT_SETTINGS, ...JSON.parse(auditSaved) });
+      }
       const tel = localStorage.getItem('mash_telemetry');
       if (tel !== null) setTelemetryEnabled(tel === 'true');
       const mkt = localStorage.getItem('mash_marketing');
@@ -175,12 +196,22 @@ export default function SettingsModal({
     } catch {}
   }, []);
 
+  const updateAuditSettings = (patch: Partial<AuditSettings>) => {
+    setAuditSettings(prev => {
+      const next = { ...prev, ...patch };
+      try {
+        localStorage.setItem('mash_audit_settings', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
   // When opened, reload real projects, auth info, and reset tab
   useEffect(() => {
     if (isOpen) {
       loadProjects();
       loadAuth();
-      setSelectedNav(initialTab || 'appearance');
+      setSelectedNav(initialTab || 'general');
     }
   }, [isOpen, initialTab]);
 
@@ -348,8 +379,6 @@ export default function SettingsModal({
                 {[
                   { id: 'general', label: 'General' },
                   { id: 'appearance', label: 'Appearance' },
-                  { id: 'application', label: 'Application' },
-                  { id: 'browser', label: 'Browser' },
                 ].map(item => (
                   <button
                     key={item.id}
@@ -794,12 +823,120 @@ export default function SettingsModal({
             </div>
           )}
 
-          {/* OTHER TABS (Fallback for General, Application, Models, etc.) */}
-          {selectedNav !== 'appearance' && selectedNav !== 'account' && !selectedNav.startsWith('project_') && (
+          {/* GENERAL AUDIT SETTINGS TAB */}
+          {selectedNav === 'general' && (
+            <div className="max-w-xl space-y-6">
+              <div>
+                <h2 className="text-[17px] font-semibold text-zinc-900 dark:text-white">General Audit Settings</h2>
+                <p className="text-xs text-zinc-500 dark:text-[#71717a] mt-0.5">
+                  Configure default auditor profile, reporting conventions, and working paper preferences.
+                </p>
+              </div>
+
+              {/* Engagement & Practice Profile */}
+              <div>
+                <h3 className="text-xs font-semibold text-zinc-700 dark:text-zinc-200 mb-2">Practice Profile</h3>
+                <div className="bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl divide-y divide-zinc-200 dark:divide-[#242426]">
+                  <div className="p-3.5 flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium text-zinc-800 dark:text-white">Lead Auditor / Partner</div>
+                      <div className="text-[11px] text-zinc-500 dark:text-[#71717a] mt-0.5">Appears on generated memos, review notes, and working papers</div>
+                    </div>
+                    <input
+                      type="text"
+                      value={auditSettings.auditorName}
+                      onChange={(e) => updateAuditSettings({ auditorName: e.target.value })}
+                      className="px-2.5 py-1 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#141416] text-zinc-900 dark:text-white w-48 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="p-3.5 flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium text-zinc-800 dark:text-white">Firm / Practice Name</div>
+                      <div className="text-[11px] text-zinc-500 dark:text-[#71717a] mt-0.5">Header brand for audit deliverables and reports</div>
+                    </div>
+                    <input
+                      type="text"
+                      value={auditSettings.firmName}
+                      onChange={(e) => updateAuditSettings({ firmName: e.target.value })}
+                      className="px-2.5 py-1 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#141416] text-zinc-900 dark:text-white w-48 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Accounting Conventions */}
+              <div>
+                <h3 className="text-xs font-semibold text-zinc-700 dark:text-zinc-200 mb-2">Conventions</h3>
+                <div className="bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl divide-y divide-zinc-200 dark:divide-[#242426]">
+                  <div className="p-3.5 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-xs font-medium text-zinc-800 dark:text-white">Default Currency</div>
+                      <div className="text-[11px] text-zinc-500 dark:text-[#71717a] mt-0.5">Currency symbol used in schedules and calculations</div>
+                    </div>
+                    <select
+                      value={auditSettings.currency}
+                      onChange={(e) => updateAuditSettings({ currency: e.target.value })}
+                      className="px-2.5 py-1 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#141416] text-zinc-900 dark:text-white outline-none cursor-pointer"
+                    >
+                      <option value="₹ (INR)">₹ (INR)</option>
+                      <option value="$ (USD)">$ (USD)</option>
+                      <option value="€ (EUR)">€ (EUR)</option>
+                      <option value="£ (GBP)">£ (GBP)</option>
+                      <option value="¥ (JPY)">¥ (JPY)</option>
+                      <option value="C$ (CAD)">C$ (CAD)</option>
+                      <option value="A$ (AUD)">A$ (AUD)</option>
+                    </select>
+                  </div>
+
+                  <div className="p-3.5 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-xs font-medium text-zinc-800 dark:text-white">Date Format</div>
+                      <div className="text-[11px] text-zinc-500 dark:text-[#71717a] mt-0.5">Standard format across all audit exhibits</div>
+                    </div>
+                    <select
+                      value={auditSettings.dateFormat}
+                      onChange={(e) => updateAuditSettings({ dateFormat: e.target.value })}
+                      className="px-2.5 py-1 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#141416] text-zinc-900 dark:text-white outline-none cursor-pointer"
+                    >
+                      <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                      <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                      <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                    </select>
+                  </div>
+
+                  <div className="p-3.5 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-xs font-medium text-zinc-800 dark:text-white">Auto-save Working Papers</div>
+                      <div className="text-[11px] text-zinc-500 dark:text-[#71717a] mt-0.5">Automatically sync changes to local workspace folder</div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={auditSettings.autoSaveWorkingPapers}
+                      onClick={() => updateAuditSettings({ autoSaveWorkingPapers: !auditSettings.autoSaveWorkingPapers })}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        auditSettings.autoSaveWorkingPapers ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-700'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          auditSettings.autoSaveWorkingPapers ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* OTHER TABS (Fallback for Shortcuts, etc.) */}
+          {selectedNav !== 'appearance' && selectedNav !== 'account' && selectedNav !== 'general' && !selectedNav.startsWith('project_') && (
             <div className="max-w-xl space-y-4">
-              <h2 className="text-[18px] font-semibold text-white capitalize">{selectedNav}</h2>
-              <div className="bg-[#18181b] border border-[#27272a] rounded-xl p-4 text-xs text-zinc-400 leading-relaxed">
-                Settings and configurations for <span className="text-white font-medium capitalize">{selectedNav}</span> are loaded according to your active workspace preferences.
+              <h2 className="text-[18px] font-semibold text-zinc-900 dark:text-white capitalize">{selectedNav}</h2>
+              <div className="bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-4 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                Settings and configurations for <span className="text-zinc-900 dark:text-white font-medium capitalize">{selectedNav}</span> are loaded according to your active workspace preferences.
               </div>
             </div>
           )}

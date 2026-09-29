@@ -41,15 +41,9 @@ export default function FilesChangedDrawer({
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center gap-1.5 cursor-pointer text-[13px]"
         >
-          <span className="text-zinc-600 dark:text-zinc-400 font-normal">
-            {count} file{count > 1 ? 's' : ''} changed
+          <span className="text-zinc-700 dark:text-zinc-300 font-medium">
+            {count} working paper{count > 1 ? 's' : ''} updated
           </span>
-          {totalAdded > 0 && (
-            <span className="text-[#34d399] font-normal ml-0.5">+{totalAdded}</span>
-          )}
-          {totalDeleted > 0 && (
-            <span className="text-[#f87171] font-normal ml-0.5">-{totalDeleted}</span>
-          )}
           <ChevronDown 
             size={13} 
             className={cn("text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-transform duration-200 ml-0.5", !isOpen && "-rotate-90")} 
@@ -65,10 +59,10 @@ export default function FilesChangedDrawer({
             }
           }}
           className="flex items-center gap-1.5 px-2.5 py-[3.5px] bg-white hover:bg-zinc-100 dark:bg-[#1a1a1c] dark:hover:bg-[#242428] border border-zinc-200 hover:border-zinc-300 dark:border-white/[0.08] dark:hover:border-white/[0.16] rounded-lg text-[12px] font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-all cursor-pointer shadow-xs"
-          title="Review changed files"
+          title="Open working paper"
         >
           <FileText size={12.5} className="text-zinc-500 dark:text-zinc-400" />
-          <span>Review</span>
+          <span>Open</span>
         </button>
       </div>
 

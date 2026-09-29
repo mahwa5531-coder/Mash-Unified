@@ -60,16 +60,39 @@ export async function streamQuery(
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${BASE_URL}/stream`, {
-      method: "POST",
-      headers,
-      signal,
-      body: JSON.stringify({
-        session_id: sessionId,
-        messages: userMessage,
-        context: context || {},
-      }),
-    });
+    let response: Response | null = null;
+    const MAX_CONNECT_ATTEMPTS = 6;
+    for (let attempt = 1; attempt <= MAX_CONNECT_ATTEMPTS; attempt++) {
+      if (signal?.aborted) return;
+      try {
+        response = await fetch(`${BASE_URL}/stream`, {
+          method: "POST",
+          headers,
+          signal,
+          body: JSON.stringify({
+            session_id: sessionId,
+            messages: userMessage,
+            context: context || {},
+          }),
+        });
+        if (response.ok) break;
+        if (response.status >= 500 && attempt < MAX_CONNECT_ATTEMPTS) {
+          const backoff = Math.min(1000 * Math.pow(1.5, attempt), 8000);
+          await new Promise((r) => setTimeout(r, backoff));
+          continue;
+        }
+        break;
+      } catch (fetchErr: any) {
+        if (signal?.aborted) return;
+        if (attempt === MAX_CONNECT_ATTEMPTS) {
+          throw fetchErr;
+        }
+        const backoff = Math.min(1000 * Math.pow(1.5, attempt), 8000);
+        await new Promise((r) => setTimeout(r, backoff));
+      }
+    }
+
+    if (!response) return;
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
