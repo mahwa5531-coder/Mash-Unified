@@ -72,7 +72,7 @@ def _build_agent_config() -> AgentConfig:
     vault = load_secure_vault() or {}
 
     custom_base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("LLM_BASE_URL")
-    custom_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("OPENROUTER_API_KEY")
+    custom_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("NVIDIA_API_KEY") or os.getenv("OPENROUTER_API_KEY")
     custom_model = os.getenv("OPENAI_MODEL") or os.getenv("LLM_MODEL")
 
     active_key = (
