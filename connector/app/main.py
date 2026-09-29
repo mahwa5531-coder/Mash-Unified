@@ -108,6 +108,7 @@ def _build_agent_config() -> AgentConfig:
     agent_config.llm_config = LLMConfig(
         api_type=active_api_type,
         model=active_model,
+        base_url=default_base_url,
         api_key=active_key,
         max_tokens=(
             int(os.getenv("LLM_MAX_TOKENS"))
