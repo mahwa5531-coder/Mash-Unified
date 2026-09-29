@@ -334,9 +334,9 @@ const AssistantMessage = memo(function AssistantMessage({
         return <ExtensionBadge extension={plainCodeText} />;
       }
 
-      // 3. Directory or partial folder path -> render PathPill
+      // 3. Directory or partial folder path -> render PathPill (strictly static/non-clickable)
       if (isDirectoryPath(plainCodeText)) {
-        return <PathPill path={plainCodeText} onOpenFolder={onOpenFile} />;
+        return <PathPill path={plainCodeText} />;
       }
 
       // 4. General inline code (symbols, clauses, parameters) — calm executive neutral (NO jarring yellow/amber)

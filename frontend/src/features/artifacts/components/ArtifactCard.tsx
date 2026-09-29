@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, FileText, Check, FileSpreadsheet, Image as ImageIcon, ArrowUpRight, Download } from 'lucide-react';
 import { ArtifactItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
+import { WorkingPaperCard } from '@/primitives/WorkingPaperCard';
 
 export type { ArtifactItem } from '@/types/artifacts';
 
@@ -120,6 +121,42 @@ export default function ArtifactCard({
     return <span className="text-[10px] uppercase font-mono tracking-wider px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20">Document</span>;
   };
 
+  // For Markdown deliverables, Memos, Plans, and Walkthroughs: render sleek WorkingPaperCard (<> Title)
+  if (!isExcel && !isChart) {
+    const actionSlot = isPlan ? (
+      <div>
+        {shouldShowProceed ? (
+          <button
+            type="button"
+            onClick={handleProceedClick}
+            disabled={isStreaming}
+            className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1a73e8] hover:bg-[#1557b0] active:bg-[#174ea6] text-white text-xs font-medium rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 select-none"
+            title="Proceed with the implementation plan (Ctrl+Enter)"
+          >
+            <span>Proceed</span>
+            <span className="text-[10px] text-blue-100/80 font-mono tracking-tight ml-0.5">Ctrl+↵</span>
+          </button>
+        ) : isPlanImplemented ? (
+          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-md text-[11px] font-medium select-none">
+            <Check size={11} className="shrink-0" />
+            <span>Implemented</span>
+          </div>
+        ) : null}
+      </div>
+    ) : undefined;
+
+    return (
+      <WorkingPaperCard
+        filePath={artifact.filePath}
+        title={artifact.title}
+        summary={artifact.summary}
+        type={artifact.type}
+        onOpen={onOpen}
+        action={actionSlot}
+      />
+    );
+  }
+
   return (
     <div 
       onClick={() => onOpen(artifact.filePath)}
@@ -154,28 +191,6 @@ export default function ArtifactCard({
           >
             <Download size={14} />
           </a>
-        )}
-
-        {isPlan && (
-          <div>
-            {shouldShowProceed ? (
-              <button
-                type="button"
-                onClick={handleProceedClick}
-                disabled={isStreaming}
-                className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1a73e8] hover:bg-[#1557b0] active:bg-[#174ea6] text-white text-xs font-medium rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 select-none"
-                title="Proceed with the implementation plan (Ctrl+Enter)"
-              >
-                <span>Proceed</span>
-                <span className="text-[10px] text-blue-100/80 font-mono tracking-tight ml-0.5">Ctrl+↵</span>
-              </button>
-            ) : isPlanImplemented ? (
-              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-md text-[11px] font-medium select-none">
-                <Check size={11} className="shrink-0" />
-                <span>Implemented</span>
-              </div>
-            ) : null}
-          </div>
         )}
       </div>
     </div>

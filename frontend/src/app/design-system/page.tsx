@@ -599,35 +599,35 @@ export default function DesignSystemPreviewPage() {
                 1. Standalone Extension Badges (`&lt;ExtensionBadge /&gt;`)
               </span>
               <p className="text-[12px] text-[var(--m-text-secondary)]">
-                Eliminates raw code tags and replaces them with authentic vector logos in domain-appropriate, restrained tints (Emerald for Excel, Crimson for PDF, Sky for Markdown).
+                Static ghost badges for file formats (`.xlsx`, `.pdf`, `.md`). Logos and cursor glow removed for a clean, non-distracting monochrome audit appearance.
               </p>
               <div className="flex flex-wrap gap-2 items-center p-3 rounded-lg bg-[var(--m-bg-app)] border border-[var(--m-border-subtle)]">
-                <ExtensionBadge extension=".xlsx" onClick={() => setLastClicked('Extension: .xlsx')} />
-                <ExtensionBadge extension=".pdf" onClick={() => setLastClicked('Extension: .pdf')} />
-                <ExtensionBadge extension=".csv" onClick={() => setLastClicked('Extension: .csv')} />
-                <ExtensionBadge extension=".docx" onClick={() => setLastClicked('Extension: .docx')} />
-                <ExtensionBadge extension=".md" onClick={() => setLastClicked('Extension: .md')} />
-                <ExtensionBadge extension=".py" onClick={() => setLastClicked('Extension: .py')} />
-                <ExtensionBadge extension=".sql" onClick={() => setLastClicked('Extension: .sql')} />
-                <ExtensionBadge extension=".json" onClick={() => setLastClicked('Extension: .json')} />
-                <ExtensionBadge extension=".zip" onClick={() => setLastClicked('Extension: .zip')} />
+                <ExtensionBadge extension=".xlsx" />
+                <ExtensionBadge extension=".pdf" />
+                <ExtensionBadge extension=".csv" />
+                <ExtensionBadge extension=".docx" />
+                <ExtensionBadge extension=".md" />
+                <ExtensionBadge extension=".py" />
+                <ExtensionBadge extension=".sql" />
+                <ExtensionBadge extension=".json" />
+                <ExtensionBadge extension=".zip" />
               </div>
             </div>
 
             {/* 2. Directory / Partial Path Pills */}
             <div className="space-y-2">
               <span className="text-xs font-mono uppercase tracking-wider text-[var(--m-text-muted)] block">
-                2. Directory & Partial Path Pills (`&lt;PathPill /&gt;`)
+                2. Directory & Partial Path Pills (`&lt;PathPill /&gt;`) — Strictly Static
               </span>
               <p className="text-[12px] text-[var(--m-text-secondary)]">
-                Renders workspace folders and directories cleanly with subtle folder icons instead of dumping unformatted text into bright yellow code tags.
+                Renders workspace folders and directories cleanly. <strong className="text-[var(--m-text-primary)]">Strictly non-clickable</strong>: only files with complete paths and links are interactive, eliminating false click targets.
               </p>
               <div className="flex flex-wrap gap-2 items-center p-3 rounded-lg bg-[var(--m-bg-app)] border border-[var(--m-border-subtle)]">
-                <PathPill path="workpapers/FY26/" onOpenFolder={(p) => setLastClicked(`Folder: ${p}`)} />
-                <PathPill path="Audit_Deliverables/CARO_2020/" onOpenFolder={(p) => setLastClicked(`Folder: ${p}`)} />
-                <PathPill path="procedures/statutory_vouching/" onOpenFolder={(p) => setLastClicked(`Folder: ${p}`)} />
-                <PathPill path="evidence/bank_confirmations/" onOpenFolder={(p) => setLastClicked(`Folder: ${p}`)} />
-                <PathPill path="src/primitives/" onOpenFolder={(p) => setLastClicked(`Folder: ${p}`)} />
+                <PathPill path="workpapers/FY26/" />
+                <PathPill path="Audit_Deliverables/CARO_2020/" />
+                <PathPill path="procedures/statutory_vouching/" />
+                <PathPill path="evidence/bank_confirmations/" />
+                <PathPill path="src/primitives/" />
               </div>
             </div>
 
