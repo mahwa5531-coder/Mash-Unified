@@ -8,9 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import FileIcon from '@/components/renderers/FileIcon';
 import { FilePill } from '@/primitives';
-import { renderOutputWithLinks } from './FilePill';
+import { renderOutputWithLinks } from './fileLinkRenderer';
 import { formatDurationDisplay, isToolRunning } from './toolTimeline';
 import type { TimelineEntry } from './types';
 

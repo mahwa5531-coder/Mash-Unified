@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { ChevronDown, FileText } from 'lucide-react';
-import FileIcon from '@/components/renderers/FileIcon';
+import { FileIcon } from '@/primitives/FileIcon';
 import { cn } from '@/lib/utils';
 import { EditedFileItem } from '@/types/artifacts';
 

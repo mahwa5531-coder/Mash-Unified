@@ -11,7 +11,6 @@ import katex from 'katex';
 import TaskWorkLogAccordion from '@/features/chat/components/TaskWorkLogAccordion';
 import ArtifactCard from '@/features/artifacts/components/ArtifactCard';
 import FilesChangedDrawer from '@/features/artifacts/components/FilesChangedDrawer';
-import FileIcon from '@/components/renderers/FileIcon';
 import CodeBlock from '@/components/renderers/CodeBlock';
 import CalloutBlockquote from '@/components/renderers/CalloutBlockquote';
 import TableContainer from '@/components/renderers/TableContainer';
