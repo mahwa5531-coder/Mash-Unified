@@ -3,6 +3,7 @@ export * from './AuditBadge';
 export * from './FilePill';
 export * from './PathPill';
 export * from './ExtensionBadge';
+export * from './WorkingPaperCard';
 export * from './AuditCallout';
 export * from './FileTab';
 export * from './FileTabStrip';

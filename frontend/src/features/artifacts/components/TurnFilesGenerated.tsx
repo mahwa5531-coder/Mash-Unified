@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { ChevronDown, FileText } from 'lucide-react';
-import { FileIcon } from '@/primitives/FileIcon';
+import { FilePill } from '@/primitives/FilePill';
 import { cn } from '@/lib/utils';
 import { EditedFileItem } from '@/types/artifacts';
 
@@ -20,6 +20,7 @@ interface TurnFilesGeneratedProps {
  * TurnFilesGenerated
  * 
  * Displays files created, generated, or modified in the current assistant turn.
+ * Features full-width clickable rows, unified FilePills, and ghost folder paths.
  * Rendered inline right before the turn footer for quick inspection.
  */
 export function TurnFilesGenerated({
@@ -64,16 +65,16 @@ export function TurnFilesGenerated({
             }
           }}
           className="flex items-center gap-1.5 px-2.5 py-[3.5px] bg-white hover:bg-zinc-100 dark:bg-[#1a1a1c] dark:hover:bg-[#242428] border border-zinc-200 hover:border-zinc-300 dark:border-white/[0.08] dark:hover:border-white/[0.16] rounded-lg text-[12px] font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-all cursor-pointer shadow-xs"
-          title="Open generated file"
+          title="Open first generated file"
         >
           <FileText size={12.5} className="text-zinc-500 dark:text-zinc-400" />
           <span>Open</span>
         </button>
       </div>
 
-      {/* Expanded File List */}
+      {/* Expanded File List - Entire Row is Clickable */}
       {isOpen && (
-        <div className="flex flex-col gap-1.5 mt-3 pt-0.5">
+        <div className="flex flex-col gap-1 mt-2.5 pt-0.5">
           {files.map((file, idx) => {
             const rawDir = file.dir || '';
             const cleanDir = rawDir
@@ -81,34 +82,37 @@ export function TurnFilesGenerated({
               : '';
 
             return (
-              <div
+              <button
                 key={file.path || idx}
+                type="button"
                 onClick={() => onOpenFile?.(file.path)}
-                className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-zinc-200/50 dark:hover:bg-white/[0.04] cursor-pointer group select-none transition-colors"
-                title={`Open ${file.path}`}
+                className="w-full text-left flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-zinc-200/50 dark:hover:bg-white/[0.04] cursor-pointer group select-none transition-colors outline-none focus-visible:ring-1 focus-visible:ring-zinc-400"
+                title={`Click anywhere to open ${file.path}`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <FileIcon 
-                    filename={file.filename} 
-                    size={15} 
-                    className="opacity-70 group-hover:opacity-100 transition-opacity duration-150" 
+                  {/* Canonical FilePill */}
+                  <FilePill 
+                    path={file.path} 
+                    label={file.filename} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenFile?.(file.path);
+                    }} 
                   />
-                  <span className="text-[13px] font-normal text-zinc-700 group-hover:text-zinc-950 dark:text-zinc-300 dark:group-hover:text-white transition-colors duration-150 truncate">
-                    {file.filename}
-                  </span>
+                  {/* Ghost Folder Directory Path - Decreased Size & Calm Tone */}
                   {cleanDir && (
-                    <span className="text-[12px] text-zinc-400 dark:text-zinc-500 font-sans transition-colors duration-150 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 truncate ml-1">
+                    <span className="text-[10.5px] font-mono text-zinc-400/80 dark:text-zinc-500/70 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 transition-colors truncate">
                       {cleanDir}
                     </span>
                   )}
                 </div>
 
                 {file.addedLines !== undefined && file.addedLines > 0 && (
-                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 shrink-0 ml-2">
+                  <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 shrink-0 ml-2">
                     +{file.addedLines}
                   </span>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>

@@ -14,6 +14,7 @@ import {
   FilePill, 
   PathPill,
   ExtensionBadge,
+  WorkingPaperCard,
   AuditCallout, 
   FileTab, 
   FileTabStrip,
@@ -630,10 +631,48 @@ export default function DesignSystemPreviewPage() {
               </div>
             </div>
 
-            {/* 3. TurnFilesGenerated Component */}
+            {/* 3. Created .md Deliverables & Working Paper Cards (Rendered Before TurnFilesGenerated) */}
             <div className="space-y-2">
               <span className="text-xs font-mono uppercase tracking-wider text-[var(--m-text-muted)] block">
-                3. Files Generated at End of Turn (`&lt;TurnFilesGenerated /&gt;`)
+                3. Created .md Deliverables & Working Paper Cards (`&lt;WorkingPaperCard /&gt;`)
+              </span>
+              <p className="text-[12px] text-[var(--m-text-secondary)]">
+                Rendered at the end of an audit procedure turn, <em>immediately before</em> the files generated section. Presents working paper memos, substantive schedules, and walkthroughs with humanized titles, executive findings, and sign-off status.
+              </p>
+              <div className="p-3 rounded-lg bg-[var(--m-bg-app)] border border-[var(--m-border-subtle)] space-y-2">
+                <WorkingPaperCard
+                  title="Revenue Recognition Testing Memo (Ind AS 115)"
+                  filePath="Audit_Deliverables/Revenue_Recognition_Memo.md"
+                  summary="Substantive testing of 45 high-value customer contracts; verified 5-step performance obligation satisfaction and accrued rebates."
+                  type="memo"
+                  status="ready_for_review"
+                  onOpen={(p) => setLastClicked(`Review Working Paper: ${p}`)}
+                />
+
+                <WorkingPaperCard
+                  title="Procure-to-Pay ICFR Walkthrough Documentation"
+                  filePath="Audit_Deliverables/Controls_Walkthrough_P2P.md"
+                  summary="End-to-end testing of 3-way matching controls between purchase orders, goods receipt notes, and vendor tax invoices."
+                  type="walkthrough"
+                  status="ready_for_review"
+                  onOpen={(p) => setLastClicked(`Review Walkthrough: ${p}`)}
+                />
+
+                <WorkingPaperCard
+                  title="Trade Payables Substantive Verification Schedule"
+                  filePath="workpapers/Trade_Payables_Substantive_Testing.xlsx"
+                  summary="100% sampling of balances exceeding materiality threshold (₹10 Lakhs); circularization confirmations reconciled."
+                  type="schedule"
+                  status="signed_off"
+                  onOpen={(p) => setLastClicked(`Review Schedule: ${p}`)}
+                />
+              </div>
+            </div>
+
+            {/* 4. TurnFilesGenerated Component */}
+            <div className="space-y-2">
+              <span className="text-xs font-mono uppercase tracking-wider text-[var(--m-text-muted)] block">
+                4. Files Generated at End of Turn (`&lt;TurnFilesGenerated /&gt;`)
               </span>
               <p className="text-[12px] text-[var(--m-text-secondary)]">
                 Rendered at the end of an assistant turn right before the footer. Displays files produced or updated in that procedure, complete with authentic vector logos and one-click &quot;Open&quot; action into the side viewer.
@@ -664,10 +703,10 @@ export default function DesignSystemPreviewPage() {
               </div>
             </div>
 
-            {/* 4. Color Grading: Calm Executive Neutral vs Old False-Alarm Yellow */}
+            {/* 5. Color Grading: Calm Executive Neutral vs Old False-Alarm Yellow */}
             <div className="space-y-2 pt-1 border-t border-[var(--m-border-subtle)]">
               <span className="text-xs font-mono uppercase tracking-wider text-[var(--m-text-muted)] block">
-                4. Audit Color Grading: Calm Executive Neutral vs Old False-Alarm Amber
+                5. Audit Color Grading: Calm Executive Neutral vs Old False-Alarm Amber
               </span>
               <p className="text-[12px] text-[var(--m-text-secondary)]">
                 In auditing, amber/yellow signals <strong className="text-amber-500 font-medium">CAUTION / RISK / DEFICIENCY</strong>. Neutral parameters and code tokens are now rendered in crisp neutral zinc to eliminate false alarms:
