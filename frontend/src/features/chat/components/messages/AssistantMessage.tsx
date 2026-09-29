@@ -10,7 +10,7 @@ import rehypeKatex from 'rehype-katex';
 import katex from 'katex';
 import TaskWorkLogAccordion from '@/features/chat/components/TaskWorkLogAccordion';
 import ArtifactCard from '@/features/artifacts/components/ArtifactCard';
-import FilesChangedDrawer from '@/features/artifacts/components/FilesChangedDrawer';
+import { TurnFilesGenerated } from '@/features/artifacts';
 import CodeBlock from '@/components/renderers/CodeBlock';
 import CalloutBlockquote from '@/components/renderers/CalloutBlockquote';
 import TableContainer from '@/components/renderers/TableContainer';
@@ -19,7 +19,7 @@ import { Message } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
 import { cn } from '@/lib/utils';
-import { FilePill } from '@/primitives';
+import { FilePill, AuditBadge } from '@/primitives';
 import { ExecutionStatusDisclosure } from './ExecutionStatusDisclosure';
 import { ImageLightboxModal, LightboxImageData } from './ImageLightboxModal';
 import { AssistantMessageFooter } from './AssistantMessageFooter';
@@ -116,24 +116,6 @@ function renderFileButton(filePath: string, label?: string, onOpenFile?: (p: str
   );
 }
 
-const BADGE_STYLES: Record<string, string> = {
-  COMPLIANT: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  'NO EXCEPTION': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  'NO EXCEPTION NOTED': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  PASS: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  EXCEPTION: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-  'MATERIAL WEAKNESS': 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-  FAIL: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-  'SIGNIFICANT DEFICIENCY': 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  'CONTROL DEFICIENCY': 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20',
-  'HIGH RISK': 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  'MEDIUM RISK': 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700/50',
-  'LOW RISK': 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700/50',
-  NOTE: 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700/50',
-  WARNING: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  CAUTION: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
-};
-
 const STATUS_TAG_REGEX = /(\[(?:COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\])/g;
 const FILE_PATH_IN_PROSE_REGEX = /((?:file:\/\/\/?|[a-zA-Z]:[/\\]|\/(?:Users|home|tmp)\/|(?:scratch|tests|django|frontend|connector|src)\/)[^\s'",;()<>]+\.(?:py|tsx?|jsx?|mjs|json|ya?ml|toml|sql|csv|xlsx?|md|txt|diff|patch|html|css|log)(?:#L\d+(?:-\d+)?)?)/gi;
 
@@ -144,14 +126,10 @@ function processTextNodesForBadges(children: any, onOpenFile?: (path: string) =>
       const match = part.match(/^\[(COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\]$/);
       if (match) {
         const tag = match[1];
-        const style = BADGE_STYLES[tag] || 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700';
         return (
-          <span
-            key={`tag_${idx}`}
-            className={`inline-flex items-center px-1.5 py-0.2 mx-1 rounded-[4px] text-[10.5px] font-mono font-medium tracking-tight border select-none align-baseline ${style}`}
-          >
+          <AuditBadge key={`tag_${idx}`} status={tag}>
             {tag}
-          </span>
+          </AuditBadge>
         );
       }
 
@@ -493,9 +471,9 @@ const AssistantMessage = memo(function AssistantMessage({
         </div>
       )}
 
-      {/* 6. Files Changed Drawer (Antigravity-style collapsible edited files list) */}
+      {/* 6. Files Generated in this turn */}
       {editedFilesData.files.length > 0 && (
-        <FilesChangedDrawer
+        <TurnFilesGenerated
           files={editedFilesData.files}
           totalAdded={editedFilesData.totalAdded}
           totalDeleted={editedFilesData.totalDeleted}

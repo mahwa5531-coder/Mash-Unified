@@ -181,11 +181,7 @@ export function extractEditedFiles(msg: Message): {
 
       const shouldExclude = (p: string) => {
         const lower = p.toLowerCase().replace(/\\/g, '/');
-        // Ignore all doc artifacts as they appear in ArtifactCards at the bottom of the turn
-        if (lower.endsWith('.md')) {
-          return true;
-        }
-        // Exclude scratch scripts and internal agent directories from git-like files changed drawer
+        // Exclude internal agent directories and scratch/temp paths
         return (
           lower.includes('/scratch/') ||
           lower.startsWith('scratch/') ||
