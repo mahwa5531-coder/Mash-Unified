@@ -241,6 +241,9 @@ export default function TaskWorkLogAccordion({
 
   // 1. While actively streaming: render timeline steps + dynamic animated "Working..." or "Thinking for Xs..."
   if (isStreaming) {
+    const isActivelyThinkingNow = isActivelyThinking || (activeThinkingStep !== null);
+    const activeTool = tools.find(t => isToolRunning(t)) || (steps ? steps.find((s: any) => s.type === 'tool' && s.status === 'running') : null);
+
     return (
       <div className="w-full min-w-0 text-[13px] font-sans my-1 select-none">
         {groupedTimeline.length > 0 && (
@@ -248,7 +251,7 @@ export default function TaskWorkLogAccordion({
             {groupedTimeline.map((entry) => renderTimelineRow(entry, false))}
           </div>
         )}
-        {isActivelyThinking && !groupedTimeline.some(e => e.type === 'thought') ? (
+        {isActivelyThinkingNow && !groupedTimeline.some(e => e.type === 'thought') ? (
           <div className="flex items-center gap-1.5 text-xs text-foreground font-sans py-0.5">
             <Loader2 size={11} className="animate-spin text-sky-500 shrink-0" />
             <span>Thinking for {formatDurationDisplay(liveThinkingSeconds)}</span>
@@ -258,8 +261,19 @@ export default function TaskWorkLogAccordion({
               <span>.</span>
             </span>
           </div>
-        ) : !isActivelyThinking && groupedTimeline.length === 0 ? (
+        ) : activeTool ? (
+          <div className="flex items-center gap-1.5 text-xs text-sky-500 dark:text-sky-400 font-sans py-0.5">
+            <Loader2 size={11} className="animate-spin shrink-0" />
+            <span>Running {activeTool.name || 'tool'}</span>
+            <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
+              <span>.</span>
+              <span>.</span>
+              <span>.</span>
+            </span>
+          </div>
+        ) : !hasAssistantContent ? (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-sans py-0.5">
+            <Loader2 size={11} className="animate-spin text-zinc-400 shrink-0" />
             <span className="inline-flex items-center text-muted-foreground">
               <span>Working</span>
               <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
