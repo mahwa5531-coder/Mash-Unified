@@ -11,6 +11,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { generateCleanSessionTitle } from '@/utils/sessionTitle';
 
 interface ChatToolbarProps {
   isSidebarOpen: boolean;
@@ -33,6 +34,11 @@ export function ChatToolbar({
   sessionTitle,
   selectedSessionId,
 }: ChatToolbarProps) {
+  const isProjectSession = Boolean(sessionRepo && sessionRepo !== 'No Repo' && sessionRepo !== 'Mash');
+  const cleanTitle = selectedSessionId
+    ? generateCleanSessionTitle(sessionTitle || '', selectedSessionId)
+    : (sessionTitle || 'New Conversation');
+
   return (
     <div className="h-9 bg-[#121214] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center justify-between px-3 select-none shrink-0 z-40 transition-all">
                 <div className="flex items-center h-full min-w-0 flex-1">
@@ -57,28 +63,38 @@ export function ChatToolbar({
                   <div className="flex items-center min-w-0 flex-1 pl-1">
                     <Breadcrumb className="min-w-0">
                       <BreadcrumbList className="gap-1.5 sm:gap-2 flex-nowrap overflow-hidden">
-                        <BreadcrumbItem className="shrink-0">
-                          <span className="text-zinc-400 font-normal text-xs">
-                            {sessionRepo && sessionRepo !== 'No Repo' ? sessionRepo : 'Mash'}
-                          </span>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator className="shrink-0 text-zinc-600" />
-                        <BreadcrumbItem className="min-w-0">
-                          {isHistoryActive ? (
+                        {isHistoryActive ? (
+                          <BreadcrumbItem className="min-w-0">
                             <BreadcrumbPage className="font-medium text-xs text-zinc-200 truncate">
                               History
                             </BreadcrumbPage>
-                          ) : !selectedSessionId ? (
-                            <BreadcrumbPage className="font-medium text-xs text-zinc-200 flex items-center gap-1.5 truncate">
-                              <Sparkles size={11} className="text-sky-400 shrink-0" />
-                              <span className="truncate">New Conversation</span>
-                            </BreadcrumbPage>
-                          ) : (
-                            <BreadcrumbPage className="font-medium text-xs text-zinc-200 truncate max-w-[280px] sm:max-w-[450px]">
-                              {sessionTitle || `Session ${selectedSessionId.slice(0, 8)}`}
-                            </BreadcrumbPage>
-                          )}
-                        </BreadcrumbItem>
+                          </BreadcrumbItem>
+                        ) : (
+                          <>
+                            {isProjectSession && (
+                              <>
+                                <BreadcrumbItem className="shrink-0">
+                                  <span className="text-zinc-400 font-normal text-xs">
+                                    {sessionRepo}
+                                  </span>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator className="shrink-0 text-zinc-600" />
+                              </>
+                            )}
+                            <BreadcrumbItem className="min-w-0">
+                              {!selectedSessionId ? (
+                                <BreadcrumbPage className="font-medium text-xs text-zinc-200 flex items-center gap-1.5 truncate">
+                                  <Sparkles size={11} className="text-sky-400 shrink-0" />
+                                  <span className="truncate">New Conversation</span>
+                                </BreadcrumbPage>
+                              ) : (
+                                <BreadcrumbPage className="font-medium text-xs text-zinc-200 truncate max-w-[280px] sm:max-w-[450px]">
+                                  {cleanTitle}
+                                </BreadcrumbPage>
+                              )}
+                            </BreadcrumbItem>
+                          </>
+                        )}
                       </BreadcrumbList>
                     </Breadcrumb>
                   </div>

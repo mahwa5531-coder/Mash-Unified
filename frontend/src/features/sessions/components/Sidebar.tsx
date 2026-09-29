@@ -12,6 +12,7 @@ import { PinnedSection } from './PinnedSection';
 import { WorkspacesSection } from './WorkspacesSection';
 import { DirectConversationsSection } from './DirectConversationsSection';
 import { QuickProjectModal } from './QuickProjectModal';
+import { generateCleanSessionTitle } from '@/utils/sessionTitle';
 
 interface SidebarProps {
   selectedSessionId: string | null;
@@ -270,7 +271,7 @@ export default function Sidebar({
   }, [selectedSessionId, selectedSessionTitle, selectedSessionRepo]);
 
   const handleSessionClick = async (session: SessionItem) => {
-    const title = session.custom_title || session.title || `Session ${session.session_id.slice(0, 8)}`;
+    const title = generateCleanSessionTitle(session.custom_title || session.title || '', session.session_id);
     
     let repo = session.workspace_uri || 'No Repo';
     if (repo !== 'No Repo' && repo.includes('/')) {
