@@ -1,161 +1,134 @@
 "use client";
 
-import * as React from "react";
-import { AlertTriangle, AlertCircle, X, ShieldAlert, Sparkles, ArrowRight } from "lucide-react";
-import { Button } from "@/primitives/Button";
-import { cn } from "@/lib/utils";
+import React, { useMemo } from 'react';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-export type QuotaBannerVariant = "warning" | "danger" | "info";
-
-export type QuotaBannerProps = {
+export interface QuotaBannerProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  actionLabel?: React.ReactNode;
-  onAction?: () => void;
+  /** Title of the quota notification */
+  title?: string;
+  /** Dynamic refresh / renewal date or timestamp (e.g. ISO string or Date) */
+  refreshDate?: string | Date;
+  /** Custom description override (if not using dynamic refresh text) */
+  description?: string;
+  /** Action callbacks */
+  onSeePlans?: () => void;
+  onEnableOverages?: () => void;
   onDismiss?: () => void;
-  variant?: QuotaBannerVariant;
   className?: string;
-  /**
-   * "inline": banner occupies normal layout space directly above the chat composer.
-   * "floating": positions it over the app content.
-   */
-  placement?: "inline" | "floating";
-  /** Optional extra classes for the outer positioning wrapper. */
-  wrapperClassName?: string;
-};
-
-const VARIANT_STYLES: Record<QuotaBannerVariant, {
-  container: string;
-  iconBox: string;
-  icon: React.ReactElement;
-  titleColor: string;
-  descColor: string;
-  buttonVariant: "primary" | "secondary" | "danger";
-}> = {
-  warning: {
-    container: "bg-amber-50/90 dark:bg-[#1c1813] border-amber-200/90 dark:border-amber-800/40 shadow-[0_4px_20px_rgba(245,158,11,0.08)]",
-    iconBox: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25",
-    icon: <AlertTriangle size={15} className="shrink-0" />,
-    titleColor: "text-amber-950 dark:text-amber-100",
-    descColor: "text-amber-900/80 dark:text-amber-200/80",
-    buttonVariant: "primary",
-  },
-  danger: {
-    container: "bg-rose-50/90 dark:bg-[#1c1114] border-rose-200/90 dark:border-rose-800/40 shadow-[0_4px_20px_rgba(244,63,94,0.08)]",
-    iconBox: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/25",
-    icon: <ShieldAlert size={15} className="shrink-0" />,
-    titleColor: "text-rose-950 dark:text-rose-100",
-    descColor: "text-rose-900/80 dark:text-rose-200/80",
-    buttonVariant: "danger",
-  },
-  info: {
-    container: "bg-sky-50/90 dark:bg-[#111722] border-sky-200/90 dark:border-sky-800/40 shadow-[0_4px_20px_rgba(14,165,233,0.08)]",
-    iconBox: "bg-sky-500/15 text-sky-700 dark:text-sky-400 border border-sky-500/25",
-    icon: <Sparkles size={15} className="shrink-0" />,
-    titleColor: "text-sky-950 dark:text-sky-100",
-    descColor: "text-sky-900/80 dark:text-sky-200/80",
-    buttonVariant: "primary",
-  },
-};
+}
 
 /**
  * QuotaBanner Primitive
  * 
- * High-visibility system notification banner for LLM token limits, workspace quotas, and API cooling periods.
- * Sits directly above the chat composer dock or as an inline announcement.
+ * Faithful 1:1 implementation matching the Antigravity/Mash quota completion banner.
+ * Sits directly above the chat composer dock.
+ * Displays dynamic baseline quota refresh date/time and provides 'See Plans' & 'Enable Overages' actions.
  */
 export function QuotaBanner({
   open = true,
   onOpenChange,
   title = "Baseline model quota reached",
-  description = "Your plan's baseline quota has been reached for this billing period. To continue running substantive procedures, review your account or upgrade your workspace.",
-  actionLabel = "View Plans",
-  onAction,
+  refreshDate,
+  description,
+  onSeePlans,
+  onEnableOverages,
   onDismiss,
-  variant = "warning",
   className,
-  placement = "inline",
-  wrapperClassName,
 }: QuotaBannerProps) {
   if (!open) return null;
 
-  const dismiss = () => {
+  const handleDismiss = () => {
     onDismiss?.();
     onOpenChange?.(false);
   };
 
-  const style = VARIANT_STYLES[variant] || VARIANT_STYLES.warning;
+  // Format dynamic renewal date and time (e.g. "9/17/2026, 2:58:31 PM")
+  const formattedRefreshTime = useMemo(() => {
+    if (!refreshDate) {
+      // Default dynamic fallback: computes upcoming rolling refresh
+      const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}, ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`;
+    }
+    if (typeof refreshDate === 'string') {
+      const d = new Date(refreshDate);
+      if (!isNaN(d.getTime())) {
+        return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}, ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`;
+      }
+      return refreshDate;
+    }
+    return `${refreshDate.getMonth() + 1}/${refreshDate.getDate()}/${refreshDate.getFullYear()}, ${refreshDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`;
+  }, [refreshDate]);
+
+  const bodyText = description || `Your plan's baseline quota will refresh on ${formattedRefreshTime}. To continue using this model now, enable AI Credit overages.`;
 
   return (
     <div
+      role="alert"
+      aria-live="polite"
       className={cn(
-        "pointer-events-auto w-full",
-        placement === "floating" && "absolute inset-x-0 top-0 z-50 flex justify-center px-4 pt-4",
-        wrapperClassName
+        "w-full rounded-2xl p-4 sm:p-4.5 select-text font-sans text-left transition-all",
+        "bg-[#1c1c1f] dark:bg-[#1a1a1c] border border-zinc-300/80 dark:border-white/[0.08] shadow-lg",
+        className
       )}
     >
-      <section
-        role="alert"
-        aria-live="polite"
-        className={cn(
-          "relative w-full rounded-2xl border transition-all select-text font-sans p-4",
-          style.container,
-          className
-        )}
-      >
-        <div className="flex items-start justify-between gap-3">
-          {/* Left: Icon + Content */}
-          <div className="flex items-start gap-3 flex-1 min-w-0">
-            <div className={cn(
-              "w-7 h-7 rounded-xl flex items-center justify-center shrink-0 shadow-2xs mt-0.5",
-              style.iconBox
-            )}>
-              {style.icon}
-            </div>
+      {/* Top Header Row */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Subtle amber quota badge icon matching Antigravity screenshot */}
+          <svg 
+            width="15" 
+            height="15" 
+            viewBox="0 0 16 16" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+            className="text-amber-400 shrink-0 select-none"
+          >
+            <rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M5 7h6M5 9h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
 
-            <div className="flex-1 min-w-0">
-              <h3 className={cn("text-[14px] font-semibold tracking-tight", style.titleColor)}>
-                {title}
-              </h3>
-              {description && (
-                <p className={cn("text-[13px] leading-relaxed mt-1 font-normal", style.descColor)}>
-                  {description}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            {actionLabel && (
-              <Button
-                size="sm"
-                variant={style.buttonVariant}
-                onClick={onAction}
-                iconPosition="right"
-                icon={<ArrowRight size={13} />}
-                className="shadow-xs cursor-pointer text-xs"
-              >
-                {actionLabel}
-              </Button>
-            )}
-
-            {onDismiss && (
-              <button
-                type="button"
-                onClick={dismiss}
-                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer select-none"
-                aria-label="Dismiss banner"
-                title="Dismiss"
-              >
-                <X size={15} />
-              </button>
-            )}
-          </div>
+          <span className="text-[13.5px] font-medium text-zinc-100 tracking-tight truncate">
+            {title}
+          </span>
         </div>
-      </section>
+
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="text-zinc-400 hover:text-zinc-200 transition-colors p-0.5 cursor-pointer select-none rounded"
+          title="Dismiss"
+          aria-label="Dismiss banner"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* Description text with dynamic renewal date/time */}
+      <p className="text-[13px] text-zinc-400 dark:text-[#a1a1aa] leading-relaxed mt-1.5 mb-3.5">
+        {bodyText}
+      </p>
+
+      {/* Action Buttons Row (Right Aligned) */}
+      <div className="flex items-center justify-end gap-2 select-none">
+        <button
+          type="button"
+          onClick={onSeePlans}
+          className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.06] transition-colors cursor-pointer"
+        >
+          See Plans
+        </button>
+
+        <button
+          type="button"
+          onClick={onEnableOverages}
+          className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-white bg-[#1a73e8] hover:bg-[#1557b0] active:bg-[#174ea6] transition-colors cursor-pointer shadow-xs"
+        >
+          Enable Overages
+        </button>
+      </div>
     </div>
   );
 }

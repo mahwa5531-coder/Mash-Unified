@@ -398,11 +398,8 @@ export default function ChatCanvas({
               <QuotaBanner
                 open={showQuotaBanner}
                 onOpenChange={setShowQuotaBanner}
-                placement="inline"
-                title="Baseline model quota reached"
-                description="Your plan's baseline quota has been reached for this billing period. Please review your account or contact your administrator."
-                actionLabel="View Account"
-                onAction={() => onOpenSettings?.('account')}
+                onSeePlans={() => onOpenSettings?.('plans')}
+                onEnableOverages={() => onOpenSettings?.('account')}
                 onDismiss={() => setShowQuotaBanner(false)}
               />
             </div>

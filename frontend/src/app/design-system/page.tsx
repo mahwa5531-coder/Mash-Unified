@@ -309,7 +309,6 @@ export default function DesignSystemPreviewPage() {
   ]);
   const [activeDemoTabId, setActiveDemoTabId] = useState('1');
   const [quotaBannerOpen, setQuotaBannerOpen] = useState(true);
-  const [quotaBannerVariant, setQuotaBannerVariant] = useState<'warning' | 'danger' | 'info'>('warning');
 
   const toggleTheme = () => {
     const next = !isDark;
@@ -428,12 +427,16 @@ export default function DesignSystemPreviewPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-[var(--m-text-primary)] flex items-center gap-2">
               <span className="w-5 h-5 rounded-md bg-[var(--m-accent-soft)] text-[var(--m-accent)] flex items-center justify-center text-xs font-mono">2</span>
-              <span>Audit Compliance Badges (`&lt;AuditBadge /&gt;`)</span>
+              <span>Audit Compliance Badges (`&lt;AuditBadge /&gt;`) — Non-Alarmist Palette</span>
             </h2>
             <span className="font-mono text-xs text-[var(--m-text-muted)]">`src/primitives/AuditBadge.tsx`</span>
           </div>
 
           <div className="p-5 rounded-xl border border-[var(--m-border)] bg-[var(--m-bg-surface)] space-y-4">
+            <div className="text-xs text-[var(--m-text-secondary)] leading-relaxed">
+              <strong className="text-[var(--m-text-primary)]">Non-Alarmist Palette:</strong> Calibrated light shades (subtle 8–12% desaturated tints) that smoothly work on dark and light backgrounds. Eliminates glaring neon colors and background-clashing bright fills.
+            </div>
+
             <div>
               <span className="text-xs font-mono uppercase tracking-wider text-[var(--m-text-muted)] block mb-2.5">Pre-Mapped Standard Audit Statuses</span>
               <div className="flex flex-wrap gap-2 items-center">
@@ -470,20 +473,20 @@ export default function DesignSystemPreviewPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-[var(--m-text-primary)] flex items-center gap-2">
               <span className="w-5 h-5 rounded-md bg-[var(--m-accent-soft)] text-[var(--m-accent)] flex items-center justify-center text-xs font-mono">3</span>
-              <span>Executive Audit Observation Cards (`&lt;AuditCallout /&gt;`) — High Visibility</span>
+              <span>Audit Observation Blockquotes (`&lt;AuditCallout /&gt;`) — Content-First</span>
             </h2>
             <span className="font-mono text-xs text-[var(--m-text-muted)]">`src/primitives/AuditCallout.tsx`</span>
           </div>
 
           <div className="p-5 rounded-xl border border-[var(--m-border)] bg-[var(--m-bg-surface)] space-y-5">
             <div className="text-xs text-[var(--m-text-secondary)] leading-relaxed">
-              <strong className="text-[var(--m-text-primary)]">Maximum Authority & Visibility for Audit Findings:</strong> Replaces outdated lopsided 2018 markdown blockquotes with fully rounded executive observation cards. Features severity-calibrated ambient washes, frosted icon anchors, uppercase statutory badges, bold finding headlines, and standard authority section (§) citations.
+              <strong className="text-[var(--m-text-primary)]">Calm Background with Side Accent Line:</strong> Authentic Markdown blockquotes with calm gray/black background (`bg-zinc-100/70` in light mode, `bg-[#141416]` in dark mode) and subtle colored side border line. Presents pure audit data with zero artificial card boxes or bright background clashes.
             </div>
 
             {/* Direct Comparison */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3.5 rounded-lg bg-[var(--m-bg-app)] border border-[var(--m-border-subtle)]">
               <div>
-                <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--m-text-muted)] block mb-1.5">❌ Before: Flawed Tiny Inline Badge</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--m-text-muted)] block mb-1.5">❌ Flawed: Tiny Isolated Badge</span>
                 <div className="p-3 bg-[var(--m-bg-surface)] rounded-md border border-[var(--m-border)] text-xs space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[var(--m-text-muted)]">Observation #1:</span>
@@ -496,7 +499,7 @@ export default function DesignSystemPreviewPage() {
               </div>
 
               <div>
-                <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--m-success)] block mb-1.5">✅ After: Modern Executive Observation Card</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--m-success)] block mb-1.5">✅ Non-Alarmist Blockquote (Content-First)</span>
                 <AuditCallout
                   status="MATERIAL WEAKNESS"
                   title="Fixed Asset Physical Discrepancy > 10%"
@@ -770,62 +773,24 @@ export default function DesignSystemPreviewPage() {
               >
                 {quotaBannerOpen ? 'Hide Banner' : 'Show Banner'}
               </button>
-              <div className="h-4 w-px bg-[var(--m-border)] mx-1" />
-              <button
-                type="button"
-                onClick={() => { setQuotaBannerVariant('warning'); setQuotaBannerOpen(true); }}
-                className={`px-2.5 py-1 rounded-md border text-xs font-medium cursor-pointer transition-colors ${quotaBannerVariant === 'warning' ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-[var(--m-border)] hover:bg-[var(--m-bg-surface)]'}`}
-              >
-                Warning Variant
-              </button>
-              <button
-                type="button"
-                onClick={() => { setQuotaBannerVariant('danger'); setQuotaBannerOpen(true); }}
-                className={`px-2.5 py-1 rounded-md border text-xs font-medium cursor-pointer transition-colors ${quotaBannerVariant === 'danger' ? 'border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400' : 'border-[var(--m-border)] hover:bg-[var(--m-bg-surface)]'}`}
-              >
-                Danger Variant
-              </button>
-              <button
-                type="button"
-                onClick={() => { setQuotaBannerVariant('info'); setQuotaBannerOpen(true); }}
-                className={`px-2.5 py-1 rounded-md border text-xs font-medium cursor-pointer transition-colors ${quotaBannerVariant === 'info' ? 'border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-400' : 'border-[var(--m-border)] hover:bg-[var(--m-bg-surface)]'}`}
-              >
-                Info Variant
-              </button>
+              <span className="text-zinc-500 text-[11.5px] ml-2">
+                (Faithful 1:1 match to production Antigravity quota design — single canonical style)
+              </span>
             </div>
 
             {/* Live Interactive Banner Display */}
             {quotaBannerOpen ? (
               <div className="space-y-3">
                 <span className="text-[11px] font-mono text-[var(--m-text-muted)] uppercase tracking-wider block">
-                  Live Interactive Banner Preview (Active Variant: {quotaBannerVariant})
+                  Live Production Quota Banner Preview
                 </span>
                 <QuotaBanner
                   open={quotaBannerOpen}
                   onOpenChange={setQuotaBannerOpen}
-                  variant={quotaBannerVariant}
-                  title={
-                    quotaBannerVariant === 'warning'
-                      ? "Baseline model quota reached"
-                      : quotaBannerVariant === 'danger'
-                      ? "Rate limit exceeded (Cooling Down)"
-                      : "Pro Workspace 1M Token Context Active"
-                  }
-                  description={
-                    quotaBannerVariant === 'warning'
-                      ? "Your plan's baseline quota has been reached for this billing period. To continue running substantive procedures, review your account or upgrade your workspace."
-                      : quotaBannerVariant === 'danger'
-                      ? "Provider API rate limits temporarily triggered. The connector will automatically resume procedure execution in 42 seconds."
-                      : "Extended 1,000,000 token context window enabled for deep multi-year general ledger analysis."
-                  }
-                  actionLabel={
-                    quotaBannerVariant === 'warning'
-                      ? "View Plans"
-                      : quotaBannerVariant === 'danger'
-                      ? "Retry Now"
-                      : "Documentation"
-                  }
-                  onAction={() => setLastClicked(`QuotaBanner: Clicked ${quotaBannerVariant} Action`)}
+                  title="Baseline model quota reached"
+                  refreshDate={new Date(Date.now() + 24 * 3600 * 1000)}
+                  onSeePlans={() => setLastClicked('QuotaBanner: Clicked See Plans')}
+                  onEnableOverages={() => setLastClicked('QuotaBanner: Clicked Enable Overages')}
                   onDismiss={() => {
                     setQuotaBannerOpen(false);
                     setLastClicked('QuotaBanner: Dismissed');

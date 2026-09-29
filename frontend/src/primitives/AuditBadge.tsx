@@ -39,20 +39,27 @@ const STATUS_VARIANT_MAP: Record<string, AuditSemanticVariant> = {
   'HIGH RISK': 'warning',
   WARNING: 'warning',
   CAUTION: 'warning',
-  'CONTROL DEFICIENCY': 'info',
+  'CONTROL DEFICIENCY': 'warning',
   'MEDIUM RISK': 'neutral',
   'LOW RISK': 'neutral',
   NOTE: 'neutral',
 };
 
+// Non-Alarmist Palette: calm, desaturated light shades that smoothly work on dark/light backgrounds without color clash
 const VARIANT_STYLES: Record<AuditSemanticVariant, string> = {
-  success: 'bg-[var(--m-success-soft)] text-[var(--m-success)] border-[var(--m-success)]/25',
-  warning: 'bg-[var(--m-warning-soft)] text-[var(--m-warning)] border-[var(--m-warning)]/25',
-  danger: 'bg-[var(--m-danger-soft)] text-[var(--m-danger)] border-[var(--m-danger)]/25',
-  info: 'bg-[var(--m-info-soft)] text-[var(--m-info)] border-[var(--m-info)]/25',
-  neutral: 'bg-[var(--m-bg-surface-hover)] text-[var(--m-text-secondary)] border-[var(--m-border)]',
+  danger: 'bg-rose-500/[0.08] dark:bg-rose-500/[0.12] text-rose-700 dark:text-rose-400 border-rose-500/20 dark:border-rose-500/30',
+  warning: 'bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-800 dark:text-amber-400 border-amber-500/20 dark:border-amber-500/30',
+  success: 'bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12] text-emerald-800 dark:text-emerald-400 border-emerald-500/20 dark:border-emerald-500/30',
+  info: 'bg-zinc-100 dark:bg-white/[0.05] text-zinc-700 dark:text-zinc-300 border-zinc-200/80 dark:border-white/[0.08]',
+  neutral: 'bg-zinc-100 dark:bg-white/[0.05] text-zinc-700 dark:text-zinc-300 border-zinc-200/80 dark:border-white/[0.08]',
 };
 
+/**
+ * AuditBadge Primitive
+ * 
+ * Non-alarmist statutory audit status badges.
+ * Uses calm, light shades that blend cleanly with the background without visual clash or neon glare.
+ */
 export function AuditBadge({
   status,
   variant,
@@ -66,7 +73,7 @@ export function AuditBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded-[var(--m-radius-xs)] font-mono text-[10.5px] font-medium tracking-tight border select-none align-baseline leading-none shadow-2xs",
+        "inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded-[4px] font-mono text-[10.5px] font-medium tracking-tight border select-none align-baseline leading-none shadow-2xs",
         VARIANT_STYLES[resolvedVariant],
         className
       )}
