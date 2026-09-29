@@ -12,6 +12,8 @@ import {
   Button, 
   AuditBadge, 
   FilePill, 
+  PathPill,
+  ExtensionBadge,
   AuditCallout, 
   FileTab, 
   FileTabStrip,
@@ -38,6 +40,7 @@ import {
   MediaEvidenceLogo,
   WebLink,
 } from '@/primitives';
+import { TurnFilesGenerated } from '@/features/artifacts';
 
 interface ActiveLogoInfo {
   id: string;
@@ -574,6 +577,126 @@ export default function DesignSystemPreviewPage() {
             <div className="text-[11.5px] text-[var(--m-text-muted)] flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               <span>Hover any file pill above to preview the cursor highlight response. Active click dispatches to the workspace editor.</span>
+            </div>
+          </div>
+        </section>
+
+        {/* UNIT 4B: ExtensionBadge, PathPill & TurnFilesGenerated (Audit Non-Alarmist Primitives) */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-[var(--m-text-primary)] flex items-center gap-2">
+              <span className="w-5 h-5 rounded-md bg-[var(--m-accent-soft)] text-[var(--m-accent)] flex items-center justify-center text-xs font-mono">4B</span>
+              <span>Audit Primitives: `&lt;ExtensionBadge /&gt;`, `&lt;PathPill /&gt;` & `&lt;TurnFilesGenerated /&gt;`</span>
+            </h2>
+            <span className="font-mono text-xs text-[var(--m-text-muted)]">Non-Alarmist Palette for CAs & Auditors</span>
+          </div>
+
+          <div className="p-5 rounded-xl border border-[var(--m-border)] bg-[var(--m-bg-surface)] space-y-5">
+            {/* 1. Standalone File Extension Badges */}
+            <div className="space-y-2">
+              <span className="text-xs font-mono uppercase tracking-wider text-[var(--m-text-muted)] block">
+                1. Standalone Extension Badges (`&lt;ExtensionBadge /&gt;`)
+              </span>
+              <p className="text-[12px] text-[var(--m-text-secondary)]">
+                Eliminates raw code tags and replaces them with authentic vector logos in domain-appropriate, restrained tints (Emerald for Excel, Crimson for PDF, Sky for Markdown).
+              </p>
+              <div className="flex flex-wrap gap-2 items-center p-3 rounded-lg bg-[var(--m-bg-app)] border border-[var(--m-border-subtle)]">
+                <ExtensionBadge extension=".xlsx" onClick={() => setLastClicked('Extension: .xlsx')} />
+                <ExtensionBadge extension=".pdf" onClick={() => setLastClicked('Extension: .pdf')} />
+                <ExtensionBadge extension=".csv" onClick={() => setLastClicked('Extension: .csv')} />
+                <ExtensionBadge extension=".docx" onClick={() => setLastClicked('Extension: .docx')} />
+                <ExtensionBadge extension=".md" onClick={() => setLastClicked('Extension: .md')} />
+                <ExtensionBadge extension=".py" onClick={() => setLastClicked('Extension: .py')} />
+                <ExtensionBadge extension=".sql" onClick={() => setLastClicked('Extension: .sql')} />
+                <ExtensionBadge extension=".json" onClick={() => setLastClicked('Extension: .json')} />
+                <ExtensionBadge extension=".zip" onClick={() => setLastClicked('Extension: .zip')} />
+              </div>
+            </div>
+
+            {/* 2. Directory / Partial Path Pills */}
+            <div className="space-y-2">
+              <span className="text-xs font-mono uppercase tracking-wider text-[var(--m-text-muted)] block">
+                2. Directory & Partial Path Pills (`&lt;PathPill /&gt;`)
+              </span>
+              <p className="text-[12px] text-[var(--m-text-secondary)]">
+                Renders workspace folders and directories cleanly with subtle folder icons instead of dumping unformatted text into bright yellow code tags.
+              </p>
+              <div className="flex flex-wrap gap-2 items-center p-3 rounded-lg bg-[var(--m-bg-app)] border border-[var(--m-border-subtle)]">
+                <PathPill path="workpapers/FY26/" onOpenFolder={(p) => setLastClicked(`Folder: ${p}`)} />
+                <PathPill path="Audit_Deliverables/CARO_2020/" onOpenFolder={(p) => setLastClicked(`Folder: ${p}`)} />
+                <PathPill path="procedures/statutory_vouching/" onOpenFolder={(p) => setLastClicked(`Folder: ${p}`)} />
+                <PathPill path="evidence/bank_confirmations/" onOpenFolder={(p) => setLastClicked(`Folder: ${p}`)} />
+                <PathPill path="src/primitives/" onOpenFolder={(p) => setLastClicked(`Folder: ${p}`)} />
+              </div>
+            </div>
+
+            {/* 3. TurnFilesGenerated Component */}
+            <div className="space-y-2">
+              <span className="text-xs font-mono uppercase tracking-wider text-[var(--m-text-muted)] block">
+                3. Files Generated at End of Turn (`&lt;TurnFilesGenerated /&gt;`)
+              </span>
+              <p className="text-[12px] text-[var(--m-text-secondary)]">
+                Rendered at the end of an assistant turn right before the footer. Displays files produced or updated in that procedure, complete with authentic vector logos and one-click &quot;Open&quot; action into the side viewer.
+              </p>
+              <div className="p-3 rounded-lg bg-[var(--m-bg-app)] border border-[var(--m-border-subtle)]">
+                <TurnFilesGenerated
+                  files={[
+                    {
+                      filename: 'Revenue_Recognition_Memo.md',
+                      path: 'Audit_Deliverables/Revenue_Recognition_Memo.md',
+                      dir: 'Audit_Deliverables',
+                      addedLines: 84,
+                    },
+                    {
+                      filename: 'Trade_Payables_Substantive_Testing.xlsx',
+                      path: 'workpapers/Trade_Payables_Substantive_Testing.xlsx',
+                      dir: 'workpapers',
+                      addedLines: 230,
+                    },
+                    {
+                      filename: 'CARO_Clause_3_Summary.pdf',
+                      path: 'reports/CARO_Clause_3_Summary.pdf',
+                      dir: 'reports',
+                    },
+                  ]}
+                  onOpenFile={(p) => setLastClicked(`Open Generated File: ${p}`)}
+                />
+              </div>
+            </div>
+
+            {/* 4. Color Grading: Calm Executive Neutral vs Old False-Alarm Yellow */}
+            <div className="space-y-2 pt-1 border-t border-[var(--m-border-subtle)]">
+              <span className="text-xs font-mono uppercase tracking-wider text-[var(--m-text-muted)] block">
+                4. Audit Color Grading: Calm Executive Neutral vs Old False-Alarm Amber
+              </span>
+              <p className="text-[12px] text-[var(--m-text-secondary)]">
+                In auditing, amber/yellow signals <strong className="text-amber-500 font-medium">CAUTION / RISK / DEFICIENCY</strong>. Neutral parameters and code tokens are now rendered in crisp neutral zinc to eliminate false alarms:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.04] space-y-1.5">
+                  <span className="text-[11px] font-mono font-semibold text-amber-600 dark:text-amber-400 block uppercase">
+                    ❌ Old Style (Jarring False Alarm)
+                  </span>
+                  <p className="text-xs text-[var(--m-text-secondary)]">
+                    Checked formula <code className="bg-amber-500/10 text-amber-800 dark:text-amber-200 border border-amber-500/20 px-1 py-0.5 rounded font-mono text-[11px]">SUM(D2:D140)</code> under account <code className="bg-amber-500/10 text-amber-800 dark:text-amber-200 border border-amber-500/20 px-1 py-0.5 rounded font-mono text-[11px]">GL_2100_TradePayables</code>.
+                  </p>
+                  <span className="text-[10.5px] text-amber-700/80 dark:text-amber-400/70 block">
+                    Distracting amber makes routine account codes look like audit violations.
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-lg border border-zinc-200/80 dark:border-white/[0.1] bg-zinc-50 dark:bg-white/[0.02] space-y-1.5">
+                  <span className="text-[11px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 block uppercase">
+                    ✓ New Calm Executive Tone
+                  </span>
+                  <p className="text-xs text-[var(--m-text-secondary)]">
+                    Checked formula <code className="bg-zinc-100 dark:bg-white/[0.06] text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-white/[0.08] px-1 py-0.5 rounded font-mono text-[11px]">SUM(D2:D140)</code> under account <code className="bg-zinc-100 dark:bg-white/[0.06] text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-white/[0.08] px-1 py-0.5 rounded font-mono text-[11px]">GL_2100_TradePayables</code>.
+                  </p>
+                  <span className="text-[10.5px] text-[var(--m-text-muted)] block">
+                    Clear, calm neutral text. Amber is preserved exclusively for actual risk tags.
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
