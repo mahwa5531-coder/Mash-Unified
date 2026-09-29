@@ -480,7 +480,7 @@ export default function DesignSystemPreviewPage() {
 
           <div className="p-5 rounded-xl border border-[var(--m-border)] bg-[var(--m-bg-surface)] space-y-5">
             <div className="text-xs text-[var(--m-text-secondary)] leading-relaxed">
-              <strong className="text-[var(--m-text-primary)]">Calm Background with Side Accent Line:</strong> Authentic Markdown blockquotes with calm gray/black background (`bg-zinc-100/70` in light mode, `bg-[#141416]` in dark mode) and subtle colored side border line. Presents pure audit data with zero artificial card boxes or bright background clashes.
+              <strong className="text-[var(--m-text-primary)]">Clean Reference Blockquote:</strong> Solid 3px vertical accent bar on the left, transparent background, bold colored uppercase label on top, followed by clean body text. No artificial card boxes, no clashing borders.
             </div>
 
             {/* Direct Comparison */}
@@ -499,14 +499,9 @@ export default function DesignSystemPreviewPage() {
               </div>
 
               <div>
-                <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--m-success)] block mb-1.5">✅ Non-Alarmist Blockquote (Content-First)</span>
-                <AuditCallout
-                  status="MATERIAL WEAKNESS"
-                  title="Fixed Asset Physical Discrepancy > 10%"
-                  cite="CARO 2020 Clause 3(i) / SA 315"
-                  className="my-0"
-                >
-                  Discrepancy of ₹1.42 Cr identified between asset register and physical count sheets. Management has not initiated reconciliation.
+                <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--m-success)] block mb-1.5">✅ Reference Blockquote (Exact Match)</span>
+                <AuditCallout status="NOTE">
+                  In <strong>&quot;Pro&quot; Reasoning Mode</strong>, the model generates hidden reasoning tokens (Chain-of-Thought) before writing code or checking ledger balances. We model both <strong>Standard Output</strong> (~416 tokens/call) and <strong>Pro Reasoning Output</strong> (~1,000 tokens/call including reasoning tokens).
                 </AuditCallout>
               </div>
             </div>
@@ -517,7 +512,6 @@ export default function DesignSystemPreviewPage() {
 
               <AuditCallout
                 status="EXCEPTION"
-                title="Unreconciled GST 2B vs Purchase Register Variance"
                 cite="CGST Act 2017 / Rule 36(4)"
               >
                 14 vendor invoices totaling ₹28.5 Lakhs claimed in GSTR-3B do not reflect in auto-populated GSTR-2B portal data for Q3.

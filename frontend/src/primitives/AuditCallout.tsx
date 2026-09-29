@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { AuditBadge } from './AuditBadge';
 
 export type AuditCalloutStatus =
   | 'EXCEPTION'
@@ -25,11 +24,11 @@ export type AuditCalloutStatus =
 export type AuditCalloutVariant = 'danger' | 'warning' | 'success' | 'info' | 'neutral';
 
 export interface AuditCalloutProps extends React.ComponentPropsWithoutRef<'blockquote'> {
-  /** Statutory audit status tag (e.g. 'EXCEPTION', 'MATERIAL WEAKNESS', 'COMPLIANT') */
+  /** Statutory audit status tag (e.g. 'NOTE', 'EXCEPTION', 'WARNING') */
   status?: AuditCalloutStatus | string;
   /** Explicit visual variant override */
   variant?: AuditCalloutVariant;
-  /** Finding headline or statutory clause title */
+  /** Finding headline or clause title */
   title?: string;
   /** Statutory reference, standard citation, or workpaper cross-reference */
   cite?: string;
@@ -53,27 +52,50 @@ const STATUS_VARIANT_MAP: Record<string, AuditCalloutVariant> = {
   'PASS': 'success',
   'NO EXCEPTION': 'success',
   'LOW RISK': 'success',
-  'NOTE': 'neutral',
+  'NOTE': 'info',
+  'TIP': 'info',
+  'IMPORTANT': 'info',
   'DISCLOSURE': 'neutral',
   'OBSERVATION': 'neutral',
   'CARO 2020': 'neutral',
 };
 
-// Non-Alarmist border accents: only the side line color changes subtly
-const SIDE_BORDER_MAP: Record<AuditCalloutVariant, string> = {
-  danger: 'border-l-rose-500/70 dark:border-l-rose-500/60',
-  warning: 'border-l-amber-500/70 dark:border-l-amber-500/60',
-  success: 'border-l-emerald-500/70 dark:border-l-emerald-500/60',
-  info: 'border-l-zinc-400 dark:border-l-zinc-600',
-  neutral: 'border-l-zinc-300 dark:border-l-zinc-700',
+const VARIANT_CONFIG: Record<AuditCalloutVariant, { border: string; labelColor: string; defaultLabel?: string }> = {
+  danger: {
+    border: 'border-l-rose-500',
+    labelColor: 'text-rose-500 dark:text-rose-400',
+    defaultLabel: 'EXCEPTION',
+  },
+  warning: {
+    border: 'border-l-amber-500',
+    labelColor: 'text-amber-500 dark:text-amber-400',
+    defaultLabel: 'WARNING',
+  },
+  success: {
+    border: 'border-l-emerald-500',
+    labelColor: 'text-emerald-500 dark:text-emerald-400',
+    defaultLabel: 'COMPLIANT',
+  },
+  info: {
+    border: 'border-l-blue-600',
+    labelColor: 'text-blue-500 dark:text-blue-400',
+    defaultLabel: 'NOTE',
+  },
+  neutral: {
+    border: 'border-l-zinc-500',
+    labelColor: 'text-zinc-400 dark:text-zinc-400',
+    defaultLabel: 'OBSERVATION',
+  },
 };
 
 /**
  * AuditCallout Primitive
  * 
- * Minimalist, non-alarmist blockquote for audit observations.
- * Uses a visible calm gray/black background with only the side border line colored.
- * Presents only the pure audit data without bright clashing containers or flashy boxes.
+ * Faithful implementation matching the clean Antigravity/Mash reference blockquote:
+ * - Solid 3px colored accent bar on the left
+ * - Transparent background (no box, no clashing borders)
+ * - Uppercase bold colored label on top (e.g. NOTE, WARNING, EXCEPTION)
+ * - Clean, high-legibility body prose directly below
  */
 export function AuditCallout({
   status,
@@ -87,43 +109,31 @@ export function AuditCallout({
   const normalizedStatus = status?.toUpperCase().trim();
   const variant: AuditCalloutVariant =
     propVariant ||
-    (normalizedStatus ? STATUS_VARIANT_MAP[normalizedStatus] || 'neutral' : 'neutral');
+    (normalizedStatus ? STATUS_VARIANT_MAP[normalizedStatus] || 'info' : 'info');
 
-  const sideBorder = SIDE_BORDER_MAP[variant];
+  const config = VARIANT_CONFIG[variant] || VARIANT_CONFIG.info;
+  const label = status || title || (propVariant ? config.defaultLabel : undefined);
 
   return (
     <blockquote
       className={cn(
-        "my-3 pl-3.5 pr-3 py-2.5 rounded-r-lg border-l-2 select-text font-sans text-[13.5px] leading-relaxed transition-colors",
-        "bg-zinc-100/70 dark:bg-[#141416] text-zinc-800 dark:text-zinc-200 border-r border-t border-b border-zinc-200/50 dark:border-white/[0.04]",
-        sideBorder,
+        "my-3 pl-3.5 py-0.5 border-l-[3px] select-text font-sans text-[13.5px] leading-relaxed bg-transparent",
+        config.border,
         className
       )}
       {...props}
     >
-      {(status || title) && (
-        <div className="flex items-center gap-2 mb-1.5 font-medium flex-wrap">
-          {status && (
-            <AuditBadge status={status} />
-          )}
-          {title && (
-            <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-[13px]">
-              {title}
-            </span>
-          )}
-          {cite && (
-            <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 ml-auto">
-              § {cite}
-            </span>
-          )}
+      {label && (
+        <div className={cn("font-semibold text-xs tracking-wider uppercase mb-1 select-none", config.labelColor)}>
+          {label}
         </div>
       )}
 
-      <div className="text-zinc-700 dark:text-zinc-300 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>p]:my-1">
+      <div className="text-zinc-800 dark:text-zinc-300 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>p]:my-1">
         {children}
       </div>
 
-      {cite && !title && (
+      {cite && (
         <footer className="mt-1.5 text-[11px] font-mono text-zinc-500 dark:text-zinc-400 not-italic select-text">
           — § {cite}
         </footer>
