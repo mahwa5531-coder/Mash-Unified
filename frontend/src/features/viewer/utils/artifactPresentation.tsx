@@ -1,5 +1,4 @@
-// Artifact presentation helpers: title cleanup, type-based icon, extension badge.
-import { FileText, BookOpen, Code, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
+import { FileIcon } from '@/primitives/FileIcon';
 import type { ArtifactFileItem } from '@/services/artifacts';
 
 export function formatArtifactTitle(name: string): string {
@@ -11,26 +10,7 @@ export function formatArtifactTitle(name: string): string {
 export const UNSUPPORTED_DOC_REGEX = /\.(docx|doc|pptx|ppt|zip|tar|gz|7z|rar|exe|bin|iso|dmg|dll|so|dylib)$/i;
 
 export function getArtifactIcon(item: ArtifactFileItem) {
-  const lower = item.name.toLowerCase();
-  if (/\.pdf$/i.test(lower)) {
-    return <FileText size={14} className="text-red-400 group-hover:text-red-300 shrink-0" />;
-  }
-  if (/\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/i.test(lower)) {
-    return <ImageIcon size={14} className="text-purple-400 group-hover:text-purple-300 shrink-0" />;
-  }
-  if (/\.(xlsx|xls|csv|xlsm)$/i.test(lower)) {
-    return <FileSpreadsheet size={14} className="text-emerald-400 group-hover:text-emerald-300 shrink-0" />;
-  }
-  if (lower.includes('walkthrough')) {
-    return <BookOpen size={14} className="text-blue-400 group-hover:text-blue-300 shrink-0" />;
-  }
-  if (lower.includes('plan')) {
-    return <Code size={14} className="text-sky-400 group-hover:text-sky-300 shrink-0" />;
-  }
-  if (/\.(py|ts|tsx|js|sql|sh|ps1)$/.test(lower) || item.type === 'code' || item.name.startsWith('scratch/')) {
-    return <Code size={14} className="text-muted-foreground group-hover:text-foreground shrink-0" />;
-  }
-  return <FileText size={14} className="text-muted-foreground group-hover:text-foreground shrink-0" />;
+  return <FileIcon filename={item.name} size={14} />;
 }
 
 export function getArtifactExtensionBadge(item: ArtifactFileItem) {

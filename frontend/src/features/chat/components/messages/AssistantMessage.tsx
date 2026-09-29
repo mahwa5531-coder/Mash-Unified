@@ -19,7 +19,7 @@ import { Message } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
 import { cn } from '@/lib/utils';
-import { FilePill, AuditBadge } from '@/primitives';
+import { FilePill, AuditBadge, WebLink } from '@/primitives';
 import { ExecutionStatusDisclosure } from './ExecutionStatusDisclosure';
 import { ImageLightboxModal, LightboxImageData } from './ImageLightboxModal';
 import { AssistantMessageFooter } from './AssistantMessageFooter';
@@ -370,9 +370,9 @@ const AssistantMessage = memo(function AssistantMessage({
         return renderFileButton(href, rawLabel, onOpenFile);
       }
       return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 underline underline-offset-2 decoration-blue-500/40 hover:decoration-blue-400 transition-colors inline-flex items-center gap-0.5 font-medium" {...props}>
+        <WebLink href={href} {...props}>
           {children}
-        </a>
+        </WebLink>
       );
     },
     img({src, alt, ...props}: any) {
