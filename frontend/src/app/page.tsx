@@ -35,7 +35,18 @@ export default function Home() {
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const [isRightSidebarMaximized, setIsRightSidebarMaximized] = useState(false);
   const [fileToOpen, setFileToOpen] = useState<string | null>(null);
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const saved = localStorage.getItem('mash_theme_settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.mode === 'light') return false;
+        if (parsed.mode === 'system') return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+    } catch {}
+    return true;
+  });
   const [isHistoryActive, setIsHistoryActive] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<string>('appearance');
@@ -71,6 +82,17 @@ export default function Home() {
       root.setAttribute('data-theme', 'light');
     }
   }, [isDark]);
+
+  // Prevent back button from escaping the SPA to about:blank
+  useEffect(() => {
+    history.replaceState({ mash: true }, '');
+    history.pushState({ mash: true }, '');
+    const onPopState = () => {
+      history.pushState({ mash: true }, '');
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   // ponytail: stable callbacks to prevent unneeded re-mounts/re-renders of ChatCanvas and Sidebar
   const handleSelectSession = useCallback((sessionId: string, title?: string, repoName?: string) => {

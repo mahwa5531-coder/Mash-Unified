@@ -16,6 +16,7 @@ import { fetchFileContent, getFileContentFromCache, invalidateFileCache } from '
 import { fetchTaskLog, fetchBackgroundTasks, killBackgroundTask, BackgroundTaskItem } from '@/services/tasks';
 import { fetchSessionArtifacts, ArtifactFileItem } from '@/services/artifacts';
 import { BASE_URL } from '@/services/client';
+import { normalizePath } from '@/utils/normalizePath';
 
 export interface RightSidebarProps {
   onToggle: () => void;
@@ -315,10 +316,7 @@ export default function RightSidebar({
 
   // Atomic Tab Opening (Guarantees zero duplicate tabs)
   const openFileTab = useCallback((name: string, fullPath: string, type: 'file' | 'image' = 'file') => {
-    let cleanPath = decodeURIComponent((fullPath || '').replace(/^file:\/\/\/?/i, ''));
-    cleanPath = cleanPath.replace(/^\/([a-zA-Z]:)/, '$1');
-    const pathWithoutAnchor = cleanPath.split('#')[0];
-    const normalizedPath = pathWithoutAnchor.replace(/\\/g, '/');
+    const normalizedPath = normalizePath(fullPath);
 
     const isImg = type === 'image' || /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/i.test(normalizedPath || name);
     const isPdf = /\.pdf$/i.test(normalizedPath || name);
@@ -358,9 +356,7 @@ export default function RightSidebar({
   // Listen to fileToOpen prop from chat/workspace and open automatically
   useEffect(() => {
     if (fileToOpen) {
-      let cleanPath = decodeURIComponent(fileToOpen.replace(/^file:\/\/\/?/i, ''));
-      cleanPath = cleanPath.replace(/^\/([a-zA-Z]:)/, '$1');
-      const pathWithoutAnchor = cleanPath.split('#')[0];
+      const pathWithoutAnchor = normalizePath(fileToOpen);
       const basename = pathWithoutAnchor.split(/[/\\]/).pop() || pathWithoutAnchor;
       openFileTab(basename, pathWithoutAnchor);
       onFileOpened?.();

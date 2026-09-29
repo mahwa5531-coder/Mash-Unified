@@ -3,6 +3,7 @@
 // Re-export canonical FilePill primitive from @/primitives
 import React from 'react';
 import { FilePill as PrimitiveFilePill, FilePillProps } from '@/primitives';
+import { normalizePath } from '@/utils/normalizePath';
 
 export { FilePill as PrimitiveFilePill } from '@/primitives';
 
@@ -49,7 +50,7 @@ export function renderOutputWithLinks(text: string, onOpenFile?: (path: string) 
 
   return parts.map((part, idx) => {
     if (part.startsWith('file:///')) {
-      const cleanPath = decodeURIComponent(part.replace(/^file:\/\/\/?/, '')).replace(/^\/([a-zA-Z]:)/, '$1');
+      const cleanPath = normalizePath(part);
       const basename = cleanPath.split(/[/\\]/).pop() || cleanPath;
       return (
         <PrimitiveFilePill

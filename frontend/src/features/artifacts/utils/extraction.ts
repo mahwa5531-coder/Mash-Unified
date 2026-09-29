@@ -1,6 +1,7 @@
 import { Message } from '@/types/chat';
 import { ArtifactItem, EditedFileItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
+import { normalizePath } from '@/utils/normalizePath';
 
 // ----------------------------------------------------------------------
 // Helper to extract and format Artifact cards (Documentation, Spreadsheets, Visual Charts)
@@ -87,8 +88,7 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
     let match;
     while ((match = linkRegex.exec(msg.content)) !== null) {
       const linkText = match[1];
-      let linkPath = match[2].replace(/^file:\/\/\/?/, '');
-      linkPath = linkPath.replace(/^\/([a-zA-Z]:)/, '$1');
+      let linkPath = normalizePath(match[2]);
 
       const { isArtifact, type } = classifyArtifact(linkPath);
       if (isArtifact && !seenPaths.has(linkPath)) {
@@ -130,7 +130,7 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
 // ponytail: canonical group for doc artifacts so revised plans/walkthroughs vanish from past turns
 export function getArtifactCanonicalGroup(filePathOrTitle: string): string {
   if (!filePathOrTitle) return '';
-  const clean = filePathOrTitle.replace(/^file:\/\/\/?/, '').replace(/\\/g, '/');
+  const clean = normalizePath(filePathOrTitle);
   const filename = (clean.split('/').pop() || clean).toLowerCase().trim();
   if (filename.includes('implementation_plan') || filename.includes('plan.md')) {
     return 'implementation_plan.md';
@@ -176,8 +176,7 @@ export function extractEditedFiles(msg: Message): {
       const isPatch = name.includes('apply_patch') || name.includes('patch');
 
       const normalizeClean = (raw: string) => {
-        let p = raw.replace(/^file:\/\/\/?/, '');
-        return p.replace(/^\/([a-zA-Z]:)/, '$1');
+        return normalizePath(raw, false);
       };
 
       const shouldExclude = (p: string) => {

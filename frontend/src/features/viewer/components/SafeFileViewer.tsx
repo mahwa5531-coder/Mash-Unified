@@ -13,6 +13,7 @@ import { openSystemFile } from '@/services/files';
 import TableContainer from '@/components/renderers/TableContainer';
 import CalloutBlockquote from '@/components/renderers/CalloutBlockquote';
 import { useIsDarkMode } from '@/hooks/useIsDarkMode';
+import { normalizePath } from '@/utils/normalizePath';
 
 const MermaidRenderer = dynamic(() => import('@/components/renderers/MermaidRenderer'), {
   ssr: false,
@@ -306,7 +307,7 @@ export default function SafeFileViewer({
                 img({src, alt, ...props}: any) {
                   let resolvedSrc = src;
                   if (resolvedSrc && (resolvedSrc.startsWith('file:///') || resolvedSrc.startsWith('file://') || resolvedSrc.startsWith('/'))) {
-                    const clean = resolvedSrc.replace(/^file:\/\/\/?/, '');
+                    const clean = normalizePath(resolvedSrc);
                     resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(clean)}${sessionQuery}`;
                   }
                   return (

@@ -24,6 +24,7 @@ import { FilePill } from '@/primitives';
 import { ExecutionStatusDisclosure } from './ExecutionStatusDisclosure';
 import { ImageLightboxModal, LightboxImageData } from './ImageLightboxModal';
 import { AssistantMessageFooter } from './AssistantMessageFooter';
+import { normalizePath } from '@/utils/normalizePath';
 
 // ponytail: stable plugin array references — prevents ReactMarkdown from re-parsing on every streaming flush
 const REMARK_PLUGINS = [remarkGfm, remarkMath] as any;
@@ -65,8 +66,7 @@ function extractChildText(node: any): string {
 
 // ponytail: format file pills to render clean basenames instead of overwhelming full filesystem paths
 function formatFilePill(rawLabel: string, rawHref: string) {
-  let rawPath = decodeURIComponent(rawHref || rawLabel || '').replace(/^file:\/\/\/?/i, '');
-  rawPath = rawPath.replace(/^\/([a-zA-Z]:)/, '$1');
+  let rawPath = normalizePath(rawHref || rawLabel || '', false);
   const [filePath, lineAnchor] = rawPath.split('#');
 
   const parts = filePath.split(/[/\\]/);
@@ -90,7 +90,7 @@ function formatFilePill(rawLabel: string, rawHref: string) {
 // ponytail: Detect if a string is a valid file path or standalone filename with recognized extension
 function isFilePathOrName(raw: string): boolean {
   if (!raw || typeof raw !== 'string') return false;
-  const clean = raw.trim().replace(/^file:\/\/\/?/i, '').split('#')[0];
+  const clean = normalizePath(raw.trim());
   if (!clean || clean.includes(' ') || clean.includes('\n') || clean.includes('(') || clean.includes(')')) return false;
 
   const FILE_EXT_REGEX = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|pyw|ipynb|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|db|sqlite|md|markdown|txt|log|html|css|scss|xml|xbrl|sh|bash|zsh|ps1|rs|go|c|cpp|h|java|zip|tar|gz|png|jpe?g|gif|svg|webp)$/i;
@@ -404,8 +404,7 @@ const AssistantMessage = memo(function AssistantMessage({
       const isRemote = resolvedSrc && (resolvedSrc.startsWith('http://') || resolvedSrc.startsWith('https://') || resolvedSrc.startsWith('data:'));
 
       if (resolvedSrc && !isRemote) {
-        cleanPath = resolvedSrc.replace(/^file:\/\/\/?/, '');
-        cleanPath = cleanPath.replace(/^\/([a-zA-Z]:)/, '$1');
+        cleanPath = normalizePath(resolvedSrc);
         resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}${msg.sessionId ? `&session_id=${encodeURIComponent(msg.sessionId)}` : ''}`;
       }
 

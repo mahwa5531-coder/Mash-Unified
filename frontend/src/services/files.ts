@@ -1,6 +1,7 @@
 // File content: LRU-cached reads, in-flight dedup, paged Excel access.
 
 import { BASE_URL, safeFetch } from './client';
+import { normalizePath } from '@/utils/normalizePath';
 
 // Client-side in-memory cache with LRU eviction: keeps active working-set tabs instantly accessible with 0ms network latency
 const MAX_FILE_CACHE_SIZE = 25;
@@ -18,18 +19,18 @@ function cacheFileContent(cleanKey: string, content: string): void {
 }
 
 export function getFileContentFromCache(filePath: string): string | undefined {
-  const cleanKey = decodeURIComponent((filePath || '').replace(/^file:\/\/\/?/i, '')).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\\/g, '/').split('#')[0];
+  const cleanKey = normalizePath(filePath);
   return fileContentMemoryCache.get(cleanKey);
 }
 
 export function setFileContentInCache(filePath: string, content: string): void {
-  const cleanKey = decodeURIComponent((filePath || '').replace(/^file:\/\/\/?/i, '')).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\\/g, '/').split('#')[0];
+  const cleanKey = normalizePath(filePath);
   cacheFileContent(cleanKey, content);
 }
 
 export function invalidateFileCache(filePath?: string): void {
   if (filePath) {
-    const cleanKey = decodeURIComponent((filePath || '').replace(/^file:\/\/\/?/i, '')).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\\/g, '/').split('#')[0];
+    const cleanKey = normalizePath(filePath);
     fileContentMemoryCache.delete(cleanKey);
     inFlightFileFetches.delete(cleanKey);
   } else {
@@ -39,7 +40,7 @@ export function invalidateFileCache(filePath?: string): void {
 }
 
 export async function fetchFileContent(filePath: string, sessionId?: string, bypassCache: boolean = false): Promise<string> {
-  const cleanKey = decodeURIComponent((filePath || '').replace(/^file:\/\/\/?/i, '')).replace(/^\/([a-zA-Z]:)/, '$1').replace(/\\/g, '/').split('#')[0];
+  const cleanKey = normalizePath(filePath);
   if (!bypassCache && fileContentMemoryCache.has(cleanKey)) {
     return fileContentMemoryCache.get(cleanKey)!;
   }

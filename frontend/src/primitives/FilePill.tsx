@@ -4,6 +4,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import FileIcon from '@/primitives/FileIcon';
 import { cn } from '@/lib/utils';
+import { normalizePath } from '@/utils/normalizePath';
 
 export interface FilePillProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   path: string;
@@ -24,8 +25,7 @@ export function FilePill({
   onClick,
   ...props
 }: FilePillProps) {
-  let cleanPath = decodeURIComponent(path || '').replace(/^file:\/\/\/?/i, '');
-  cleanPath = cleanPath.replace(/^\/([a-zA-Z]:)/, '$1');
+  const cleanPath = normalizePath(path);
   const [filePathOnly, hashAnchor] = cleanPath.split('#');
 
   const parts = filePathOnly.split(/[/\\]/);
