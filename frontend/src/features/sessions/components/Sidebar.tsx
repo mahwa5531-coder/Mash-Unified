@@ -34,19 +34,6 @@ interface SidebarProps {
 const MIN_WIDTH = 220;
 const MAX_WIDTH = 450;
 
-// ponytail: Module-level cache eliminates empty flashes and provides 0ms initial render for sidebar
-let cachedSidebarSessions: SessionItem[] = [];
-let cachedSidebarProjects: ProjectItem[] = [];
-
-if (typeof window !== 'undefined') {
-  try {
-    const s = localStorage.getItem('nexau_cached_sessions');
-    if (s) cachedSidebarSessions = JSON.parse(s);
-    const p = localStorage.getItem('nexau_cached_projects');
-    if (p) cachedSidebarProjects = JSON.parse(p);
-  } catch {}
-}
-
 export default function Sidebar({ 
   selectedSessionId, 
   selectedSessionTitle, 
@@ -63,10 +50,21 @@ export default function Sidebar({
   onToggleArchive: externalOnToggleArchive,
   onDeleteSession,
 }: SidebarProps) {
-  const [sessions, setSessions] = useState<SessionItem[]>(() => cachedSidebarSessions);
-  const [registeredProjects, setRegisteredProjects] = useState<ProjectItem[]>(() => cachedSidebarProjects);
+  // ponytail: initialize with empty arrays to guarantee identical SSR & client hydration DOM
+  const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [registeredProjects, setRegisteredProjects] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [, setStoreTick] = useState(0);
+
+  // Restore client-side cache after hydration completes
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem('nexau_cached_sessions');
+      if (s) setSessions(JSON.parse(s));
+      const p = localStorage.getItem('nexau_cached_projects');
+      if (p) setRegisteredProjects(JSON.parse(p));
+    } catch {}
+  }, []);
 
   // Scroll shading & sticky section awareness
   const [canScrollDown, setCanScrollDown] = useState(false);
@@ -194,7 +192,6 @@ export default function Sidebar({
       if (fetchedSessions) {
         const validSessions = fetchedSessions.filter(s => !deletedSessionIds.current.has(s.session_id));
         setSessions(validSessions);
-        cachedSidebarSessions = validSessions;
         try {
           localStorage.setItem('nexau_cached_sessions', JSON.stringify(validSessions));
         } catch {}
@@ -202,7 +199,6 @@ export default function Sidebar({
 
       if (fetchedProjects) {
         setRegisteredProjects(fetchedProjects);
-        cachedSidebarProjects = fetchedProjects;
         try {
           localStorage.setItem('nexau_cached_projects', JSON.stringify(fetchedProjects));
         } catch {}
