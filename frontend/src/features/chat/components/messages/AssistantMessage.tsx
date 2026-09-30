@@ -7,8 +7,6 @@ import { TurnFilesGenerated } from '@/features/artifacts';
 import { extractArtifacts, extractEditedFiles } from '@/features/artifacts/utils/extraction';
 import { Message, ExecutionStep, ToolCall } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
-import { WorkingPaperCard } from '@/primitives';
-import { formatArtifactTitle } from '@/features/viewer/utils/artifactPresentation';
 import { ExecutionStatusDisclosure } from './ExecutionStatusDisclosure';
 import { ImageLightboxModal, LightboxImageData } from './ImageLightboxModal';
 import { AssistantMessageFooter } from './AssistantMessageFooter';
@@ -66,12 +64,11 @@ const AssistantMessage = memo(function AssistantMessage({
   const artifacts = passedArtifacts !== undefined ? passedArtifacts : localArtifacts;
   const editedFilesData = useMemo(() => isActivelyStreaming ? { files: [], totalAdded: 0, totalDeleted: 0 } : extractEditedFiles(msg), [msg.tools, isActivelyStreaming]);
 
-  // Filter markdown files created in this turn to render executive WorkingPaperCards
-  const mdWorkingPapers = useMemo(() => {
-    return editedFilesData.files.filter((f) => 
-      f.filename.toLowerCase().endsWith('.md') || f.path.toLowerCase().endsWith('.md')
-    );
-  }, [editedFilesData.files]);
+  // Filter edited files to exclude files already displayed as prominent artifact/deliverable cards
+  const nonArtifactEditedFiles = useMemo(() => {
+    const artifactPaths = new Set(artifacts.map(a => a.filePath.toLowerCase().replace(/\\/g, '/')));
+    return editedFilesData.files.filter(f => !artifactPaths.has(f.path.toLowerCase().replace(/\\/g, '/')));
+  }, [editedFilesData.files, artifacts]);
 
   // ponytail: Interleaved Sequential Units — clean chronological flow where worklogs and authentic prose alternate
   const units = useMemo<Array<
@@ -220,7 +217,7 @@ const AssistantMessage = memo(function AssistantMessage({
         onContinue={onContinue}
       />
 
-      {/* 4. Bottom Artifact Cards (Walkthrough, Implementation Plan, etc.) */}
+      {/* 4. Deliverable & Working Paper Cards (Walkthrough, Plans, Spreadsheets, Memos) */}
       {artifacts.length > 0 && (
         <div className="mt-3 flex flex-col gap-2">
           {artifacts.map((art) => (
@@ -236,24 +233,10 @@ const AssistantMessage = memo(function AssistantMessage({
         </div>
       )}
 
-      {/* 5. Working Paper Deliverable Cards (.md files created in this turn) */}
-      {mdWorkingPapers.length > 0 && (
-        <div className="mt-2.5 flex flex-col gap-1">
-          {mdWorkingPapers.map((file) => (
-            <WorkingPaperCard
-              key={file.path}
-              filePath={file.path}
-              title={formatArtifactTitle(file.filename)}
-              onOpen={onOpenFile}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* 6. Files Generated in this turn */}
-      {editedFilesData.files.length > 0 && (
+      {/* 5. Additional Code / Configuration Files Modified in this turn */}
+      {nonArtifactEditedFiles.length > 0 && (
         <TurnFilesGenerated
-          files={editedFilesData.files}
+          files={nonArtifactEditedFiles}
           totalAdded={editedFilesData.totalAdded}
           totalDeleted={editedFilesData.totalDeleted}
           onOpenFile={onOpenFile}

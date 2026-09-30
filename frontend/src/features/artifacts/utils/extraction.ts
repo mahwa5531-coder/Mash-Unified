@@ -3,7 +3,26 @@ import { ArtifactItem, EditedFileItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
 import { normalizePath } from '@/utils/normalizePath';
 
+export function isArtifactPath(p: string): boolean {
+  if (!p || shouldExcludePath(p)) return false;
+  const lower = p.toLowerCase().replace(/\\/g, '/');
+  // Mash strictly parses deliverables and working papers from 2 designated folders:
+  // 1. Audit_Deliverables/ (statutory deliverables in project workspace)
+  // 2. working_papers/ (session working papers in brain)
+  // Plus explicit executive plans/walkthroughs
+  return (
+    lower.includes('audit_deliverables/') ||
+    lower.startsWith('audit_deliverables/') ||
+    lower.includes('working_papers/') ||
+    lower.startsWith('working_papers/') ||
+    lower.endsWith('implementation_plan.md') ||
+    lower.endsWith('plan.md') ||
+    lower.endsWith('walkthrough.md')
+  );
+}
+
 export function shouldExcludePath(p: string): boolean {
+  if (!p) return true;
   const lower = p.toLowerCase().replace(/\\/g, '/');
   return (
     lower.includes('/scratch/') ||
@@ -14,10 +33,13 @@ export function shouldExcludePath(p: string): boolean {
     lower.startsWith('.gemini/') ||
     lower.includes('/.nexau/') ||
     lower.startsWith('.nexau/') ||
+    lower.includes('/.system_generated/') ||
+    lower.startsWith('.system_generated/') ||
     lower.includes('/tmp/') ||
     lower.startsWith('tmp/') ||
     lower.includes('/temp/') ||
-    lower.startsWith('temp/')
+    lower.startsWith('temp/') ||
+    lower.includes('/node_modules/')
   );
 }
 
@@ -29,6 +51,10 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
   const seenPaths = new Set<string>();
 
   const classifyArtifact = (p: string): { isArtifact: boolean; type: 'plan' | 'walkthrough' | 'doc' | 'spreadsheet' | 'chart' } => {
+    // Strictly guard: only files belonging to the 2 authorized folders are deliverables/working papers
+    if (!isArtifactPath(p)) {
+      return { isArtifact: false, type: 'doc' };
+    }
     const lower = p.toLowerCase().replace(/\\/g, '/');
     if (/\.(xlsx|xls|csv)$/i.test(lower)) {
       return { isArtifact: true, type: 'spreadsheet' };
@@ -42,10 +68,7 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
     if (lower.includes('walkthrough')) {
       return { isArtifact: true, type: 'walkthrough' };
     }
-    if (lower.endsWith('.md')) {
-      return { isArtifact: true, type: 'doc' };
-    }
-    return { isArtifact: false, type: 'doc' };
+    return { isArtifact: true, type: 'doc' };
   };
 
   // 1. Check tools for created artifacts (plans, walkthroughs, spreadsheets, visual charts)
@@ -102,7 +125,7 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
 
   // 2. Strict Fallback: Check markdown text ONLY if no tool calls created cards
   if (artifacts.length === 0 && (!msg.tools || msg.tools.length === 0) && msg.content) {
-    const linkRegex = /\[([^\]]+)\]\((file:\/\/\/[^)]+|(?:[a-zA-Z]:[/\\]|\/|\.\/|NexAU_Outputs\/|Audit_Deliverables\/|working_papers\/|scratch\/)[^)]+\.(?:md|xlsx?|csv|png|jpe?g|svg))\)/gi;
+    const linkRegex = /\[([^\]]+)\]\((file:\/\/\/[^)]+|(?:[a-zA-Z]:[/\\]|\/|\.\/|Audit_Deliverables\/|working_papers\/)[^)]+\.(?:md|xlsx?|csv|png|jpe?g|svg))\)/gi;
     let match;
     while ((match = linkRegex.exec(msg.content)) !== null) {
       const linkText = match[1];
