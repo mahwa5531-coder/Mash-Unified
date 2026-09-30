@@ -659,6 +659,17 @@ async def get_transcript(
             end_idx = total_lines - offset if offset > 0 else total_lines
             lines = lines[start_idx:end_idx]
 
+        # ponytail: Write physical transcript.json into session logs directory so disk inspection always succeeds
+        try:
+            b_dir = get_session_brain_dir(session_id)
+            log_dir = b_dir / ".system_generated" / "logs"
+            if log_dir.is_dir():
+                import json
+                t_file = log_dir / "transcript.json"
+                t_file.write_text(json.dumps({"lines": lines, "total": total_lines}, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
+
         return {"lines": lines, "total": total_lines}
     except Exception as e:
         logger.warning(f"Error loading transcript: {e}")

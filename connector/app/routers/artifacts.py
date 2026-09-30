@@ -63,57 +63,70 @@ async def list_artifacts(
             is_project_session = True
             project_dir = str(Path(ws_uri).resolve())
 
-    items = []
+    primary_brain_dir = get_brain_dir(session_id, session)
+    wp_dir = Path(primary_brain_dir) / "working_papers"
 
+    deliverables_items = []
+    working_papers_items = []
+
+    # 1. Scan working_papers in session brain directory (always present for all sessions)
+    if wp_dir.is_dir():
+        for f in sorted(wp_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            if f.is_file() and not f.name.startswith("."):
+                working_papers_items.append({
+                    "name": f.name,
+                    "rel_path": f"working_papers/{f.name}",
+                    "path": str(f.resolve()).replace("\\", "/"),
+                    "mtime": f.stat().st_mtime,
+                    "size": f.stat().st_size,
+                    "group": "working_papers",
+                })
+    # Also check root-level deliverable files directly in brain directory (.md, .xlsx, .csv, .pdf)
+    b_path = Path(primary_brain_dir)
+    if b_path.is_dir():
+        for f in sorted(b_path.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            if f.is_file() and f.suffix.lower() in (".md", ".xlsx", ".csv", ".pdf") and not f.name.startswith("."):
+                if f.name not in {it["name"] for it in working_papers_items}:
+                    working_papers_items.append({
+                        "name": f.name,
+                        "rel_path": f.name,
+                        "path": str(f.resolve()).replace("\\", "/"),
+                        "mtime": f.stat().st_mtime,
+                        "size": f.stat().st_size,
+                        "group": "working_papers",
+                    })
+
+    # 2. If PROJECT session: parse <workspace>/Audit_Deliverables/
+    deliv_dir_str = None
     if is_project_session and project_dir:
-        # PROJECT SESSION: parse ONLY <workspace>/Audit_Deliverables/
         deliv_dir = Path(project_dir) / "Audit_Deliverables"
         if deliv_dir.is_dir():
+            deliv_dir_str = str(deliv_dir.resolve()).replace("\\", "/")
             for f in sorted(deliv_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
                 if f.is_file() and not f.name.startswith("."):
-                    items.append({
+                    deliverables_items.append({
                         "name": f.name,
                         "rel_path": f"Audit_Deliverables/{f.name}",
                         "path": str(f.resolve()).replace("\\", "/"),
                         "mtime": f.stat().st_mtime,
+                        "size": f.stat().st_size,
+                        "group": "deliverables",
                     })
-        return {
-            "files": [it["rel_path"] for it in items],
-            "items": items,
-            "project_directory": project_dir,
-            "mode": "workspace",
-        }
-    else:
-        # STANDALONE SESSION: parse ONLY <brain>/working_papers/
-        primary_brain_dir = get_brain_dir(session_id, session)
-        wp_dir = Path(primary_brain_dir) / "working_papers"
-        if wp_dir.is_dir():
-            for f in sorted(wp_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
-                if f.is_file() and not f.name.startswith("."):
-                    items.append({
-                        "name": f.name,
-                        "rel_path": f"working_papers/{f.name}",
-                        "path": str(f.resolve()).replace("\\", "/"),
-                        "mtime": f.stat().st_mtime,
-                    })
-        # Also check root-level deliverable files directly in brain directory (.md, .xlsx, .csv, .pdf)
-        b_path = Path(primary_brain_dir)
-        if b_path.is_dir():
-            for f in sorted(b_path.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
-                if f.is_file() and f.suffix.lower() in (".md", ".xlsx", ".csv", ".pdf") and not f.name.startswith("."):
-                    if f.name not in {it["name"] for it in items}:
-                        items.append({
-                            "name": f.name,
-                            "rel_path": f.name,
-                            "path": str(f.resolve()).replace("\\", "/"),
-                            "mtime": f.stat().st_mtime,
-                        })
-        return {
-            "files": [it["rel_path"] for it in items],
-            "items": items,
-            "brain_directory": str(primary_brain_dir),
-            "mode": "standalone",
-        }
+
+    all_items = deliverables_items + working_papers_items
+
+    return {
+        "is_project_session": is_project_session,
+        "deliverables": deliverables_items,
+        "working_papers": working_papers_items,
+        "items": all_items,
+        "files": [it["rel_path"] for it in all_items],
+        "project_directory": project_dir,
+        "deliverables_directory": deliv_dir_str,
+        "brain_directory": str(primary_brain_dir),
+        "working_papers_directory": str(wp_dir.resolve()).replace("\\", "/"),
+        "mode": "workspace" if is_project_session else "standalone",
+    }
 
 
 @router.get("/artifacts/{user_id}/{session_id}/{filename:path}")

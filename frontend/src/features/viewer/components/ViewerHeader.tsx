@@ -11,8 +11,8 @@ export interface ViewerHeaderProps {
   openTabs: TabItem[];
   activeTabId: string | null;
   setActiveTabId: React.Dispatch<React.SetStateAction<string | null>>;
-  openSections: { artifacts: boolean; backgroundTasks: boolean };
-  setOpenSections: React.Dispatch<React.SetStateAction<{ artifacts: boolean; backgroundTasks: boolean }>>;
+  openSections: { deliverables?: boolean; workingPapers?: boolean; artifacts?: boolean; backgroundTasks: boolean };
+  setOpenSections: React.Dispatch<React.SetStateAction<any>>;
   isMaximized: boolean;
   onToggle: () => void;
   handleToggleMaximize: () => void;
@@ -39,7 +39,7 @@ export function ViewerHeader({
       }
     } else {
       setViewMode('explorer');
-      setOpenSections(prev => ({ ...prev, artifacts: true }));
+      setOpenSections((prev: any) => ({ ...prev, deliverables: true, workingPapers: true, artifacts: true }));
     }
   };
 

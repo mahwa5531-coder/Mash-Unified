@@ -14,7 +14,7 @@ import { formatArtifactTitle, UNSUPPORTED_DOC_REGEX } from '../utils/artifactPre
 import type { TabItem } from '../types';
 import { fetchFileContent, getFileContentFromCache, invalidateFileCache } from '@/services/files';
 import { fetchTaskLog, fetchBackgroundTasks, killBackgroundTask, BackgroundTaskItem } from '@/services/tasks';
-import { fetchSessionArtifacts, ArtifactFileItem } from '@/services/artifacts';
+import { fetchSessionArtifactsData, ArtifactFileItem, SessionArtifactsData } from '@/services/artifacts';
 import { BASE_URL } from '@/services/client';
 import { normalizePath } from '@/utils/normalizePath';
 
@@ -43,20 +43,30 @@ export default function RightSidebar({
   isMaximized: controlledIsMaximized,
   onToggleMaximize
 }: RightSidebarProps) {
-  // Accordion Sections State (backgroundTasks defaults to collapsed to minimize distraction for auditors)
+  // Accordion Sections State
   const [openSections, setOpenSections] = useState({
-    artifacts: true,
+    deliverables: true,
+    workingPapers: true,
     backgroundTasks: false,
+    artifacts: true,
   });
 
   // Expanded items state ("See all")
   const [expandedSection, setExpandedSection] = useState<{
-    artifacts: boolean;
+    deliverables?: boolean;
+    workingPapers?: boolean;
     tasks: boolean;
+    artifacts?: boolean;
   }>({
-    artifacts: false,
+    deliverables: false,
+    workingPapers: false,
     tasks: false,
+    artifacts: false,
   });
+
+  const toggleSection = (key: 'deliverables' | 'workingPapers' | 'backgroundTasks' | 'artifacts') => {
+    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // Inline filter search queries
   const [artifactFilter, setArtifactFilter] = useState('');
@@ -88,7 +98,12 @@ export default function RightSidebar({
   const [fileViewMode, setFileViewMode] = useState<'preview' | 'raw'>('preview');
 
   // Data States
-  const [artifacts, setArtifacts] = useState<ArtifactFileItem[]>([]);
+  const [artifactsData, setArtifactsData] = useState<SessionArtifactsData>({
+    isProjectSession: false,
+    deliverables: [],
+    workingPapers: [],
+    items: [],
+  });
   const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTaskItem[]>([]);
 
   const prevSessionIdRef = useRef<string | undefined>(sessionId);
@@ -107,10 +122,15 @@ export default function RightSidebar({
   const loadArtifacts = useCallback(async () => {
     if (!sessionId) return;
     try {
-      const items = await fetchSessionArtifacts(sessionId);
-      setArtifacts(items || []);
+      const data = await fetchSessionArtifactsData(sessionId);
+      setArtifactsData(data);
     } catch {
-      setArtifacts([]);
+      setArtifactsData({
+        isProjectSession: false,
+        deliverables: [],
+        workingPapers: [],
+        items: [],
+      });
     }
   }, [sessionId]);
 
@@ -309,10 +329,6 @@ export default function RightSidebar({
       }
     }
   }, [onToggleMaximize, internalIsMaximized, width]);
-
-  const toggleSection = (key: keyof typeof openSections) => {
-    setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
-  };
 
   // Atomic Tab Opening (Guarantees zero duplicate tabs)
   const openFileTab = useCallback((name: string, fullPath: string, type: 'file' | 'image' = 'file') => {
@@ -616,7 +632,7 @@ export default function RightSidebar({
       {/* Main Content Body */}
       {viewMode === 'explorer' ? (
         <ExplorerPanel
-          artifacts={artifacts}
+          artifactsData={artifactsData}
           effectiveTasks={effectiveTasks}
           openSections={openSections}
           toggleSection={toggleSection}
@@ -630,6 +646,7 @@ export default function RightSidebar({
           openTerminalTab={openTerminalTab}
           handleKillTask={handleKillTask}
           handleKillAllTasks={handleKillAllTasks}
+          onRefresh={loadArtifacts}
         />
       ) : !activeTab ? (
         <ViewerEmptyState setViewMode={setViewMode} />

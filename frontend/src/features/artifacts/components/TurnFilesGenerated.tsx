@@ -82,10 +82,17 @@ export function TurnFilesGenerated({
               : '';
 
             return (
-              <button
+              <div
                 key={file.path || idx}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => onOpenFile?.(file.path)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onOpenFile?.(file.path);
+                  }
+                }}
                 className="w-full text-left flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-zinc-200/50 dark:hover:bg-white/[0.04] cursor-pointer group select-none transition-colors outline-none focus-visible:ring-1 focus-visible:ring-zinc-400"
                 title={`Click anywhere to open ${file.path}`}
               >
@@ -112,7 +119,7 @@ export function TurnFilesGenerated({
                     +{file.addedLines}
                   </span>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>
