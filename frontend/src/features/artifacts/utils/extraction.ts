@@ -11,9 +11,13 @@ export function shouldExcludePath(p: string): boolean {
     lower.includes('/.scratch/') ||
     lower.startsWith('.scratch/') ||
     lower.includes('/.gemini/') ||
+    lower.startsWith('.gemini/') ||
     lower.includes('/.nexau/') ||
+    lower.startsWith('.nexau/') ||
     lower.includes('/tmp/') ||
-    lower.includes('/temp/')
+    lower.startsWith('tmp/') ||
+    lower.includes('/temp/') ||
+    lower.startsWith('temp/')
   );
 }
 

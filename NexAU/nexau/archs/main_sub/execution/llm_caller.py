@@ -14,8 +14,8 @@
 RFC-0006: structured tool calling  provider 
 
 module,  ``llm_config.api_type``  neutral structured
-tool definitions  OpenAI / Anthropic / Gemini  provider schema. 
 """
+from __future__ import annotations
 
 import asyncio
 import contextvars

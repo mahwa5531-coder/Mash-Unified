@@ -201,7 +201,7 @@ async def list_sessions(
                 "working_directory": ctx.get("working_directory", workspace_uri),
                 "section": section,
                 "message_count": msg_count,
-                "total_tokens": msg_count * 150,
+                "total_tokens": ctx.get("total_tokens") or 0,
                 "last_user_view_time": last_view_time,
                 "has_unread": has_unread,
                 "updated_at": updated_iso,

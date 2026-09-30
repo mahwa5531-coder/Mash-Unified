@@ -263,8 +263,8 @@ class StopPayload(BaseModel):
     session_id: str | None = None
     user_id: str = "default_user"
     agent_id: str | None = None
-    force: bool = False
-    timeout: float | None = None
+    force: bool = True
+    timeout: float | None = 15.0
 
 
 @router.post("/stop")
@@ -285,8 +285,8 @@ async def stop_agent_bridge(
             user_id=uid,
             session_id=sid,
             agent_id=payload.agent_id if payload else None,
-            force=payload.force if payload else True,
-            timeout=payload.timeout if payload else None,
+            force=payload.force if payload is not None else True,
+            timeout=payload.timeout if payload is not None else 15.0,
         )
         stop_reason = getattr(result, "stop_reason", "stopped")
     except Exception as e:

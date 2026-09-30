@@ -253,13 +253,10 @@ async def get_file_content(
                 found = True
                 break
         if not found:
-            p = p.resolve()
-
-    if not p.exists():
-        raise HTTPException(status_code=404, detail=f"File '{clean_path or path}' not found on local disk.")
-
-    if p.is_dir():
-        raise HTTPException(status_code=403, detail="Access denied: Path is outside authorized workspace directories.")
+            try:
+                p = p.resolve()
+            except Exception:
+                pass
 
     eng = _get_engine(engine)
     if not is_path_in_base_roots(p):
@@ -269,6 +266,21 @@ async def get_file_content(
                 status_code=403,
                 detail="Access denied: Path is outside authorized workspace directories."
             )
+
+    try:
+        exists = p.exists()
+        is_dir = p.is_dir() if exists else False
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Access denied: Permission denied accessing path.")
+    except Exception:
+        exists = False
+        is_dir = False
+
+    if not exists:
+        raise HTTPException(status_code=404, detail=f"File '{clean_path or path}' not found on local disk.")
+
+    if is_dir:
+        raise HTTPException(status_code=403, detail="Access denied: Path is outside authorized workspace directories.")
 
     if raw:
         return FileResponse(p, filename=p.name)
