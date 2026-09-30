@@ -12,7 +12,6 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
-import { MashBrandIcon } from '@/primitives';
 
 interface ChatToolbarProps {
   isSidebarOpen: boolean;
@@ -46,8 +45,8 @@ export function ChatToolbar({
                   {/* When Left Sidebar is CLOSED: show Logo and PanelLeft here */}
                   {!isSidebarOpen && (
                     <div className="flex items-center gap-1.5 shrink-0 mr-3">
-                      <div className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-100 flex items-center justify-center shadow-xs select-none mr-1">
-                        <MashBrandIcon size={13} className="text-zinc-100" />
+                      <div className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-100 flex items-center justify-center font-bold text-[11px] shadow-xs select-none mr-1">
+                        M
                       </div>
                       <button
                         type="button"

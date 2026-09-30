@@ -32,9 +32,8 @@ async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEng
     target_dir = docs_dir / clean_name
     target_dir.mkdir(parents=True, exist_ok=True)
     
-    # Subdirectories for outputs and deliverables
-    (target_dir / "Audit_Deliverables").mkdir(parents=True, exist_ok=True)
-    (target_dir / "NexAU_Outputs").mkdir(parents=True, exist_ok=True)
+    from nexau.archs.platform.path_helpers import scaffold_workspace_storage
+    scaffold_workspace_storage(target_dir)
     
     normalized_path = os.path.normpath(str(target_dir)).replace("\\", "/")
     
@@ -55,9 +54,8 @@ async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEng
 async def create_project(request: CreateProjectRequest, engine: DatabaseEngineDep):
     normalized_path = os.path.normpath(request.local_folder_path).replace("\\", "/")
     try:
-        os.makedirs(normalized_path, exist_ok=True)
-        os.makedirs(os.path.join(normalized_path, "Audit_Deliverables"), exist_ok=True)
-        os.makedirs(os.path.join(normalized_path, "NexAU_Outputs"), exist_ok=True)
+        from nexau.archs.platform.path_helpers import scaffold_workspace_storage
+        scaffold_workspace_storage(normalized_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create directory: {e}")
 

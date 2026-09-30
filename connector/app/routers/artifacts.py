@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from app.dependencies import DatabaseEngineDep, get_engine, _engine
 from app.models.project import ProjectModel
-from app.workspace import get_allowed_file_roots, is_path_in_base_roots, resolve_session_workspace
+from app.workspace import get_allowed_file_roots, is_path_in_base_roots, resolve_session_workspace, APP_WORKSPACE_ROOT
 from nexau.archs.session.orm import ComparisonFilter
 from nexau.archs.session.models import SessionModel
 from nexau.archs.platform.path_helpers import get_session_brain_dir
@@ -44,108 +44,76 @@ async def list_artifacts(
     engine: DatabaseEngineDep,
     user_id: str = "default_user",
 ):
-    """List all artifacts for a session from both the brain directory and project workspace."""
+    """List deliverables for a session:
+    - If in a project workspace: parse ONLY <workspace>/Audit_Deliverables/
+    - If in a standalone session (No Repo): parse ONLY <brain_dir>/working_papers/
+    """
     eng = _get_engine(engine)
     session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id)) if eng else None
-    primary_brain_dir = get_brain_dir(session_id, session)
-
-    candidate_dirs = [
-        Path(primary_brain_dir),
-        Path.home() / ".nexau" / "brain" / session_id,
-        Path.home() / ".gemini" / "antigravity" / "brain" / session_id,
-    ]
-
-    files_with_mtime: list[tuple[str, float]] = []
-    seen_files = set()
-    found_brain_dir = primary_brain_dir
-
-    for b_dir in candidate_dirs:
-        if b_dir.is_dir():
-            found_brain_dir = str(b_dir)
-            try:
-                SYSTEM_IGNORE = {
-                    "scratch", "working_papers", ".user_uploaded", ".system_generated", "media", "cache"
-                }
-                for f in os.listdir(b_dir):
-                    if f.startswith(".") or f.endswith(".metadata.json") or f in SYSTEM_IGNORE:
-                        continue
-                    full_p = b_dir / f
-                    if full_p.is_file() and f not in seen_files:
-                        seen_files.add(f)
-                        files_with_mtime.append((f, full_p.stat().st_mtime))
-            except Exception:
-                pass
-
-            wp_p = b_dir / "working_papers"
-            if wp_p.is_dir():
-                try:
-                    for f in os.listdir(wp_p):
-                        if f.startswith(".") or f.endswith(".metadata.json"):
-                            continue
-                        rel_f = f"working_papers/{f}"
-                        full_p = wp_p / f
-                        if full_p.is_file() and rel_f not in seen_files:
-                            seen_files.add(rel_f)
-                            files_with_mtime.append((rel_f, full_p.stat().st_mtime))
-                except Exception:
-                    pass
-
-            scratch_p = b_dir / "scratch"
-            if scratch_p.is_dir():
-                try:
-                    for f in os.listdir(scratch_p):
-                        if f.startswith(".") or f.endswith(".metadata.json"):
-                            continue
-                        rel_f = f"scratch/{f}"
-                        full_p = scratch_p / f
-                        if full_p.is_file() and rel_f not in seen_files:
-                            seen_files.add(rel_f)
-                            files_with_mtime.append((rel_f, full_p.stat().st_mtime))
-                except Exception:
-                    pass
-
-    # Include deliverables from project Audit_Deliverables and NexAU_Outputs folders
+    
+    ws = await resolve_session_workspace(eng, session_id) if session else None
+    is_project_session = False
     project_dir = None
-    try:
-        ws = await resolve_session_workspace(eng, session_id)
-        if ws and ws.is_dir():
-            project_dir = str(ws)
-            for folder_name in ("Audit_Deliverables", "NexAU_Outputs"):
-                outputs_dir = ws / folder_name
-                if outputs_dir.is_dir():
-                    for f in os.listdir(outputs_dir):
-                        if f.startswith("."):
-                            continue
-                        full_p = outputs_dir / f
-                        rel_f = f"{folder_name}/{f}"
-                        if full_p.is_file() and rel_f not in seen_files:
-                            seen_files.add(rel_f)
-                            files_with_mtime.append((rel_f, full_p.stat().st_mtime))
-    except Exception:
-        pass
-
-    files_with_mtime.sort(key=lambda x: x[1], reverse=True)
-    files = [x[0] for x in files_with_mtime]
+    if ws and ws.is_dir() and ws != APP_WORKSPACE_ROOT:
+        is_project_session = True
+        project_dir = str(ws)
+    elif session and session.context:
+        ws_uri = session.context.get("workspace_uri", "")
+        if ws_uri and ws_uri != "No Repo" and Path(ws_uri).is_dir():
+            is_project_session = True
+            project_dir = str(Path(ws_uri).resolve())
 
     items = []
-    for rel_f, mtime in files_with_mtime:
-        if (rel_f.startswith("Audit_Deliverables/") or rel_f.startswith("NexAU_Outputs/")) and project_dir:
-            full_path = str((Path(project_dir) / rel_f).resolve())
-        else:
-            full_path = str((Path(found_brain_dir) / rel_f).resolve())
-        items.append({
-            "name": Path(rel_f).name,
-            "rel_path": rel_f,
-            "path": full_path.replace("\\", "/"),
-            "mtime": mtime,
-        })
 
-    return {
-        "files": files,
-        "items": items,
-        "brain_directory": found_brain_dir,
-        "project_directory": project_dir,
-    }
+    if is_project_session and project_dir:
+        # PROJECT SESSION: parse ONLY <workspace>/Audit_Deliverables/
+        deliv_dir = Path(project_dir) / "Audit_Deliverables"
+        if deliv_dir.is_dir():
+            for f in sorted(deliv_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+                if f.is_file() and not f.name.startswith("."):
+                    items.append({
+                        "name": f.name,
+                        "rel_path": f"Audit_Deliverables/{f.name}",
+                        "path": str(f.resolve()).replace("\\", "/"),
+                        "mtime": f.stat().st_mtime,
+                    })
+        return {
+            "files": [it["rel_path"] for it in items],
+            "items": items,
+            "project_directory": project_dir,
+            "mode": "workspace",
+        }
+    else:
+        # STANDALONE SESSION: parse ONLY <brain>/working_papers/
+        primary_brain_dir = get_brain_dir(session_id, session)
+        wp_dir = Path(primary_brain_dir) / "working_papers"
+        if wp_dir.is_dir():
+            for f in sorted(wp_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+                if f.is_file() and not f.name.startswith("."):
+                    items.append({
+                        "name": f.name,
+                        "rel_path": f"working_papers/{f.name}",
+                        "path": str(f.resolve()).replace("\\", "/"),
+                        "mtime": f.stat().st_mtime,
+                    })
+        # Also check root-level deliverable files directly in brain directory (.md, .xlsx, .csv, .pdf)
+        b_path = Path(primary_brain_dir)
+        if b_path.is_dir():
+            for f in sorted(b_path.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+                if f.is_file() and f.suffix.lower() in (".md", ".xlsx", ".csv", ".pdf") and not f.name.startswith("."):
+                    if f.name not in {it["name"] for it in items}:
+                        items.append({
+                            "name": f.name,
+                            "rel_path": f.name,
+                            "path": str(f.resolve()).replace("\\", "/"),
+                            "mtime": f.stat().st_mtime,
+                        })
+        return {
+            "files": [it["rel_path"] for it in items],
+            "items": items,
+            "brain_directory": str(primary_brain_dir),
+            "mode": "standalone",
+        }
 
 
 @router.get("/artifacts/{user_id}/{session_id}/{filename:path}")
@@ -484,22 +452,32 @@ async def get_file_content(
 
 @router.get("/workspace/tree")
 @router.get("/api/workspace/tree")
-async def get_workspace_tree(session_id: str | None = None):
-    """Scan and return workspace file tree, scratch folder, and session artifacts."""
-    workspace_root = Path.cwd()
-    scratch_dir = workspace_root / ".scratch"
+async def get_workspace_tree(session_id: str | None = None, engine: DatabaseEngineDep = None):
+    """Scan and return workspace file tree focusing strictly on audit deliverables, data files, and session artifacts."""
+    eng = _get_engine(engine)
+    workspace_root = await resolve_session_workspace(eng, session_id) if session_id else APP_WORKSPACE_ROOT
+    scratch_dir = workspace_root / ".scratch" if (workspace_root / ".scratch").exists() else workspace_root / "scratch"
 
-    def scan_dir(dir_path: Path, max_depth=3, current_depth=0):
+    deliverables_dir = workspace_root / "Audit_Deliverables"
+
+    def scan_dir(dir_path: Path, max_depth=2, current_depth=0):
         if current_depth > max_depth or not dir_path.exists():
             return []
         items = []
-        ignored = {".git", ".venv", "node_modules", "__pycache__", ".pytest_cache", ".ruff_cache", "dist", "build"}
+        ignored = {
+            ".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache",
+            ".ruff_cache", "dist", "build", ".next", ".hypothesis", "antigravity",
+            "backup_frontend", ".nexau", ".gemini"
+        }
         try:
             for entry in sorted(dir_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
-                if entry.name in ignored:
+                if entry.name in ignored or entry.name.startswith("."):
                     continue
                 rel_path = str(entry.relative_to(workspace_root)).replace("\\", "/")
                 if entry.is_dir():
+                    # Only recurse into Audit_Deliverables or top-level data/docs folders
+                    if current_depth == 0 and entry.name != "Audit_Deliverables" and not any(k in entry.name.lower() for k in ("data", "doc", "paper", "audit", "sheet")):
+                        continue
                     children = scan_dir(entry, max_depth, current_depth + 1)
                     items.append({
                         "name": entry.name,
@@ -522,9 +500,8 @@ async def get_workspace_tree(session_id: str | None = None):
     scratch_files = scan_dir(scratch_dir) if scratch_dir.exists() else []
 
     artifacts = []
-    artifacts_dir = Path("artifacts")
-    if artifacts_dir.exists():
-        artifacts = scan_dir(artifacts_dir)
+    if deliverables_dir.exists():
+        artifacts = scan_dir(deliverables_dir)
 
     return {
         "workspace": workspace_files,

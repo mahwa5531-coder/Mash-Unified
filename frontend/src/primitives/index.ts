@@ -13,4 +13,3 @@ export * from './FileIcon';
 export * from './Modal';
 export * from './WebLink';
 export * from './QuotaBanner';
-export * from './MashBrandIcon';

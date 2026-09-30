@@ -128,12 +128,16 @@ def get_project_cache_dir(project_id: str) -> Path:
 
 def scaffold_nexau_system_storage() -> Path:
     """Scaffold global NexAU system directories on disk (~/.nexau/...).
-    Ensures brain and database directories exist on clean install.
-    Session-specific logs/tasks/cache are scaffolded inside brain/<session_id>/.
+    Ensures database, brain, agents, vault, templates, and cache exist on clean install.
     """
     home = get_nexau_home()
-    (home / "brain").mkdir(parents=True, exist_ok=True)
     (home / "database").mkdir(parents=True, exist_ok=True)
+    (home / "brain").mkdir(parents=True, exist_ok=True)
+    (home / "agents").mkdir(parents=True, exist_ok=True)
+    (home / "vault").mkdir(parents=True, exist_ok=True)
+    (home / "templates").mkdir(parents=True, exist_ok=True)
+    (home / "cache").mkdir(parents=True, exist_ok=True)
+    get_installation_id()
     return home
 
 
@@ -142,21 +146,50 @@ def scaffold_session_storage(session_id: str, project_id: str | None = None) -> 
     ~/.nexau/brain/<session_id>/
       ├── .system_generated/
       │   ├── logs/
-      │   ├── tasks/
-      │   └── messages/
+      │   └── tasks/
       ├── .user_uploaded/
-      ├── media/
-      └── scratch/
+      ├── working_papers/
+      ├── scratch/
+      └── cache/
     """
     brain_dir = get_session_brain_dir(session_id, project_id)
     (brain_dir / ".system_generated" / "logs").mkdir(parents=True, exist_ok=True)
     (brain_dir / ".system_generated" / "tasks").mkdir(parents=True, exist_ok=True)
-    (brain_dir / ".system_generated" / "messages").mkdir(parents=True, exist_ok=True)
     (brain_dir / ".user_uploaded").mkdir(parents=True, exist_ok=True)
-    (brain_dir / "media").mkdir(parents=True, exist_ok=True)
+    (brain_dir / "working_papers").mkdir(parents=True, exist_ok=True)
     (brain_dir / "scratch").mkdir(parents=True, exist_ok=True)
     (brain_dir / "cache").mkdir(parents=True, exist_ok=True)
     return brain_dir
+
+
+def scaffold_workspace_storage(workspace_path: str | Path) -> Path:
+    """Scaffold the designated audit folders inside the user's workspace:
+    <workspace_root>/
+      ├── Audit_Deliverables/   (Official statutory deliverables, memos, spreadsheets)
+      └── .nexau/               (Hidden metadata, local workspace cache)
+    """
+    ws = Path(workspace_path).resolve()
+    if not ws.exists() or not ws.is_dir():
+        ws.mkdir(parents=True, exist_ok=True)
+
+    (ws / "Audit_Deliverables").mkdir(parents=True, exist_ok=True)
+    (ws / ".nexau" / "cache").mkdir(parents=True, exist_ok=True)
+    
+    ws_meta = ws / ".nexau" / "workspace.json"
+    if not ws_meta.exists():
+        import json
+        from datetime import datetime, timezone
+        try:
+            ws_meta.write_text(json.dumps({
+                "name": ws.name,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "deliverables_dir": "Audit_Deliverables",
+                "version": "1.0.0",
+            }, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+    return ws
 
 
 def get_brain_dir(session_id: str | None = None, project_id: str | None = None) -> Path:

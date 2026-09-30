@@ -49,7 +49,7 @@ async def _ensure_project_and_context(
     NexAU handles session creation itself via SessionManager._get_or_create_session().
     This function only prepares the *context dict* that NexAU will store.
     """
-    from nexau.archs.platform.path_helpers import scaffold_session_storage
+    from nexau.archs.platform.path_helpers import scaffold_session_storage, scaffold_workspace_storage
 
     project_id = resolved_context.get("project_id")
 
@@ -61,6 +61,12 @@ async def _ensure_project_and_context(
     resolved_context["session_id"] = sid
     if not resolved_context.get("working_directory"):
         resolved_context["working_directory"] = workspace_target
+
+    if workspace_target and workspace_target != "No Repo" and os.path.exists(workspace_target):
+        try:
+            scaffold_workspace_storage(workspace_target)
+        except Exception:
+            pass
 
     if not eng:
         return
