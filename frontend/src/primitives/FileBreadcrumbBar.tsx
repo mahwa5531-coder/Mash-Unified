@@ -40,12 +40,13 @@ export function FileBreadcrumbBar({
   className,
 }: FileBreadcrumbBarProps) {
   // Parse complete breadcrumb segments from path
-  const segments = customSegments ?? React.useMemo(() => {
+  const parsedSegments = React.useMemo(() => {
     if (!path) return ['Overview'];
     const clean = path.replace(/\\/g, '/').replace(/^\/+/, '').replace(/^[a-zA-Z]:\/?/, '');
     const parts = clean.split('/').filter(Boolean);
     return parts.length > 0 ? parts : [path];
   }, [path]);
+  const segments = customSegments ?? parsedSegments;
 
   const directorySegments = segments.slice(0, -1);
   const lastSegment = segments[segments.length - 1] || 'Overview';

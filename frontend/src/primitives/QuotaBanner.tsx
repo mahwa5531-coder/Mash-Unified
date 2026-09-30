@@ -38,17 +38,11 @@ export function QuotaBanner({
   onDismiss,
   className,
 }: QuotaBannerProps) {
-  if (!open) return null;
-
-  const handleDismiss = () => {
-    onDismiss?.();
-    onOpenChange?.(false);
-  };
-
   // Format dynamic renewal date and time (e.g. "9/17/2026, 2:58:31 PM")
   const formattedRefreshTime = useMemo(() => {
     if (!refreshDate) {
       // Default dynamic fallback: computes upcoming rolling refresh
+      // eslint-disable-next-line react-hooks/purity
       const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
       return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}, ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`;
     }
@@ -61,6 +55,13 @@ export function QuotaBanner({
     }
     return `${refreshDate.getMonth() + 1}/${refreshDate.getDate()}/${refreshDate.getFullYear()}, ${refreshDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`;
   }, [refreshDate]);
+
+  if (!open) return null;
+
+  const handleDismiss = () => {
+    onDismiss?.();
+    onOpenChange?.(false);
+  };
 
   const bodyText = description || `Your plan's baseline quota will refresh on ${formattedRefreshTime}. To continue using this model now, enable AI Credit overages.`;
 

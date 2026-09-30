@@ -1,6 +1,6 @@
 // HTTP transport core: base URL + safe fetch wrapper shared by all services.
 
-export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+export const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
 
 /** Read stored access token from localStorage (if in browser) */
 export function getStoredAccessToken(): string | null {
