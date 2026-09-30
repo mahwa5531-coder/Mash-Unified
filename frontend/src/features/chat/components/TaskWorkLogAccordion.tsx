@@ -204,6 +204,7 @@ export default function TaskWorkLogAccordion({
 
   const renderTimelineRow = (entry: TimelineEntry, isChild = false) => (
     <TimelineRow
+      key={entry.id}
       entry={entry}
       isChild={isChild}
       isStreaming={isStreaming}
