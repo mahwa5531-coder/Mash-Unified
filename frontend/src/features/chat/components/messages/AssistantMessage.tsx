@@ -126,7 +126,7 @@ const AssistantMessage = memo(function AssistantMessage({
             flushWork();
             result.push({
               type: 'prose',
-              id: step.id || `prose_${result.length}`,
+              id: `prose_${result.length}_${step.id || ''}`,
               content: cleanText,
             });
           }
