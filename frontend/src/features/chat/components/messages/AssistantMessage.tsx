@@ -5,7 +5,7 @@ import TaskWorkLogAccordion from '@/features/chat/components/TaskWorkLogAccordio
 import ArtifactCard from '@/features/artifacts/components/ArtifactCard';
 import { TurnFilesGenerated } from '@/features/artifacts';
 import { extractArtifacts, extractEditedFiles } from '@/features/artifacts/utils/extraction';
-import { Message } from '@/types/chat';
+import { Message, ExecutionStep, ToolCall } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
 import { WorkingPaperCard } from '@/primitives';
 import { formatArtifactTitle } from '@/features/viewer/utils/artifactPresentation';
@@ -73,44 +73,142 @@ const AssistantMessage = memo(function AssistantMessage({
     );
   }, [editedFilesData.files]);
 
-  // Extract raw assistant prose text with fallback to text steps
-  const rawText = useMemo(() => {
-    if (msg.content && msg.content.trim().length > 0) return msg.content;
+  // ponytail: Interleaved Sequential Units — clean chronological flow where worklogs and authentic prose alternate
+  const units = useMemo<Array<
+    | { type: 'worklog'; id: string; steps: ExecutionStep[]; thoughts: string[]; tools: ToolCall[] }
+    | { type: 'prose'; id: string; content: string }
+  >>(() => {
     if (msg.steps && msg.steps.length > 0) {
-      const textSteps = msg.steps.filter((s: any) => s.type === 'text' && s.content && s.content.trim().length > 0);
-      if (textSteps.length > 0) {
-        return textSteps.map((s: any) => s.content.trim()).join('\n\n');
+      const result: Array<
+        | { type: 'worklog'; id: string; steps: ExecutionStep[]; thoughts: string[]; tools: ToolCall[] }
+        | { type: 'prose'; id: string; content: string }
+      > = [];
+      let currentWorkSteps: ExecutionStep[] = [];
+
+      const flushWork = () => {
+        if (currentWorkSteps.length > 0) {
+          const tools: ToolCall[] = [];
+          const thoughts: string[] = [];
+          currentWorkSteps.forEach((s) => {
+            if (s.type === 'tool') {
+              tools.push({
+                id: s.tool_call_id || s.id,
+                name: s.name || 'action',
+                args: s.args || {},
+                output: s.output || '',
+                status: (s.status as any) || 'completed',
+              });
+            } else if (s.type === 'thinking' && s.content) {
+              thoughts.push(s.content);
+            } else if (s.thoughts && s.thoughts.length > 0) {
+              thoughts.push(...s.thoughts);
+            }
+            if (s.tools && s.tools.length > 0) {
+              tools.push(...s.tools);
+            }
+          });
+
+          result.push({
+            type: 'worklog',
+            id: `work_${result.length}_${currentWorkSteps[0].id || result.length}`,
+            steps: [...currentWorkSteps],
+            thoughts,
+            tools,
+          });
+          currentWorkSteps = [];
+        }
+      };
+
+      for (const step of msg.steps) {
+        if (step.type === 'text') {
+          const cleanText = (step.content || '').replace(/\[VERIFIED\]\s*/gi, '').trim();
+          if (cleanText) {
+            flushWork();
+            result.push({
+              type: 'prose',
+              id: step.id || `prose_${result.length}`,
+              content: cleanText,
+            });
+          }
+        } else {
+          currentWorkSteps.push(step);
+        }
+      }
+      flushWork();
+
+      if (result.length > 0) {
+        return result;
       }
     }
-    return '';
-  }, [msg.content, msg.steps]);
+
+    // Fallback: Flat or legacy structure
+    const fallbackUnits: Array<
+      | { type: 'worklog'; id: string; steps: ExecutionStep[]; thoughts: string[]; tools: ToolCall[] }
+      | { type: 'prose'; id: string; content: string }
+    > = [];
+    const hasWork = (msg.thoughts && msg.thoughts.length > 0) || (msg.tools && msg.tools.length > 0);
+    if (hasWork) {
+      fallbackUnits.push({
+        type: 'worklog',
+        id: 'work_primary',
+        steps: msg.steps || [],
+        thoughts: msg.thoughts || [],
+        tools: msg.tools || [],
+      });
+    }
+    const cleanContent = (msg.content || '').replace(/\[VERIFIED\]\s*/gi, '').trim();
+    if (cleanContent) {
+      fallbackUnits.push({
+        type: 'prose',
+        id: 'prose_primary',
+        content: cleanContent,
+      });
+    }
+    return fallbackUnits;
+  }, [msg.steps, msg.thoughts, msg.tools, msg.content]);
+
+  // Aggregate all prose text for clipboard copy in footer
+  const allProseText = useMemo(() => {
+    const proseTexts = units
+      .filter((u): u is { type: 'prose'; id: string; content: string } => u.type === 'prose')
+      .map((u) => u.content);
+    if (proseTexts.length > 0) return proseTexts.join('\n\n');
+    return msg.content || '';
+  }, [units, msg.content]);
 
   return (
     <div className="text-[13.5px] text-[var(--text-primary)] w-full mb-1.5">
-      {/* 1. Reasoning & Tools (Chronological work trace with in-between text) */}
-      <TaskWorkLogAccordion 
-        steps={msg.steps}
-        thoughts={msg.thoughts} 
-        tools={msg.tools} 
-        isStreaming={isLast && isStreaming} 
-        isLast={isLast}
-        thinkingDurationSeconds={msg.thinkingDurationSeconds}
-        hasAssistantContent={!!(msg.content && msg.content.trim().length > 0)}
-        totalDurationSeconds={msg.totalDurationSeconds}
-        turnStartTime={msg.turnStartTime}
-        onOpenFile={onOpenFile}
-      />
+      {/* Interleaved Sequential Units (Thoughts, Tools, and Authentic Assistant Prose in Chronological Order) */}
+      {units.map((unit, uIdx) => {
+        if (unit.type === 'worklog') {
+          return (
+            <TaskWorkLogAccordion
+              key={unit.id}
+              steps={unit.steps}
+              thoughts={unit.thoughts}
+              tools={unit.tools}
+              isStreaming={isLast && isStreaming && uIdx === units.length - 1}
+              isLast={isLast}
+              thinkingDurationSeconds={msg.thinkingDurationSeconds}
+              hasAssistantContent={units.some((u, i) => i > uIdx && u.type === 'prose')}
+              totalDurationSeconds={msg.totalDurationSeconds}
+              turnStartTime={msg.turnStartTime}
+              onOpenFile={onOpenFile}
+            />
+          );
+        }
 
-      {/* 2. Decoupled Executive Markdown Prose */}
-      {rawText && (
-        <AssistantProse
-          content={rawText}
-          isStreaming={isActivelyStreaming}
-          sessionId={msg.sessionId}
-          onOpenFile={onOpenFile}
-          onImageClick={setLightboxImage}
-        />
-      )}
+        return (
+          <AssistantProse
+            key={unit.id}
+            content={unit.content}
+            isStreaming={isActivelyStreaming && uIdx === units.length - 1}
+            sessionId={msg.sessionId}
+            onOpenFile={onOpenFile}
+            onImageClick={setLightboxImage}
+          />
+        );
+      })}
 
       {/* 3. Execution Status Disclosure (Error / Interrupted / Aborted) */}
       <ExecutionStatusDisclosure
@@ -167,8 +265,8 @@ const AssistantMessage = memo(function AssistantMessage({
       {!isActivelyStreaming && (
         <AssistantMessageFooter
           displayTime={displayTime}
-          rawText={rawText || (msg.thoughts && msg.thoughts.length > 0 ? msg.thoughts.join('\n\n') : '')}
-          hasPrecedingContent={!!(rawText || artifacts.length > 0 || editedFilesData.files.length > 0)}
+          rawText={allProseText || (msg.thoughts && msg.thoughts.length > 0 ? msg.thoughts.join('\n\n') : '')}
+          hasPrecedingContent={!!(allProseText || artifacts.length > 0 || editedFilesData.files.length > 0)}
         />
       )}
 

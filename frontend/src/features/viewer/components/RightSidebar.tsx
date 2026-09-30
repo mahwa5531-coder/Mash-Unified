@@ -628,25 +628,6 @@ export default function RightSidebar({
         handleCloseTab={handleCloseTab}
       />
 
-      {/* Row 2: Canonical FileBreadcrumbBar Primitive (Permanently anchored below Row 1) */}
-      <FileBreadcrumbBar
-        path={
-          viewMode === 'explorer'
-            ? 'workspace/Deliverables_and_Papers'
-            : (activeTab?.path || activeTab?.title || 'workspace/Overview')
-        }
-        type={activeTab?.type}
-        actions={
-          activeTab ? (
-            <ViewerTabMenu
-              activeTab={activeTab}
-              content={tabContent[activeTab.id]}
-              onCloseTab={handleCloseTab}
-            />
-          ) : null
-        }
-      />
-
       {/* Main Content Body */}
       {viewMode === 'explorer' ? (
         <ExplorerPanel
@@ -659,6 +640,19 @@ export default function RightSidebar({
         <ViewerEmptyState setViewMode={setViewMode} />
       ) : (
         <div className="flex-1 overflow-hidden flex flex-col bg-card text-card-foreground">
+          {/* Row 2: Canonical FileBreadcrumbBar Primitive (Rendered only when a file tab is opened) */}
+          <FileBreadcrumbBar
+            path={activeTab.path || activeTab.title || ''}
+            type={activeTab.type}
+            actions={
+              <ViewerTabMenu
+                activeTab={activeTab}
+                content={tabContent[activeTab.id]}
+                onCloseTab={handleCloseTab}
+              />
+            }
+          />
+
           {/* Safe File Viewer Body */}
           <div className="flex-1 overflow-hidden bg-card">
             {activeTab?.type === 'terminal' ? (
