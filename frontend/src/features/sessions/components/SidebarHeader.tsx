@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { PanelLeft, Plus, Clock } from 'lucide-react';
+import { MashBrandIcon } from '@/primitives';
 
 export interface SidebarHeaderProps {
   onNewSession: (repoName?: string) => void;
@@ -20,8 +21,8 @@ export function SidebarHeader({
     <>
       {/* Row 2: Top Header Bar (height h-9 = 36px, matching Row 2 of window) */}
       <div className="h-9 bg-[#121214] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center gap-1.5 px-3 select-none shrink-0">
-        <div className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-100 flex items-center justify-center font-bold text-[11px] shadow-xs select-none mr-1">
-          M
+        <div className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-100 flex items-center justify-center shadow-xs select-none mr-1">
+          <MashBrandIcon size={13} className="text-zinc-100" />
         </div>
         <button
           type="button"
