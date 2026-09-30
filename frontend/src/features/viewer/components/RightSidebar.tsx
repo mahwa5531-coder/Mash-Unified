@@ -7,7 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ViewerHeader } from './ViewerHeader';
 import { ExplorerPanel } from './ExplorerPanel';
 import { ViewerEmptyState } from './ViewerEmptyState';
-import { FileBreadcrumbBar } from '@/primitives/FileBreadcrumbBar';
+import { FileBreadcrumbBar } from '@/primitives';
 import { TerminalViewer } from './TerminalViewer';
 import { ViewerTabMenu } from './ViewerTabMenu';
 import { formatArtifactTitle, UNSUPPORTED_DOC_REGEX } from '../utils/artifactPresentation';
@@ -628,6 +628,24 @@ export default function RightSidebar({
         handleCloseTab={handleCloseTab}
       />
 
+      {/* Row 2: Canonical FileBreadcrumbBar Primitive (Permanently anchored below Row 1) */}
+      <FileBreadcrumbBar
+        path={
+          viewMode === 'explorer'
+            ? 'workspace/Deliverables_and_Papers'
+            : (activeTab?.path || activeTab?.title || 'workspace/Overview')
+        }
+        type={activeTab?.type}
+        actions={
+          activeTab ? (
+            <ViewerTabMenu
+              activeTab={activeTab}
+              content={tabContent[activeTab.id]}
+              onCloseTab={handleCloseTab}
+            />
+          ) : null
+        }
+      />
 
       {/* Main Content Body */}
       {viewMode === 'explorer' ? (
@@ -641,20 +659,6 @@ export default function RightSidebar({
         <ViewerEmptyState setViewMode={setViewMode} />
       ) : (
         <div className="flex-1 overflow-hidden flex flex-col bg-card text-card-foreground">
-          <FileBreadcrumbBar
-            path={activeTab?.path || activeTab?.title || ''}
-            type={activeTab?.type}
-            actions={
-              activeTab ? (
-                <ViewerTabMenu
-                  activeTab={activeTab}
-                  content={tabContent[activeTab.id]}
-                  onCloseTab={handleCloseTab}
-                />
-              ) : null
-            }
-          />
-
           {/* Safe File Viewer Body */}
           <div className="flex-1 overflow-hidden bg-card">
             {activeTab?.type === 'terminal' ? (
