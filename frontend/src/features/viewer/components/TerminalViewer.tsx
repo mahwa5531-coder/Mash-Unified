@@ -3,7 +3,7 @@
 // Terminal tab body: task header + status chip + numbered monospace log.
 import React, { MouseEvent as ReactMouseEvent } from 'react';
 import { StopCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/primitives';
 import type { TabItem } from '../types';
 
 interface TerminalViewerProps {

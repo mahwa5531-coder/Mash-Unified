@@ -5,7 +5,7 @@
 import React, { useMemo, MouseEvent as ReactMouseEvent } from 'react';
 import { Search, X, StopCircle, Loader2, Clock, CheckCircle2, ExternalLink } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/primitives';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { CollapsibleSection } from './CollapsibleSection';
 import {
