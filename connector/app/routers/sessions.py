@@ -149,11 +149,15 @@ async def list_sessions(
             "nlp_batch"
         )
 
+        seen_sids = set()
         result = []
         for s in db_sessions:
             sid = s.session_id
+            if sid in seen_sids:
+                continue
             if not include_benchmarks and any(p in sid.lower() for p in bench_patterns):
                 continue
+            seen_sids.add(sid)
 
             ctx = s.context or {}
             stats = session_stats.get(sid, {"count": 0, "last_action_time": None})

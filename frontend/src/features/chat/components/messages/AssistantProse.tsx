@@ -18,7 +18,8 @@ import {
 } from '@/primitives';
 import CodeBlock from '@/components/renderers/CodeBlock';
 import TableContainer from '@/components/renderers/TableContainer';
-import { normalizePath } from '@/utils/normalizePath';
+import { normalizePath, safeDecodeURI } from '@/utils/normalizePath';
+import { shouldExcludePath } from '@/features/artifacts/utils/extraction';
 import { BASE_URL } from '@/services/client';
 
 const REMARK_PLUGINS = [remarkGfm, remarkMath] as any;
@@ -63,7 +64,7 @@ function formatFilePill(rawLabel: string, rawHref: string) {
 
   const parts = filePath.split(/[/\\]/);
   const basename = parts.pop() || filePath;
-  const labelParts = decodeURIComponent(rawLabel || '').split(/[/\\]/);
+  const labelParts = safeDecodeURI(rawLabel || '').split(/[/\\]/);
   const cleanLabel = labelParts.pop() || basename;
 
   let display = (cleanLabel && !cleanLabel.startsWith('file:') && cleanLabel !== '[object Object]' ? cleanLabel : basename).trim();
@@ -77,8 +78,9 @@ function formatFilePill(rawLabel: string, rawHref: string) {
 
 // Detect if a string is a valid full file path with recognized extension (must have directory slash, no wildcards)
 function isFullFilePath(raw: string): boolean {
-  if (!raw || typeof raw !== 'string') return false;
+  if (!raw || typeof raw !== 'string' || shouldExcludePath(raw)) return false;
   const clean = normalizePath(raw.trim());
+  if (shouldExcludePath(clean)) return false;
   if (!clean || clean.includes(' ') || clean.includes('\n') || clean.includes('(') || clean.includes(')') || clean.includes('*') || clean.includes('?')) return false;
 
   const FILE_EXT_REGEX = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|pyw|ipynb|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|db|sqlite|md|markdown|txt|log|html|css|scss|xml|xbrl|sh|bash|zsh|ps1|rs|go|c|cpp|h|java|zip|tar|gz|png|jpe?g|gif|svg|webp)$/i;
@@ -370,7 +372,7 @@ export const AssistantProse = memo(function AssistantProse({
       const isRelativeFile = /\.(xlsx?|xlsm|csv|json|md|markdown|txt|log|py|tsx?|jsx?|mjs|sql|ya?ml|toml|xml|env|html|css|pdf|png|jpe?g|svg|webp|gif|j2|jinja2?)$/i.test(href.split('#')[0]);
       const isLocalPath = (href.startsWith('/') || href.startsWith('./') || href.startsWith('../')) && isFullFilePath(href);
 
-      if (isFileUri || isWinPath || isRelativeFile || isLocalPath || isFullFilePath(href)) {
+      if ((isFileUri || isWinPath || isRelativeFile || isLocalPath || isFullFilePath(href)) && !shouldExcludePath(href)) {
         const rawLabel = extractChildText(children);
         const { filePath, display } = formatFilePill(rawLabel || href, href);
         return <FilePill path={filePath} label={display} onOpenFile={onOpenFile} />;

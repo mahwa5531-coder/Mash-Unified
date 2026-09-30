@@ -52,7 +52,17 @@ export async function fetchFileContent(filePath: string, sessionId?: string, byp
     try {
       const qs = sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : '';
       const res = await safeFetch(`${BASE_URL}/files/content?path=${encodeURIComponent(cleanKey)}${qs}`);
-      if (!res.ok) return "Failed to load file content.";
+      if (!res.ok) {
+        if (res.status === 404) {
+          try {
+            const errData = await res.json();
+            return errData.detail || `File '${cleanKey}' not found on local disk.`;
+          } catch {
+            return `File '${cleanKey}' not found on local disk.`;
+          }
+        }
+        return "Failed to load file content.";
+      }
       const data = await res.json();
       if (data.type === 'excel' || data.type === 'univer') {
         const serialized = JSON.stringify(data);

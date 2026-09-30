@@ -256,7 +256,7 @@ async def get_file_content(
             p = p.resolve()
 
     if not p.exists():
-        return {"content": f"File '{clean_path or path}' not found on local disk.", "error": "not_found"}
+        raise HTTPException(status_code=404, detail=f"File '{clean_path or path}' not found on local disk.")
 
     if p.is_dir():
         raise HTTPException(status_code=403, detail="Access denied: Path is outside authorized workspace directories.")
