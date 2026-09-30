@@ -29,10 +29,16 @@ export function extractLineRange(args?: Record<string, any>): string | null {
 }
 
 export function formatDurationDisplay(secs: number): string {
+  if (secs <= 0) return '0s';
   if (secs < 60) return `${secs}s`;
   const mins = Math.floor(secs / 60);
-  const rem = secs % 60;
-  return rem > 0 ? `${mins}m ${rem}s` : `${mins}m`;
+  const remSecs = secs % 60;
+  if (mins < 60) {
+    return remSecs > 0 ? `${mins}m ${remSecs}s` : `${mins}m`;
+  }
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
 }
 
 export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineEntry {
