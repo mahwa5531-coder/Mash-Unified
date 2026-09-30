@@ -495,16 +495,5 @@ export function TimelineRow({
     );
   }
 
-  // 12. Intermediate In-Flow Text Step Row
-  if (entry.type === 'text') {
-    const cleanText = (entry.data.text || '').replace(/\[VERIFIED\]\s*/gi, '').trim();
-    if (!cleanText) return null;
-    return (
-      <div key={entry.id} className="text-zinc-600 dark:text-zinc-400 text-xs py-1 px-1 font-sans leading-relaxed select-text whitespace-pre-wrap">
-        {cleanText}
-      </div>
-    );
-  }
-
   return null;
 }

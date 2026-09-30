@@ -45,6 +45,11 @@ export function FilePill({
     }
   }
 
+  // A full file path must contain a directory separator (/ or \) and not contain wildcards (* or ?)
+  const hasSlash = cleanPath.includes('/') || cleanPath.includes('\\');
+  const hasWildcard = cleanPath.includes('*') || cleanPath.includes('?');
+  const isFullPath = hasSlash && !hasWildcard;
+
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -68,31 +73,35 @@ export function FilePill({
       )}
       {...props}
     >
-      {/* Same space for logo and close button in the left slot */}
-      <span className="relative flex items-center justify-center shrink-0 w-3 h-3">
-        <span className={cn(
-          "flex items-center justify-center shrink-0 transition-opacity duration-100",
-          onClose ? "group-hover:opacity-0 group-hover:pointer-events-none" : ""
-        )}>
-          <FileIcon filename={filePathOnly} size={12} className="shrink-0 group-hover:scale-105 transition-transform" />
-        </span>
+      {/* File logo (only for full file paths) and/or close button in the left slot */}
+      {(isFullPath || onClose) && (
+        <span className="relative flex items-center justify-center shrink-0 w-3 h-3">
+          {isFullPath && (
+            <span className={cn(
+              "flex items-center justify-center shrink-0 transition-opacity duration-100",
+              onClose ? "group-hover:opacity-0 group-hover:pointer-events-none" : ""
+            )}>
+              <FileIcon filename={filePathOnly} size={12} className="shrink-0 group-hover:scale-105 transition-transform" />
+            </span>
+          )}
 
-        {onClose && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose(e);
-            }}
-            className="absolute inset-0 m-auto w-3 h-3 p-0 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-200/80 dark:hover:bg-white/[0.15] opacity-0 group-hover:opacity-100 transition-all cursor-pointer outline-none shrink-0"
-            title={`Remove ${rawDisplay}`}
-            aria-label={`Remove ${rawDisplay}`}
-          >
-            <X size={10} strokeWidth={2.2} />
-          </span>
-        )}
-      </span>
+          {onClose && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose(e);
+              }}
+              className="absolute inset-0 m-auto w-3 h-3 p-0 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-200/80 dark:hover:bg-white/[0.15] opacity-0 group-hover:opacity-100 transition-all cursor-pointer outline-none shrink-0"
+              title={`Remove ${rawDisplay}`}
+              aria-label={`Remove ${rawDisplay}`}
+            >
+              <X size={10} strokeWidth={2.2} />
+            </span>
+          )}
+        </span>
+      )}
 
       <span className="truncate max-w-[240px] font-medium leading-none">
         {rawDisplay}

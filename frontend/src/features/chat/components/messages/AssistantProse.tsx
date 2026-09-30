@@ -75,17 +75,18 @@ function formatFilePill(rawLabel: string, rawHref: string) {
   return { filePath, display };
 }
 
-// Detect if a string is a valid file path or standalone filename with recognized extension
-function isFilePathOrName(raw: string): boolean {
+// Detect if a string is a valid full file path with recognized extension (must have directory slash, no wildcards)
+function isFullFilePath(raw: string): boolean {
   if (!raw || typeof raw !== 'string') return false;
   const clean = normalizePath(raw.trim());
-  if (!clean || clean.includes(' ') || clean.includes('\n') || clean.includes('(') || clean.includes(')')) return false;
+  if (!clean || clean.includes(' ') || clean.includes('\n') || clean.includes('(') || clean.includes(')') || clean.includes('*') || clean.includes('?')) return false;
 
   const FILE_EXT_REGEX = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|pyw|ipynb|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|db|sqlite|md|markdown|txt|log|html|css|scss|xml|xbrl|sh|bash|zsh|ps1|rs|go|c|cpp|h|java|zip|tar|gz|png|jpe?g|gif|svg|webp)$/i;
 
+  const hasSlash = clean.includes('/') || clean.includes('\\');
   const parts = clean.split(/[/\\]/);
   const filename = parts.pop() || '';
-  return FILE_EXT_REGEX.test(clean) && filename.length > 0 && !filename.startsWith('.');
+  return hasSlash && FILE_EXT_REGEX.test(clean) && filename.length > 0 && !filename.startsWith('.');
 }
 
 // Detect if a string is a standalone file extension
@@ -108,17 +109,17 @@ function isDirectoryPath(raw: string): boolean {
     clean.startsWith('/') ||
     /^(workpapers|working_papers|audit_deliverables|deliverables|src|features|components|tests|scratch|docs|models|views|controllers)\//i.test(clean)
   );
-  return (endsWithSlash || isLikelyFolder) && hasSlash && !isFilePathOrName(clean);
+  return (endsWithSlash || isLikelyFolder) && hasSlash && !isFullFilePath(clean);
 }
 
-const STATUS_TAG_REGEX = /(\[(?:COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\])/g;
+const STATUS_TAG_REGEX = /(\[(?:COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|VERIFIED|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\])/g;
 const FILE_PATH_IN_PROSE_REGEX = /((?:file:\/\/\/?|[a-zA-Z]:[/\\]|\/(?:Users|home|tmp)\/|(?:scratch|tests|frontend|connector|src|working_papers|Audit_Deliverables)\/)[^\s'",;()<>]+\.(?:py|tsx?|jsx?|mjs|json|ya?ml|toml|sql|csv|xlsx?|md|txt|diff|patch|html|css|log)(?:#L\d+(?:-\d+)?)?)/gi;
 
 function processTextNodes(children: any, onOpenFile?: (path: string) => void): any {
   if (typeof children === 'string') {
     const parts = children.split(STATUS_TAG_REGEX);
     return parts.map((part, idx) => {
-      const match = part.match(/^\[(COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\]$/);
+      const match = part.match(/^\[(COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|VERIFIED|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\]$/);
       if (match) {
         const tag = match[1];
         return (
@@ -132,7 +133,7 @@ function processTextNodes(children: any, onOpenFile?: (path: string) => void): a
       if (pathParts.length === 1) return part;
 
       return pathParts.map((pPart, pIdx) => {
-        if (pPart && isFilePathOrName(pPart)) {
+        if (pPart && isFullFilePath(pPart)) {
           const { filePath, display } = formatFilePill(pPart, pPart);
           return (
             <FilePill
@@ -157,19 +158,9 @@ function processTextNodes(children: any, onOpenFile?: (path: string) => void): a
         const isInteractive = c.type === 'a' || c.type === FilePill || typeof (c.props as any)?.href === 'string' || (c.props as any)?.path;
         if (isInteractive) return c;
 
-        if (c.type === 'code') {
-          const codeText = extractChildText((c.props as any)?.children).trim();
-          if (isFilePathOrName(codeText)) {
-            const { filePath, display } = formatFilePill(codeText, codeText);
-            return (
-              <FilePill
-                key={`code_pill_${i}`}
-                path={filePath}
-                label={display}
-                onOpenFile={onOpenFile}
-              />
-            );
-          }
+        // Never traverse into code, pre, or component elements — components.code handles code rendering cleanly and prevents double-wrapping
+        if (c.type === 'code' || c.type === 'pre' || typeof c.type === 'function') {
+          return c;
         }
 
         return React.cloneElement(c, { key: i } as any, processTextNodes((c.props as any)?.children, onOpenFile));
@@ -249,7 +240,7 @@ export const AssistantProse = memo(function AssistantProse({
 
       const plainText = (extractChildText(children) || rawText).trim();
 
-      if (isFilePathOrName(plainText)) {
+      if (isFullFilePath(plainText)) {
         const { filePath, display } = formatFilePill(plainText, plainText);
         return <FilePill path={filePath} label={display} onOpenFile={onOpenFile} />;
       }
@@ -355,9 +346,9 @@ export const AssistantProse = memo(function AssistantProse({
       const isFileUri = href.startsWith('file:///') || href.startsWith('file://');
       const isWinPath = /^[a-zA-Z]:[/\\]/.test(href);
       const isRelativeFile = /\.(xlsx?|xlsm|csv|json|md|markdown|txt|log|py|tsx?|jsx?|mjs|sql|ya?ml|toml|xml|env|html|css|pdf|png|jpe?g|svg|webp|gif|j2|jinja2?)$/i.test(href.split('#')[0]);
-      const isLocalPath = (href.startsWith('/') || href.startsWith('./') || href.startsWith('../')) && isFilePathOrName(href);
+      const isLocalPath = (href.startsWith('/') || href.startsWith('./') || href.startsWith('../')) && isFullFilePath(href);
 
-      if (isFileUri || isWinPath || isRelativeFile || isLocalPath || isFilePathOrName(href)) {
+      if (isFileUri || isWinPath || isRelativeFile || isLocalPath || isFullFilePath(href)) {
         const rawLabel = extractChildText(children);
         const { filePath, display } = formatFilePill(rawLabel || href, href);
         return <FilePill path={filePath} label={display} onOpenFile={onOpenFile} />;

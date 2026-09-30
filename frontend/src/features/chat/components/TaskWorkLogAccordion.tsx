@@ -127,21 +127,6 @@ export default function TaskWorkLogAccordion({
         } else if (step.type === 'tool') {
           // 2. Unitised 'tool' step
           rawEntries.push(parseToolItem(step, step.tool_call_id || (step.id ? `${step.id}_${sIdx}` : `tool_${sIdx}`)));
-        } else if (step.type === 'text' && step.content && step.content.trim()) {
-          // ponytail: Render intermediate working text between tools as an authentic unitised step
-          const cleanText = step.content.replace(/\[VERIFIED\]\s*/gi, '').trim();
-          if (cleanText) {
-            const hasRemainingTools = steps.slice(sIdx + 1).some((s: any) => s.type === 'tool' || (s.tools && s.tools.length > 0) || s.type === 'thinking');
-            if (hasRemainingTools || (isStreaming && sIdx < steps.length - 1)) {
-              rawEntries.push({
-                id: step.id ? `text-${step.id}-${sIdx}` : `text-step-${sIdx}`,
-                type: 'text',
-                data: {
-                  text: cleanText,
-                },
-              });
-            }
-          }
         } else if (step.tools && step.tools.length > 0) {
           // 3. Legacy step with tools array
           step.tools.forEach((t: any, tIdx: number) => {
