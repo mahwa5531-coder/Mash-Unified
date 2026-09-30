@@ -633,20 +633,9 @@ export default function RightSidebar({
       {viewMode === 'explorer' ? (
         <ExplorerPanel
           artifactsData={artifactsData}
-          effectiveTasks={effectiveTasks}
           openSections={openSections}
           toggleSection={toggleSection}
-          expandedSection={expandedSection}
-          setExpandedSection={setExpandedSection}
-          artifactFilter={artifactFilter}
-          setArtifactFilter={setArtifactFilter}
-          taskFilter={taskFilter}
-          setTaskFilter={setTaskFilter}
           openFileTab={openFileTab}
-          openTerminalTab={openTerminalTab}
-          handleKillTask={handleKillTask}
-          handleKillAllTasks={handleKillAllTasks}
-          onRefresh={loadArtifacts}
         />
       ) : !activeTab ? (
         <ViewerEmptyState setViewMode={setViewMode} />
