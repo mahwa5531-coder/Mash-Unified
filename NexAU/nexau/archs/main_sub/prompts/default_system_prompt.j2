@@ -277,4 +277,13 @@ Working Papers Directory: {{ outputs_directory }}
 (The sandbox is locked inside Scratch Directory. Save all one-off work in Scratch Directory, and deliverables in Working Papers Directory.)
 {% endif %}
 Conversation ID: {{ session_id }}
+{% if active_file %}
+Active File: {{ active_file }}{% if cursor_line %} (Line {{ cursor_line }}){% endif %}
+{% endif %}
+{% if selected_text %}
+Selected Code:
+```
+{{ selected_text }}
+```
+{% endif %}
 </user_information>

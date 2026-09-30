@@ -589,8 +589,18 @@ async def get_transcript(
                     continue
 
                 # Defensively filter out internal system notices from user chat bubbles
-                if role_str == "user" and combined_text.strip().startswith("[SYSTEM NOTICE:"):
-                    continue
+                if role_str == "user":
+                    if combined_text.strip().startswith("[SYSTEM NOTICE:"):
+                        continue
+                    # Unwrap <USER_REQUEST> if present
+                    ur_match = re.search(r"<USER_REQUEST>([\s\S]*?)</USER_REQUEST>", combined_text, re.IGNORECASE)
+                    if ur_match:
+                        combined_text = ur_match.group(1)
+                    # Strip any lingering metadata or settings tags
+                    combined_text = re.sub(r"<ADDITIONAL_METADATA>[\s\S]*?</ADDITIONAL_METADATA>", "", combined_text, flags=re.IGNORECASE)
+                    combined_text = re.sub(r"<USER_SETTINGS_CHANGE>[\s\S]*?</USER_SETTINGS_CHANGE>", "", combined_text, flags=re.IGNORECASE)
+                    combined_text = re.sub(r"<user_information>[\s\S]*?</user_information>", "", combined_text, flags=re.IGNORECASE)
+                    combined_text = combined_text.strip()
 
                 # Sanitize legacy corrupted user messages that have _HANDOFF_SUMMARY_PREFIX prepended
                 if role_str == "user" and "The user request for this round is:" in combined_text:

@@ -27,8 +27,16 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
           continue;
         }
 
-        const match = typeof userText === 'string' ? userText.match(/<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/) : null;
-        if (match) userText = match[1].trim();
+        if (typeof userText === 'string') {
+          const match = userText.match(/<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i);
+          if (match) userText = match[1].trim();
+
+          userText = userText
+            .replace(/<ADDITIONAL_METADATA>[\s\S]*?<\/ADDITIONAL_METADATA>/gi, '')
+            .replace(/<USER_SETTINGS_CHANGE>[\s\S]*?<\/USER_SETTINGS_CHANGE>/gi, '')
+            .replace(/<user_information>[\s\S]*?<\/user_information>/gi, '')
+            .trim();
+        }
 
         parsedMsgs.push({
           role: 'user',
