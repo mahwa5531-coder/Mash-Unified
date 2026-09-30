@@ -4,7 +4,17 @@
  * backslash→forward slash, and optional #anchor stripping.
  */
 export function normalizePath(raw: string, stripAnchor = true): string {
-  let p = decodeURIComponent((raw || '').replace(/^file:\/\/\/?/i, ''));
+  const stripped = (raw || '').replace(/^file:\/\/\/?/i, '');
+  let p = stripped;
+  try {
+    p = decodeURIComponent(stripped);
+  } catch {
+    try {
+      p = decodeURIComponent(stripped.replace(/%(?![0-9A-Fa-f]{2})/g, '%25'));
+    } catch {
+      p = stripped;
+    }
+  }
   p = p.replace(/^\/([a-zA-Z]:)/, '$1');
   p = p.replace(/\\/g, '/');
   if (stripAnchor) p = p.split('#')[0];

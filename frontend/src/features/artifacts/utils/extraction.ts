@@ -3,6 +3,20 @@ import { ArtifactItem, EditedFileItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
 import { normalizePath } from '@/utils/normalizePath';
 
+export function shouldExcludePath(p: string): boolean {
+  const lower = p.toLowerCase().replace(/\\/g, '/');
+  return (
+    lower.includes('/scratch/') ||
+    lower.startsWith('scratch/') ||
+    lower.includes('/.scratch/') ||
+    lower.startsWith('.scratch/') ||
+    lower.includes('/.gemini/') ||
+    lower.includes('/.nexau/') ||
+    lower.includes('/tmp/') ||
+    lower.includes('/temp/')
+  );
+}
+
 // ----------------------------------------------------------------------
 // Helper to extract and format Artifact cards (Documentation, Spreadsheets, Visual Charts)
 // ----------------------------------------------------------------------
@@ -41,7 +55,7 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
       if (rawPath) {
         const pathStr = String(rawPath);
         const { isArtifact, type } = classifyArtifact(pathStr);
-        if (isArtifact && !seenPaths.has(pathStr)) {
+        if (isArtifact && !shouldExcludePath(pathStr) && !seenPaths.has(pathStr)) {
           seenPaths.add(pathStr);
           const rawFilename = pathStr.split(/[/\\]/).pop() || '';
           const rawExt = rawFilename.split('.').pop() || '';
@@ -179,20 +193,7 @@ export function extractEditedFiles(msg: Message): {
         return normalizePath(raw, false);
       };
 
-      const shouldExclude = (p: string) => {
-        const lower = p.toLowerCase().replace(/\\/g, '/');
-        // Exclude internal agent directories and scratch/temp paths
-        return (
-          lower.includes('/scratch/') ||
-          lower.startsWith('scratch/') ||
-          lower.includes('/.scratch/') ||
-          lower.startsWith('.scratch/') ||
-          lower.includes('/.gemini/') ||
-          lower.includes('/.nexau/') ||
-          lower.includes('/tmp/') ||
-          lower.includes('/temp/')
-        );
-      };
+      const shouldExclude = shouldExcludePath;
 
       const recordEdit = (cleanPath: string, added: number, deleted: number) => {
         totalAdded += added;
