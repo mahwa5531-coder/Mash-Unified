@@ -276,6 +276,28 @@ export const AssistantProse = memo(function AssistantProse({
       );
     },
 
+    ul({ children, ...props }: any) {
+      return (
+        <ul className="my-2.5 pl-5 list-disc space-y-1 text-zinc-800 dark:text-[#d4d4d8] marker:text-zinc-400 dark:marker:text-zinc-500" {...props}>
+          {children}
+        </ul>
+      );
+    },
+
+    ol({ children, ...props }: any) {
+      return (
+        <ol className="my-2.5 pl-5 list-decimal space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400" {...props}>
+          {children}
+        </ol>
+      );
+    },
+
+    hr({ ...props }: any) {
+      return (
+        <hr className="my-5 border-t border-zinc-200/60 dark:border-white/[0.08]" {...props} />
+      );
+    },
+
     li({ children, ...props }: any) {
       return (
         <li className="my-1 text-[13.5px] leading-[1.68] text-zinc-800 dark:text-[#d4d4d8]" {...props}>
