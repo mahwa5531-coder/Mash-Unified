@@ -49,8 +49,8 @@ export function WebLink({
   };
 
   const variantStyles = {
-    primary: "text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 underline-offset-2 hover:underline",
-    muted: "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white underline-offset-2 hover:underline",
+    primary: "text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 underline-offset-3 hover:underline",
+    muted: "text-zinc-600 dark:text-zinc-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors",
     citation: "text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-mono text-[11.5px] border-b border-indigo-400/40 hover:border-indigo-400",
   };
 

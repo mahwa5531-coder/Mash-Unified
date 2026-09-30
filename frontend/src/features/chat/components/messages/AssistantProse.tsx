@@ -270,7 +270,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     p({ children, ...props }: any) {
       return (
-        <p className="mb-2.5 text-[13.5px] leading-[1.68] text-zinc-800 dark:text-[#ececed] last:mb-0" {...props}>
+        <p className="mb-3 text-[13.5px] leading-[1.72] text-zinc-800 dark:text-[#d4d4d8] last:mb-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </p>
       );
@@ -278,7 +278,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     li({ children, ...props }: any) {
       return (
-        <li className="my-0.5 text-[13.5px] leading-[1.65] text-zinc-800 dark:text-[#ececed]" {...props}>
+        <li className="my-1 text-[13.5px] leading-[1.68] text-zinc-800 dark:text-[#d4d4d8]" {...props}>
           {processTextNodes(children, onOpenFile)}
         </li>
       );
@@ -286,7 +286,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h1({ children, ...props }: any) {
       return (
-        <h1 className="mt-5 mb-2.5 text-[18px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0" {...props}>
+        <h1 className="mt-6 mb-3 text-[19px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h1>
       );
@@ -294,7 +294,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h2({ children, ...props }: any) {
       return (
-        <h2 className="mt-4 mb-2 text-[15.5px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
+        <h2 className="mt-5 mb-2.5 text-[16px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/60 dark:border-white/[0.08] pb-1.5" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h2>
       );
@@ -302,7 +302,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h3({ children, ...props }: any) {
       return (
-        <h3 className="mt-3.5 mb-1.5 text-[14px] font-semibold text-zinc-900 dark:text-zinc-200 tracking-tight first:mt-0" {...props}>
+        <h3 className="mt-4 mb-2 text-[14.5px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h3>
       );
@@ -310,7 +310,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h4({ children, ...props }: any) {
       return (
-        <h4 className="mt-3 mb-1 text-[13px] font-semibold text-zinc-800 dark:text-zinc-300 tracking-tight first:mt-0" {...props}>
+        <h4 className="mt-3.5 mb-1.5 text-[12.5px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h4>
       );

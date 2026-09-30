@@ -644,7 +644,6 @@ export default function RightSidebar({
           <FileBreadcrumbBar
             path={activeTab?.path || activeTab?.title || ''}
             type={activeTab?.type}
-            onSegmentClick={() => setViewMode('explorer')}
             actions={
               activeTab ? (
                 <ViewerTabMenu

@@ -66,14 +66,14 @@ export function FileBreadcrumbBar({
         }}
         className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap text-[11.5px] py-1"
       >
-        {/* Leading Directory Segments (Words that individually turn white on hover) */}
+        {/* Leading Directory Segments (Calm static path indicators) */}
         {directorySegments.map((segment, idx) => (
           <React.Fragment key={idx}>
             <span
               onClick={onSegmentClick ? () => onSegmentClick(segment, idx) : undefined}
               className={cn(
-                "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors duration-100 shrink-0 bg-transparent hover:bg-transparent",
-                onSegmentClick ? "cursor-pointer hover:underline" : "cursor-default"
+                "text-zinc-500 dark:text-zinc-400 shrink-0 bg-transparent select-none",
+                onSegmentClick ? "cursor-pointer hover:text-zinc-800 dark:hover:text-zinc-200" : "cursor-default"
               )}
               title={segment}
             >
