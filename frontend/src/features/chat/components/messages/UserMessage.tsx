@@ -35,16 +35,7 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
 
   // Check if content has an image markdown link or path
   const imgMatch = msg.content ? msg.content.match(/!\[([^\]]*)\]\(([^)]+)\)/) : null;
-  let rawText = imgMatch ? msg.content.replace(imgMatch[0], '').trim() : (msg.content || '');
-  const userReqMatch = rawText.match(/<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i);
-  if (userReqMatch) {
-    rawText = userReqMatch[1].trim();
-  }
-  const cleanText = rawText
-    .replace(/<ADDITIONAL_METADATA>[\s\S]*?<\/ADDITIONAL_METADATA>/gi, '')
-    .replace(/<USER_SETTINGS_CHANGE>[\s\S]*?<\/USER_SETTINGS_CHANGE>/gi, '')
-    .replace(/<user_information>[\s\S]*?<\/user_information>/gi, '')
-    .trim();
+  const cleanText = imgMatch ? msg.content.replace(imgMatch[0], '').trim() : msg.content;
   const imgSrc = imgMatch ? imgMatch[2] : null;
 
   useEffect(() => {
@@ -60,7 +51,7 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(cleanText);
+    navigator.clipboard.writeText(msg.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
