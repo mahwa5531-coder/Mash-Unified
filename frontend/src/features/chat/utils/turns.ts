@@ -49,12 +49,22 @@ export function parseTranscriptLines(rawLines: any[]): Message[] {
           if (typeof args === 'string') {
             try { args = JSON.parse(args); } catch { args = {}; }
           }
+          const outputStr = String(t.output || '');
+          const isFailed = Boolean(
+            t.status === 'failed' ||
+            t.is_error ||
+            (outputStr && (
+              /^(error|exception|validationerror|failed):/i.test(outputStr.trim()) ||
+              outputStr.toLowerCase().includes("schema validation failed") ||
+              outputStr.toLowerCase().includes("validation error")
+            ))
+          );
           tools.push({
             id: t.id || `${stepPrefix}_tc_${tools.length}`,
             name,
             args,
-            output: t.output || '',
-            status: t.status || 'completed'
+            output: outputStr,
+            status: isFailed ? 'failed' : (t.status || 'completed')
           });
         }
         const tasks = step.tasks || [];

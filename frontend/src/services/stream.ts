@@ -222,12 +222,20 @@ export async function streamQuery(
               let finalArgs: Record<string, any> = {};
               try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
               const currentName = toolCallNames[callId] || event.tool_call_name || "action";
+              const isFailed = Boolean(
+                event.is_error ||
+                event.status === "failed" ||
+                /^(error|exception|validationerror|failed):/i.test(outputStr.trim()) ||
+                outputStr.toLowerCase().includes("schema validation failed") ||
+                outputStr.toLowerCase().includes("validation error")
+              );
+
               onToolCall({
                 id: callId,
                 name: currentName,
                 args: finalArgs,
                 output: outputStr || "Done.",
-                status: "completed",
+                status: isFailed ? "failed" : "completed",
                 durationSeconds: event.duration_seconds,
               });
             }

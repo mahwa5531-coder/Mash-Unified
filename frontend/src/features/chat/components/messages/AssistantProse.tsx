@@ -346,7 +346,8 @@ export const AssistantProse = memo(function AssistantProse({
 
     td({ children, ...props }: any) {
       const text = extractChildText(children).trim();
-      const isNumeric = /^[-−–]?\s*[\$₹€£]?\s*[\(]?\s*[\d,]+(\.\d+)?\s*[\)]?\s*(%|Dr|Cr|dr|cr)?$/.test(text) || /^\([\d,]+(\.\d+)?\)/.test(text);
+      // Accounting financial numbers: supports ($4,000), $(4,000), (4,000), -$4,000, 3,00,000 Dr, -8.2%, and nil hyphens
+      const isNumeric = /^[-−–]?\s*(\(\s*[\$₹€£]?|[\$₹€£]?\s*\(?)\s*[-−–]?\s*[\d,]+(\.\d+)?\s*\)?\s*(%|Dr|Cr|dr|cr)?$|^[-−–—]$/.test(text);
       return (
         <td className={`py-1.5 px-3 text-zinc-800 dark:text-zinc-300 ${isNumeric ? 'text-right font-mono text-[12px]' : 'text-left text-[12.5px]'}`} {...props}>
           {processTextNodes(children, onOpenFile)}
@@ -356,7 +357,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     th({ children, ...props }: any) {
       const text = extractChildText(children).trim();
-      const isNumeric = /^[-−–]?\s*[\$₹€£]?\s*[\(]?\s*[\d,]+(\.\d+)?\s*[\)]?\s*(%|Dr|Cr|dr|cr)?$/.test(text);
+      const isNumeric = /^[-−–]?\s*(\(\s*[\$₹€£]?|[\$₹€£]?\s*\(?)\s*[-−–]?\s*[\d,]+(\.\d+)?\s*\)?\s*(%|Dr|Cr|dr|cr)?$|^[-−–—]$/.test(text);
       return (
         <th className={`py-2 px-3 font-medium text-zinc-600 dark:text-zinc-400 text-[11px] uppercase tracking-wider ${isNumeric ? 'text-right' : 'text-left'}`} {...props}>
           {children}
