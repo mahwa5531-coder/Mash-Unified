@@ -180,7 +180,7 @@ const AssistantMessage = memo(function AssistantMessage({
   }, [units, msg.content]);
 
   return (
-    <div className="text-[13.5px] text-[var(--text-primary)] w-full mb-1.5">
+    <div className="text-[14px] text-[var(--text-primary)] w-full mb-2">
       {/* Interleaved Sequential Units (Thoughts, Tools, and Authentic Assistant Prose in Chronological Order) */}
       {units.map((unit, uIdx) => {
         if (unit.type === 'worklog') {

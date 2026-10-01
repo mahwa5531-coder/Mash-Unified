@@ -258,9 +258,9 @@ export default function TaskWorkLogAccordion({
             </span>
           </div>
         ) : !hasAssistantContent ? (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-sans py-0.5">
-            <Loader2 size={11} className="animate-spin text-zinc-400 shrink-0" />
-            <span className="inline-flex items-center text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-xs text-zinc-700 dark:text-zinc-200 font-sans py-1">
+            <Loader2 size={12} className="animate-spin text-sky-500 shrink-0" />
+            <span className="inline-flex items-center font-medium">
               <span>Working</span>
               <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
                 <span>.</span>
@@ -274,7 +274,7 @@ export default function TaskWorkLogAccordion({
     );
   }
 
-  // 2. Completed turn: render "Worked for {formattedTime} >" or "Thought for {formattedTime} >" naked text link dropdown
+  // 2. Completed turn: render "Worked for {formattedTime} >" or "Thought for {formattedTime} >" clean visible pill dropdown
   const hasOnlyThoughts = (!tools || tools.length === 0) && (!steps || steps.length === 0 || steps.every((s: any) => s.type === 'thinking' || (!s.tools || s.tools.length === 0) && (!s.name || s.name === 'thought')));
   const actionLabel = hasOnlyThoughts ? `Thought for ${formattedTime}` : `Worked for ${formattedTime}`;
 
@@ -284,10 +284,10 @@ export default function TaskWorkLogAccordion({
         type="button"
         aria-expanded={clusterOpen}
         onClick={() => setClusterOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-normal py-0.5 px-1 -mx-1 rounded-md hover:bg-muted/50 transition-all cursor-pointer select-none my-0.5 w-fit group"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white bg-zinc-100/90 dark:bg-white/[0.06] hover:bg-zinc-200/80 dark:hover:bg-white/[0.12] border border-zinc-200/80 dark:border-white/[0.08] transition-all cursor-pointer select-none my-1.5 w-fit group shadow-2xs"
       >
         <span className="font-sans">{actionLabel}</span>
-        <ChevronRight size={11} className={cn("text-muted-foreground group-hover:text-foreground transition-transform", clusterOpen && "rotate-90")} />
+        <ChevronRight size={12} className={cn("text-zinc-400 dark:text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200 transition-transform shrink-0", clusterOpen && "rotate-90")} />
       </button>
 
       {/* Chronological Timeline List revealed only when user expands */}

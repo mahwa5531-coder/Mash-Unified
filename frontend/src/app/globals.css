@@ -7,11 +7,15 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'Fira Code', Consolas, Menlo, Monaco, monospace;
   --color-border: var(--m-border-subtle);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
 }
 
 :root {
   /* Legacy bridge mapped to official --m-* token system */
   --border: var(--m-border-subtle);
+  --foreground: var(--m-text-primary);
   --bg-app: var(--m-bg-app);
   --bg-surface: var(--m-bg-surface);
   --bg-hover: var(--m-bg-surface-hover);
@@ -21,6 +25,8 @@
   --text-primary: var(--m-text-primary);
   --text-secondary: var(--m-text-secondary);
   --text-muted: var(--m-text-muted);
+  --muted: var(--m-bg-surface-hover);
+  --muted-foreground: var(--m-text-secondary);
   --accent: var(--m-accent);
   --accent-hover: var(--m-accent-hover);
   --accent-soft: var(--m-accent-soft);
@@ -30,6 +36,7 @@
 .dark {
   /* Legacy bridge automatically inherits from dark mode --m-* tokens */
   --border: var(--m-border-subtle);
+  --foreground: var(--m-text-primary);
   --bg-app: var(--m-bg-app);
   --bg-surface: var(--m-bg-surface);
   --bg-hover: var(--m-bg-surface-hover);
@@ -39,6 +46,8 @@
   --text-primary: var(--m-text-primary);
   --text-secondary: var(--m-text-secondary);
   --text-muted: var(--m-text-muted);
+  --muted: var(--m-bg-surface-hover);
+  --muted-foreground: var(--m-text-secondary);
   --accent: var(--m-accent);
   --accent-hover: var(--m-accent-hover);
   --accent-soft: var(--m-accent-soft);

@@ -92,9 +92,9 @@
   --m-border-strong: rgba(255, 255, 255, 0.16);
 
   /* Text Contrast Hierarchy (Dark Theme - WCAG AA) */
-  --m-text-primary: #ECECED;
-  --m-text-secondary: #A1A1AA;
-  --m-text-muted: #8E8E96;
+  --m-text-primary: #F4F4F6;
+  --m-text-secondary: #D4D4D8;
+  --m-text-muted: #A1A1AA;
 
   /* Interactive / Brand Accent (Dark Theme - 4.6:1 contrast) */
   --m-accent: #2F9BE8;
