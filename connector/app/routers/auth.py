@@ -123,7 +123,7 @@ class SwitchAccountPayload(BaseModel):
     api_key: str | None = None
     access_token: str | None = None
     refresh_token: str | None = None
-    plan: str = "pro"
+    plan: str | None = None
 
 
 @router.get("/config")
@@ -302,8 +302,8 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
         effective_plan = existing_acc["plan"]
         effective_credits = existing_acc.get("credits_remaining", 100)
     else:
-        effective_plan = "free"
-        effective_credits = 100
+        effective_plan = payload.plan or "free"
+        effective_credits = payload.credits_remaining if payload.credits_remaining is not None else 100
 
     accounts[payload.email] = {
         "email": payload.email,

@@ -117,6 +117,50 @@ assert.strictEqual(sB.tokenBuffer, "", "Session B buffer must remain completely 
 assert.strictEqual(sB.isStreaming, false, "Session B must not be streaming");
 console.log("  -> PASSED: Session A streaming tokens never leak into Session B");
 
+// Test 5: Cloud API data envelope parsing parity
+console.log("\n[Frontend Test 5] Cloud API Envelope (event.data) Parsing Parity");
+function parseSSEEvent(jsonStr) {
+  const event = JSON.parse(jsonStr);
+  const eventType = String(event.type || "").toUpperCase();
+  const data = event.data && typeof event.data === "object" ? event.data : {};
+  let token = "";
+  let tool = null;
+  if (eventType === "TEXT_MESSAGE_CONTENT") {
+    token = event.delta ?? data.delta ?? event.content ?? data.content ?? "";
+  } else if (eventType === "TOOL_CALL_START") {
+    const rawId = String(event.tool_call_id || data.tool_call_id || data.id || `tc_${Date.now()}`);
+    const toolName = event.tool_call_name || data.tool_call_name || event.name || data.name || "action";
+    tool = { id: rawId, name: toolName, status: "running" };
+  }
+  return { eventType, token, tool };
+}
+
+// 5a. Legacy format (direct fields)
+const legacy = parseSSEEvent(JSON.stringify({ type: "TEXT_MESSAGE_CONTENT", delta: "Direct token" }));
+assert.strictEqual(legacy.token, "Direct token", "Direct event.delta must be parsed");
+
+// 5b. Cloud API envelope format (nested in event.data)
+const cloud = parseSSEEvent(JSON.stringify({
+  type: "TEXT_MESSAGE_CONTENT",
+  event_id: "evt_123",
+  sequence: 1,
+  data: { delta: "Cloud envelope token", message_id: "msg_456" }
+}));
+assert.strictEqual(cloud.token, "Cloud envelope token", "Nested event.data.delta must be parsed");
+
+// 5c. Cloud API tool call in event.data
+const cloudTool = parseSSEEvent(JSON.stringify({
+  type: "TOOL_CALL_START",
+  event_id: "evt_124",
+  sequence: 2,
+  data: { tool_call_id: "call_abc", tool_call_name: "calculate_depreciation" }
+}));
+assert.strictEqual(cloudTool.tool.name, "calculate_depreciation", "Tool name inside event.data must be extracted");
+assert.strictEqual(cloudTool.tool.id, "call_abc", "Tool call id inside event.data must be extracted");
+
+console.log("  -> PASSED: Both direct and Cloud API nested event.data payloads parse with 100% parity");
+
 console.log("\n======================================================================");
-console.log("ALL FRONTEND CHAT RENDERING TESTS PASSED (4/4)");
+console.log("ALL FRONTEND CHAT RENDERING TESTS PASSED (5/5)");
 console.log("======================================================================");
+

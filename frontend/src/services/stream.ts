@@ -146,10 +146,11 @@ export async function streamQuery(
         try {
           const event = JSON.parse(jsonStr);
           const eventType = String(event.type || "").toUpperCase();
+          const data = event.data && typeof event.data === "object" ? event.data : {};
 
           // 1. Text token delta (the main assistant output)
           if (eventType === "TEXT_MESSAGE_CONTENT" || eventType === "TEXT_MESSAGE_CHUNK") {
-            const tokenText = event.delta || "";
+            const tokenText = event.delta ?? data.delta ?? event.content ?? data.content ?? "";
             if (tokenText) onToken(tokenText);
           }
 
@@ -159,7 +160,7 @@ export async function streamQuery(
             eventType === "REASONING_MESSAGE_CONTENT" ||
             eventType === "REASONING_MESSAGE_CHUNK"
           ) {
-            const thoughtText = event.delta || "";
+            const thoughtText = event.delta ?? data.delta ?? event.content ?? data.content ?? "";
             if (thoughtText && onThought) onThought(thoughtText);
           }
 
@@ -173,9 +174,9 @@ export async function streamQuery(
 
           // 3. Tool Call Started — name + id become available here
           else if (eventType === "TOOL_CALL_START") {
-            const rawId = String(event.tool_call_id || `tc_${Date.now()}`);
-            const callId = `${event.run_id || 'run'}_${rawId}`;
-            const toolName = event.tool_call_name || "action";
+            const rawId = String(event.tool_call_id || data.tool_call_id || data.id || `tc_${Date.now()}`);
+            const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
+            const toolName = event.tool_call_name || data.tool_call_name || event.name || data.name || "action";
             toolArgBuffers[callId] = "";
             toolCallNames[callId] = toolName;
             if (onToolCall) {
@@ -185,15 +186,15 @@ export async function streamQuery(
 
           // 4. Tool Call Args — streamed JSON chunks for the arguments
           else if (eventType === "TOOL_CALL_ARGS") {
-            const rawId = String(event.tool_call_id || "");
-            const callId = `${event.run_id || 'run'}_${rawId}`;
-            const deltaArg = event.delta || "";
+            const rawId = String(event.tool_call_id || data.tool_call_id || data.id || "");
+            const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
+            const deltaArg = event.delta ?? data.delta ?? event.arguments ?? data.arguments ?? "";
             if (callId && deltaArg) {
               toolArgBuffers[callId] = (toolArgBuffers[callId] || "") + deltaArg;
               let parsedArgs: Record<string, any> = {};
               try { parsedArgs = JSON.parse(toolArgBuffers[callId]); } catch { /* still buffering */ }
               if (onToolCall) {
-                const currentName = toolCallNames[callId] || event.tool_call_name || "action";
+                const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
                 onToolCall({ id: callId, name: currentName, args: parsedArgs, status: "running" });
               }
             }
@@ -201,30 +202,32 @@ export async function streamQuery(
 
           // 5. Tool Call End — args fully streamed, finalize
           else if (eventType === "TOOL_CALL_END") {
-            const rawId = String(event.tool_call_id || "");
-            const callId = `${event.run_id || 'run'}_${rawId}`;
+            const rawId = String(event.tool_call_id || data.tool_call_id || data.id || "");
+            const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
             if (callId && onToolCall) {
               let finalArgs: Record<string, any> = {};
               try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
-              const currentName = toolCallNames[callId] || event.tool_call_name || "action";
+              const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
               onToolCall({ id: callId, name: currentName, args: finalArgs, status: "running" });
             }
           }
 
           // 6. Tool Call Result — the output/response from the tool execution
           else if (eventType === "TOOL_CALL_RESULT") {
-            const rawId = String(event.tool_call_id || "");
-            const callId = `${event.run_id || 'run'}_${rawId}`;
+            const rawId = String(event.tool_call_id || data.tool_call_id || data.id || "");
+            const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
             // Backend field is `content` (not `output`)
-            const rawOutput = event.content ?? event.output ?? event.result ?? "";
+            const rawOutput = event.content ?? data.content ?? event.output ?? data.output ?? event.result ?? data.result ?? "";
             const outputStr = typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput, null, 2);
             if (callId && onToolCall) {
               let finalArgs: Record<string, any> = {};
               try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
-              const currentName = toolCallNames[callId] || event.tool_call_name || "action";
+              const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
               const isFailed = Boolean(
                 event.is_error ||
+                data.is_error ||
                 event.status === "failed" ||
+                data.status === "failed" ||
                 /^(error|exception|validationerror|failed):/i.test(outputStr.trim()) ||
                 outputStr.toLowerCase().includes("schema validation failed") ||
                 outputStr.toLowerCase().includes("validation error")
@@ -236,7 +239,7 @@ export async function streamQuery(
                 args: finalArgs,
                 output: outputStr || "Done.",
                 status: isFailed ? "failed" : "completed",
-                durationSeconds: event.duration_seconds,
+                durationSeconds: event.duration_seconds ?? data.duration_seconds,
               });
             }
           }
@@ -248,9 +251,9 @@ export async function streamQuery(
 
           // 8. Errors — clean normalization avoiding raw JSON envelope dumps in chat
           else if (eventType === "RUN_ERROR" || eventType === "TRANSPORT_ERROR") {
-            const errStr = event.message || event.error_message || "Unknown error";
+            const errStr = event.message || data.message || event.error_message || data.error_message || data.error || "Unknown error";
             const formatted = formatErrorMessage(errStr);
-            const errId = event.run_id || event.error_id || event.id;
+            const errId = event.run_id || data.run_id || event.error_id || data.error_id || event.id;
             if (onError) {
               onError(formatted, errId);
             } else {
