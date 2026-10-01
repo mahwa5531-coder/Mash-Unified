@@ -102,7 +102,7 @@ export default function TableContainer({ children }: { children: React.ReactNode
       <div className="overflow-x-auto select-text custom-scrollbar">
         <table
           ref={tableRef}
-          className="w-full text-[12.5px] text-left border-collapse [&_thead]:bg-zinc-50/50 dark:[&_thead]:bg-white/[0.02] [&_th]:border-b [&_th]:border-zinc-200/80 dark:[&_th]:border-white/[0.06] [&_th]:py-2.5 [&_th]:px-3.5 [&_th]:font-semibold [&_th]:text-zinc-700 dark:[&_th]:text-zinc-300 [&_th]:text-[11.5px] [&_th]:uppercase [&_th]:tracking-wider [&_tbody_tr]:border-b [&_tbody_tr]:border-zinc-100 dark:[&_tbody_tr]:border-white/[0.03] [&_tbody_tr:last-child]:border-b-0 [&_tbody_tr]:odd:bg-transparent [&_tbody_tr]:even:bg-zinc-50/30 dark:[&_tbody_tr]:even:bg-white/[0.015] [&_tbody_tr]:hover:bg-zinc-100/60 dark:[&_tbody_tr]:hover:bg-white/[0.035] [&_tbody_tr]:transition-colors [&_td]:py-2.5 [&_td]:px-3.5 [&_td]:text-zinc-800 dark:[&_td]:text-zinc-200"
+          className="w-full text-[12.5px] border-collapse [&_thead]:bg-zinc-100 dark:[&_thead]:bg-zinc-800/60 [&_th]:border-b [&_th]:border-zinc-200 dark:[&_th]:border-white/[0.08] [&_th]:py-2.5 [&_th]:px-3.5 [&_th]:font-semibold [&_th]:text-zinc-900 dark:[&_th]:text-zinc-100 [&_th]:text-[12px] [&_th]:tracking-wide [&_tbody_tr]:bg-transparent [&_tbody_tr]:border-b [&_tbody_tr]:border-zinc-100 dark:[&_tbody_tr]:border-white/[0.03] [&_tbody_tr:last-child]:border-b-0 [&_tbody_tr]:hover:bg-zinc-50/80 dark:[&_tbody_tr]:hover:bg-white/[0.02] [&_tbody_tr]:transition-colors [&_td]:py-2.5 [&_td]:px-3.5 [&_td]:text-zinc-800 dark:[&_td]:text-zinc-200"
         >
           {children}
         </table>

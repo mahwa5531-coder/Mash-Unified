@@ -57,28 +57,6 @@ function extractChildText(node: any): string {
   return '';
 }
 
-// Dynamic financial cell detector: recognizes all Unicode currency symbols (\p{Sc}), 
-// currency codes (INR, USD, EUR, etc.), accounting negative parens (e.g. ($4,000) or (₹1,50,000)),
-// Dr/Cr indicators, percentages, and Indian scales (Lakhs/Crores)
-function isFinancialCell(raw: string): boolean {
-  const text = (raw || '').trim();
-  if (!text) return false;
-  if (/^[-−–—]$/.test(text) || /^(nil|n\/a|none)$/i.test(text)) return true;
-
-  let s = text;
-  if (s.startsWith('(') && s.endsWith(')')) {
-    s = s.slice(1, -1).trim();
-  }
-
-  s = s.replace(/^[-+−–]/, '').replace(/[-+−–]$/, '').trim();
-  s = s.replace(/^\p{Sc}\s*/u, '').replace(/\s*\p{Sc}$/u, '');
-  s = s.replace(/^(rs\.?|inr|usd|eur|gbp|aed|cad|aud|sgd|chf|jpy|cny)\s*/i, '');
-  s = s.replace(/\s*(rs\.?|inr|usd|eur|gbp|aed|cad|aud|sgd|chf|jpy|cny)$/i, '');
-  s = s.replace(/\s*(%|dr\.?|cr\.?|lakhs?|crores?|[kmb])\s*$/i, '').trim();
-
-  if (!s) return false;
-  return /^[\d,]+(\.\d+)?$/.test(s) || /^[\d\.]+(,\d+)?$/.test(s);
-}
 
 // Format file pill label and path cleanly
 function formatFilePill(rawLabel: string, rawHref: string) {
@@ -295,7 +273,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     p({ children, ...props }: any) {
       return (
-        <p className="mb-3 text-[13.5px] leading-[1.72] text-zinc-800 dark:text-[#d4d4d8] last:mb-0" {...props}>
+        <p className="mb-3.5 text-[13.5px] leading-[1.75] text-zinc-800 dark:text-[#d4d4d8] last:mb-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </p>
       );
@@ -303,7 +281,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     ul({ children, ...props }: any) {
       return (
-        <ul className="my-2.5 pl-5 list-disc space-y-1 text-zinc-800 dark:text-[#d4d4d8] marker:text-zinc-400 dark:marker:text-zinc-500" {...props}>
+        <ul className="my-3 pl-6 list-disc space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:text-zinc-400 dark:marker:text-zinc-500" {...props}>
           {children}
         </ul>
       );
@@ -311,7 +289,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     ol({ children, ...props }: any) {
       return (
-        <ol className="my-2.5 pl-5 list-decimal space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400" {...props}>
+        <ol className="my-3 pl-6 list-decimal space-y-2 text-zinc-800 dark:text-[#d4d4d8] marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400" {...props}>
           {children}
         </ol>
       );
@@ -319,13 +297,13 @@ export const AssistantProse = memo(function AssistantProse({
 
     hr({ ...props }: any) {
       return (
-        <hr className="my-5 border-t border-zinc-200/60 dark:border-white/[0.08]" {...props} />
+        <hr className="my-6 border-t border-zinc-200/80 dark:border-white/[0.08]" {...props} />
       );
     },
 
     li({ children, ...props }: any) {
       return (
-        <li className="my-1 text-[13.5px] leading-[1.68] text-zinc-800 dark:text-[#d4d4d8]" {...props}>
+        <li className="my-1.5 text-[13.5px] leading-[1.7] text-zinc-800 dark:text-[#d4d4d8]" {...props}>
           {processTextNodes(children, onOpenFile)}
         </li>
       );
@@ -333,7 +311,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h1({ children, ...props }: any) {
       return (
-        <h1 className="mt-6 mb-3 text-[19px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0" {...props}>
+        <h1 className="mt-7 mb-3.5 text-[20px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h1>
       );
@@ -341,7 +319,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h2({ children, ...props }: any) {
       return (
-        <h2 className="mt-5 mb-2.5 text-[16px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/60 dark:border-white/[0.08] pb-1.5" {...props}>
+        <h2 className="mt-6 mb-3 text-[16.5px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/70 dark:border-white/[0.08] pb-1.5" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h2>
       );
@@ -349,7 +327,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h3({ children, ...props }: any) {
       return (
-        <h3 className="mt-4 mb-2 text-[14.5px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
+        <h3 className="mt-5 mb-2.5 text-[15px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h3>
       );
@@ -357,7 +335,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h4({ children, ...props }: any) {
       return (
-        <h4 className="mt-3.5 mb-1.5 text-[12.5px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 first:mt-0" {...props}>
+        <h4 className="mt-4 mb-2 text-[13px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h4>
       );
@@ -368,20 +346,20 @@ export const AssistantProse = memo(function AssistantProse({
     },
 
     td({ children, ...props }: any) {
-      const text = extractChildText(children).trim();
-      const isNumeric = props.align === 'right' || props.style?.textAlign === 'right' || isFinancialCell(text);
+      const align = props.align || props.style?.textAlign;
+      const alignClass = align === 'right' ? 'text-right font-mono tabular-nums' : align === 'center' ? 'text-center' : 'text-left';
       return (
-        <td className={`py-1.5 px-3 text-zinc-800 dark:text-zinc-300 ${isNumeric ? 'text-right font-mono text-[12px]' : 'text-left text-[12.5px]'}`} {...props}>
+        <td className={`py-2 px-3.5 text-zinc-800 dark:text-zinc-300 text-[12.5px] leading-normal ${alignClass}`} {...props}>
           {processTextNodes(children, onOpenFile)}
         </td>
       );
     },
 
     th({ children, ...props }: any) {
-      const text = extractChildText(children).trim();
-      const isNumeric = props.align === 'right' || props.style?.textAlign === 'right' || isFinancialCell(text);
+      const align = props.align || props.style?.textAlign;
+      const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
       return (
-        <th className={`py-2 px-3 font-medium text-zinc-600 dark:text-zinc-400 text-[11px] uppercase tracking-wider ${isNumeric ? 'text-right' : 'text-left'}`} {...props}>
+        <th className={`py-2.5 px-3.5 font-semibold text-zinc-700 dark:text-zinc-200 text-[11.5px] uppercase tracking-wider ${alignClass}`} {...props}>
           {children}
         </th>
       );

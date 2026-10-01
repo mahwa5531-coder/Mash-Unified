@@ -143,7 +143,13 @@ const AssistantMessage = memo(function AssistantMessage({
       | { type: 'worklog'; id: string; steps: ExecutionStep[]; thoughts: string[]; tools: ToolCall[] }
       | { type: 'prose'; id: string; content: string }
     > = [];
-    const hasWork = (msg.thoughts && msg.thoughts.length > 0) || (msg.tools && msg.tools.length > 0);
+    const hasWork = (msg.thoughts && msg.thoughts.length > 0)
+      || (msg.tools && msg.tools.length > 0)
+      || (msg.steps && msg.steps.length > 0)
+      || Boolean(msg.totalDurationSeconds && msg.totalDurationSeconds > 0)
+      || Boolean(msg.thinkingDurationSeconds && msg.thinkingDurationSeconds > 0)
+      || isActivelyStreaming;
+
     if (hasWork) {
       fallbackUnits.push({
         type: 'worklog',
@@ -162,7 +168,7 @@ const AssistantMessage = memo(function AssistantMessage({
       });
     }
     return fallbackUnits;
-  }, [msg.steps, msg.thoughts, msg.tools, msg.content]);
+  }, [msg.steps, msg.thoughts, msg.tools, msg.content, msg.totalDurationSeconds, msg.thinkingDurationSeconds, isActivelyStreaming]);
 
   // Aggregate all prose text for clipboard copy in footer
   const allProseText = useMemo(() => {
@@ -184,10 +190,10 @@ const AssistantMessage = memo(function AssistantMessage({
               steps={unit.steps}
               thoughts={unit.thoughts}
               tools={unit.tools}
-              isStreaming={isLast && isStreaming && uIdx === units.length - 1}
+              isStreaming={isActivelyStreaming}
               isLast={isLast}
               thinkingDurationSeconds={msg.thinkingDurationSeconds}
-              hasAssistantContent={units.some((u, i) => i > uIdx && u.type === 'prose')}
+              hasAssistantContent={units.some((u) => u.type === 'prose')}
               totalDurationSeconds={msg.totalDurationSeconds}
               turnStartTime={msg.turnStartTime}
               onOpenFile={onOpenFile}
