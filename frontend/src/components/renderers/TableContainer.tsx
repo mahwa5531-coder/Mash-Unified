@@ -56,9 +56,9 @@ export default function TableContainer({ children }: { children: React.ReactNode
   };
 
   return (
-    <div className="my-3.5 rounded-xl border border-zinc-200/80 dark:border-white/[0.08] bg-white dark:bg-[#151518] shadow-xs overflow-hidden group/table">
+    <div className="my-4 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111113] shadow-xs overflow-hidden group/table">
       {/* Table Action Header Bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-50/80 dark:bg-white/[0.02] border-b border-zinc-200/60 dark:border-white/[0.05] text-xs text-zinc-500 select-none">
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-zinc-50/50 dark:bg-white/[0.02] border-b border-zinc-200/70 dark:border-white/[0.06] text-xs text-zinc-500 select-none">
         <div className="flex items-center gap-1.5 font-medium text-[11px] text-zinc-600 dark:text-zinc-400">
           <TableIcon size={12} className="text-zinc-500 shrink-0" />
           <span>Table Data</span>
@@ -102,7 +102,7 @@ export default function TableContainer({ children }: { children: React.ReactNode
       <div className="overflow-x-auto select-text custom-scrollbar">
         <table
           ref={tableRef}
-          className="w-full text-[12.5px] border-collapse [&_thead]:bg-zinc-100 dark:[&_thead]:bg-zinc-800/60 [&_th]:border-b [&_th]:border-zinc-200 dark:[&_th]:border-white/[0.08] [&_th]:py-2.5 [&_th]:px-3.5 [&_th]:font-semibold [&_th]:text-zinc-900 dark:[&_th]:text-zinc-100 [&_th]:text-[12px] [&_th]:tracking-wide [&_tbody_tr]:bg-transparent [&_tbody_tr]:border-b [&_tbody_tr]:border-zinc-100 dark:[&_tbody_tr]:border-white/[0.03] [&_tbody_tr:last-child]:border-b-0 [&_tbody_tr]:hover:bg-zinc-50/80 dark:[&_tbody_tr]:hover:bg-white/[0.02] [&_tbody_tr]:transition-colors [&_td]:py-2.5 [&_td]:px-3.5 [&_td]:text-zinc-800 dark:[&_td]:text-zinc-200"
+          className="w-full text-[12.5px] border-collapse [&_thead]:bg-zinc-100/90 dark:[&_thead]:bg-white/[0.06] [&_th]:bg-zinc-100/90 dark:[&_th]:bg-white/[0.06] [&_th]:border-b [&_th]:border-zinc-200 dark:[&_th]:border-white/[0.08] [&_th]:py-2.5 [&_th]:px-3.5 [&_th]:font-semibold [&_th]:text-zinc-800 dark:[&_th]:text-zinc-200 [&_th]:text-[11.5px] [&_th]:uppercase [&_th]:tracking-wider [&_tbody_tr]:bg-transparent [&_tbody_tr]:border-b [&_tbody_tr]:border-zinc-100 dark:[&_tbody_tr]:border-white/[0.04] [&_tbody_tr:last-child]:border-b-0 [&_tbody_tr]:hover:bg-zinc-50/50 dark:[&_tbody_tr]:hover:bg-white/[0.02] [&_tbody_tr]:transition-colors [&_td]:py-2.5 [&_td]:px-3.5 [&_td]:text-zinc-800 dark:[&_td]:text-zinc-200"
         >
           {children}
         </table>

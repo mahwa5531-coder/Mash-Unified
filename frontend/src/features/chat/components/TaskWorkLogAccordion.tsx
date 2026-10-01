@@ -181,11 +181,13 @@ export default function TaskWorkLogAccordion({
     return totalDurationSeconds || fallbackSecs;
   }, [steps, totalDurationSeconds, fallbackSecs]);
 
-  const finalSecs = totalDurationSeconds || fallbackSecs;
+  const finalSecs = totalDurationSeconds || (turnStartTime ? Math.max(1, Math.round((Date.now() - turnStartTime) / 1000)) : fallbackSecs);
   const formattedTime = formatDurationDisplay(finalSecs);
   const blockFormattedTime = formatDurationDisplay(blockSecs);
 
-  if (!hasWork && (!isStreaming || hasAssistantContent)) return null;
+  const hasDuration = Boolean(totalDurationSeconds || thinkingDurationSeconds || turnStartTime);
+  if (!hasWork && !isStreaming && !hasDuration) return null;
+  if (!hasWork && isStreaming && hasAssistantContent) return null;
 
   const toggleThought = (id: string) => {
     setExpandedThoughts(prev => ({ ...prev, [id]: !prev[id] }));
@@ -258,9 +260,9 @@ export default function TaskWorkLogAccordion({
             </span>
           </div>
         ) : !hasAssistantContent ? (
-          <div className="flex items-center gap-1.5 text-xs text-zinc-700 dark:text-zinc-200 font-sans py-1">
-            <Loader2 size={12} className="animate-spin text-sky-500 shrink-0" />
-            <span className="inline-flex items-center font-medium">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-sans py-0.5">
+            <Loader2 size={11} className="animate-spin text-zinc-400 shrink-0" />
+            <span className="inline-flex items-center text-muted-foreground">
               <span>Working</span>
               <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
                 <span>.</span>
@@ -274,9 +276,10 @@ export default function TaskWorkLogAccordion({
     );
   }
 
-  // 2. Completed turn: render "Worked for {formattedTime} >" or "Thought for {formattedTime} >" clean visible pill dropdown
-  const hasOnlyThoughts = (!tools || tools.length === 0) && (!steps || steps.length === 0 || steps.every((s: any) => s.type === 'thinking' || (!s.tools || s.tools.length === 0) && (!s.name || s.name === 'thought')));
-  const actionLabel = hasOnlyThoughts ? `Thought for ${formattedTime}` : `Worked for ${formattedTime}`;
+  // 2. Completed turn: render "Worked for {formattedTime} >" or "Thought for {formattedTime} >" naked text link dropdown
+  const hasThoughts = thoughts.length > 0 || (steps && steps.some((s: any) => s.type === 'thinking' || (s.thoughts && s.thoughts.length > 0)));
+  const hasTools = (tools && tools.length > 0) || (steps && steps.some((s: any) => s.type === 'tool' || (s.tools && s.tools.length > 0)));
+  const actionLabel = hasThoughts && !hasTools ? `Thought for ${formattedTime}` : `Worked for ${formattedTime}`;
 
   return (
     <div className="w-full min-w-0 text-[13px] font-sans my-1 select-text">
@@ -284,17 +287,23 @@ export default function TaskWorkLogAccordion({
         type="button"
         aria-expanded={clusterOpen}
         onClick={() => setClusterOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white bg-zinc-100/90 dark:bg-white/[0.06] hover:bg-zinc-200/80 dark:hover:bg-white/[0.12] border border-zinc-200/80 dark:border-white/[0.08] transition-all cursor-pointer select-none my-1.5 w-fit group shadow-2xs"
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-normal py-0.5 px-1 -mx-1 rounded-md hover:bg-muted/50 transition-all cursor-pointer select-none my-0.5 w-fit group"
       >
         <span className="font-sans">{actionLabel}</span>
-        <ChevronRight size={12} className={cn("text-zinc-400 dark:text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200 transition-transform shrink-0", clusterOpen && "rotate-90")} />
+        <ChevronRight size={11} className={cn("text-muted-foreground group-hover:text-foreground transition-transform", clusterOpen && "rotate-90")} />
       </button>
 
       {/* Chronological Timeline List revealed only when user expands */}
       {clusterOpen && (
         <div className="min-w-0 overflow-hidden mt-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
           <div className="flex flex-col gap-1 py-1 text-xs">
-            {groupedTimeline.map((entry) => renderTimelineRow(entry, false))}
+            {groupedTimeline.length > 0 ? (
+              groupedTimeline.map((entry) => renderTimelineRow(entry, false))
+            ) : (
+              <div className="text-xs text-muted-foreground/80 py-1 px-1 font-sans">
+                Completed response in {formattedTime}
+              </div>
+            )}
           </div>
         </div>
       )}

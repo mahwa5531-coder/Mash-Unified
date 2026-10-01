@@ -75,6 +75,10 @@ const AssistantMessage = memo(function AssistantMessage({
     | { type: 'worklog'; id: string; steps: ExecutionStep[]; thoughts: string[]; tools: ToolCall[] }
     | { type: 'prose'; id: string; content: string }
   >>(() => {
+    const hasWork = (msg.thoughts && msg.thoughts.length > 0) || (msg.tools && msg.tools.length > 0) || (msg.steps && msg.steps.some(s => s.type !== 'text'));
+    const hasDuration = Boolean(msg.totalDurationSeconds || msg.thinkingDurationSeconds || (msg.turnStartTime && !isActivelyStreaming));
+    const shouldIncludeWorklog = hasWork || isActivelyStreaming || (msg.status === 'running') || hasDuration;
+
     if (msg.steps && msg.steps.length > 0) {
       const result: Array<
         | { type: 'worklog'; id: string; steps: ExecutionStep[]; thoughts: string[]; tools: ToolCall[] }
@@ -133,6 +137,16 @@ const AssistantMessage = memo(function AssistantMessage({
       }
       flushWork();
 
+      if (!result.some(u => u.type === 'worklog') && shouldIncludeWorklog) {
+        result.unshift({
+          type: 'worklog',
+          id: `work_primary_${msg.id || 'start'}`,
+          steps: [],
+          thoughts: msg.thoughts || [],
+          tools: msg.tools || [],
+        });
+      }
+
       if (result.length > 0) {
         return result;
       }
@@ -143,17 +157,10 @@ const AssistantMessage = memo(function AssistantMessage({
       | { type: 'worklog'; id: string; steps: ExecutionStep[]; thoughts: string[]; tools: ToolCall[] }
       | { type: 'prose'; id: string; content: string }
     > = [];
-    const hasWork = (msg.thoughts && msg.thoughts.length > 0)
-      || (msg.tools && msg.tools.length > 0)
-      || (msg.steps && msg.steps.length > 0)
-      || Boolean(msg.totalDurationSeconds && msg.totalDurationSeconds > 0)
-      || Boolean(msg.thinkingDurationSeconds && msg.thinkingDurationSeconds > 0)
-      || isActivelyStreaming;
-
-    if (hasWork) {
+    if (shouldIncludeWorklog) {
       fallbackUnits.push({
         type: 'worklog',
-        id: 'work_primary',
+        id: `work_primary_${msg.id || 'start'}`,
         steps: msg.steps || [],
         thoughts: msg.thoughts || [],
         tools: msg.tools || [],
@@ -168,7 +175,7 @@ const AssistantMessage = memo(function AssistantMessage({
       });
     }
     return fallbackUnits;
-  }, [msg.steps, msg.thoughts, msg.tools, msg.content, msg.totalDurationSeconds, msg.thinkingDurationSeconds, isActivelyStreaming]);
+  }, [msg.steps, msg.thoughts, msg.tools, msg.content, msg.status, msg.id, msg.totalDurationSeconds, msg.thinkingDurationSeconds, msg.turnStartTime, isActivelyStreaming]);
 
   // Aggregate all prose text for clipboard copy in footer
   const allProseText = useMemo(() => {
@@ -180,7 +187,7 @@ const AssistantMessage = memo(function AssistantMessage({
   }, [units, msg.content]);
 
   return (
-    <div className="text-[14px] text-[var(--text-primary)] w-full mb-2">
+    <div className="text-[13.5px] text-[var(--text-primary)] w-full mb-1.5">
       {/* Interleaved Sequential Units (Thoughts, Tools, and Authentic Assistant Prose in Chronological Order) */}
       {units.map((unit, uIdx) => {
         if (unit.type === 'worklog') {
@@ -190,10 +197,10 @@ const AssistantMessage = memo(function AssistantMessage({
               steps={unit.steps}
               thoughts={unit.thoughts}
               tools={unit.tools}
-              isStreaming={isActivelyStreaming}
+              isStreaming={isLast && isStreaming && !units.some((u, i) => i > uIdx && u.type === 'worklog')}
               isLast={isLast}
               thinkingDurationSeconds={msg.thinkingDurationSeconds}
-              hasAssistantContent={units.some((u) => u.type === 'prose')}
+              hasAssistantContent={units.some((u, i) => i > uIdx && u.type === 'prose')}
               totalDurationSeconds={msg.totalDurationSeconds}
               turnStartTime={msg.turnStartTime}
               onOpenFile={onOpenFile}

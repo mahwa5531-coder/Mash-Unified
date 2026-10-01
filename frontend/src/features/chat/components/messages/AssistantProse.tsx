@@ -57,6 +57,28 @@ function extractChildText(node: any): string {
   return '';
 }
 
+// Dynamic financial cell detector: recognizes all Unicode currency symbols (\p{Sc}), 
+// currency codes (INR, USD, EUR, etc.), accounting negative parens (e.g. ($4,000) or (₹1,50,000)),
+// Dr/Cr indicators, percentages, and Indian scales (Lakhs/Crores)
+function isFinancialCell(raw: string): boolean {
+  const text = (raw || '').trim();
+  if (!text) return false;
+  if (/^[-−–—]$/.test(text) || /^(nil|n\/a|none)$/i.test(text)) return true;
+
+  let s = text;
+  if (s.startsWith('(') && s.endsWith(')')) {
+    s = s.slice(1, -1).trim();
+  }
+
+  s = s.replace(/^[-+−–]/, '').replace(/[-+−–]$/, '').trim();
+  s = s.replace(/^\p{Sc}\s*/u, '').replace(/\s*\p{Sc}$/u, '');
+  s = s.replace(/^(rs\.?|inr|usd|eur|gbp|aed|cad|aud|sgd|chf|jpy|cny)\s*/i, '');
+  s = s.replace(/\s*(rs\.?|inr|usd|eur|gbp|aed|cad|aud|sgd|chf|jpy|cny)$/i, '');
+  s = s.replace(/\s*(%|dr\.?|cr\.?|lakhs?|crores?|[kmb])\s*$/i, '').trim();
+
+  if (!s) return false;
+  return /^[\d,]+(\.\d+)?$/.test(s) || /^[\d\.]+(,\d+)?$/.test(s);
+}
 
 // Format file pill label and path cleanly
 function formatFilePill(rawLabel: string, rawHref: string) {
@@ -257,7 +279,7 @@ export const AssistantProse = memo(function AssistantProse({
       }
 
       return (
-        <code {...props} className="bg-zinc-100 dark:bg-white/[0.08] text-zinc-900 dark:text-zinc-100 border border-zinc-200/80 dark:border-white/[0.1] px-1.5 py-0.5 mx-0.5 rounded-[5px] font-mono text-[12px] font-medium break-all select-text align-baseline">
+        <code {...props} className="bg-zinc-100 dark:bg-white/[0.06] text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-white/[0.08] px-1.5 py-0.5 mx-0.5 rounded-[4px] font-mono text-[11.5px] font-medium break-all select-text align-baseline">
           {children}
         </code>
       );
@@ -273,7 +295,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     p({ children, ...props }: any) {
       return (
-        <p className="mb-4 text-[14px] leading-[1.75] text-zinc-900 dark:text-[#f4f4f5] last:mb-0" {...props}>
+        <p className="mb-3.5 text-[13.5px] leading-[1.75] text-zinc-800 dark:text-[#d4d4d8] last:mb-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </p>
       );
@@ -281,7 +303,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     ul({ children, ...props }: any) {
       return (
-        <ul className="my-3.5 pl-6 list-disc space-y-2 text-zinc-900 dark:text-[#f4f4f5] marker:text-zinc-400 dark:marker:text-zinc-500" {...props}>
+        <ul className="my-3 pl-5 list-disc space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:text-zinc-400 dark:marker:text-zinc-500" {...props}>
           {children}
         </ul>
       );
@@ -289,7 +311,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     ol({ children, ...props }: any) {
       return (
-        <ol className="my-4 pl-6 list-decimal space-y-4 text-zinc-900 dark:text-[#f4f4f5] marker:font-semibold marker:text-zinc-500 dark:marker:text-zinc-400" {...props}>
+        <ol className="my-3 pl-5 list-decimal space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400" {...props}>
           {children}
         </ol>
       );
@@ -297,13 +319,13 @@ export const AssistantProse = memo(function AssistantProse({
 
     hr({ ...props }: any) {
       return (
-        <hr className="my-7 border-t border-zinc-200/80 dark:border-white/[0.08]" {...props} />
+        <hr className="my-5 border-t border-zinc-200/60 dark:border-white/[0.08]" {...props} />
       );
     },
 
     li({ children, ...props }: any) {
       return (
-        <li className="my-1 text-[14px] leading-[1.75] text-zinc-900 dark:text-[#f4f4f5]" {...props}>
+        <li className="my-1 text-[13.5px] leading-[1.68] text-zinc-800 dark:text-[#d4d4d8]" {...props}>
           {processTextNodes(children, onOpenFile)}
         </li>
       );
@@ -311,7 +333,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h1({ children, ...props }: any) {
       return (
-        <h1 className="mt-8 mb-4 text-[21px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0" {...props}>
+        <h1 className="mt-7 mb-3.5 text-[19px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h1>
       );
@@ -319,7 +341,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h2({ children, ...props }: any) {
       return (
-        <h2 className="mt-7 mb-3.5 text-[17.5px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/70 dark:border-white/[0.08] pb-2" {...props}>
+        <h2 className="mt-6 mb-3 text-[16px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/70 dark:border-white/[0.08] pb-2" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h2>
       );
@@ -327,7 +349,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h3({ children, ...props }: any) {
       return (
-        <h3 className="mt-6 mb-3 text-[15.5px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
+        <h3 className="mt-5 mb-2.5 text-[14.5px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h3>
       );
@@ -335,7 +357,7 @@ export const AssistantProse = memo(function AssistantProse({
 
     h4({ children, ...props }: any) {
       return (
-        <h4 className="mt-5 mb-2.5 text-[13.5px] font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 first:mt-0" {...props}>
+        <h4 className="mt-4 mb-2 text-[12.5px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h4>
       );
@@ -346,20 +368,18 @@ export const AssistantProse = memo(function AssistantProse({
     },
 
     td({ children, ...props }: any) {
-      const align = props.align || props.style?.textAlign;
-      const alignClass = align === 'right' ? 'text-right font-mono tabular-nums' : align === 'center' ? 'text-center' : 'text-left';
+      const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
       return (
-        <td className={`py-2 px-3.5 text-zinc-800 dark:text-zinc-300 text-[12.5px] leading-normal ${alignClass}`} {...props}>
+        <td className={`py-2 px-3.5 text-zinc-800 dark:text-zinc-200 tabular-nums ${alignClass} text-[12.5px]`} {...props}>
           {processTextNodes(children, onOpenFile)}
         </td>
       );
     },
 
     th({ children, ...props }: any) {
-      const align = props.align || props.style?.textAlign;
-      const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
+      const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
       return (
-        <th className={`py-2.5 px-3.5 font-semibold text-zinc-700 dark:text-zinc-200 text-[11.5px] uppercase tracking-wider ${alignClass}`} {...props}>
+        <th className={`py-2.5 px-3.5 font-semibold text-zinc-800 dark:text-zinc-200 text-[11.5px] uppercase tracking-wider ${alignClass}`} {...props}>
           {children}
         </th>
       );
@@ -429,15 +449,11 @@ export const AssistantProse = memo(function AssistantProse({
 
   return (
     <div className={cn(
-      "font-sans text-zinc-900 dark:text-[#f4f4f5] text-[14px] leading-[1.75] mt-1.5 tracking-normal",
-      // Nested list rhythm & sub-point indentation
-      "[&_ol]:my-4 [&_ol]:pl-6 [&_ol]:list-decimal [&_ol]:space-y-4",
-      "[&_ul]:my-3.5 [&_ul]:pl-6 [&_ul]:list-disc [&_ul]:space-y-2",
-      "[&_li>ul]:mt-2.5 [&_li>ul]:mb-2 [&_li>ul]:pl-5 [&_li>ul]:space-y-2 [&_li>ul]:list-disc",
-      "[&_li>ol]:mt-2.5 [&_li>ol]:mb-2 [&_li>ol]:pl-5 [&_li>ol]:space-y-3 [&_li>ol]:list-decimal",
-      "[&_li]:text-[14px] [&_li]:leading-[1.75] [&_li]:text-zinc-900 dark:[&_li]:text-[#f4f4f5]",
-      "[&_p]:mb-4 [&_p]:leading-[1.75] [&_p]:text-zinc-900 dark:[&_p]:text-[#f4f4f5] [&_p:last-child]:mb-0",
-      "[&_hr]:my-7 [&_hr]:border-zinc-200/80 dark:[&_hr]:border-white/[0.08] [&_pre]:my-3.5",
+      "font-sans text-zinc-800 dark:text-[#ececed] text-[13.5px] leading-[1.68] mt-2",
+      "[&_ul]:my-2.5 [&_ul]:pl-5 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:marker:text-zinc-400 dark:[&_ul]:marker:text-zinc-500",
+      "[&_ol]:my-2.5 [&_ol]:pl-5 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:marker:text-zinc-400 dark:[&_ol]:marker:text-zinc-500",
+      "[&_li>ul]:mt-1 [&_li>ul]:mb-0.5 [&_li>ol]:mt-1 [&_li>ol]:mb-0.5 [&_li_p]:mb-0 [&_li_p]:mt-0",
+      "[&_hr]:my-4 [&_hr]:border-zinc-200/80 dark:[&_hr]:border-white/[0.08] [&_pre]:my-2.5",
       className
     )}>
       <ReactMarkdown
