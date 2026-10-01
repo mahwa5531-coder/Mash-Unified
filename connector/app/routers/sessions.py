@@ -90,27 +90,48 @@ def _parse_epoch_seconds(val: Any) -> float:
     """Parse any datetime, ISO string, timestamp (ns, ms, sec) into unix epoch float seconds (UTC)."""
     if not val:
         return 0.0
+    now = datetime.now(timezone.utc).timestamp()
+    parsed = 0.0
     if isinstance(val, (int, float)):
+        # Range classification:
+        # > 1e16 -> nanoseconds (e.g. 1.7e18 / 1e9 = 1.7e9)
+        # > 1e13 -> microseconds (e.g. 1.7e15 / 1e6 = 1.7e9)
+        # > 1e10 -> milliseconds (e.g. 1.7e12 / 1e3 = 1.7e9)
+        # > 1e8  -> seconds (e.g. 1.7e9)
         if val > 1e16:
-            return float(val) / 1e9
-        if val > 1e11:
-            return float(val) / 1e3
-        return float(val)
-    if isinstance(val, datetime):
-        if val.tzinfo is None:
-            return val.astimezone().timestamp()
-        return val.timestamp()
-    try:
-        s = str(val).strip().replace(" ", "T")
-        dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None:
-            return dt.astimezone().timestamp()
-        return dt.timestamp()
-    except Exception:
-        try:
-            return float(val)
-        except Exception:
+            parsed = float(val) / 1e9
+        elif val > 1e13:
+            parsed = float(val) / 1e6
+        elif val > 1e10:
+            parsed = float(val) / 1e3
+        elif val > 1e8:
+            parsed = float(val)
+        else:
             return 0.0
+    elif isinstance(val, datetime):
+        if val.tzinfo is None:
+            parsed = val.astimezone(timezone.utc).timestamp()
+        else:
+            parsed = val.timestamp()
+    else:
+        try:
+            s = str(val).strip().replace(" ", "T")
+            dt = datetime.fromisoformat(s)
+            if dt.tzinfo is None:
+                parsed = dt.astimezone(timezone.utc).timestamp()
+            else:
+                parsed = dt.timestamp()
+        except Exception:
+            try:
+                num = float(val)
+                return _parse_epoch_seconds(num)
+            except Exception:
+                return 0.0
+
+    # Guard against corrupt future dates (e.g. 2033 or beyond): clamp to now + 60s
+    if parsed > (now + 60.0):
+        parsed = now
+    return parsed
 
 
 # ──────────────────────────────────────────────
@@ -146,7 +167,7 @@ async def list_sessions(
         bench_patterns = (
             "benchmark", "bench", "par_", "subfunc_", "eval", "tatqa",
             "gaia", "stataudit", "l4_", "ssc_cgl", "unbiased", "qa_report",
-            "nlp_batch"
+            "nlp_batch", "test_"
         )
 
         seen_sids = set()
