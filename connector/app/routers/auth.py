@@ -23,6 +23,7 @@ import logging
 from typing import Any
 import httpx
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from nexau.archs.platform.crypto_vault import (
@@ -125,6 +126,25 @@ class SwitchAccountPayload(BaseModel):
     plan: str = "pro"
 
 
+@router.get("/config")
+async def get_auth_config() -> dict[str, Any]:
+    """Returns dynamic cloud gateway and auth settings to frontend."""
+    config = AppConfig.load()
+    cloud_url = (
+        os.getenv("CLOUD_GATEWAY_URL")
+        or os.getenv("GATEWAY_URL")
+        or config.model.gateway_url
+        or "https://api.mash.ai"
+    ).rstrip("/")
+    mash_env = os.getenv("MASH_ENV", "production").lower()
+    auth_required = os.getenv("MASH_AUTH_REQUIRED", "").lower() in ("true", "1", "yes") or mash_env == "production"
+    return {
+        "gateway_url": cloud_url,
+        "auth_required": auth_required,
+        "env": mash_env,
+    }
+
+
 @router.get("/me")
 async def get_current_user_auth() -> dict[str, Any]:
     """Returns the current active user authentication state and metadata."""
@@ -140,8 +160,15 @@ async def get_current_user_auth() -> dict[str, Any]:
             "accounts": meta.get("accounts", []),
             "has_access_token": bool(vault.get("access_token") or vault.get("api_key")),
         }
-    
-    # ponytail: Return local authenticated auditor profile when not connected to cloud auth
+
+    mash_env = os.getenv("MASH_ENV", "production").lower()
+    auth_required = os.getenv("MASH_AUTH_REQUIRED", "").lower() in ("true", "1", "yes") or mash_env == "production"
+    if auth_required:
+        return {
+            "authenticated": False,
+        }
+
+    # ponytail: Return local authenticated auditor profile when in offline dev mode
     return {
         "authenticated": True,
         "email": meta.get("email") or "auditor@mash.local",
@@ -151,6 +178,50 @@ async def get_current_user_auth() -> dict[str, Any]:
         "accounts": meta.get("accounts", []),
         "has_access_token": True,
     }
+
+
+@router.get("/callback", response_class=HTMLResponse)
+async def handle_browser_callback(code: str):
+    """Handles browser loopback redirect after cloud Google OAuth."""
+    payload = LoginPayload(code=code)
+    try:
+        await handle_login(payload)
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>MASH Desktop - Signed In</title>
+            <style>
+                body { background: #0a0a0c; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+                .card { background: #161618; border: 1px solid rgba(255,255,255,0.1); padding: 32px 48px; border-radius: 16px; box-shadow: 0 16px 32px rgba(0,0,0,0.4); max-width: 400px; }
+                h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+                p { color: #888; font-size: 14px; margin: 0 0 12px; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div style="font-size: 40px; margin-bottom: 16px; color: #10b981;">✓</div>
+                <h2>Authentication Successful</h2>
+                <p>Your desktop app has been unlocked. You may close this tab and return to MASH.</p>
+                <script>
+                    setTimeout(() => { window.close(); }, 1200);
+                </script>
+            </div>
+        </body>
+        </html>
+        """
+    except Exception as e:
+        logger.error("Callback error: %s", e)
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Sign In Error</title></head>
+        <body style="background:#0a0a0c;color:#f87171;font-family:sans-serif;padding:40px;text-align:center;">
+            <h2>Authentication Failed</h2>
+            <p style="color:#aaa;">{str(e)}</p>
+        </body>
+        </html>
+        """
 
 
 @router.post("/login")

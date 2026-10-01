@@ -182,6 +182,16 @@ async def stream_query_bridge(
 
     # Per-request model override (app-specific: frontend sends context.model)
     effective_agent_config = server._default_agent_config
+    
+    # ponytail: dynamically attach live rotated JWT token to outgoing LLM requests
+    from app.routers.auth import ensure_valid_token
+    live_token = await ensure_valid_token()
+    if live_token and effective_agent_config and effective_agent_config.llm_config:
+        if effective_agent_config.llm_config.api_key != live_token:
+            new_llm = copy.copy(effective_agent_config.llm_config)
+            new_llm.api_key = live_token
+            effective_agent_config = effective_agent_config.model_copy(update={"llm_config": new_llm})
+
     requested_model = resolved_context.get("model")
     if requested_model and effective_agent_config and effective_agent_config.llm_config:
         if requested_model not in ("default", "pool", "nexau-pool") and requested_model != effective_agent_config.llm_config.model:

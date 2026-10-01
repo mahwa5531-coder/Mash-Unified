@@ -15,17 +15,9 @@ import { sessionStore } from '@/features/chat';
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar';
 import { ChatToolbar } from '@/components/layout/ChatToolbar';
 
-const DEFAULT_LOCAL_USER: AuthUser = {
-  authenticated: true,
-  email: 'auditor@mash.local',
-  name: 'Audit Lead',
-  plan: 'enterprise',
-  credits_remaining: 999999,
-};
-
 export default function Home() {
-  const [authUser, setAuthUser] = useState<AuthUser | null>(DEFAULT_LOCAL_USER);
-  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedSessionTitle, setSelectedSessionTitle] = useState<string>('New Conversation');
   const [selectedSessionRepo, setSelectedSessionRepo] = useState<string>('No Repo');
@@ -59,13 +51,13 @@ export default function Home() {
         if (user && user.authenticated) {
           setAuthUser(user);
         } else {
-          setAuthUser(DEFAULT_LOCAL_USER);
+          setAuthUser(null);
         }
         setIsAuthLoading(false);
       }
     }).catch(() => {
       if (isMounted) {
-        setAuthUser(DEFAULT_LOCAL_USER);
+        setAuthUser(null);
         setIsAuthLoading(false);
       }
     });

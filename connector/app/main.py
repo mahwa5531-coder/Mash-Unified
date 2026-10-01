@@ -9,6 +9,7 @@ from pathlib import Path
 # ponytail: Explicitly load .env file so new LLM settings apply
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 # Ensure NexAU engine is importable from sibling directory
 _nexau_dir = Path(__file__).resolve().parent.parent.parent / "NexAU"
@@ -71,6 +72,7 @@ def _build_agent_config() -> AgentConfig:
     app_cfg = AppConfig.load()
     vault = load_secure_vault() or {}
 
+    cloud_gateway = os.getenv("CLOUD_GATEWAY_URL") or os.getenv("GATEWAY_URL") or app_cfg.model.gateway_url
     custom_base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("LLM_BASE_URL")
     custom_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("NVIDIA_API_KEY") or os.getenv("OPENROUTER_API_KEY")
     custom_model = os.getenv("OPENAI_MODEL") or os.getenv("LLM_MODEL")
@@ -79,9 +81,9 @@ def _build_agent_config() -> AgentConfig:
         custom_key
         or vault.get("api_key")
         or vault.get("access_token")
-        or ("sk-local-test" if custom_base_url else "")
+        or ("sk-local-test" if (custom_base_url or cloud_gateway) else "")
     )
-    active_model = custom_model or app_cfg.model.default_model or "google/gemini-2.5-flash"
+    active_model = custom_model or app_cfg.model.default_model or "mash-audit-v1"
 
     active_api_type = os.getenv("LLM_API_TYPE", "openai_chat_completion")
     is_mock = os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes") or active_key.lower() in ("mock", "none", "test")
@@ -89,6 +91,9 @@ def _build_agent_config() -> AgentConfig:
     if is_mock:
         active_key = active_key or "mock"
         default_base_url = "http://mock"
+    elif cloud_gateway:
+        clean_gw = cloud_gateway.rstrip("/")
+        default_base_url = clean_gw if clean_gw.endswith("/v1") else f"{clean_gw}/v1"
     elif custom_base_url:
         default_base_url = custom_base_url
     elif active_key.startswith("sk-or-"):
@@ -96,7 +101,7 @@ def _build_agent_config() -> AgentConfig:
         if not ("/" in active_model):
             active_model = "google/gemini-2.5-flash"
     else:
-        default_base_url = app_cfg.model.gateway_url or os.getenv("BIFROST_GATEWAY_URL", "https://openrouter.ai/api/v1")
+        default_base_url = os.getenv("BIFROST_GATEWAY_URL", "https://openrouter.ai/api/v1")
 
     thinking_budget = int(os.getenv("LLM_THINKING_BUDGET", "16384"))
     extra_llm_params: dict[str, Any] = {}

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { fetchAuthMe, AuthUser } from '@/services/auth';
+import { BASE_URL, safeFetch } from '@/services/client';
 import { 
   Card, 
   CardHeader, 
@@ -55,8 +56,18 @@ export default function DesktopSignInView({ onAuthSuccess }: DesktopSignInViewPr
 
   // ALL authentication delegates strictly to Google OAuth via Cloud Gateway.
   // Nothing is authenticated or stored locally on the desktop.
-  const handleCloudGoogleAuth = (hintEmail?: string) => {
-    const cloudGatewayUrl = (process.env.NEXT_PUBLIC_GATEWAY_URL || "https://api.mash.ai").replace(/\/+$/, "");
+  const handleCloudGoogleAuth = async (hintEmail?: string) => {
+    let cloudGatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL;
+    if (!cloudGatewayUrl) {
+      try {
+        const res = await safeFetch(`${BASE_URL}/api/auth/config`);
+        if (res.ok) {
+          const cfg = await res.json();
+          if (cfg.gateway_url) cloudGatewayUrl = cfg.gateway_url;
+        }
+      } catch {}
+    }
+    cloudGatewayUrl = (cloudGatewayUrl || "https://api.mash.ai").replace(/\/+$/, "");
     const emailParam = hintEmail ? `?login_hint=${encodeURIComponent(hintEmail)}` : '';
     try {
       window.open(`${cloudGatewayUrl}/v1/auth/oauth/google${emailParam}`, '_blank');
