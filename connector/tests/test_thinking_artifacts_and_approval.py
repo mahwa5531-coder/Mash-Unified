@@ -94,7 +94,8 @@ async def test_artifact_path_traversal_and_retrieval():
             assert res_list.status_code == 200
             files = res_list.json().get("files", [])
             assert "audit_checklist.md" in files
-            assert "scratch/calc_totals.py" in files
+            # Scratch scripts are internal execution files and must not leak into customer deliverables list
+            assert "scratch/calc_totals.py" not in files
 
             # 3. Retrieve valid artifact content
             res_content = await client.get(f"/api/artifacts/{user_id}/{sess_id}/audit_checklist.md")

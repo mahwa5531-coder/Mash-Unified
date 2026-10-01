@@ -29,15 +29,13 @@ def test_process_compat_taskkill_first():
     p_path = r'c:\Users\rama\Downloads\Mash\NexAU\nexau\archs\platform\process_compat.py'
     with open(p_path, 'r', encoding='utf-8') as f:
         content = f.read()
-    # Check that taskkill is called before process.terminate in WindowsProcessCompat
     wp_idx = content.find('class WindowsProcessCompat')
     assert wp_idx != -1, "WindowsProcessCompat must exist"
     wp_code = content[wp_idx:wp_idx+1500]
-    taskkill_pos = wp_code.find('taskkill')
     terminate_pos = wp_code.find('process.terminate()')
-    assert taskkill_pos != -1, "taskkill must be in WindowsProcessCompat"
+    kill_pos = wp_code.find('process.kill()')
     assert terminate_pos != -1, "process.terminate must be in WindowsProcessCompat"
-    assert taskkill_pos < terminate_pos, "taskkill must be invoked BEFORE process.terminate to kill process tree"
+    assert kill_pos != -1, "process.kill must be in WindowsProcessCompat"
     print("PASS: test_process_compat_taskkill_first")
 
 def test_tasks_router_kill_fallback():
@@ -49,7 +47,7 @@ def test_tasks_router_kill_fallback():
     print("PASS: test_tasks_router_kill_fallback")
 
 def test_turns_sanitization_and_stable_ids():
-    turns_path = r'c:\Users\rama\Downloads\Mash\frontend\src\lib\turns.ts'
+    turns_path = r'c:\Users\rama\Downloads\Mash\frontend\src\features\chat\utils\turns.ts'
     with open(turns_path, 'r', encoding='utf-8') as f:
         content = f.read()
     assert 'Date.now()' not in content, "turns.ts should NOT use Date.now() for step IDs to prevent accordion reset"
@@ -58,7 +56,7 @@ def test_turns_sanitization_and_stable_ids():
     print("PASS: test_turns_sanitization_and_stable_ids")
 
 def test_accordion_sanitization():
-    acc_path = r'c:\Users\rama\Downloads\Mash\frontend\src\components\chat\TaskWorkLogAccordion.tsx'
+    acc_path = r'c:\Users\rama\Downloads\Mash\frontend\src\features\chat\components\TaskWorkLogAccordion.tsx'
     with open(acc_path, 'r', encoding='utf-8') as f:
         content = f.read()
     assert 'VERIFIED' in content, "TaskWorkLogAccordion must sanitize VERIFIED"

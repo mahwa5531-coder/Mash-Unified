@@ -135,7 +135,7 @@ def write_file(
         original_content = ""
 
         # Overwrite safety guard
-        overwrite_flag = kwargs.get("overwrite", True)
+        overwrite_flag = Overwrite if Overwrite is not None else (overwrite if overwrite is not None else kwargs.get("overwrite", True))
         if file_exists and overwrite_flag is False:
             error_msg = f"Target file already exists: {resolved_path}. Set 'overwrite: true' if you explicitly intend to overwrite."
             return {
