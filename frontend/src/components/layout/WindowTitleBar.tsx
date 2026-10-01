@@ -14,10 +14,11 @@ interface WindowTitleBarProps {
 /**
  * Native-style Desktop Window Titlebar for Mash.
  *
- * Implements Microsoft Windows 11 Human Interface Guidelines (HIG):
- * - Height: 36px (h-9) with 44px x 36px click targets.
- * - Icon sizes: 14px-16px for comfortable visibility and clicking on High-DPI screens.
- * - Draggable region: data-tauri-drag-region for native window movement.
+ * Implements Microsoft Visual Studio Code & Windows custom titlebar specifications:
+ * - Height: 30px (h-[30px]) - sleek, space-efficient desktop IDE height.
+ * - Click targets: 46px x 30px per control button (VS Code workbench standard).
+ * - Icon sizes: 11px-14px with strokeWidth 1.5 for crisp, elegant rendering.
+ * - Draggable region: data-tauri-drag-region and WebkitAppRegion: 'drag' for native window movement.
  * - Wired to Tauri, Electron, and PyWebView native window APIs with graceful browser fallback.
  */
 export function WindowTitleBar({
@@ -105,19 +106,19 @@ export function WindowTitleBar({
   return (
     <div
       data-tauri-drag-region
-      className="h-9 bg-zinc-100 dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-white/[0.06] flex items-center justify-between select-none shrink-0 text-xs text-zinc-600 dark:text-zinc-400 z-50 transition-colors"
+      className="h-[30px] bg-zinc-100 dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-white/[0.06] flex items-center justify-between select-none shrink-0 text-xs text-zinc-600 dark:text-zinc-400 z-50 transition-colors"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {/* Left: Branding & App Identity */}
-      <div className="flex items-center gap-2.5 px-3 h-full no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        <div className="flex items-center gap-1.5 text-zinc-900 dark:text-zinc-100 font-semibold tracking-wider text-xs">
-          <MashBrandIcon size={16} className="text-cyan-600 dark:text-cyan-400 shrink-0" />
+      <div className="flex items-center gap-2 px-3 h-full no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <div className="flex items-center gap-1.5 text-zinc-900 dark:text-zinc-100 font-semibold tracking-wider text-[11px]">
+          <MashBrandIcon size={14} className="text-cyan-600 dark:text-cyan-400 shrink-0" />
           <span>MASH</span>
         </div>
-        <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-normal hidden sm:inline-block">
+        <span className="text-[10px] text-zinc-400 dark:text-zinc-600 font-normal hidden sm:inline-block">
           |
         </span>
-        <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[280px] font-medium hidden sm:inline-block">
+        <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[320px] font-normal hidden sm:inline-block">
           {title}
         </span>
       </div>
@@ -125,7 +126,7 @@ export function WindowTitleBar({
       {/* Center Draggable Spacer */}
       <div className="flex-1 h-full cursor-default" data-tauri-drag-region />
 
-      {/* Right: Windows 11 Standard Sized Titlebar Controls (44px x 36px click target) */}
+      {/* Right: VS Code Standard Sized Titlebar Controls (46px x 30px click target) */}
       <div
         className="flex items-center h-full no-drag"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -134,37 +135,37 @@ export function WindowTitleBar({
         <button
           type="button"
           onClick={handleMinimize}
-          className="w-11 h-9 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
+          className="w-[46px] h-[30px] flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/80 dark:hover:bg-white/[0.08] active:bg-zinc-300 dark:active:bg-white/[0.12] transition-colors cursor-pointer"
           title="Minimize"
           aria-label="Minimize"
         >
-          <Minus size={15} strokeWidth={1.75} />
+          <Minus size={14} strokeWidth={1.5} />
         </button>
 
         {/* Maximize / Restore Button */}
         <button
           type="button"
           onClick={handleMaximize}
-          className="w-11 h-9 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
+          className="w-[46px] h-[30px] flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/80 dark:hover:bg-white/[0.08] active:bg-zinc-300 dark:active:bg-white/[0.12] transition-colors cursor-pointer"
           title={isMaximized ? "Restore Down" : "Maximize"}
           aria-label={isMaximized ? "Restore Down" : "Maximize"}
         >
           {isMaximized ? (
-            <Copy size={13} strokeWidth={1.75} className="rotate-180" />
+            <Copy size={11} strokeWidth={1.5} className="rotate-180" />
           ) : (
-            <Square size={13} strokeWidth={1.75} />
+            <Square size={11} strokeWidth={1.5} />
           )}
         </button>
 
-        {/* Close Button (Windows Standard Red Hover) */}
+        {/* Close Button (VS Code Windows Standard Red Hover #c42b1c) */}
         <button
           type="button"
           onClick={handleClose}
-          className="w-11 h-9 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-white hover:bg-[#e81123] transition-colors cursor-pointer"
+          className="w-[46px] h-[30px] flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-white hover:bg-[#c42b1c] active:bg-[#b22619] transition-colors cursor-pointer"
           title="Close"
           aria-label="Close"
         >
-          <X size={16} strokeWidth={1.75} />
+          <X size={14} strokeWidth={1.5} />
         </button>
       </div>
     </div>
