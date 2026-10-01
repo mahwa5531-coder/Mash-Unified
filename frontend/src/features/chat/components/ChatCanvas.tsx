@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  ChevronDown, ChevronUp, ArrowRight, Pencil, Trash2, History, Loader2, AlertCircle, Sparkles
-} from 'lucide-react';
+import { ChevronDown, History } from 'lucide-react';
 import ChatComposer from '@/features/chat/components/ChatComposer';
 import QuotaBanner from '@/features/chat/components/QuotaBanner';
 import UserMessage from '@/features/chat/components/messages/UserMessage';
@@ -12,6 +10,9 @@ import { ScrollToBottomButton } from '@/features/chat/components/ScrollToBottomB
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useChatStream } from '@/features/chat/hooks/useChatStream';
 import { useScrollToBottom } from '@/features/chat/hooks/useScrollToBottom';
+import { ChatHeroView } from './ChatHeroView';
+import { SteeringQueueBanner } from './SteeringQueueBanner';
+import { ChatHistoryLoadState } from './ChatHistoryLoadState';
 
 interface ChatCanvasProps {
   sessionId: string | null;
@@ -31,9 +32,7 @@ interface ChatCanvasProps {
 const EMPTY_ARTIFACTS: any[] = [];
 
 export default function ChatCanvas({ 
-  sessionId, sessionTitle, sessionRepo, pendingWorkspacePath,
-  isSidebarOpen, onToggleSidebar, 
-  isRightSidebarOpen, onToggleRightSidebar,
+  sessionId, sessionRepo, pendingWorkspacePath,
   onSessionCreated,
   onOpenFile,
   onOpenSettings,
@@ -98,7 +97,6 @@ export default function ChatCanvas({
 
   const handleLoadEarlier = async () => {
     if (startIndex > 0) {
-      // Shift visible window backwards by up to 50 turns without negative clamping
       setWindowOffsetFromEnd((prev) => Math.max(0, Math.min(turns.length - MAX_LIVE_TURNS, prev + 50)));
     } else if (hasEarlierTurns) {
       await loadEarlierTurns();
@@ -106,7 +104,7 @@ export default function ChatCanvas({
     }
   };
 
-  // OpenHands velocity-aware scroll retention hook
+  // Velocity-aware scroll retention hook
   const {
     autoScroll,
     hitBottom,
@@ -120,7 +118,7 @@ export default function ChatCanvas({
   const lastAiThoughts = lastAiMsg?.thoughts?.length;
   const lastAiTools = lastAiMsg?.tools?.length;
 
-  // Auto-scroll strictly to bottom ONLY when autoScroll is active (disarmed when user scrolls up)
+  // Auto-scroll strictly to bottom ONLY when autoScroll is active
   useEffect(() => {
     if (autoScroll) {
       scrollDomToBottom();
@@ -187,50 +185,17 @@ export default function ChatCanvas({
         onScroll={handleScroll} 
         className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 custom-scrollbar relative"
       >
-        
         <div className="max-w-3xl mx-auto flex flex-col min-h-full pb-6 w-full">
           
-          {/* History Load Error State with Retry Button */}
-          {sessionId && historyLoadError && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-20 select-none mt-12">
-              <div className="w-10 h-10 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 flex items-center justify-center mb-3 text-red-500 shadow-xs">
-                <AlertCircle size={20} />
-              </div>
-              <h3 className="text-sm font-medium text-[var(--text-primary)] mb-1">Failed to load conversation</h3>
-              <p className="text-xs text-[var(--text-muted)] mb-4">Could not retrieve history from backend server.</p>
-              <button
-                type="button"
-                onClick={retryLoadHistory}
-                className="px-3.5 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-medium transition-colors cursor-pointer shadow-xs focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]"
-              >
-                Retry Loading
-              </button>
-            </div>
-          )}
-
-          {/* Buffering Indicator when switching to existing session whose history is loading */}
-          {sessionId && !isHistoryLoaded && !historyLoadError && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-24 select-none mt-16 animate-pulse">
-              <div className="w-10 h-10 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center mb-4 text-[var(--accent)] shadow-md">
-                <Loader2 size={20} className="animate-spin text-zinc-400" />
-              </div>
-              <h3 className="text-sm font-medium text-[var(--text-primary)] mb-1">Loading conversation</h3>
-              <p className="text-xs text-[var(--text-muted)]">Fetching transcript and workspace state...</p>
-            </div>
-          )}
+          <ChatHistoryLoadState
+            sessionId={sessionId}
+            isHistoryLoaded={isHistoryLoaded}
+            historyLoadError={historyLoadError}
+            retryLoadHistory={retryLoadHistory}
+          />
 
           {/* Fresh Hero View (Only for new session when no sessionId is active) */}
-          {!sessionId && chatMessages.length === 0 && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-24 select-none opacity-90 mt-16">
-              <div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center mb-5 text-[var(--accent)] shadow-md">
-                <Sparkles size={22} />
-              </div>
-              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2 tracking-tight">MASH Statutory Audit AI</h2>
-              <p className="text-[13.5px] text-[var(--text-secondary)] max-w-md leading-relaxed">
-                Specialized in Indian Statutory Audit, CA Firm Workpapers, Benford's Law, Monetary Unit Sampling, and Data Analytics.
-              </p>
-            </div>
-          )}
+          {!sessionId && chatMessages.length === 0 && <ChatHeroView />}
 
           {/* Messages Feed */}
           {chatMessages.length > 0 && (
@@ -326,73 +291,23 @@ export default function ChatCanvas({
       <div className="shrink-0 w-full z-20 bg-transparent pb-3 px-4 sm:px-6 relative">
         <div className="max-w-3xl mx-auto w-full relative">
 
-          {/* Antigravity-Style Queued Messages Card */}
-          {queuedMessage && (
-            <div className="w-full bg-white/95 dark:bg-[#181818]/95 border border-zinc-200 dark:border-[#27272a] rounded-2xl p-3.5 mb-2 shadow-xl backdrop-blur-md transition-all animate-in fade-in slide-in-from-bottom-2">
-              {/* Header row */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium text-zinc-800 dark:text-zinc-200">Queued Messages</span>
-                  <span className="px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 text-[10px] text-zinc-600 dark:text-zinc-400 font-mono flex items-center justify-center leading-none">
-                    1
-                  </span>
-                  <span className="text-xs text-zinc-500 font-normal ml-0.5">Sends after agent finishes working</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsQueueExpanded((prev) => !prev)}
-                  className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 p-0.5 transition-colors cursor-pointer"
-                  title={isQueueExpanded ? "Collapse" : "Expand"}
-                >
-                  {isQueueExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                </button>
-              </div>
+          <SteeringQueueBanner
+            queuedMessage={queuedMessage}
+            isQueueExpanded={isQueueExpanded}
+            onToggleExpand={() => setIsQueueExpanded((prev) => !prev)}
+            onInject={injectQueued}
+            onEdit={handleEditQueued}
+            onDiscard={discardQueued}
+          />
 
-              {/* Message row */}
-              {isQueueExpanded && (
-                <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-zinc-200 dark:border-zinc-800/60">
-                  <span className="text-[13px] text-zinc-800 dark:text-zinc-300 font-sans break-words pr-4 truncate">
-                    {queuedMessage}
-                  </span>
-                  <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 shrink-0">
-                    <button
-                      type="button"
-                      onClick={injectQueued}
-                      className="p-1 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded transition-colors cursor-pointer"
-                      title="Send now (inject into running agent)"
-                    >
-                      <ArrowRight size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleEditQueued}
-                      className="p-1 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded transition-colors cursor-pointer"
-                      title="Edit message"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={discardQueued}
-                      className="p-1 hover:text-red-500 dark:hover:text-red-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 rounded transition-colors cursor-pointer"
-                      title="Delete"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Floating Scroll-to-Bottom Button (appears when user has scrolled up, 0 document height) */}
+          {/* Floating Scroll-to-Bottom Button */}
           {!hitBottom && (
             <div className="absolute -top-11 left-1/2 -translate-x-1/2 pointer-events-auto z-30">
               <ScrollToBottomButton onClick={scrollDomToBottom} />
             </div>
           )}
 
-          {/* Quota Banner (Option 1: Placed directly above chat composer) */}
+          {/* Quota Banner */}
           {showQuotaBanner && (
             <div className="mb-2 w-full max-w-4xl mx-auto px-1">
               <QuotaBanner
