@@ -1,0 +1,5 @@
+# Test-run artifacts (raw JSONL/logs from scripts/run_validation.sh and
+# scripts/run_full_validation_grouped.sh) — regenerated per run, never shipped.
+build/
+bin/
+tools/

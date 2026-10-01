@@ -1,0 +1,81 @@
+# NexaU Cloud API — local/production-shaped stack.
+#
+#   docker compose up -d          # postgres + redis + bifrost + api
+#   docker compose logs -f api
+#   docker compose down -v        # full reset
+#
+# Secrets come from the environment (.env next to this file is read by
+# compose automatically): NEXAU_AUTH_HS256_SECRET is REQUIRED for the api
+# service to start (see the api.environment block).
+#
+# Bifrost is an independent deployment with its OWN database (spec §13):
+# logical separation is enforced by separate credentials and schemas.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nexau
+      POSTGRES_PASSWORD: nexau-dev-only
+      POSTGRES_DB: nexau
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexau -d nexau"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "512mb", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  bifrost:
+    image: maximhq/bifrost:latest
+    environment:
+      # Bifrost's own persistence — SEPARATE logical ownership (spec §13).
+      BIFROST_PROVIDER_KEYS_OPENAI: "${BIFROST_OPENAI_API_KEY:-}"
+      BIFROST_TRANSPORT_BUFFER_SIZE: "16384"
+    ports:
+      - "8081:8080"
+    # Provider keys are injected at runtime; never baked into images.
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NEXAU_HTTP_ADDR: ":8080"
+      NEXAU_DATABASE_URL: "postgres://nexau:nexau-dev-only@postgres:5432/nexau?sslmode=disable"
+      NEXAU_REDIS_URL: "redis://redis:6379/0"
+      NEXAU_BIFROST_URL: "http://bifrost:8080"
+      NEXAU_BIFROST_API_KEY: "${BIFROST_API_KEY:-}"
+      NEXAU_AUTH_MODE: "local"
+      # SECURITY (2026-09-19 audit, finding 1): the JWT signing secret is a
+      # deployment credential and is NEVER committed. Compose fails fast with
+      # this message when it is missing. Generate one:
+      #   echo "NEXAU_AUTH_HS256_SECRET=$(openssl rand -hex 32)" >> .env
+      # Any deployment that ever ran with the previously committed default
+      # MUST rotate (all access tokens are invalidated by rotation).
+      NEXAU_AUTH_HS256_SECRET: "${NEXAU_AUTH_HS256_SECRET:?NEXAU_AUTH_HS256_SECRET is not set: generate one with: openssl rand -hex 32}"
+      NEXAU_LOG_LEVEL: "info"
+      NEXAU_LOG_FORMAT: "json"
+      NEXAU_OTEL_PROMETHEUS: "true"
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
