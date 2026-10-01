@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
-import { fetchSessions, markSessionViewed, renameSession, deleteSession, SessionItem } from '@/services/sessions';
-import { fetchProjects, ProjectItem, selectFolder, resolveFolder, createProject, deleteProject } from '@/services/projects';
-import { isSessionStreaming, subscribeToSessionStore, sessionStore } from '@/features/chat';
+import { useState, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
+import { markSessionViewed, renameSession, deleteSession, SessionItem } from '@/services/sessions';
+import { ProjectItem, selectFolder, resolveFolder, createProject, deleteProject } from '@/services/projects';
+import { sessionStore } from '@/features/chat';
 import { SessionItemRow } from './SessionItemRow';
 import { SessionContextMenu } from './SessionContextMenu';
 import { SidebarHeader } from './SidebarHeader';
@@ -13,6 +13,8 @@ import { WorkspacesSection } from './WorkspacesSection';
 import { DirectConversationsSection } from './DirectConversationsSection';
 import { QuickProjectModal } from './QuickProjectModal';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
+import { useSidebarResize } from '../hooks/useSidebarResize';
+import { useSidebarData } from '../hooks/useSidebarData';
 
 interface SidebarProps {
   selectedSessionId: string | null;
@@ -31,9 +33,6 @@ interface SidebarProps {
   onDeleteSession?: (sessionId: string) => void;
 }
 
-const MIN_WIDTH = 220;
-const MAX_WIDTH = 450;
-
 export default function Sidebar({ 
   selectedSessionId, 
   selectedSessionTitle, 
@@ -50,21 +49,36 @@ export default function Sidebar({
   onToggleArchive: externalOnToggleArchive,
   onDeleteSession,
 }: SidebarProps) {
-  // ponytail: initialize with empty arrays to guarantee identical SSR & client hydration DOM
-  const [sessions, setSessions] = useState<SessionItem[]>([]);
-  const [registeredProjects, setRegisteredProjects] = useState<ProjectItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [, setStoreTick] = useState(0);
+  // Atomised Resizing
+  const { width: effectiveWidth, startResizing } = useSidebarResize({
+    controlledWidth,
+    onWidthChange,
+  });
 
-  // Restore client-side cache after hydration completes
-  useEffect(() => {
-    try {
-      const s = localStorage.getItem('nexau_cached_sessions');
-      if (s) setSessions(JSON.parse(s));
-      const p = localStorage.getItem('nexau_cached_projects');
-      if (p) setRegisteredProjects(JSON.parse(p));
-    } catch {}
-  }, []);
+  // Atomised Data & State Management
+  const {
+    sessions,
+    setSessions,
+    registeredProjects,
+    loading,
+    refreshData,
+    pinnedSessionIds,
+    togglePin,
+    handleArchive,
+    openFolders,
+    setOpenFolders,
+    toggleFolder,
+    deletedSessionIds,
+    pinnedSessions,
+    workspaceSessions,
+    directConversations,
+  } = useSidebarData({
+    selectedSessionId,
+    selectedSessionTitle,
+    selectedSessionRepo,
+    externalArchivedSessionIds,
+    externalOnToggleArchive,
+  });
 
   // Scroll shading & sticky section awareness
   const [canScrollDown, setCanScrollDown] = useState(false);
@@ -80,55 +94,6 @@ export default function Sidebar({
     setCanScrollDown(prev => (prev !== hasDown ? hasDown : prev));
   }, []);
 
-  // Pinned Sessions State
-  const [pinnedSessionIds, setPinnedSessionIds] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('nexau_pinned_sessions');
-      if (saved) {
-        setPinnedSessionIds(new Set(JSON.parse(saved)));
-      }
-    } catch {}
-  }, []);
-
-  const togglePin = (sessionId: string) => {
-    setPinnedSessionIds(prev => {
-      const next = new Set(prev);
-      if (next.has(sessionId)) {
-        next.delete(sessionId);
-      } else {
-        next.add(sessionId);
-      }
-      try {
-        localStorage.setItem('nexau_pinned_sessions', JSON.stringify(Array.from(next)));
-      } catch {}
-      return next;
-    });
-    setActiveMenuSessionId(null);
-  };
-
-  // Archiving State
-  const [internalArchivedIds, setInternalArchivedIds] = useState<Set<string>>(new Set());
-  const archivedIds = externalArchivedSessionIds || internalArchivedIds;
-
-  const handleArchive = (sessionId: string) => {
-    if (externalOnToggleArchive) {
-      externalOnToggleArchive(sessionId);
-    } else {
-      setInternalArchivedIds(prev => {
-        const next = new Set(prev);
-        if (next.has(sessionId)) next.delete(sessionId);
-        else next.add(sessionId);
-        return next;
-      });
-    }
-    setActiveMenuSessionId(null);
-  };
-
-  // Folders expansion state
-  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
-
   // Context Menu State
   const [activeMenuSessionId, setActiveMenuSessionId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -141,134 +106,9 @@ export default function Sidebar({
   // Quick Project Modal State
   const [isQuickProjectModalOpen, setIsQuickProjectModalOpen] = useState(false);
 
-  // Resizing state
-  const [internalWidth, setInternalWidth] = useState<number>(260);
-  const effectiveWidth = controlledWidth !== undefined ? controlledWidth : internalWidth;
-  const isResizingRef = useRef<boolean>(false);
-  const startXRef = useRef<number>(0);
-  const startWidthRef = useRef<number>(260);
-
-  const startResizing = useCallback((e: ReactMouseEvent) => {
-    e.preventDefault();
-    isResizingRef.current = true;
-    startXRef.current = e.clientX;
-    startWidthRef.current = effectiveWidth;
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
-
-    const handleMouseMove = (ev: MouseEvent) => {
-      if (!isResizingRef.current) return;
-      const delta = ev.clientX - startXRef.current;
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidthRef.current + delta));
-      if (onWidthChange) {
-        onWidthChange(newWidth);
-      } else {
-        setInternalWidth(newWidth);
-      }
-    };
-
-    const handleMouseUp = () => {
-      isResizingRef.current = false;
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  }, [effectiveWidth, onWidthChange]);
-
-  const deletedSessionIds = useRef<Set<string>>(new Set());
-
-  // Data fetching
-  const refreshData = useCallback(async () => {
-    try {
-      const [fetchedSessions, fetchedProjects] = await Promise.all([
-        fetchSessions(),
-        fetchProjects().catch(() => [] as ProjectItem[])
-      ]);
-
-      if (fetchedSessions) {
-        const validSessions = fetchedSessions.filter(s => !deletedSessionIds.current.has(s.session_id));
-        setSessions(validSessions);
-        try {
-          localStorage.setItem('nexau_cached_sessions', JSON.stringify(validSessions));
-        } catch {}
-      }
-
-      if (fetchedProjects) {
-        setRegisteredProjects(fetchedProjects);
-        try {
-          localStorage.setItem('nexau_cached_projects', JSON.stringify(fetchedProjects));
-        } catch {}
-      }
-    } catch (err) {
-      console.error('Failed to load sidebar data:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshData();
-    const interval = setInterval(refreshData, 10000);
-    return () => clearInterval(interval);
-  }, [refreshData]);
-
-  // Subscribe to live sessionStore
-  useEffect(() => {
-    return subscribeToSessionStore(() => {
-      setStoreTick(t => t + 1);
-    });
-  }, []);
-
-  // Sync selected session locally
-  useEffect(() => {
-    if (!selectedSessionId) return;
-    const timer = setTimeout(() => {
-      setSessions(prev => {
-        const exists = prev.some(s => s.session_id === selectedSessionId);
-        if (exists) {
-          return prev.map(s => {
-            if (s.session_id === selectedSessionId) {
-              return {
-                ...s,
-                title: selectedSessionTitle || s.title,
-              };
-            }
-            return s;
-          });
-        }
-        const newSession: SessionItem = {
-          session_id: selectedSessionId,
-          title: selectedSessionTitle || 'New Session',
-          custom_title: '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          message_count: 0,
-          total_tokens: 0,
-          last_user_view_time: new Date().toISOString(),
-          has_unread: false,
-          workspace_uri: selectedSessionRepo || 'No Repo',
-          section: selectedSessionRepo && selectedSessionRepo !== 'No Repo' ? 'workspace' : 'conversation',
-        };
-        const combined = [newSession, ...prev];
-        const seen = new Set<string>();
-        return combined.filter((s) => {
-          if (seen.has(s.session_id)) return false;
-          seen.add(s.session_id);
-          return true;
-        });
-      });
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [selectedSessionId, selectedSessionTitle, selectedSessionRepo]);
-
   const handleSessionClick = async (session: SessionItem) => {
     const title = generateCleanSessionTitle(session.custom_title || session.title || '', session.session_id);
     
-    // Check if session belongs to a project/workspace
     const isDirectConversation = session.section === 'conversation' || !session.workspace_uri || session.workspace_uri === 'No Repo';
     let repo = 'No Repo';
     if (!isDirectConversation) {
@@ -360,16 +200,6 @@ export default function Sidebar({
     setActiveMenuSessionId(null);
   };
 
-  const toggleFolder = (folderName: string) => {
-    setOpenFolders(prev => {
-      const isCurrentlyOpen = prev[folderName] ?? true;
-      return {
-        ...prev,
-        [folderName]: !isCurrentlyOpen,
-      };
-    });
-  };
-
   const handleDeleteProjectClick = async (e: React.MouseEvent, projectId?: string, projectName?: string) => {
     e.stopPropagation();
     if (!projectId && !projectName) return;
@@ -385,7 +215,6 @@ export default function Sidebar({
   };
 
   const handleAddWorkspace = async () => {
-    // 1. In-browser native Directory Picker: Opens the exact "Open workspace / Select folder" native dialog
     if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {
       try {
         const dirHandle = await (window as any).showDirectoryPicker({ mode: 'read' });
@@ -410,15 +239,11 @@ export default function Sidebar({
           }
         }
       } catch (err: any) {
-        if (err?.name === 'AbortError') {
-          // User canceled dialog
-          return;
-        }
+        if (err?.name === 'AbortError') return;
         console.warn("Browser showDirectoryPicker fallback:", err);
       }
     }
 
-    // 2. Fallback to native backend selectFolder
     try {
       const selected = await selectFolder();
       if (selected && selected.folder_path) {
@@ -436,57 +261,11 @@ export default function Sidebar({
     }
   };
 
-  const handleNewProject = handleAddWorkspace;
-
   const handleQuickProjectCreated = (project: ProjectItem) => {
     refreshData();
     setOpenFolders(prev => ({ ...prev, [project.name]: true }));
     onNewSession(project.name, project.local_folder_path);
   };
-
-  // Group sessions by workspace and pinned status
-  const visibleSessions = sessions.filter(s => !archivedIds.has(s.session_id));
-  const pinnedSessions = visibleSessions.filter(s => pinnedSessionIds.has(s.session_id));
-  const unpinnedSessions = visibleSessions.filter(s => !pinnedSessionIds.has(s.session_id));
-
-  const workspaceSessions: Record<string, SessionItem[]> = {};
-  const directConversations: SessionItem[] = [];
-
-  // Pre-populate all registered projects so they appear in Workspaces section
-  registeredProjects.forEach(p => {
-    workspaceSessions[p.name] = [];
-  });
-
-  unpinnedSessions.forEach(session => {
-    const uri = session.workspace_uri;
-    if (!uri || uri === 'No Repo') {
-      directConversations.push(session);
-      return;
-    }
-
-    // Match session to a registered project by path or name
-    const normUri = uri.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-    const matchedProject = registeredProjects.find(p => {
-      const normPath = p.local_folder_path ? p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() : '';
-      return (
-        normPath === normUri ||
-        p.name.toLowerCase() === uri.toLowerCase() ||
-        normPath.endsWith('/' + uri.toLowerCase()) ||
-        normUri.endsWith('/' + p.name.toLowerCase())
-      );
-    });
-
-    const targetGroupName = matchedProject ? matchedProject.name : (
-      uri.includes('/') || uri.includes('\\')
-        ? uri.split(/[/\\]/).filter(Boolean).pop() || uri
-        : uri
-    );
-
-    if (!workspaceSessions[targetGroupName]) {
-      workspaceSessions[targetGroupName] = [];
-    }
-    workspaceSessions[targetGroupName].push(session);
-  });
 
   const renderSessionItem = (s: SessionItem, isPinnedContext: boolean = false) => {
     const isSelected = !isHistoryActive && selectedSessionId === s.session_id;
@@ -519,7 +298,7 @@ export default function Sidebar({
         onMouseDown={startResizing}
       />
 
-      {/* Top Header Bar & Quick Actions (without Scheduled Tasks!) */}
+      {/* Top Header Bar & Quick Actions */}
       <SidebarHeader
         onNewSession={onNewSession}
         onToggle={onToggle}
@@ -549,13 +328,13 @@ export default function Sidebar({
             canScrollUp={canScrollUp}
             onToggleFolder={toggleFolder}
             onNewSession={onNewSession}
-            onNewProject={handleNewProject}
+            onNewProject={handleAddWorkspace}
             onOpenQuickProjectModal={() => setIsQuickProjectModalOpen(true)}
             onDeleteProject={handleDeleteProjectClick}
             renderSessionItem={renderSessionItem}
           />
 
-          {/* Direct Conversations Section (NO Scheduled Tasks!) */}
+          {/* Direct Conversations Section */}
           <DirectConversationsSection
             directConversations={directConversations}
             loading={loading}
