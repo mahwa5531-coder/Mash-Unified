@@ -107,7 +107,7 @@ type AuthConfig struct {
 	Audience        string        // expected `aud` (default nexau-cloud-api)
 	HS256Secret     string        // local mode only; ≥32 bytes enforced
 	HS256SecretFile string        // optional path; takes precedence (secret-manager friendly)
-	AccessTokenTTL  time.Duration // default 15m
+	AccessTokenTTL  time.Duration // default 1h
 	RefreshTokenTTL time.Duration // default 30d
 	DeviceTokenTTL  time.Duration // default 100d
 	Leeway          time.Duration // clock skew tolerance (default 30s)
@@ -335,7 +335,7 @@ func Load() (*Config, error) {
 		Issuer:               envStr("NEXAU_AUTH_ISSUER", "https://auth.nexau.cloud"),
 		Audience:             envStr("NEXAU_AUTH_AUDIENCE", "nexau-cloud-api"),
 		HS256Secret:          os.Getenv("NEXAU_AUTH_HS256_SECRET"),
-		AccessTokenTTL:       envDur("NEXAU_AUTH_ACCESS_TOKEN_TTL", 15*time.Minute),
+		AccessTokenTTL:       envDur("NEXAU_AUTH_ACCESS_TOKEN_TTL", 1*time.Hour),
 		RefreshTokenTTL:      envDur("NEXAU_AUTH_REFRESH_TOKEN_TTL", 30*24*time.Hour),
 		DeviceTokenTTL:       envDur("NEXAU_AUTH_DEVICE_TOKEN_TTL", 100*24*time.Hour),
 		Leeway:               envDur("NEXAU_AUTH_LEEWAY", 30*time.Second),
