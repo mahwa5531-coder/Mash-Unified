@@ -55,6 +55,15 @@ export function generateCleanSessionTitle(rawText: string, fallbackId = ''): str
     return fallbackId ? `Session ${fallbackId.slice(0, 8)}` : 'New Session';
   }
 
+  // Strip attachment metadata blocks injected into user text
+  t = t.replace(/\[Attached (?:file|files)[^\]]*\]/gi, '').trim();
+
+  // Prefer first conversational line if prompt has multiple lines
+  const firstNonEmptyLine = t.split('\n').map(l => l.trim()).find(l => l.length > 0) || '';
+  if (firstNonEmptyLine && !firstNonEmptyLine.startsWith('[') && firstNonEmptyLine.length > 3) {
+    t = firstNonEmptyLine;
+  }
+
   // 1. Detect leading file/folder path (e.g. "C:\Users\...\file.xlsx" or /path/to/file)
   const pathMatch = t.match(/^([a-zA-Z]:[\\/][^"'`\r\n]*|\/[^"'`\r\n]+)/);
   if (pathMatch) {
@@ -83,13 +92,13 @@ export function generateCleanSessionTitle(rawText: string, fallbackId = ''): str
     return truncateAtWordBoundary(toTitleCase(basename), 34);
   }
 
-  // 2. Legacy filesystem paths stored in DB (e.g. "C:\Projects\benchmark...")
-  if (t.includes('\\') || (t.includes('/') && t.split('/').length > 2)) {
+  // 2. Legacy filesystem paths stored in DB (e.g. standalone path string "C:\Projects\benchmark...")
+  if (!t.includes(' ') && (t.includes('\\') || (t.includes('/') && t.split('/').length > 2))) {
     const parts = t.split(/[\\/]/).filter(Boolean);
     if (parts.length > 1) {
       const last = parts.pop() || '';
       if (last.length > 2) {
-        return truncateAtWordBoundary(toTitleCase(last.replace(/\.+$/, '')), 32);
+        return truncateAtWordBoundary(toTitleCase(last.replace(/[\]\.)]+$/, '')), 32);
       }
     }
   }

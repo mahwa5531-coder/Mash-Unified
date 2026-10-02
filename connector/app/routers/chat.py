@@ -247,12 +247,11 @@ async def stream_query_bridge(
                             cur_sess.updated_at = now_utc
                             ctx = dict(cur_sess.context or {})
                             ctx["updated_at"] = now_utc.isoformat()
-                            ctx["last_user_view_time"] = now_utc.isoformat()
                             cur_sess.context = ctx
                             await eng.update(cur_sess)
                     await asyncio.shield(_shielded_view_sync())
             except (asyncio.CancelledError, Exception) as ex:
-                logger.debug("Session view time update skipped or cancelled: %s", ex)
+                logger.debug("Session update skipped or cancelled: %s", ex)
 
     return StreamingResponse(
         sse_event_stream(),

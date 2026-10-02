@@ -86,7 +86,7 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
             }
           }
 
-          const isFeedbackRequested = Boolean(meta?.RequestFeedback ?? meta?.requestFeedback);
+          const isFeedbackRequested = Boolean(meta?.RequestFeedback ?? meta?.requestFeedback ?? meta?.request_feedback);
           const thumbnailUrl = type === 'chart' 
             ? `${BASE_URL}/files/content?path=${encodeURIComponent(pathStr)}${msg.sessionId ? `&session_id=${encodeURIComponent(msg.sessionId)}` : ''}`
             : undefined;

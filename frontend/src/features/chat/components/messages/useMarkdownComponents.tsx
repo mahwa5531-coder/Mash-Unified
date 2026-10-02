@@ -42,6 +42,8 @@ interface UseMarkdownComponentsProps {
   sessionId?: string;
 }
 
+const PreContext = React.createContext(false);
+
 export function useMarkdownComponents({
   onOpenFile,
   onImageClick,
@@ -49,11 +51,20 @@ export function useMarkdownComponents({
   sessionId,
 }: UseMarkdownComponentsProps) {
   return useMemo(() => ({
+    pre({ children }: any) {
+      return (
+        <PreContext.Provider value={true}>
+          {children}
+        </PreContext.Provider>
+      );
+    },
+
     code({ node, className: codeClassName, children, ...props }: any) {
+      const isInsidePre = React.useContext(PreContext);
       const match = /language-(\w+)/.exec(codeClassName || '');
       const lang = match ? match[1].toLowerCase() : '';
       const rawText = String(children).replace(/\n$/, '');
-      const isBlock = Boolean(codeClassName || rawText.includes('\n'));
+      const isBlock = Boolean(isInsidePre || codeClassName || rawText.includes('\n'));
 
       if (isBlock && lang === 'mermaid') {
         return <MermaidRenderer chart={rawText} isStreaming={isStreaming} />;

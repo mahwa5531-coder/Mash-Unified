@@ -47,6 +47,11 @@ async def test_ui_backend_comprehensive_unit_suite():
             assert res.status_code == 200
             assert any(p["id"] == pid for p in res.json()["projects"])
 
+            # Rename project
+            res = await client.post(f"/api/projects/{pid}/rename", json={"name": "Renamed Unit Project"})
+            assert res.status_code == 200
+            assert res.json()["name"] == "Renamed Unit Project"
+
             # -------------------------------------------------------------
             # 2. Sessions Router & Subagents Unit Tests
             # -------------------------------------------------------------

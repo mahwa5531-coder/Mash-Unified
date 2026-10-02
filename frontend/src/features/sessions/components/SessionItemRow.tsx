@@ -68,29 +68,27 @@ export function SessionItemRow({
       )}
 
       {!isEditing && (
-        <div className="flex items-center justify-end shrink-0 ml-1.5 min-w-[28px]">
-          {/* When not hovering: Show Spinner if running, Blue Dot if completed/unread, or Time if seen */}
-          <div className="group-hover/item:hidden flex items-center justify-end">
-            {isStreaming ? (
-              <span 
-                className="w-3 h-3 rounded-full border-[1.5px] border-sky-400/30 border-t-sky-400 animate-spin shrink-0" 
-                title="Running in background..." 
-              />
-            ) : showUnread ? (
-              <div 
-                className="w-4 h-4 rounded-full bg-blue-100 dark:bg-[#182433] flex items-center justify-center shrink-0 select-none" 
-                title="Completed - unread activity" 
-              >
-                <span className="w-[6.5px] h-[6.5px] rounded-full bg-[#2f81f7] shrink-0" />
-              </div>
-            ) : (
-              <span className={`text-[11.5px] font-mono shrink-0 ${isSelected ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                {formatRelativeTime(s.updated_at)}
-              </span>
-            )}
-          </div>
+        <div className="flex items-center justify-end shrink-0 ml-1.5 gap-1.5 min-w-[28px]">
+          {/* Active Status Indicators: Always visible and hoverable */}
+          {isStreaming ? (
+            <span 
+              className="w-3 h-3 rounded-full border-[1.5px] border-sky-400/30 border-t-sky-400 animate-spin shrink-0" 
+              title="Running in background..." 
+            />
+          ) : showUnread ? (
+            <div 
+              className="w-4 h-4 rounded-full bg-blue-100 dark:bg-[#182433] flex items-center justify-center shrink-0 select-none group-hover/item:hidden" 
+              title="Completed - unread activity" 
+            >
+              <span className="w-[6.5px] h-[6.5px] rounded-full bg-[#2f81f7] shrink-0" />
+            </div>
+          ) : (
+            <span className={`text-[11.5px] font-mono shrink-0 group-hover/item:hidden ${isSelected ? 'text-zinc-400' : 'text-zinc-500'}`}>
+              {formatRelativeTime(s.updated_at)}
+            </span>
+          )}
 
-          {/* When hovering: Show ONLY vertical 3-dots button */}
+          {/* When hovering: Show vertical 3-dots button */}
           <div className="hidden group-hover/item:flex items-center justify-end shrink-0">
             <button
               type="button"

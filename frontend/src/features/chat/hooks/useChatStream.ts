@@ -524,17 +524,18 @@ export function useChatStream({
         const totalElapsed = s.turnStartTime > 0 ? Math.max(1, Math.round((Date.now() - s.turnStartTime) / 1000)) : undefined;
         const next = [...s.chatMessages];
         const idx = findTargetAssistantIdx(next, s.activeTurnId);
-        if (idx >= 0 && next[idx].status === 'running') {
+        if (idx >= 0 && next[idx].status !== 'aborted') {
           next[idx] = {
             ...next[idx],
-            status: 'completed',
-            totalDurationSeconds: totalElapsed,
+            status: s.wasUserAborted ? 'aborted' : 'completed',
+            totalDurationSeconds: totalElapsed ?? next[idx].totalDurationSeconds,
           };
           s.chatMessages = next;
           if (activeSid === activeSessionIdRef.current) {
             setChatMessages(next);
           }
         }
+        s.wasUserAborted = false;
       }
       if (activeSid === activeSessionIdRef.current) {
         setIsStreaming(false);
@@ -557,10 +558,31 @@ export function useChatStream({
     if (!curSid) return;
     const s = sessionStore.get(curSid);
     if (!s || !s.isStreaming) return;
-    s.abortController?.abort();
-    s.abortController = null;
+    s.wasUserAborted = true;
     s.isStreaming = false;
     flushActiveStreamBuffer();
+
+    const elapsed = s.turnStartTime > 0 ? Math.max(1, Math.round((Date.now() - s.turnStartTime) / 1000)) : undefined;
+    const next = [...s.chatMessages];
+    const targetIdx = findTargetAssistantIdx(next, s.activeTurnId);
+    if (targetIdx >= 0) {
+      next[targetIdx] = {
+        ...next[targetIdx],
+        status: 'aborted',
+        totalDurationSeconds: elapsed ?? next[targetIdx].totalDurationSeconds,
+      };
+      s.chatMessages = next;
+      if (curSid === activeSessionIdRef.current) {
+        setChatMessages(next);
+      }
+    }
+    setIsStreaming(false);
+    notifyStoreListeners();
+
+    const ctrl = s.abortController;
+    s.abortController = null;
+    ctrl?.abort();
+
     try {
       await fetch(`${BASE_URL}/stop`, {
         method: 'POST',
@@ -568,15 +590,6 @@ export function useChatStream({
         body: JSON.stringify({ session_id: curSid, user_id: 'default_user', force: true }),
       });
     } catch {}
-    const next = [...s.chatMessages];
-    const targetIdx = findTargetAssistantIdx(next, s.activeTurnId);
-    if (targetIdx >= 0 && next[targetIdx].status === 'running') {
-      next[targetIdx] = { ...next[targetIdx], status: 'aborted' };
-      s.chatMessages = next;
-      setChatMessages(next);
-    }
-    setIsStreaming(false);
-    notifyStoreListeners();
   }, [flushActiveStreamBuffer]);
 
   const handleRetry = useCallback((userText?: string, targetSid?: string) => {

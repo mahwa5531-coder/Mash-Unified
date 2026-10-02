@@ -34,9 +34,7 @@ export function ViewerHeader({
 }: ViewerHeaderProps) {
   const handleToggleExplorer = () => {
     if (viewMode === 'explorer') {
-      if (openTabs.length > 0) {
-        setViewMode('editor');
-      }
+      setViewMode('editor');
     } else {
       setViewMode('explorer');
       setOpenSections((prev: any) => ({ ...prev, deliverables: true, workingPapers: true, artifacts: true }));

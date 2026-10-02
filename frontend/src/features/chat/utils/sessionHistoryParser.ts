@@ -169,15 +169,19 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
               }
             }
           }
+          const isAborted = step.status === 'aborted' || step.stop_reason === 'user_stopped' || step.stop_reason === 'stop';
+          if (isAborted) prevMsg.status = 'aborted';
           if (step.created_at || (step as any).timestamp) {
             prevMsg.timestamp = step.created_at || (step as any).timestamp;
           }
           if (thinkingDurationSeconds) prevMsg.thinkingDurationSeconds = thinkingDurationSeconds;
           if (totalDurationSeconds) prevMsg.totalDurationSeconds = totalDurationSeconds;
         } else {
+          const isAborted = step.status === 'aborted' || step.stop_reason === 'user_stopped' || step.stop_reason === 'stop';
           parsedMsgs.push({ 
             role: 'assistant', 
             content: content.trim(), 
+            status: isAborted ? 'aborted' : (step.status || 'completed'),
             thoughts: thoughts, 
             tools: tools,
             tasks: tasks,

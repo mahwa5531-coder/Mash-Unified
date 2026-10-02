@@ -23,6 +23,7 @@ export interface SessionRuntimeState {
   historyLoadError?: boolean;
   rawLines?: any[];
   hasUnread?: boolean;
+  wasUserAborted?: boolean;
 }
 
 export const sessionStore = new Map<string, SessionRuntimeState>();

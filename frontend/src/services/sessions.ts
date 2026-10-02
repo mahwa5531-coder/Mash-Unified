@@ -46,19 +46,17 @@ export async function fetchTranscript(
   shallowTools: boolean = true,
   offset: number = 0
 ): Promise<TranscriptResponse> {
-  try {
-    const params = new URLSearchParams();
-    if (limit > 0) params.set("limit", limit.toString());
-    if (shallowTools) params.set("shallow_tools", "true");
-    if (offset > 0) params.set("offset", offset.toString());
-    const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await safeFetch(`${BASE_URL}/sessions/${sessionId}/transcript${qs}`);
-    if (!res.ok) return { lines: [], total: 0 };
-    const data = await res.json();
-    return { lines: data.lines || [], total: data.total || 0 };
-  } catch {
-    return { lines: [], total: 0 };
+  const params = new URLSearchParams();
+  if (limit > 0) params.set("limit", limit.toString());
+  if (shallowTools) params.set("shallow_tools", "true");
+  if (offset > 0) params.set("offset", offset.toString());
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  const res = await safeFetch(`${BASE_URL}/sessions/${sessionId}/transcript${qs}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch transcript: ${res.status}`);
   }
+  const data = await res.json();
+  return { lines: data.lines || [], total: data.total || 0 };
 }
 
 export async function markSessionViewed(sessionId: string): Promise<boolean> {

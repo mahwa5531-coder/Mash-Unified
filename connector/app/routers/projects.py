@@ -140,6 +140,26 @@ async def list_projects(user_id: str, engine: DatabaseEngineDep):
     return {"projects": list(reversed(results))}
 
 
+class RenameProjectRequest(BaseModel):
+    name: str
+
+
+@router.post("/{project_id}/rename")
+@router.patch("/{project_id}")
+async def rename_project(project_id: str, request: RenameProjectRequest, engine: DatabaseEngineDep):
+    clean_name = request.name.strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="Project name cannot be empty")
+    project = await engine.find_first(ProjectModel, filters=ComparisonFilter.eq("id", project_id))
+    if not project:
+        project = await engine.find_first(ProjectModel, filters=ComparisonFilter.eq("name", project_id))
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project.name = clean_name
+    await engine.update(project)
+    return {"status": "success", "id": project.id, "name": clean_name}
+
+
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, engine: DatabaseEngineDep):
     import shutil

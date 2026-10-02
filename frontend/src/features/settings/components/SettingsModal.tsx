@@ -400,6 +400,7 @@ export default function SettingsModal({
               activeProject={activeProject}
               isDeletingProject={isDeletingProject}
               onDeleteActiveProject={handleDeleteActiveProject}
+              onProjectRenamed={loadProjects}
             />
           )}
 

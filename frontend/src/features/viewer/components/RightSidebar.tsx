@@ -72,6 +72,7 @@ export default function RightSidebar({
     setTabContent,
     isLoadingContent,
     openFileTab,
+    openTerminalTab,
     handleCloseTab,
     activeTab,
   } = useViewerTabs(sessionId);
@@ -219,6 +220,8 @@ export default function RightSidebar({
             openSections={openSections}
             toggleSection={toggleSection}
             openFileTab={openFileTab}
+            backgroundTasks={backgroundTasks}
+            openTerminalTab={openTerminalTab}
           />
         ) : !activeTab ? (
           <ViewerEmptyState setViewMode={setViewMode} />

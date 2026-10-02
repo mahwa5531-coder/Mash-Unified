@@ -1,26 +1,105 @@
 "use client";
 
-import React from 'react';
-import { Pencil, Folder } from 'lucide-react';
-import type { ProjectItem } from '@/services/projects';
+import React, { useState, useEffect } from 'react';
+import { Pencil, Folder, Check, X } from 'lucide-react';
+import { renameProject, type ProjectItem } from '@/services/projects';
 
 interface ProjectTabProps {
   activeProject: ProjectItem | { id: string; name: string; local_folder_path: string; session_count: number };
   isDeletingProject: boolean;
   onDeleteActiveProject: () => void;
+  onProjectRenamed?: (newName: string) => void;
 }
 
 export function ProjectTab({
   activeProject,
   isDeletingProject,
   onDeleteActiveProject,
+  onProjectRenamed,
 }: ProjectTabProps) {
+  const [currentName, setCurrentName] = useState(activeProject.name);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(activeProject.name);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setCurrentName(activeProject.name);
+    setRenameValue(activeProject.name);
+  }, [activeProject.name]);
+
+  const handleSaveRename = async () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === currentName) {
+      setIsRenaming(false);
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const ok = await renameProject(activeProject.id, trimmed);
+      if (ok) {
+        setCurrentName(trimmed);
+        onProjectRenamed?.(trimmed);
+      }
+    } finally {
+      setIsSaving(false);
+      setIsRenaming(false);
+    }
+  };
+
+  const handleCancelRename = () => {
+    setRenameValue(currentName);
+    setIsRenaming(false);
+  };
+
   return (
     <div className="max-w-xl space-y-6">
       <div>
         <div className="flex items-center gap-2">
-          <h2 className="text-[18px] font-semibold text-zinc-900 dark:text-white">{activeProject.name}</h2>
-          <Pencil size={13} className="text-zinc-400 cursor-pointer hover:text-zinc-700 dark:hover:text-white" />
+          {isRenaming ? (
+            <div className="flex items-center gap-1.5 flex-1">
+              <input
+                type="text"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveRename();
+                  if (e.key === 'Escape') handleCancelRename();
+                }}
+                autoFocus
+                disabled={isSaving}
+                className="text-[17px] font-semibold text-zinc-900 dark:text-white bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5 outline-none focus:border-emerald-500 w-full max-w-sm"
+              />
+              <button
+                type="button"
+                onClick={handleSaveRename}
+                disabled={isSaving || !renameValue.trim()}
+                title="Save"
+                className="p-1 text-emerald-600 hover:text-emerald-500 disabled:opacity-40 cursor-pointer"
+              >
+                <Check size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelRename}
+                title="Cancel"
+                className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <h2 className="text-[18px] font-semibold text-zinc-900 dark:text-white">{currentName}</h2>
+              <button
+                type="button"
+                onClick={() => setIsRenaming(true)}
+                title="Rename Project"
+                className="p-0.5 text-zinc-400 cursor-pointer hover:text-zinc-700 dark:hover:text-white transition-colors"
+              >
+                <Pencil size={13} />
+              </button>
+            </>
+          )}
         </div>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Manage project folders, agent settings, and permissions.</p>
       </div>

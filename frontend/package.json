@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:chat": "node tests/test_chat_scenarios.mjs",
+    "test:sidebar": "node test_right_sidebar_logic.cjs",
+    "test:fuzz": "npx tsx --tsconfig tsconfig.json tests/fuzz_session_store.ts",
+    "test": "node tests/test_chat_scenarios.mjs && node test_right_sidebar_logic.cjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
