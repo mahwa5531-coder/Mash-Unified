@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TimelineRow } from './work-log/TimelineRow';
 import {
@@ -240,8 +240,7 @@ export default function TaskWorkLogAccordion({
           </div>
         )}
         {isActivelyThinkingNow && !groupedTimeline.some(e => e.type === 'thought') ? (
-          <div className="flex items-center gap-1.5 text-xs text-foreground font-sans py-0.5">
-            <Loader2 size={11} className="animate-spin text-sky-500 shrink-0" />
+          <div className="flex items-center text-xs text-zinc-400 dark:text-zinc-500 font-sans py-0.5 select-none">
             <span>Thinking for {formatDurationDisplay(liveThinkingSeconds)}</span>
             <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
               <span>.</span>
@@ -250,8 +249,7 @@ export default function TaskWorkLogAccordion({
             </span>
           </div>
         ) : activeTool ? (
-          <div className="flex items-center gap-1.5 text-xs text-sky-500 dark:text-sky-400 font-sans py-0.5">
-            <Loader2 size={11} className="animate-spin shrink-0" />
+          <div className="flex items-center text-xs text-zinc-400 dark:text-zinc-500 font-sans py-0.5 select-none">
             <span>Running {activeTool.name || 'tool'}</span>
             <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
               <span>.</span>
@@ -260,15 +258,12 @@ export default function TaskWorkLogAccordion({
             </span>
           </div>
         ) : !hasAssistantContent ? (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-sans py-0.5">
-            <Loader2 size={11} className="animate-spin text-zinc-400 shrink-0" />
-            <span className="inline-flex items-center text-muted-foreground">
-              <span>Working</span>
-              <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
-                <span>.</span>
-                <span>.</span>
-                <span>.</span>
-              </span>
+          <div className="flex items-center text-xs text-zinc-400 dark:text-zinc-500 font-sans py-0.5 select-none">
+            <span>Working</span>
+            <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
+              <span>.</span>
+              <span>.</span>
+              <span>.</span>
             </span>
           </div>
         ) : null}

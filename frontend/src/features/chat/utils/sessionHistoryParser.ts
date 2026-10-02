@@ -1,5 +1,18 @@
 import { Message } from '@/types/chat';
 
+// ponytail: strip technical terminal sentinels like [DONE], [END], [VERIFIED]
+function cleanTerminalMarkers(raw?: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const cleaned = raw
+    .replace(/\[VERIFIED\]\s*/gi, '')
+    .replace(/\s*\[(DONE|END|done|end)\]\s*$/gi, '')
+    .trim();
+  if (/^\[?(DONE|END|done|end)\]?$/i.test(cleaned)) {
+    return '';
+  }
+  return cleaned;
+}
+
 // ponytail: transforms raw NexAU DB action records into structured chat Message[] for rendering
 export function parseSessionHistory(rawLines: any[]): Message[] {
   const parsedMsgs: Message[] = [];
@@ -36,7 +49,7 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
           tasks: [],
         });
       } else if (step.role === 'assistant' || step.source === 'MODEL' || step.type === 'PLANNER_RESPONSE') {
-        let content = typeof step.content === 'string' ? step.content.replace(/\[VERIFIED\]\s*/gi, '') : '';
+        let content = cleanTerminalMarkers(typeof step.content === 'string' ? step.content : '');
         const thoughts: string[] = Array.isArray(step.thoughts) ? [...step.thoughts] : (step.thinking ? [step.thinking] : []);
         const rawTools: any[] = Array.isArray(step.tools) ? step.tools : (Array.isArray(step.tool_calls) ? step.tool_calls : []);
         const stepPrefix = step.action_id || step.id || (step as any).step_index !== undefined ? `st_${(step as any).step_index}` : `m_${parsedMsgs.length}`;
@@ -70,8 +83,10 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
         if (Array.isArray(step.content)) {
           for (const b of step.content) {
             if (b.type === 'text' && b.text) {
-              const cleanBText = b.text.replace(/\[VERIFIED\]\s*/gi, '');
-              content += (content ? '\n' : '') + cleanBText;
+              const cleanBText = cleanTerminalMarkers(b.text);
+              if (cleanBText) {
+                content += (content ? '\n' : '') + cleanBText;
+              }
             }
             if ((b.type === 'reasoning' || b.type === 'thinking') && (b.text || b.thinking)) {
               thoughts.push(b.text || b.thinking);

@@ -143,6 +143,11 @@ export async function streamQuery(
         const jsonStr = trimmed.slice(5).trim();
         if (!jsonStr) continue;
 
+        // Terminal SSE sentinel frame ([DONE] or [END])
+        if (/^\[?(DONE|END)\]?$/i.test(jsonStr)) {
+          break;
+        }
+
         try {
           const event = JSON.parse(jsonStr);
           const eventType = String(event.type || "").toUpperCase();
@@ -150,7 +155,8 @@ export async function streamQuery(
 
           // 1. Text token delta (the main assistant output)
           if (eventType === "TEXT_MESSAGE_CONTENT" || eventType === "TEXT_MESSAGE_CHUNK") {
-            const tokenText = event.delta ?? data.delta ?? event.content ?? data.content ?? "";
+            const rawToken = event.delta ?? data.delta ?? event.content ?? data.content ?? "";
+            const tokenText = typeof rawToken === "string" ? rawToken.replace(/\s*\[?(DONE|END|done|end)\]?\s*$/g, '') : '';
             if (tokenText) onToken(tokenText);
           }
 
@@ -160,7 +166,8 @@ export async function streamQuery(
             eventType === "REASONING_MESSAGE_CONTENT" ||
             eventType === "REASONING_MESSAGE_CHUNK"
           ) {
-            const thoughtText = event.delta ?? data.delta ?? event.content ?? data.content ?? "";
+            const rawThought = event.delta ?? data.delta ?? event.content ?? data.content ?? "";
+            const thoughtText = typeof rawThought === "string" ? rawThought.replace(/\s*\[?(DONE|END|done|end)\]?\s*$/g, '') : '';
             if (thoughtText && onThought) onThought(thoughtText);
           }
 
