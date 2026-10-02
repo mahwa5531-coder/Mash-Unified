@@ -290,15 +290,24 @@ export default function TaskWorkLogAccordion({
       {/* Chronological Timeline List revealed only when user expands */}
       {clusterOpen && (
         <div className="min-w-0 overflow-hidden mt-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
-          <div className="flex flex-col gap-1 py-1 text-xs">
-            {groupedTimeline.length > 0 ? (
-              groupedTimeline.map((entry) => renderTimelineRow(entry, false))
-            ) : (
-              <div className="text-xs text-muted-foreground/80 py-1 px-1 font-sans">
-                Completed response in {formattedTime}
-              </div>
-            )}
-          </div>
+          {hasThoughts && !hasTools ? (
+            <div
+              ref={thoughtScrollRef}
+              className="mt-1 mb-2 pl-3 border-l-2 border-zinc-300 dark:border-zinc-700/80 py-1 text-[12px] leading-relaxed max-h-56 overflow-y-auto custom-scrollbar italic font-sans text-zinc-500 dark:text-zinc-400 select-text whitespace-pre-wrap"
+            >
+              {thoughts.join('\n\n') || (steps ? steps.filter((s: any) => s.type === 'thinking').map((s: any) => s.content || (s.thoughts ? s.thoughts.join('\n\n') : '')).join('\n\n') : '')}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1 py-1 text-xs">
+              {groupedTimeline.length > 0 ? (
+                groupedTimeline.map((entry) => renderTimelineRow(entry, false))
+              ) : (
+                <div className="text-xs text-muted-foreground/80 py-1 px-1 font-sans">
+                  Completed response in {formattedTime}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

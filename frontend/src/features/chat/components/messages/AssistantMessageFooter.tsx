@@ -33,13 +33,15 @@ export function AssistantMessageFooter({
       <span className="text-[11px] text-[var(--text-muted)] font-mono">
         {displayTime}
       </span>
-      <button
-        onClick={handleCopy}
-        className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-        title="Copy response"
-      >
-        {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-      </button>
+      {rawText ? (
+        <button
+          onClick={handleCopy}
+          className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+          title="Copy response"
+        >
+          {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+        </button>
+      ) : null}
     </div>
   );
 }

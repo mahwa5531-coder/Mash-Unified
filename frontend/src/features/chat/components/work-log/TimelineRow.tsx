@@ -47,9 +47,7 @@ export function TimelineRow(props: TimelineRowProps) {
         liveThinkingSeconds={props.liveThinkingSeconds}
         latchedThinkingSeconds={props.latchedThinkingSeconds}
         isExpanded={!!props.expandedThoughts[entry.id] || Boolean(props.isStreaming && entry.data?.status === 'running')}
-        copiedId={props.copiedId}
         toggleThought={props.toggleThought}
-        handleCopy={props.handleCopy}
         thoughtScrollRef={props.thoughtScrollRef}
       />
     );

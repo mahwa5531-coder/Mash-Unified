@@ -1,7 +1,6 @@
 import React from 'react';
 import { FilePill, AuditBadge } from '@/primitives';
 import { normalizePath, safeDecodeURI } from '@/utils/normalizePath';
-import { shouldExcludePath } from '@/features/artifacts/utils/extraction';
 
 // Safely extract plain text from markdown AST / React children
 export function extractChildText(node: any): string {
@@ -33,19 +32,18 @@ export function formatFilePill(rawLabel: string, rawHref: string) {
   return { filePath, display };
 }
 
-// Detect if a string is a valid full file path with recognized extension (must have directory slash, no wildcards)
+// Detect if a string is a valid file path with recognized extension
 export function isFullFilePath(raw: string): boolean {
-  if (!raw || typeof raw !== 'string' || shouldExcludePath(raw)) return false;
+  if (!raw || typeof raw !== 'string') return false;
   const clean = normalizePath(raw.trim());
-  if (shouldExcludePath(clean)) return false;
+  if (clean.includes('/node_modules/') || clean.startsWith('node_modules/')) return false;
   if (!clean || clean.includes(' ') || clean.includes('\n') || clean.includes('(') || clean.includes(')') || clean.includes('*') || clean.includes('?')) return false;
 
   const FILE_EXT_REGEX = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|pyw|ipynb|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|db|sqlite|md|markdown|txt|log|html|css|scss|xml|xbrl|sh|bash|zsh|ps1|rs|go|c|cpp|h|java|zip|tar|gz|png|jpe?g|gif|svg|webp)$/i;
 
-  const hasSlash = clean.includes('/') || clean.includes('\\');
   const parts = clean.split(/[/\\]/);
   const filename = parts.pop() || '';
-  return hasSlash && FILE_EXT_REGEX.test(clean) && filename.length > 0 && !filename.startsWith('.');
+  return FILE_EXT_REGEX.test(clean) && filename.length > 0 && !filename.startsWith('.');
 }
 
 // Detect if a string is a standalone file extension

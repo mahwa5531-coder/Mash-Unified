@@ -33,22 +33,79 @@ export function MarkdownFileViewer({
   sessionQuery,
 }: MarkdownFileViewerProps) {
   return (
-    <div className="markdown-body p-5 leading-relaxed text-[13px] bg-[var(--bg-surface)]">
-      <ReactMarkdown 
-        remarkPlugins={[remarkGfm]}
-        components={{
-          code({inline, className, children, ...props}: any) {
-            const match = /language-(\w+)/.exec(className || '');
-            const lang = match ? match[1].toLowerCase() : '';
-            if (!inline && lang === 'mermaid') {
-              return <MermaidRenderer chart={String(children).replace(/\n$/, '')} />;
-            }
-            return (
-              <code className={className} {...props}>
-                {children}
-              </code>
-            );
-          },
+    <div className="p-3 bg-zinc-100/60 dark:bg-[#121215] min-h-full">
+      <div className="markdown-body p-6 md:p-8 leading-relaxed text-[13px] bg-white dark:bg-[#1c1c20] text-zinc-900 dark:text-zinc-100 rounded-xl shadow-xs border border-zinc-200/70 dark:border-white/[0.08]">
+        <ReactMarkdown 
+          remarkPlugins={[remarkGfm]}
+          components={{
+            h1({children, ...props}: any) {
+              return <h1 className="mt-6 mb-3 text-[18px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0" {...props}>{children}</h1>;
+            },
+            h2({children, ...props}: any) {
+              return <h2 className="mt-5 mb-2.5 text-[15.5px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/70 dark:border-white/[0.08] pb-1.5" {...props}>{children}</h2>;
+            },
+            h3({children, ...props}: any) {
+              return <h3 className="mt-4 mb-2 text-[14px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>{children}</h3>;
+            },
+            h4({children, ...props}: any) {
+              return <h4 className="mt-3.5 mb-1.5 text-[12.5px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 first:mt-0" {...props}>{children}</h4>;
+            },
+            p({children, ...props}: any) {
+              return <p className="mb-3 text-[13px] leading-[1.7] text-zinc-800 dark:text-[#d4d4d8] last:mb-0" {...props}>{children}</p>;
+            },
+            ul({children, ...props}: any) {
+              return <ul className="my-2.5 pl-5 list-disc space-y-1 text-zinc-800 dark:text-[#d4d4d8] marker:text-zinc-400 dark:marker:text-zinc-500" {...props}>{children}</ul>;
+            },
+            ol({children, ...props}: any) {
+              return <ol className="my-2.5 pl-5 list-decimal space-y-1 text-zinc-800 dark:text-[#d4d4d8] marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400" {...props}>{children}</ol>;
+            },
+            li({children, ...props}: any) {
+              return <li className="my-0.5 text-[13px] leading-[1.65]" {...props}>{children}</li>;
+            },
+            hr({...props}: any) {
+              return <hr className="my-4 border-t border-zinc-200/70 dark:border-white/[0.08]" {...props} />;
+            },
+            a({href, children, ...props}: any) {
+              return (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sky-600 dark:text-sky-400 underline underline-offset-2 hover:text-sky-500 transition-colors"
+                  {...props}
+                >
+                  {children}
+                </a>
+              );
+            },
+            code({inline, className, children, ...props}: any) {
+              const match = /language-(\w+)/.exec(className || '');
+              const lang = match ? match[1].toLowerCase() : '';
+              if (!inline && lang === 'mermaid') {
+                return <MermaidRenderer chart={String(children).replace(/\n$/, '')} />;
+              }
+              if (inline) {
+                return (
+                  <code className="px-1.5 py-0.5 rounded text-[12px] font-mono bg-zinc-100 dark:bg-[#28282e] text-zinc-800 dark:text-zinc-200 border border-zinc-200/60 dark:border-white/[0.08]" {...props}>
+                    {children}
+                  </code>
+                );
+              }
+              return (
+                <div className="my-3 rounded-lg overflow-hidden border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50 dark:bg-[#141416]">
+                  {lang && (
+                    <div className="px-3 py-1 bg-zinc-100 dark:bg-[#19191d] border-b border-zinc-200/70 dark:border-zinc-800/80 text-[10.5px] font-mono font-medium text-zinc-500 uppercase tracking-wider">
+                      {lang}
+                    </div>
+                  )}
+                  <pre className="p-3.5 overflow-x-auto text-[12px] font-mono leading-relaxed text-zinc-800 dark:text-zinc-200">
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  </pre>
+                </div>
+              );
+            },
           img({src, alt, ...props}: any) {
             let resolvedSrc = src;
             if (resolvedSrc && (resolvedSrc.startsWith('file:///') || resolvedSrc.startsWith('file://') || resolvedSrc.startsWith('/'))) {
@@ -91,6 +148,7 @@ export function MarkdownFileViewer({
       >
         {isMassiveFile ? displayedContent : (content || '// Empty markdown file')}
       </ReactMarkdown>
+      </div>
     </div>
   );
 }

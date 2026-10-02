@@ -13,7 +13,6 @@ import {
 import CodeBlock from '@/components/renderers/CodeBlock';
 import TableContainer from '@/components/renderers/TableContainer';
 import { normalizePath } from '@/utils/normalizePath';
-import { shouldExcludePath } from '@/features/artifacts/utils/extraction';
 import { BASE_URL } from '@/services/client';
 import type { LightboxImageData } from './ImageLightboxModal';
 import {
@@ -217,7 +216,7 @@ export function useMarkdownComponents({
       const isRelativeFile = /\.(xlsx?|xlsm|csv|json|md|markdown|txt|log|py|tsx?|jsx?|mjs|sql|ya?ml|toml|xml|env|html|css|pdf|png|jpe?g|svg|webp|gif|j2|jinja2?)$/i.test(href.split('#')[0]);
       const isLocalPath = (href.startsWith('/') || href.startsWith('./') || href.startsWith('../')) && isFullFilePath(href);
 
-      if ((isFileUri || isWinPath || isRelativeFile || isLocalPath || isFullFilePath(href)) && !shouldExcludePath(href)) {
+      if (isFileUri || isWinPath || isRelativeFile || isLocalPath || isFullFilePath(href)) {
         const rawLabel = extractChildText(children);
         const { filePath, display } = formatFilePill(rawLabel || href, href);
         return <FilePill path={filePath} label={display} onOpenFile={onOpenFile} />;

@@ -158,7 +158,7 @@ const AssistantMessage = memo(function AssistantMessage({
       {!isActivelyStreaming && (
         <AssistantMessageFooter
           displayTime={displayTime}
-          rawText={allProseText || (msg.thoughts && msg.thoughts.length > 0 ? msg.thoughts.join('\n\n') : '')}
+          rawText={allProseText}
           hasPrecedingContent={!!(allProseText || artifacts.length > 0 || editedFilesData.files.length > 0)}
         />
       )}

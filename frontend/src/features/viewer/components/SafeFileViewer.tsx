@@ -136,7 +136,7 @@ export default function SafeFileViewer({
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-app)] overflow-hidden">
+    <div className="flex flex-col h-full bg-zinc-100/60 dark:bg-[#121215] overflow-hidden">
       {/* Massive File Backend Truncation Shield */}
       {isMassiveFile && (
         <div className="px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/25 flex items-center justify-between text-xs text-amber-600 dark:text-amber-400 select-none shrink-0 gap-2">
@@ -167,11 +167,11 @@ export default function SafeFileViewer({
             sessionQuery={sessionQuery}
           />
         ) : (
-          <div className="flex-1 w-full h-full min-h-[350px] bg-white dark:bg-[#161616] text-[12.5px] leading-relaxed select-text flex flex-col overflow-hidden">
+          <div className="flex-1 w-full h-full min-h-[350px] bg-white dark:bg-[#1c1c20] text-[12.5px] leading-relaxed select-text flex flex-col overflow-hidden">
             {viewMode === 'raw' ? (
               <pre 
                 style={{ contentVisibility: 'auto', containIntrinsicSize: '0 500px' }}
-                className="p-4 font-mono text-[12.5px] leading-relaxed select-text whitespace-pre overflow-x-auto text-zinc-800 dark:text-zinc-200 h-full overflow-auto"
+                className="p-5 font-mono text-[12.5px] leading-relaxed select-text whitespace-pre overflow-x-auto text-zinc-800 dark:text-zinc-200 h-full overflow-auto bg-white dark:bg-[#1c1c20]"
               >
                 {displayedContent}
               </pre>
