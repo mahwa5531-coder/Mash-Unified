@@ -33,13 +33,15 @@ export function ViewerTabMenu({ activeTab, content = '', onCloseTab }: ViewerTab
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-[#18181a] border border-zinc-200 dark:border-white/[0.08] shadow-xl p-1 rounded-xl">
-        <DropdownMenuItem
-          onClick={() => navigator.clipboard.writeText(content)}
-          className="text-xs gap-2 cursor-pointer rounded-lg py-1.5"
-        >
-          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-          <span>Copy Content</span>
-        </DropdownMenuItem>
+        {content && (
+          <DropdownMenuItem
+            onClick={() => navigator.clipboard.writeText(content)}
+            className="text-xs gap-2 cursor-pointer rounded-lg py-1.5"
+          >
+            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>Copy Content</span>
+          </DropdownMenuItem>
+        )}
 
         {activeTab.path && (
           <DropdownMenuItem

@@ -86,7 +86,7 @@ export function useViewerTabs(sessionId?: string) {
 
     const isImg = type === 'image' || /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/i.test(normalizedPath || name);
     const isPdf = /\.pdf$/i.test(normalizedPath || name);
-    const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods)$/i.test(normalizedPath || name);
+    const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods|csv)$/i.test(normalizedPath || name);
     const isUnsupported = UNSUPPORTED_DOC_REGEX.test(normalizedPath || name);
     const tabId = isImg ? `img-${normalizedPath}` : `file-${normalizedPath}`;
 

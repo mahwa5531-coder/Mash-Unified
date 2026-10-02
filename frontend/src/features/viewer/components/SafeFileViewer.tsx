@@ -75,7 +75,7 @@ export default function SafeFileViewer({
   const cleanName = (path || filename || '').toLowerCase();
   const isImage = /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/.test(cleanName);
   const isMarkdown = /\.md$/i.test(cleanName);
-  const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods)$/i.test(cleanName);
+  const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods|csv)$/i.test(cleanName);
   const isPdf = /\.pdf$/i.test(cleanName);
   const isUnsupported = /\.(docx|doc|pptx|ppt|zip|tar|gz|7z|rar|exe|bin|iso|dmg|dll|so|dylib)$/i.test(cleanName);
 
