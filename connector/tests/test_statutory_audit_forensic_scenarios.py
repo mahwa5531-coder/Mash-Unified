@@ -44,7 +44,7 @@ from nexau.archs.tool.builtin import (
     run_shell_command,
     audit_skill_tool,
 )
-from nexau.ingestion_pipeline.csv_to_md_parquet import parse_csv_to_markdown
+from app.ingestion.csv_to_md_parquet import parse_csv_to_markdown
 
 
 class MockAgentState:

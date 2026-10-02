@@ -7,7 +7,6 @@ import { TimelineRow } from './work-log/TimelineRow';
 import {
   formatDurationDisplay,
   parseToolItem,
-  groupToolEntries,
   isToolRunning,
 } from './work-log/toolTimeline';
 import type { ToolCallItem, ExecutionStep, TimelineEntry } from './work-log/types';
@@ -134,12 +133,12 @@ export default function TaskWorkLogAccordion({
           });
         }
       });
-      return groupToolEntries(rawEntries, isStreaming);
+      return rawEntries;
     }
 
     // Branch B: Streaming or legacy flat messages fallback
     const rawToolEntries = tools.map((t, tIdx) => parseToolItem(t, tIdx));
-    const groupedTools = groupToolEntries(rawToolEntries, isStreaming);
+    const groupedTools = rawToolEntries;
 
     if (thoughts.length > 0) {
       const combinedThoughtText = thoughts.join('\n\n').trim();

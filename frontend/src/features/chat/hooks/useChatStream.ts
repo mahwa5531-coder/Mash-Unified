@@ -61,7 +61,7 @@ export function useChatStream({
   }, [sessionId]);
 
   const DEFAULT_MODEL = 'default';
-  const [thinkingBudget, setThinkingBudget] = useState<string>('high');
+  const thinkingBudget = 'high';
   const lastModelRef = useRef<{ model: string; effort: string }>({ model: 'default', effort: 'high' });
 
   // 1. Atomised Buffer Flusher

@@ -52,7 +52,7 @@ async def get_system_info():
     """Returns the machine installation ID, version, OS, and local database size."""
     import sys
     import platform
-    from nexau.archs.platform.path_helpers import get_installation_id, get_nexau_home, get_database_path
+    from app.paths import get_installation_id, get_nexau_home, get_database_path
 
     db_path = get_database_path()
     db_size = db_path.stat().st_size if db_path.exists() else 0
@@ -276,7 +276,7 @@ async def resolve_folder_endpoint(request: ResolveFolderRequest):
 @router.post("/system/quickstart-folder")
 async def get_quickstart_folder():
     """Get or generate the default quickstart folder path under ~/.nexau/projects/."""
-    from nexau.archs.platform.path_helpers import get_nexau_home
+    from app.paths import get_nexau_home
     projects_dir = get_nexau_home() / "projects"
     projects_dir.mkdir(parents=True, exist_ok=True)
 

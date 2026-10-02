@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
 from app.main import app, lifespan
-from nexau.archs.platform.path_helpers import (
+from app.paths import (
     get_nexau_home,
     get_session_brain_dir,
     get_database_path,

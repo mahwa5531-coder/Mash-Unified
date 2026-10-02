@@ -195,7 +195,3 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     };
   }
 }
-
-export function groupToolEntries(entries: TimelineEntry[], _isStreaming: boolean): TimelineEntry[] {
-  return entries;
-}

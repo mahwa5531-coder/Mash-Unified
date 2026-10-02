@@ -61,7 +61,13 @@ async def ensure_valid_token() -> str | None:
     # 2. Expired or expiring soon: rotate using sliding refresh_token
     if refresh_token:
         config = AppConfig.load()
-        gateway_url = config.model.gateway_url or os.getenv("GATEWAY_URL") or os.getenv("OPENAI_BASE_URL")
+        gateway_url = (
+            os.getenv("CLOUD_GATEWAY_URL")
+            or os.getenv("GATEWAY_URL")
+            or os.getenv("OPENAI_BASE_URL")
+            or os.getenv("NEXAU_CLOUD_API_URL")
+            or config.model.gateway_url
+        )
         if gateway_url:
             clean_url = gateway_url.rstrip("/")
             try:
@@ -240,9 +246,10 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
     # If single-use exchange code received from browser loopback
     if payload.code:
         cloud_url = (
-            config.model.gateway_url
+            os.getenv("CLOUD_GATEWAY_URL")
             or os.getenv("GATEWAY_URL")
             or os.getenv("NEXAU_CLOUD_API_URL")
+            or config.model.gateway_url
             or "https://api.mash.ai"
         ).rstrip("/")
         
@@ -429,9 +436,10 @@ async def handle_logout() -> dict[str, Any]:
     if refresh_token or access_token:
         config = AppConfig.load()
         gateway_url = (
-            config.model.gateway_url
+            os.getenv("CLOUD_GATEWAY_URL")
             or os.getenv("GATEWAY_URL")
             or os.getenv("NEXAU_CLOUD_API_URL")
+            or config.model.gateway_url
             or "https://api.mash.ai"
         ).rstrip("/")
         try:

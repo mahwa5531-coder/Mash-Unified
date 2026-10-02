@@ -600,7 +600,7 @@ class Agent:
         llm_config = self.config.llm_config or LLMConfig()
 
         try:
-            if llm_config.api_type in {"gemini_rest", "google_genai", "generate_with_token"}:
+            if llm_config.api_type in {"gemini_rest", "generate_with_token"}:
                 return None
             if llm_config.api_type == "anthropic_chat_completion":
                 client_kwargs = llm_config.to_client_kwargs()
@@ -622,7 +622,7 @@ class Agent:
         llm_config = self.config.llm_config or LLMConfig()
 
         try:
-            if llm_config.api_type in {"gemini_rest", "google_genai", "generate_with_token"}:
+            if llm_config.api_type in {"gemini_rest", "generate_with_token"}:
                 return None
             if llm_config.api_type == "anthropic_chat_completion":
                 client_kwargs = llm_config.to_client_kwargs()

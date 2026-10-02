@@ -32,7 +32,7 @@ async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEng
     target_dir = docs_dir / clean_name
     target_dir.mkdir(parents=True, exist_ok=True)
     
-    from nexau.archs.platform.path_helpers import scaffold_workspace_storage
+    from app.paths import scaffold_workspace_storage
     scaffold_workspace_storage(target_dir)
     
     normalized_path = os.path.normpath(str(target_dir)).replace("\\", "/")
@@ -54,7 +54,7 @@ async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEng
 async def create_project(request: CreateProjectRequest, engine: DatabaseEngineDep):
     normalized_path = os.path.normpath(request.local_folder_path).replace("\\", "/")
     try:
-        from nexau.archs.platform.path_helpers import scaffold_workspace_storage
+        from app.paths import scaffold_workspace_storage
         scaffold_workspace_storage(normalized_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create directory: {e}")
@@ -143,7 +143,7 @@ async def list_projects(user_id: str, engine: DatabaseEngineDep):
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, engine: DatabaseEngineDep):
     import shutil
-    from nexau.archs.platform.path_helpers import get_nexau_home, get_session_brain_dir
+    from app.paths import get_nexau_home, get_session_brain_dir
     from nexau.archs.session.models import SessionModel, AgentRunActionModel
 
     # Find project by id OR name

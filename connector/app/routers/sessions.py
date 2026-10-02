@@ -17,7 +17,7 @@ from nexau.archs.session.agent_run_action_service import reduce_actions_stream
 from nexau.archs.session.models import SessionModel, AgentRunActionModel
 from nexau.archs.session.orm import ComparisonFilter
 from nexau.archs.session.id_generator import generate_session_id, generate_run_id
-from nexau.archs.platform.path_helpers import get_session_brain_dir
+from app.paths import get_session_brain_dir
 from nexau.archs.session.steering import queue_steering_message, peek_steering_messages, clear_steering_messages
 
 logger = logging.getLogger(__name__)
@@ -259,7 +259,7 @@ async def create_session(
             raise HTTPException(status_code=404, detail="Project not found")
 
     session_id = request.session_id or generate_session_id()
-    from nexau.archs.platform.path_helpers import scaffold_session_storage
+    from app.paths import scaffold_session_storage
     brain_path = scaffold_session_storage(session_id, project.id if project else request.project_id)
 
     section = request.section or ("workspace" if request.workspace_uri not in ("No Repo", "", None) or project or request.project_id else "conversation")

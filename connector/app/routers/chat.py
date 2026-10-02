@@ -16,7 +16,7 @@ from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 from nexau.archs.session.id_generator import generate_session_id
 from nexau.archs.transports.http.sse_server import SSETransportServer
-from nexau.archs.platform.path_helpers import resolve_deliverables_dir, resolve_sandbox_work_dir
+from app.paths import resolve_deliverables_dir, resolve_sandbox_work_dir
 from app.dependencies import get_engine
 from app.models.project import ProjectModel
 
@@ -49,7 +49,7 @@ async def _ensure_project_and_context(
     NexAU handles session creation itself via SessionManager._get_or_create_session().
     This function only prepares the *context dict* that NexAU will store.
     """
-    from nexau.archs.platform.path_helpers import scaffold_session_storage, scaffold_workspace_storage
+    from app.paths import scaffold_session_storage, scaffold_workspace_storage
 
     project_id = resolved_context.get("project_id")
 

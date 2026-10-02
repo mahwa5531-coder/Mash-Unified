@@ -1,11 +1,13 @@
 import { Message } from '@/types/chat';
 
-// ponytail: strip NexAU reasoning-only [empty] sentinel and [VERIFIED] marker; preserve all genuine LLM text/JSON
+// ponytail: strip NexAU reasoning-only [empty] sentinel, [VERIFIED] marker, and [DONE]/[END] protocol sentinels
 function cleanAssistantContent(raw?: string): string {
   if (!raw || typeof raw !== 'string') return '';
   const trimmed = raw.trim();
-  if (trimmed === '[empty]') return '';
-  return raw.replace(/\[VERIFIED\]\s*/gi, '');
+  if (trimmed === '[empty]' || /^\[?(DONE|END|done|end)\]?$/i.test(trimmed)) return '';
+  return raw
+    .replace(/\[VERIFIED\]\s*/gi, '')
+    .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '');
 }
 
 // ponytail: transforms raw NexAU DB action records into structured chat Message[] for rendering

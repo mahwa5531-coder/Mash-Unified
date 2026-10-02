@@ -13,7 +13,7 @@ from app.models.project import ProjectModel
 from app.workspace import get_allowed_file_roots, is_path_in_base_roots, resolve_session_workspace, APP_WORKSPACE_ROOT
 from nexau.archs.session.orm import ComparisonFilter
 from nexau.archs.session.models import SessionModel
-from nexau.archs.platform.path_helpers import get_session_brain_dir
+from app.paths import get_session_brain_dir
 
 logger = logging.getLogger(__name__)
 

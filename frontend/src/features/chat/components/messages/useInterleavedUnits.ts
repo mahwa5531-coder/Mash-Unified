@@ -5,6 +5,16 @@ export type MessageInterleavedUnit =
   | { type: 'worklog'; id: string; steps: ExecutionStep[]; thoughts: string[]; tools: ToolCall[] }
   | { type: 'prose'; id: string; content: string };
 
+function cleanProseContent(raw?: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (trimmed === '[empty]' || /^\[?(DONE|END|done|end)\]?$/i.test(trimmed)) return '';
+  return raw
+    .replace(/\[VERIFIED\]\s*/gi, '')
+    .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '')
+    .trim();
+}
+
 /**
  * ponytail: Interleaved Sequential Units — clean chronological flow where worklogs and authentic prose alternate
  */
@@ -61,7 +71,7 @@ export function useInterleavedUnits(msg: Message, isActivelyStreaming: boolean):
 
       for (const step of msg.steps) {
         if (step.type === 'text') {
-          const cleanText = (step.content || '').replace(/\[VERIFIED\]\s*/gi, '').trim();
+          const cleanText = cleanProseContent(step.content);
           if (cleanText) {
             flushWork();
             result.push({
@@ -102,7 +112,7 @@ export function useInterleavedUnits(msg: Message, isActivelyStreaming: boolean):
         tools: msg.tools || [],
       });
     }
-    const cleanContent = (msg.content || '').replace(/\[VERIFIED\]\s*/gi, '').trim();
+    const cleanContent = cleanProseContent(msg.content);
     if (cleanContent) {
       fallbackUnits.push({
         type: 'prose',

@@ -46,7 +46,7 @@ from app.routers import projects, sessions, chat, artifacts, uploads, tasks, sys
 # ──────────────────────────────────────────────
 # DB path (~/.nexau/nexau.db)
 # ──────────────────────────────────────────────
-from nexau.archs.platform.path_helpers import get_nexau_home, get_database_path, get_session_brain_dir, get_project_cache_dir
+from app.paths import get_nexau_home, get_database_path, get_session_brain_dir, get_project_cache_dir
 
 _DB_DIR = get_nexau_home()
 _DB_PATH = get_database_path()
@@ -156,7 +156,7 @@ def _build_agent_config() -> AgentConfig:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import app.dependencies as _deps
-    from nexau.archs.platform.path_helpers import scaffold_nexau_system_storage
+    from app.paths import scaffold_nexau_system_storage
 
     scaffold_nexau_system_storage()
     engine = init_engine(_DB_ASYNC_URL)

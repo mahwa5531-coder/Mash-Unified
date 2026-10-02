@@ -71,7 +71,7 @@ frontend/src/
 |---|---|---|
 | **chat** | streaming orchestration, message rendering, composer, work log, session runtime state | persistence (services), artifact cards (artifacts feature) |
 | **artifacts** | artifact detection from messages, deliverable cards, edited-file drawer | viewing files (viewer feature) |
-| **sessions** | sidebar navigation, session lists, context menu, history page | chat state (imports via `@/features/chat` barrel) |
+| **sessions** | sidebar navigation, session lists, context menu, history page | chat state |
 | **viewer** | right panel: explorer, file/code/excel/terminal viewing, tabs | file fetching (services/files) |
 | **settings** | settings modal, theme engine UI, project management UI | project API calls (services/projects) |
 | **auth** | sign-in view | auth API (services/auth) |
@@ -80,13 +80,13 @@ frontend/src/
 
 ```
 app
- └─> features (via barrel index.ts ONLY)
+ └─> features (direct component/hook imports)
        └─> services ─> types / lib
        └─> components/{ui,layout,renderers}
        └─> types / utils / hooks / lib
 ```
 
-1. **Features never import each other's internals.** Cross-feature imports go through the feature's `index.ts`. The one sanctioned cross-feature edge is `chat → artifacts` (chat renders artifact cards).
+1. **Direct feature imports.** Components and hooks are imported directly from their canonical feature paths (e.g. `@/features/auth/components/DesktopSignInView`), avoiding intermediate `index.ts` re-export barrels for optimal tree-shaking and zero indirection.
 2. **Services never import features or components.** They return typed data.
 3. **`components/renderers` never import services or features** — they are pure presentation over content.
 4. **`page.tsx` is a composition root**: it owns app-level UI state (selection, panel toggles, theme) and wires callbacks between features. It contains no rendering of feature internals.

@@ -38,12 +38,6 @@ import anthropic
 import httpx
 import openai
 import requests
-try:
-    from google import genai
-    from google.genai import types as genai_types
-except (ImportError, AttributeError):
-    genai = None  # type: ignore[assignment]
-    genai_types = None  # type: ignore[assignment]
 from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
@@ -479,7 +473,7 @@ class LLMCaller:
         self,
         openai_client: Any,
         llm_config: LLMConfig,
-        retry_attempts: int = 6,
+        retry_attempts: int = 5,
         *,
         retry_backoff_max_seconds: int = 30,
         on_retry: OnRetryCallback | None = None,
@@ -560,7 +554,7 @@ class LLMCaller:
         """
         runtime_client = openai_client if openai_client is not None else self.openai_client
 
-        if not runtime_client and not self.middleware_manager and self.llm_config.api_type not in ("gemini_rest", "google_genai"):
+        if not runtime_client and not self.middleware_manager and self.llm_config.api_type != "gemini_rest":
             raise RuntimeError(
                 "OpenAI client is not available. Please check your API configuration.",
             )
@@ -959,7 +953,7 @@ class LLMCaller:
         # call_llm
         runtime_client = openai_client if openai_client is not None else self.openai_client
 
-        if not runtime_client and not self.middleware_manager and self.llm_config.api_type not in ("gemini_rest", "google_genai"):
+        if not runtime_client and not self.middleware_manager and self.llm_config.api_type != "gemini_rest":
             raise RuntimeError(
                 "OpenAI client is not available. Please check your API configuration.",
             )
@@ -1087,15 +1081,11 @@ class LLMCaller:
                     # force stop event loop shutdown
                     return await self._run_sync_in_llm_pool(sync_call_fn, params)
 
-                # Gemini / Google GenAI: native async path
+                # Gemini / Google GenAI: disabled in favor of OpenAI-compatible Cloud API gateway
                 if self.llm_config.api_type in ("gemini_rest", "google_genai"):
-                    kwargs = dict(params.api_params)
-                    return await call_llm_with_google_genai_async(
-                        kwargs,
-                        middleware_manager=self.middleware_manager,
-                        model_call_params=params,
-                        llm_config=self.llm_config,
-                        tracer=self._get_tracer(),
+                    raise NotImplementedError(
+                        "Direct Google GenAI SDK and Gemini REST calls are disabled. "
+                        "Mash routes all models through the OpenAI-compatible Cloud API gateway (api_type='openai_chat_completion')."
                     )
 
                 # OpenAI / Anthropic: async SDK, await
@@ -1256,12 +1246,9 @@ def call_llm_with_different_client(
             tracer=tracer,
         )
     elif llm_config.api_type in ("gemini_rest", "google_genai"):
-        return call_llm_with_google_genai(
-            kwargs,
-            middleware_manager=middleware_manager,
-            model_call_params=model_call_params,
-            llm_config=llm_config,
-            tracer=tracer,
+        raise NotImplementedError(
+            "Direct Google GenAI SDK and Gemini REST calls are disabled. "
+            "Mash routes all models through the OpenAI-compatible Cloud API gateway (api_type='openai_chat_completion')."
         )
     elif llm_config.api_type == "generate_with_token":
         return call_llm_with_generate_with_token(
@@ -2110,12 +2097,9 @@ async def call_llm_with_different_client_async(
             tracer=tracer,
         )
     elif llm_config.api_type in ("gemini_rest", "google_genai"):
-        return await call_llm_with_google_genai_async(
-            kwargs,
-            middleware_manager=middleware_manager,
-            model_call_params=model_call_params,
-            llm_config=llm_config,
-            tracer=tracer,
+        raise NotImplementedError(
+            "Direct Google GenAI SDK and Gemini REST calls are disabled. "
+            "Mash routes all models through the OpenAI-compatible Cloud API gateway (api_type='openai_chat_completion')."
         )
     else:
         raise ValueError(f"Invalid API type for async call: {llm_config.api_type}")
@@ -2692,261 +2676,20 @@ def _build_bifrost_headers(
     return headers
 
 
-def _build_google_genai_client(
-    llm_config: LLMConfig,
-    model_call_params: ModelCallParams | None = None,
-) -> genai.Client:
-    """Initialize a production-grade google-genai Client with Bifrost-first headers."""
-    if genai is None:
-        raise ImportError("google-genai is not installed. Install via `pip install google-genai`.")
-    http_opts: dict[str, Any] = {}
-    base_url = (llm_config.base_url or "").rstrip("/")
-    if base_url:
-        if base_url.endswith("/v1beta"):
-            http_opts["base_url"] = base_url[:-7]
-            http_opts["api_version"] = "v1beta"
-        elif base_url.endswith("/v1"):
-            http_opts["base_url"] = base_url[:-3]
-            http_opts["api_version"] = "v1"
-        else:
-            http_opts["base_url"] = base_url
-
-    headers = _build_bifrost_headers(llm_config, model_call_params)
-    if headers:
-        http_opts["headers"] = headers
-
-    if llm_config.timeout:
-        http_opts["timeout"] = float(llm_config.timeout)
-
-    api_key = llm_config.api_key or "bifrost-gateway"
-    return genai.Client(
-        api_key=api_key,
-        http_options=http_opts if http_opts else None,
+def call_llm_with_google_genai(*args: Any, **kwargs: Any) -> Any:
+    """Direct Google GenAI SDK calls are removed; all traffic routes through OpenAI gateway."""
+    raise NotImplementedError(
+        "Direct Google GenAI SDK calls have been removed. "
+        "Mash routes all models through the OpenAI-compatible Cloud API gateway."
     )
 
 
-def _build_google_genai_config(
-    llm_config: LLMConfig,
-    system_instruction: Any,
-    gemini_tools: list[dict[str, Any]] | None,
-) -> genai_types.GenerateContentConfig:
-    """Build typed GenerateContentConfig for Google GenAI SDK."""
-    extra = llm_config.extra_params or {}
-    nested = extra.get("extra_params") if isinstance(extra.get("extra_params"), dict) else {}
-    thinking_config = (
-        extra.get("thinkingConfig")
-        or extra.get("thinking_config")
-        or nested.get("thinkingConfig")
-        or nested.get("thinking_config")
+async def call_llm_with_google_genai_async(*args: Any, **kwargs: Any) -> Any:
+    """Direct Google GenAI SDK calls are removed; all traffic routes through OpenAI gateway."""
+    raise NotImplementedError(
+        "Direct Google GenAI SDK calls have been removed. "
+        "Mash routes all models through the OpenAI-compatible Cloud API gateway."
     )
-    if thinking_config:
-        if isinstance(thinking_config, dict):
-            tc = dict(thinking_config)
-            if "includeThoughts" not in tc and "include_thoughts" not in tc:
-                tc["include_thoughts"] = True
-            thinking_cfg = tc
-        else:
-            thinking_cfg = thinking_config
-    else:
-        thinking_cfg = None
-
-    top_k_val: int | None = None
-    top_k = extra.get("top_k") or nested.get("top_k")
-    if top_k is not None:
-        try:
-            top_k_val = int(top_k)
-        except (TypeError, ValueError):
-            pass
-
-    sdk_tools = [{"function_declarations": gemini_tools}] if gemini_tools else None
-
-    return genai_types.GenerateContentConfig(
-        temperature=llm_config.temperature if llm_config.temperature is not None else 0.7,
-        max_output_tokens=llm_config.max_tokens,
-        top_p=llm_config.top_p,
-        top_k=top_k_val,
-        system_instruction=system_instruction,
-        tools=sdk_tools,
-        automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True),
-        thinking_config=thinking_cfg,
-    )
-
-
-def call_llm_with_google_genai(
-    kwargs: dict[str, Any],
-    *,
-    middleware_manager: MiddlewareManager | None = None,
-    model_call_params: ModelCallParams | None = None,
-    llm_config: LLMConfig | None = None,
-    tracer: BaseTracer | None = None,
-) -> ModelResponse:
-    """Call Google GenAI API directly via the official google-genai SDK.
-
-    Bifrost-first architecture: telemetry headers and proxy URL are mapped directly
-    into genai.Client(http_options=...). Streaming responses yield typed
-    GenerateContentResponse chunks aggregated natively into ModelResponse.
-    """
-    if not llm_config:
-        raise ValueError("llm_config is required for google_genai call")
-    if model_call_params is None:
-        raise ValueError("Google GenAI calls require explicit ModelCallParams with UMP messages")
-
-    from nexau.archs.llm.llm_aggregators.gemini_rest.gemini_rest_event_aggregator import GeminiResponse
-    from nexau.core.adapters.gemini_messages import GeminiMessagesAdapter
-
-    contents, system_instruction = GeminiMessagesAdapter().to_vendor_format(model_call_params.messages)
-    tools = kwargs.get("tools")
-    gemini_tools = convert_tools_to_gemini(tools) if tools else []
-
-    client = _build_google_genai_client(llm_config, model_call_params)
-    config = _build_google_genai_config(llm_config, system_instruction, gemini_tools)
-
-    stream_requested = bool(kwargs.pop("stream", False) or getattr(llm_config, "stream", False))
-    should_trace = tracer is not None and get_current_span() is not None
-    trace_inputs = {"contents": contents, "model": llm_config.model}
-
-    if stream_requested:
-        run_id = _resolve_run_id(model_call_params)
-        emitter = _get_event_emitter(middleware_manager)
-        aggregator = GeminiRestEventAggregator(on_event=emitter, run_id=run_id)
-        shutdown_ev = model_call_params.shutdown_event if model_call_params else None
-
-        trace_ctx = TraceContext(tracer, "Google GenAI streamGenerateContent", SpanType.LLM, inputs=trace_inputs) if should_trace and tracer is not None else None
-        start_time = time.time()
-        first_token_time = None
-
-        try:
-            stream = client.models.generate_content_stream(
-                model=llm_config.model,
-                contents=contents,
-                config=config,
-            )
-            for chunk in stream:
-                if shutdown_ev is not None and shutdown_ev.is_set():
-                    logger.info("🛑 Shutdown event detected during Google GenAI streaming")
-                    break
-                if first_token_time is None:
-                    first_token_time = time.time()
-                chunk_json = chunk.model_dump(by_alias=True, mode="json", exclude_none=True)
-                processed_chunk = _process_stream_chunk(chunk_json, middleware_manager, model_call_params)
-                if processed_chunk is not None:
-                    aggregator.aggregate(cast(GeminiResponse, processed_chunk))
-
-            res = cast(dict[str, Any], aggregator.build())
-            if trace_ctx is not None:
-                with trace_ctx:
-                    trace_ctx.set_outputs(_enrich_gemini_trace_outputs(res, llm_config.model))
-                    if first_token_time is not None:
-                        trace_ctx.set_attributes({"time_to_first_token_ms": (first_token_time - start_time) * 1000})
-            return ModelResponse.from_gemini_rest(res)
-        except Exception as exc:
-            wrapped_error = _maybe_wrap_stream_idle_timeout(exc, transport_name="google_genai stream", llm_config=llm_config)
-            if wrapped_error is not None:
-                raise wrapped_error from exc
-            raise
-
-    # Non-streaming path
-    trace_ctx = TraceContext(tracer, "Google GenAI generateContent", SpanType.LLM, inputs=trace_inputs) if should_trace and tracer is not None else None
-    try:
-        response = client.models.generate_content(
-            model=llm_config.model,
-            contents=contents,
-            config=config,
-        )
-        response_json = response.model_dump(by_alias=True, mode="json", exclude_none=True)
-        if trace_ctx is not None:
-            with trace_ctx:
-                trace_ctx.set_outputs(_enrich_gemini_trace_outputs(_to_serializable_dict(response_json), llm_config.model))
-        return ModelResponse.from_gemini_rest(response_json)
-    except Exception as exc:
-        logger.error(f"Google GenAI API call failed: {exc}")
-        raise
-
-
-async def call_llm_with_google_genai_async(
-    kwargs: dict[str, Any],
-    *,
-    middleware_manager: MiddlewareManager | None = None,
-    model_call_params: ModelCallParams | None = None,
-    llm_config: LLMConfig,
-    tracer: BaseTracer | None = None,
-) -> ModelResponse:
-    """Async version of call_llm_with_google_genai using client.aio."""
-    if model_call_params is None:
-        raise ValueError("Google GenAI calls require explicit ModelCallParams with UMP messages")
-
-    from nexau.archs.llm.llm_aggregators.gemini_rest.gemini_rest_event_aggregator import GeminiResponse
-    from nexau.core.adapters.gemini_messages import GeminiMessagesAdapter
-
-    contents, system_instruction = GeminiMessagesAdapter().to_vendor_format(model_call_params.messages)
-    tools = kwargs.get("tools")
-    gemini_tools = convert_tools_to_gemini(tools) if tools else []
-
-    client = _build_google_genai_client(llm_config, model_call_params)
-    config = _build_google_genai_config(llm_config, system_instruction, gemini_tools)
-
-    stream_requested = bool(kwargs.pop("stream", False) or getattr(llm_config, "stream", False))
-    should_trace = tracer is not None and get_current_span() is not None
-    trace_inputs = {"contents": contents, "model": llm_config.model}
-
-    if stream_requested:
-        run_id = _resolve_run_id(model_call_params)
-        emitter = _get_event_emitter(middleware_manager)
-        aggregator = GeminiRestEventAggregator(on_event=emitter, run_id=run_id)
-        shutdown_ev = model_call_params.shutdown_event if model_call_params else None
-
-        trace_ctx = TraceContext(tracer, "Google GenAI streamGenerateContent (async)", SpanType.LLM, inputs=trace_inputs) if should_trace and tracer is not None else None
-        start_time = time.time()
-        first_token_time = None
-
-        try:
-            stream_or_coro = client.aio.models.generate_content_stream(
-                model=llm_config.model,
-                contents=contents,
-                config=config,
-            )
-            stream = await stream_or_coro if inspect.isawaitable(stream_or_coro) else stream_or_coro
-            async for chunk in stream:
-                if shutdown_ev is not None and shutdown_ev.is_set():
-                    logger.info("🛑 Shutdown event detected during Google GenAI streaming (async)")
-                    break
-                if first_token_time is None:
-                    first_token_time = time.time()
-                chunk_json = chunk.model_dump(by_alias=True, mode="json", exclude_none=True)
-                processed_chunk = _process_stream_chunk(chunk_json, middleware_manager, model_call_params)
-                if processed_chunk is not None:
-                    aggregator.aggregate(cast(GeminiResponse, processed_chunk))
-
-            res = cast(dict[str, Any], aggregator.build())
-            if trace_ctx is not None:
-                with trace_ctx:
-                    trace_ctx.set_outputs(_enrich_gemini_trace_outputs(res, llm_config.model))
-                    if first_token_time is not None:
-                        trace_ctx.set_attributes({"time_to_first_token_ms": (first_token_time - start_time) * 1000})
-            return ModelResponse.from_gemini_rest(res)
-        except Exception as exc:
-            wrapped_error = _maybe_wrap_stream_idle_timeout(exc, transport_name="google_genai stream (async)", llm_config=llm_config)
-            if wrapped_error is not None:
-                raise wrapped_error from exc
-            raise
-
-    # Non-streaming async path
-    trace_ctx = TraceContext(tracer, "Google GenAI generateContent (async)", SpanType.LLM, inputs=trace_inputs) if should_trace and tracer is not None else None
-    try:
-        response_or_coro = client.aio.models.generate_content(
-            model=llm_config.model,
-            contents=contents,
-            config=config,
-        )
-        response = await response_or_coro if inspect.isawaitable(response_or_coro) else response_or_coro
-        response_json = response.model_dump(by_alias=True, mode="json", exclude_none=True)
-        if trace_ctx is not None:
-            with trace_ctx:
-                trace_ctx.set_outputs(_enrich_gemini_trace_outputs(_to_serializable_dict(response_json), llm_config.model))
-        return ModelResponse.from_gemini_rest(response_json)
-    except Exception as exc:
-        logger.error(f"Google GenAI API call failed (async): {exc}")
-        raise
 
 
 # Backward compatibility aliases

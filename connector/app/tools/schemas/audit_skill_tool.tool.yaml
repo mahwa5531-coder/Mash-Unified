@@ -1,0 +1,47 @@
+type: tool
+name: audit_skill_tool
+description: |
+  Master Statutory Audit Knowledge & Workflow Grounding Engine for Indian CA/CPA
+  engagements.
+
+  Provides structured, standardized audit procedures across 72 procedures and
+  17 ICAI / Companies Act 2013 domains.
+
+  `get_skill` retrieves the detailed methodology for a specific audit area,
+  including objectives, scope, dependencies, required inputs, procedures,
+  decision points, professional-skepticism probes, risks, fraud indicators,
+  validation criteria, expected outputs, and escalation conditions.
+
+  `search_skills` locates relevant procedures by keyword.
+  `list_skills` lists procedures available within a domain.
+  `get_guide` provides the overall navigation guide across audit domains.
+
+  Use this tool when the task requires defined audit methodology, testing
+  procedures, applicable criteria, evidence requirements, sampling guidance,
+  decision points, or workpaper expectations.
+
+  The retrieved workflow is a professional methodology reference. The agent
+  must apply it to the actual engagement, evidence, data, and scope rather than
+  assuming every step is applicable in every case.
+
+input_schema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum: [get_skill, search_skills, list_skills, get_guide]
+      description: "The audit knowledge action to perform."
+    skill_name:
+      type: string
+      enum: ['accounting-estimates-testing', 'accounts-payable-testing', 'accounts-receivable-confirmation', 'actuarial-mathematics-for-employee-benefits', 'analytical-procedures', 'attribute-sampling-for-controls-testing', 'audit-conclusion-and-reporting', 'audit-planning-and-strategy', 'audit-sampling-methodology', 'bank-balance-confirmation', 'bank-reconciliation-testing', 'benford-law-analysis', 'borrowings-testing', 'capital-work-in-progress-testing', 'cash-and-petty-cash-testing', 'companies-act-compliance-testing', 'data-profiling-and-analytics', 'deferred-tax-testing', 'depreciation-testing', 'discounted-cash-flow-and-valuation-mathematics', 'effective-interest-rate-and-amortized-cost', 'employee-benefits-testing', 'engagement-acceptance-and-continuance', 'engagement-quality-review', 'evaluation-of-misstatements', 'external-confirmations', 'fair-value-measurement-mathematics', 'finance-costs-testing', 'financial-instruments-valuation-testing', 'fixed-assets-additions-testing', 'fixed-assets-disposal-testing', 'fraud-risk-assessment', 'going-concern-assessment', 'group-audit-considerations', 'gst-testing', 'income-tax-testing', 'inventory-cut-off-testing', 'inventory-physical-verification', 'inventory-valuation-testing', 'investments-testing', 'journal-entry-testing', 'management-representation-letter', 'materiality-determination', 'materiality-quantitative-models', 'misstatement-projection-techniques', 'monetary-unit-sampling', 'payroll-testing', 'probability-and-risk-models-in-audit', 'provisions-and-contingent-liabilities-testing', 'purchase-cut-off-testing', 'purchase-testing', 'ratio-analysis-and-financial-analytics', 'regression-and-correlation-analysis', 'related-party-identification', 'related-party-transactions-testing', 'reserves-and-surplus-testing', 'revenue-cut-off-testing', 'revenue-recognition-testing', 'risk-assessment', 'sales-returns-and-credit-notes-testing', 'sample-size-determination-methodology', 'service-organization-controls', 'share-capital-testing', 'statutory-dues-testing', 'subsequent-events-review', 'time-series-and-trend-analysis', 'trial-balance-validation', 'understanding-entity-and-environment', 'understanding-internal-control', 'variables-sampling-for-substantive-testing', 'variance-analysis-for-standard-costing', 'workpaper-documentation']
+      description: "Required when action is 'get_skill'. The slug name of the statutory audit procedure."
+    query:
+      type: string
+      description: "Required when action is 'search_skills'. Search term or keywords."
+    domain:
+      type: string
+      description: "Optional domain filter for action='list_skills' (e.g. '01-engagement-and-planning', '12-taxation')."
+  required:
+    - action
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

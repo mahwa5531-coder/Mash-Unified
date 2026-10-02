@@ -6,7 +6,7 @@ from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 from pathlib import Path
 
-from nexau.archs.platform.path_helpers import get_session_brain_dir
+from app.paths import get_session_brain_dir
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 

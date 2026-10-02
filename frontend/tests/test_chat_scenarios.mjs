@@ -160,7 +160,41 @@ assert.strictEqual(cloudTool.tool.id, "call_abc", "Tool call id inside event.dat
 
 console.log("  -> PASSED: Both direct and Cloud API nested event.data payloads parse with 100% parity");
 
+// Test 6: Multi-Sentinel [DONE] [END] Stripping & Text Integrity
+console.log("\n[Frontend Test 6] Multi-Sentinel [DONE] [END] Stripping & Word Integrity");
+function processDeltaToken(rawToken) {
+  if (typeof rawToken !== "string" || !rawToken) return "";
+  if (/^\[?(DONE|END)\]?$/i.test(rawToken.trim())) return "";
+  return rawToken.replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, "");
+}
+
+// 6a. Single delta with multiple terminal sentinels [DONE] [END]
+const multiSentinel = processDeltaToken("Audit completed successfully. [DONE] [END]");
+assert.strictEqual(multiSentinel, "Audit completed successfully.", "Multiple trailing sentinels must all be stripped");
+
+// 6b. Delta that is purely multiple sentinels
+const pureSentinels = processDeltaToken("[DONE] [END]");
+assert.strictEqual(pureSentinels, "", "Pure sentinel sequences must resolve to empty string");
+
+// 6c. Delta that is a standalone sentinel
+assert.strictEqual(processDeltaToken("[DONE]"), "", "Standalone [DONE] must be stripped");
+assert.strictEqual(processDeltaToken("DONE"), "", "Standalone DONE must be stripped");
+assert.strictEqual(processDeltaToken("[END]"), "", "Standalone [END] must be stripped");
+
+// 6d. Legitimate English ending in 'done' or 'end' must NOT be corrupted
+const englishDone = processDeltaToken("The financial audit is well done");
+assert.strictEqual(englishDone, "The financial audit is well done", "English word 'done' must never be stripped");
+
+const englishEnd = processDeltaToken("Review the period end");
+assert.strictEqual(englishEnd, "Review the period end", "English word 'end' must never be stripped");
+
+// 6e. Legitimate JSON payload containing status: "done"
+const jsonPayload = processDeltaToken('{"status": "done", "records": 42}');
+assert.strictEqual(jsonPayload, '{"status": "done", "records": 42}', "JSON with done status must never be corrupted");
+
+console.log("  -> PASSED: Multiple sentinels cleanly stripped; English words & JSON 100% preserved");
+
 console.log("\n======================================================================");
-console.log("ALL FRONTEND CHAT RENDERING TESTS PASSED (5/5)");
+console.log("ALL FRONTEND CHAT RENDERING TESTS PASSED (6/6)");
 console.log("======================================================================");
 

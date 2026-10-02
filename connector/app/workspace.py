@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.models.project import ProjectModel
-from nexau.archs.platform.path_helpers import get_session_brain_dir
+from app.paths import get_session_brain_dir
 from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 
