@@ -230,7 +230,7 @@ export default function TaskWorkLogAccordion({
   // 1. While actively streaming: render timeline steps + dynamic animated "Working..." or "Thinking for Xs..."
   if (isStreaming) {
     const isActivelyThinkingNow = isActivelyThinking || (activeThinkingStep !== null);
-    const activeTool = tools.find(t => isToolRunning(t)) || (steps ? steps.find((s: any) => s.type === 'tool' && s.status === 'running') : null);
+    const activeTool = tools.find(t => isToolRunning(t, isStreaming)) || (steps ? steps.find((s: any) => s.type === 'tool' && (s.status === 'running' || (isStreaming && !s.output))) : null);
 
     return (
       <div className="w-full min-w-0 text-[13px] font-sans my-1 select-none">

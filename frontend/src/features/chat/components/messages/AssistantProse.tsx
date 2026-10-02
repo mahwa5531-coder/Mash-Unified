@@ -60,6 +60,9 @@ export const AssistantProse = memo(function AssistantProse({
       >
         {sanitizedContent}
       </ReactMarkdown>
+      {isStreaming && (
+        <span className="inline-block w-1.5 h-3.5 ml-1 bg-zinc-400 dark:bg-zinc-500 rounded-xs animate-pulse align-middle" aria-hidden="true" />
+      )}
     </div>
   );
 });
