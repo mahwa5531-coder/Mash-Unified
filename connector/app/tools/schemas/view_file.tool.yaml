@@ -1,0 +1,63 @@
+type: tool
+name: view_file
+description: |
+  View the contents of a file from the local filesystem. This tool supports text files and following binary files: image, pdf, video, audio.
+
+  Text file usage:
+  - The lines of the file are 1-indexed
+  - You can view at most 800 lines at a time
+  - Specify StartLine and EndLine to view the lines of the file using slice notation:
+    - Omit both to view the entire file, or the first 800 lines of the file, whichever is smaller.
+    - Specify StartLine only to view the remaining lines of the file, or the next 800 lines, whichever is smaller
+    - Specify EndLine only to view the remaining preceding lines of the file, or the previous 800 lines, whichever is smaller
+    - Specify both to view a precise line range. This range must be smaller than 800 lines or only the first 800 lines of the range will be shown.
+  - Content is limited to 46080 bytes per view. If content is truncated, use the ContentOffset parameter to view the remaining content
+  Binary file usage:
+  - Do not provide StartLine or EndLine arguments, this tool always returns the entire file
+  Spreadsheet & Tabular Data (.xlsx, .xls, .csv, .parquet):
+  - Automatically routes through the Calamine & Polars ingestion engine.
+  - Small sheets (<=100 rows) are rendered directly as structured Markdown tables.
+  - Large sheets (>100 rows) return column schemas, 5 sample preview rows, and the queryable '.parquet' path for DuckDB.
+  Directory usage:
+  - If a directory path is provided, lists the files and folder structure.
+
+input_schema:
+  type: object
+  properties:
+    AbsolutePath:
+      type: string
+      description: "Path to file or directory to view. Must be an absolute path or workspace-relative path."
+    file_path:
+      type: string
+      description: "Alias for AbsolutePath."
+    StartLine:
+      type: integer
+      description: "Optional. Startline to view, 1-indexed, inclusive. When specified, this value must be less than or equal to EndLine."
+    start_line:
+      type: integer
+      description: "Alias for StartLine."
+    EndLine:
+      type: integer
+      description: "Optional. Endline to view, 1-indexed, inclusive. When specified, this value must be greater than or equal to StartLine."
+    end_line:
+      type: integer
+      description: "Alias for EndLine."
+    ContentOffset:
+      type: integer
+      description: "Optional. Byte offset into the content. Use this to view content beyond the initial byte limit when the tool output indicates content was truncated."
+    content_offset:
+      type: integer
+      description: "Alias for ContentOffset."
+    sheet_name:
+      type: string
+      description: "Optional (Excel only): The specific sheet name to read (e.g. 'Sales Register', 'P&L'). If omitted on multi-sheet workbooks, returns the sheet index."
+    toolAction:
+      type: string
+      description: "Brief 2-5 word summary of what this tool is doing. Capitalize like a sentence."
+    toolSummary:
+      type: string
+      description: "Brief 2-5 word noun phrase describing what this tool call is about. Capitalize like a sentence."
+  required:
+    - AbsolutePath
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

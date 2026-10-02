@@ -1,0 +1,35 @@
+type: tool
+name: background_task_manage_tool
+description: "Manage background tasks started by run_shell_command with is_background=true.\
+  \ Use this tool to check the status of a running task, retrieve its output, kill\
+  \ a running task, or list all background tasks.\n\nAvailable actions:\n1. **status**:\
+  \ Get the current status and output of a background task.\n   - Requires the `pid`\
+  \ returned by run_shell_command when is_background=true.\n   - Returns the task's\
+  \ current status (running/success/error), stdout, stderr, and exit code.\n\n2. **kill**:\
+  \ Kill a running background task.\n   - Requires the `pid` of the task to kill.\n\
+  \   - The task will be terminated and removed from tracking.\n\n3. **list**: List\
+  \ all tracked background tasks and their current statuses.\n   - No `pid` required.\n\
+  \   - Returns a summary of all background tasks with their pid, command, status,\
+  \ and duration.\n\n\nUsage notes:\n  - Use the `pid` returned by run_shell_command\
+  \ when is_background=true (shown in content).\n  - Use `list` first if you don't\
+  \ remember the pid of a task.\n  - After killing a task, it will no longer appear\
+  \ in the list.\n  - Finished tasks remain in the list until explicitly killed."
+input_schema:
+  type: object
+  properties:
+    action:
+      type: string
+      enum:
+      - status
+      - kill
+      - list
+      description: 'The action to perform: "status" to check a task, "kill" to terminate
+        a task, or "list" to see all background tasks.'
+    pid:
+      type: integer
+      description: The process ID of the background task. Required for "status" and
+        "kill" actions. This is the pid returned by run_shell_command when is_background=true.
+  required:
+  - action
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

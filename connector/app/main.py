@@ -64,8 +64,10 @@ def _build_agent_config() -> AgentConfig:
     from nexau.archs.platform.app_config import AppConfig
     from nexau.archs.platform.crypto_vault import load_secure_vault
 
-    # Load canonical agent configuration directly from NexAU
-    manifest_path = Path(nexau.__file__).parent / "agents" / "main_agent.yaml"
+    # Load canonical agent configuration (local Mash manifest preferred)
+    local_manifest = Path(__file__).resolve().parent / "resources" / "main_agent.yaml"
+    fallback_manifest = Path(nexau.__file__).parent / "agents" / "main_agent.yaml"
+    manifest_path = local_manifest if local_manifest.exists() else fallback_manifest
     agent_config = AgentConfig.from_yaml(manifest_path)
 
     # Runtime LLM credential resolution from settings/vault/env
@@ -135,7 +137,7 @@ def _build_agent_config() -> AgentConfig:
         max_tokens=(
             int(os.getenv("LLM_MAX_TOKENS"))
             if os.getenv("LLM_MAX_TOKENS")
-            else (65536 if (":free" in active_model or "openrouter/free" in active_model) else (app_cfg.model.max_tokens or 4096))
+            else (vault.get("max_tokens") or (65536 if (":free" in active_model or "openrouter/free" in active_model or "gemini" in active_model) else (app_cfg.model.max_tokens or 4096)))
         ),
         timeout=float(os.getenv("LLM_TIMEOUT") or "120.0"),
         stream_idle_timeout=float(os.getenv("LLM_STREAM_IDLE_TIMEOUT") or "45.0"),
@@ -143,8 +145,21 @@ def _build_agent_config() -> AgentConfig:
         **extra_llm_params,
     )
 
-    if os.getenv("LLM_MAX_CONTEXT_TOKENS"):
-        agent_config.max_context_tokens = int(os.getenv("LLM_MAX_CONTEXT_TOKENS"))
+    # Dynamic context window: cloud/vault authoritative, else adapt to model capacity
+    cloud_context = (
+        int(os.getenv("LLM_MAX_CONTEXT_TOKENS"))
+        if os.getenv("LLM_MAX_CONTEXT_TOKENS")
+        else vault.get("max_context_tokens")
+    )
+    if cloud_context:
+        agent_config.max_context_tokens = int(cloud_context)
+    elif "gemini" in active_model.lower():
+        agent_config.max_context_tokens = 1048576  # 1M tokens
+    elif "claude" in active_model.lower():
+        agent_config.max_context_tokens = 200000   # 200k tokens
+    elif "gpt-4" in active_model.lower():
+        agent_config.max_context_tokens = 128000   # 128k tokens
+
     if os.getenv("AGENT_MAX_ITERATIONS"):
         agent_config.max_iterations = int(os.getenv("AGENT_MAX_ITERATIONS"))
 

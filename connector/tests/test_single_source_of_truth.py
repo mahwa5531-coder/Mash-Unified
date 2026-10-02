@@ -33,7 +33,7 @@ def test_yaml_env_override_resolution(monkeypatch):
 
 def test_main_agent_context_propagation():
     """Verify main_agent.yaml propagates single context window to all middlewares."""
-    manifest_path = Path(__file__).resolve().parent.parent.parent / "NexAU" / "nexau" / "agents" / "main_agent.yaml"
+    manifest_path = Path(__file__).resolve().parent.parent / "app" / "resources" / "main_agent.yaml"
     cfg = AgentConfig.from_yaml(manifest_path)
     
     # Context limit is cleanly parsed
@@ -51,7 +51,7 @@ def test_main_agent_context_propagation():
 
 def test_dynamic_context_window_override():
     """Verify updating max_context_tokens on AgentConfig propagates to all middlewares."""
-    manifest_path = Path(__file__).resolve().parent.parent.parent / "NexAU" / "nexau" / "agents" / "main_agent.yaml"
+    manifest_path = Path(__file__).resolve().parent.parent / "app" / "resources" / "main_agent.yaml"
     cfg = AgentConfig.from_yaml(manifest_path)
     cfg.max_context_tokens = 256000
 

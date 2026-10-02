@@ -87,8 +87,10 @@ async def test_pillar_1_runtime_context_scaffolding():
 # PILLAR 2: Jinja System Prompt Rendering & Variable Interpolation
 # ==============================================================================
 def test_pillar_2_system_prompt_rendering():
-    prompt_path = Path(__file__).parent.parent.parent / "NexAU" / "nexau" / "archs" / "main_sub" / "prompts" / "default_system_prompt.j2"
-    assert prompt_path.exists(), "default_system_prompt.j2 must exist"
+    local_prompt = Path(__file__).parent.parent / "app" / "prompts" / "statutory_auditor.j2"
+    fallback_prompt = Path(__file__).parent.parent.parent / "NexAU" / "nexau" / "archs" / "main_sub" / "prompts" / "default_system_prompt.j2"
+    prompt_path = local_prompt if local_prompt.exists() else fallback_prompt
+    assert prompt_path.exists(), "prompt template must exist"
 
     template_str = prompt_path.read_text(encoding="utf-8")
     template = Template(template_str)

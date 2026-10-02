@@ -1,0 +1,59 @@
+type: tool
+name: write_file
+description: >-
+  Use this tool to create new files or overwrite existing files.
+  The file and any parent directories will be created for you if they do not already exist.
+
+  Follow these instructions:
+  1. By default, ensure `overwrite: true` is explicitly passed if replacing an existing file.
+  2. When creating an artifact deliverable (e.g., implementation plans, statutory reports, audit workpapers), always provide `artifact_metadata`.
+  3. For temporary Python calculation scripts or scratch data, save them strictly in the session's `scratch/` directory with `user_facing: false`.
+  4. NEVER use write_file to edit or patch an existing file. Use 'replace_file_content' for all code or text modifications. Reserve write_file exclusively for creating brand new files.
+
+input_schema:
+  type: object
+  properties:
+    TargetFile:
+      type: string
+      description: "The target file to create and write code to. Must be an absolute path or workspace-relative path."
+    file_path:
+      type: string
+      description: "Alias for TargetFile."
+    CodeContent:
+      type: string
+      description: "The code or document contents to write to the file."
+    content:
+      type: string
+      description: "Alias for CodeContent."
+    overwrite:
+      type: boolean
+      default: true
+      description: "Set this to true to overwrite an existing file. WARNING: This will replace the entire file contents. Only use when you explicitly intend to create a brand new file or completely overwrite. For editing existing files, always use 'replace_file_content'."
+    Overwrite:
+      type: boolean
+      description: "Alias for overwrite."
+    description:
+      type: string
+      description: "Brief, user-facing explanation of what this change did. Focus on non-obvious rationale, design decisions, or important context. Don't just restate what the code does."
+    artifact_metadata:
+      type: object
+      description: "Metadata that defines artifact properties. Required when creating an artifact file."
+      properties:
+        summary:
+          type: string
+          description: "Detailed multi-line summary of the artifact file, after edits have been made. Focus on the contents, findings, and purpose of the artifact."
+        user_facing:
+          type: boolean
+          description: "Set to true if this artifact should be presented to the user (e.g. audit reports, implementation plans). Set to false for scratch scripts, temporary data files, or files that the user does not need to see."
+        request_feedback:
+          type: boolean
+          description: "Set to true if you would like to request user feedback on this artifact and if the contents are executable (e.g., an implementation plan). The user will be provided with a 'Proceed' button to execute it."
+      required:
+        - summary
+        - user_facing
+        - request_feedback
+  required:
+    - file_path
+    - content
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#

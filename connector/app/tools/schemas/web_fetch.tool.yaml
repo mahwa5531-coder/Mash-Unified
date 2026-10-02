@@ -1,0 +1,22 @@
+type: tool
+name: web_fetch
+description: |
+  Fetch content from a URL via HTTP request. Converts HTML to markdown.
+  Use when:
+  (1) extracting text from public pages,
+  (2) reading static content, articles, or documentation,
+  (3) inspecting specific webpage details found during search,
+  (4) speed is important, or
+  (5) no visual interaction needed.
+  Converts HTML to markdown. No JavaScript execution, no authentication.
+
+input_schema:
+  type: object
+  properties:
+    url:
+      type: string
+      description: "The HTTP or HTTPS URL to fetch and read content from."
+  required:
+    - url
+  additionalProperties: false
+  $schema: http://json-schema.org/draft-07/schema#
