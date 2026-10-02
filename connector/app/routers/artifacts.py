@@ -282,12 +282,15 @@ async def get_file_content(
     if is_dir:
         raise HTTPException(status_code=403, detail="Access denied: Path is outside authorized workspace directories.")
 
+    ext = p.suffix.lower()
+    if ext == ".pdf":
+        return FileResponse(p, media_type="application/pdf", content_disposition_type="inline")
+
+    if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".svg"):
+        return FileResponse(p, content_disposition_type="inline")
+
     if raw:
         return FileResponse(p, filename=p.name)
-
-    ext = p.suffix.lower()
-    if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".svg", ".pdf"):
-        return FileResponse(p, media_type="application/pdf" if ext == ".pdf" else None)
 
     # Complex office documents and binary archives: return FileResponse directly for safe download
     unsupported_binary_exts = {

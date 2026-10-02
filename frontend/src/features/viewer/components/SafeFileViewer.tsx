@@ -121,7 +121,7 @@ export default function SafeFileViewer({
   }
 
   if (isPdf) {
-    return <PdfViewer filename={filename} path={path} sessionQuery={sessionQuery} />;
+    return <PdfViewer filename={filename} path={path} sessionId={sessionId} sessionQuery={sessionQuery} />;
   }
 
   if (isUnsupported) {

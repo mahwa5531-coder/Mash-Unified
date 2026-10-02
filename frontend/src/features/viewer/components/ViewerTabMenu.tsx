@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { MoreVertical, Copy, Download, X } from 'lucide-react';
+import { MoreVertical, Copy, Download, ExternalLink, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { BASE_URL } from '@/services/client';
+import { openSystemFile } from '@/services/files';
 import type { TabItem } from '../types';
 
 interface ViewerTabMenuProps {
@@ -51,15 +52,29 @@ export function ViewerTabMenu({ activeTab, content = '', onCloseTab }: ViewerTab
         )}
 
         {activeTab.path && (
-          <DropdownMenuItem
-            onClick={() => {
-              window.open(`${BASE_URL}/files/content?path=${encodeURIComponent(activeTab.path!)}&raw=true`, '_blank');
-            }}
-            className="text-xs gap-2 cursor-pointer rounded-lg py-1.5"
-          >
-            <Download className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>Download / Open Raw</span>
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem
+              onClick={() => openSystemFile(activeTab.path!)}
+              className="text-xs gap-2 cursor-pointer rounded-lg py-1.5"
+            >
+              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Open in Default App</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                const a = document.createElement('a');
+                a.href = `${BASE_URL}/files/content?path=${encodeURIComponent(activeTab.path!)}&raw=true`;
+                a.download = activeTab.title || 'file';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              }}
+              className="text-xs gap-2 cursor-pointer rounded-lg py-1.5"
+            >
+              <Download className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Download File</span>
+            </DropdownMenuItem>
+          </>
         )}
 
         <DropdownMenuSeparator className="my-1 bg-zinc-200 dark:bg-white/[0.06]" />

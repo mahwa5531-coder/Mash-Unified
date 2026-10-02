@@ -1,53 +1,50 @@
 "use client";
 
-import React from 'react';
-import { Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { ExternalLink, FileText, Loader2 } from 'lucide-react';
 import { BASE_URL } from '@/services/client';
+import { openSystemFile } from '@/services/files';
 
 interface PdfViewerProps {
   filename: string;
   path?: string;
+  sessionId?: string;
   sessionQuery: string;
 }
 
-export function PdfViewer({ filename, path, sessionQuery }: PdfViewerProps) {
-  const rawPdfUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}&raw=true${sessionQuery}`;
-  const embedPdfUrl = `${rawPdfUrl}#view=FitH&toolbar=1&navpanes=0`;
+export function PdfViewer({ filename, path, sessionId, sessionQuery }: PdfViewerProps) {
+  const [isOpening, setIsOpening] = useState(false);
+  const pdfUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}${sessionQuery}#toolbar=1&navpanes=0`;
+
+  const handleOpenSystem = async () => {
+    setIsOpening(true);
+    await openSystemFile(path || filename, sessionId);
+    setTimeout(() => setIsOpening(false), 1200);
+  };
 
   return (
-    <div className="flex flex-col h-full w-full bg-zinc-100 dark:bg-[#141414] overflow-hidden select-none">
-      <div className="h-9 px-4 border-b border-zinc-200 dark:border-[#222] bg-white dark:bg-[#1a1a1d] flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-          <span className="font-mono text-zinc-800 dark:text-zinc-300 truncate text-[11.5px] font-medium">{filename}</span>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <a
-            href={rawPdfUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sky-500 dark:text-sky-400 hover:text-sky-600 dark:hover:text-sky-300 hover:underline flex items-center gap-1 cursor-pointer text-[11.5px]"
+    <div className="flex flex-col h-full w-full bg-[var(--bg-app)] overflow-hidden select-none relative">
+      <object
+        data={pdfUrl}
+        type="application/pdf"
+        className="w-full h-full border-0 bg-white dark:bg-[#1a1a1d]"
+      >
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center text-[var(--text-muted)] gap-3 bg-[var(--bg-app)]">
+          <FileText size={36} className="text-rose-500" />
+          <p className="text-xs text-[var(--text-secondary)] max-w-xs">
+            Embedded PDF preview is not supported by your current browser environment.
+          </p>
+          <button
+            type="button"
+            onClick={handleOpenSystem}
+            disabled={isOpening}
+            className="mt-2 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            Open in new tab
-          </a>
-          <a
-            href={rawPdfUrl}
-            download={filename}
-            className="p-1 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Download PDF"
-          >
-            <Download size={13} />
-          </a>
+            {isOpening ? <Loader2 size={13} className="animate-spin" /> : <ExternalLink size={13} />}
+            <span>Open in System PDF Viewer</span>
+          </button>
         </div>
-      </div>
-      <div className="flex-1 w-full h-full min-h-0 bg-zinc-200 dark:bg-[#2b2b2b] relative">
-        <embed
-          type="application/pdf"
-          src={embedPdfUrl}
-          className="w-full h-full border-0 absolute inset-0"
-          title={filename}
-        />
-      </div>
+      </object>
     </div>
   );
 }
