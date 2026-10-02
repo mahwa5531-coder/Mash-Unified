@@ -167,7 +167,7 @@ async def list_sessions(
         bench_patterns = (
             "benchmark", "bench", "par_", "subfunc_", "eval", "tatqa",
             "gaia", "stataudit", "l4_", "ssc_cgl", "unbiased", "qa_report",
-            "nlp_batch", "test_"
+            "nlp_batch"
         )
 
         seen_sids = set()

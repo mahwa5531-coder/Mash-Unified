@@ -48,11 +48,15 @@ def test_tasks_router_kill_fallback():
 
 def test_turns_sanitization_and_stable_ids():
     turns_path = r'c:\Users\rama\Downloads\Mash\frontend\src\features\chat\utils\turns.ts'
+    parser_path = r'c:\Users\rama\Downloads\Mash\frontend\src\features\chat\utils\sessionHistoryParser.ts'
     with open(turns_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    assert 'Date.now()' not in content, "turns.ts should NOT use Date.now() for step IDs to prevent accordion reset"
-    assert 'VERIFIED' in content, "turns.ts must sanitize VERIFIED"
-    assert 'last.type === \'thinking\' && rStep.type === \'thinking\'' in content, "turns.ts must merge consecutive thinking steps"
+        t_content = f.read()
+    with open(parser_path, 'r', encoding='utf-8') as f:
+        p_content = f.read()
+    content = t_content + "\n" + p_content
+    assert 'Date.now()' not in t_content, "turns.ts should NOT use Date.now() for step IDs to prevent accordion reset"
+    assert 'VERIFIED' in content, "turns.ts / sessionHistoryParser must sanitize VERIFIED"
+    assert 'last.type === \'thinking\' && rStep.type === \'thinking\'' in content, "must merge consecutive thinking steps"
     print("PASS: test_turns_sanitization_and_stable_ids")
 
 def test_accordion_sanitization():

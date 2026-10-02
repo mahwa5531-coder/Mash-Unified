@@ -123,6 +123,7 @@ async def test_k3_rapid_reconnect_flooding():
         return_value=httpx.Response(200, headers={"Content-Type": "text/event-stream"}, text='data: {"type": "HEARTBEAT"}\n\n')
     )
 
+    gc.collect()
     mem_start = psutil.Process().memory_info().rss / (1024 * 1024)
     async with httpx.AsyncClient(timeout=5.0) as client:
         for _ in range(50):

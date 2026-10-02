@@ -102,9 +102,11 @@ def view_file(
     # Extract extension
     ext = Path(resolved_path).suffix.lower()
 
-    # 3. Tabular Datasets (.xlsx, .xls, .csv, .parquet) -> Calamine Engine
     if ext in [".xlsx", ".xls"]:
-        from nexau.ingestion_pipeline.excel_to_md import parse_excel_to_markdown
+        try:
+            from app.ingestion.excel_to_md import parse_excel_to_markdown
+        except ImportError:
+            from nexau.ingestion_pipeline.excel_to_md import parse_excel_to_markdown
 
         proj_id = None
         sess_id = None
@@ -127,7 +129,10 @@ def view_file(
         }
 
     if ext in [".csv", ".tsv"]:
-        from nexau.ingestion_pipeline.csv_to_md_parquet import parse_csv_to_markdown
+        try:
+            from app.ingestion.csv_to_md_parquet import parse_csv_to_markdown
+        except ImportError:
+            from nexau.ingestion_pipeline.csv_to_md_parquet import parse_csv_to_markdown
 
         proj_id = None
         sess_id = None
