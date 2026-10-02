@@ -85,7 +85,3 @@ export async function fetchSessionArtifactsData(sessionId: string): Promise<Sess
   }
 }
 
-export async function fetchSessionArtifacts(sessionId: string): Promise<ArtifactFileItem[]> {
-  const data = await fetchSessionArtifactsData(sessionId);
-  return data.items;
-}

@@ -118,23 +118,3 @@ export async function resolveFolder(folderName: string, sampleChildren?: string[
     return { status: 'error', folder_path: '', folder_name: folderName };
   }
 }
-
-export interface DirectoryBrowseResponse {
-  current_path: string;
-  parent_path: string | null;
-  drives: string[];
-  shortcuts: Array<{ name: string; path: string }>;
-  directories: Array<{ name: string; path: string; is_hidden?: boolean }>;
-}
-
-export async function browseDirectories(path?: string): Promise<DirectoryBrowseResponse | null> {
-  try {
-    const qs = path ? `?path=${encodeURIComponent(path)}` : '';
-    const res = await safeFetch(`${BASE_URL}/api/system/browse-directories${qs}`);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (err) {
-    console.warn("Failed to browse directories:", err);
-    return null;
-  }
-}

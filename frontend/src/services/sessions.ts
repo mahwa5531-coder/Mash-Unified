@@ -122,18 +122,6 @@ export async function queueSteeringMessage(
   }
 }
 
-export async function fetchSessionQueue(
-  sessionId: string
-): Promise<{ session_id: string; queued: string[]; count: number }> {
-  try {
-    const res = await safeFetch(`${BASE_URL}/sessions/${sessionId}/queue`);
-    if (!res.ok) return { session_id: sessionId, queued: [], count: 0 };
-    return await res.json();
-  } catch (err) {
-    return { session_id: sessionId, queued: [], count: 0 };
-  }
-}
-
 export async function uploadSessionFile(
   sessionId: string,
   file: File
@@ -150,19 +138,5 @@ export async function uploadSessionFile(
   } catch (err) {
     console.warn("Failed to upload file:", err);
     return null;
-  }
-}
-
-export async function fetchSessionUploads(
-  sessionId: string
-): Promise<Array<{ name: string; path: string; size_bytes: number }>> {
-  try {
-    const res = await safeFetch(`${BASE_URL}/api/uploads/${sessionId}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.uploads || [];
-  } catch (err) {
-    console.warn("Failed to fetch uploads:", err);
-    return [];
   }
 }
