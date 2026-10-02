@@ -3,23 +3,22 @@
 import React, { memo } from 'react';
 import katex from 'katex';
 import { Streamdown } from 'streamdown';
-import { code as codePlugin } from '@streamdown/code';
 import { createMathPlugin } from '@streamdown/math';
-import { mermaid as mermaidPlugin } from '@streamdown/mermaid';
+import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
 import { useAgentMarkdownComponents } from './useAgentMarkdownComponents';
+import CodeBlock from '@/components/renderers/CodeBlock';
+import MermaidRenderer from '@/components/renderers/MermaidRenderer';
 
 /**
  * AgentMarkdown — the single unified markdown renderer for the whole app.
  *
- * Replaces the former react-markdown stack (AssistantProse +
- * useMarkdownComponents + MarkdownFileViewer) with streamdown 2.7:
- *  - Streaming-first: remend repairs unterminated fences/tables/math mid-stream
- *  - Shiki grammar-aware dual-theme syntax highlighting (@streamdown/code)
- *  - KaTeX math (@streamdown/math) and Mermaid diagrams (@streamdown/mermaid)
- *  - Custom Mash features (FilePills, AuditBadges, AuditCallout, lightbox)
- *    preserved via the shared component map.
+ * Uses streamdown 2.7 for streaming-first AST repair & KaTeX math,
+ * and delegates code blocks and diagrams to the proven existing Mash modules:
+ *  - CodeBlock: full header bar with language, line count, collapse/expand, and Copy button
+ *  - MermaidRenderer: Diagram View header with pulse indicator, zoom controls, Code/Visual toggle, and Copy SVG
+ *  - components: FilePills, PathPills, ExtensionBadges, AuditBadges, AuditCallouts, TableContainer
  *
  * mode="chat"     → compact message typography, streaming caret, capped blocks
  * mode="artifact" → spacious document typography, full-height code/tables
@@ -29,7 +28,6 @@ import { useAgentMarkdownComponents } from './useAgentMarkdownComponents';
 const mathPlugin = createMathPlugin({ singleDollarTextMath: true });
 
 // Fenced ```latex / ```math / ```katex blocks render as display math
-// (preserves the previous useMarkdownComponents behavior).
 const LATEX_LANGUAGES = ['latex', 'math', 'katex'];
 
 function LatexBlock({ code: source, isIncomplete }: { code: string; isIncomplete?: boolean }) {
@@ -52,6 +50,44 @@ function LatexBlock({ code: source, isIncomplete }: { code: string; isIncomplete
     return <div className="font-mono text-xs text-rose-400 my-2">{source}</div>;
   }
 }
+
+function StreamdownMermaidBlock({ code: chart, isIncomplete }: { code: string; isIncomplete?: boolean }) {
+  return <MermaidRenderer chart={chart} isStreaming={isIncomplete} />;
+}
+
+function StreamdownCodeBlock({ code, language, isIncomplete }: { code: string; language: string; isIncomplete?: boolean }) {
+  return <CodeBlock language={language || 'code'} code={code} isStreaming={isIncomplete} />;
+}
+
+// Proxy matching all programming languages except 'mermaid' and LATEX_LANGUAGES
+const allOtherLanguages = new Proxy([] as string[], {
+  get(target, prop) {
+    if (prop === 'includes') {
+      return (lang: string) => {
+        if (!lang) return true;
+        const l = String(lang).toLowerCase().trim();
+        if (l === 'mermaid') return false;
+        if (LATEX_LANGUAGES.includes(l)) return false;
+        return true;
+      };
+    }
+    return Reflect.get(target, prop);
+  }
+});
+
+// Remark plugin ensuring code blocks without explicit language get default 'text' lang
+const ensureCodeLanguagePlugin = () => (tree: any) => {
+  const visit = (node: any) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'code' && !node.lang) {
+      node.lang = 'text';
+    }
+    if (Array.isArray(node.children)) {
+      node.children.forEach(visit);
+    }
+  };
+  visit(tree);
+};
 
 // Same URL policy as the previous AssistantProse stack.
 function safeUrlTransform(url: string): string {
@@ -94,11 +130,15 @@ export const AgentMarkdown = memo(function AgentMarkdown({
       <Streamdown
         mode={isStreaming ? 'streaming' : 'static'}
         plugins={{
-          code: codePlugin,
           math: mathPlugin,
-          mermaid: mermaidPlugin,
-          renderers: [{ component: LatexBlock, language: LATEX_LANGUAGES }],
+          renderers: [
+            { component: StreamdownMermaidBlock, language: 'mermaid' },
+            { component: LatexBlock, language: LATEX_LANGUAGES },
+            { component: StreamdownCodeBlock, language: allOtherLanguages },
+          ],
         }}
+        remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
+        controls={false}
         components={components}
         urlTransform={safeUrlTransform}
         caret={isChat && isStreaming ? 'block' : undefined}
