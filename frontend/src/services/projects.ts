@@ -67,7 +67,7 @@ export async function renameProject(projectId: string, name: string): Promise<bo
 
 export async function deleteProject(projectId: string): Promise<boolean> {
   try {
-    const res = await safeFetch(`${BASE_URL}/api/projects/${projectId}`, {
+    const res = await safeFetch(`${BASE_URL}/api/projects/${encodeURIComponent(projectId)}`, {
       method: 'DELETE',
     });
     return res.ok;

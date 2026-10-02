@@ -163,26 +163,40 @@ async def rename_project(project_id: str, request: RenameProjectRequest, engine:
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, engine: DatabaseEngineDep):
     import shutil
+    from urllib.parse import unquote
     from app.paths import get_nexau_home, get_session_brain_dir
     from nexau.archs.session.models import SessionModel, AgentRunActionModel
 
-    # Find project by id OR name
-    project = await engine.find_first(ProjectModel, filters=ComparisonFilter.eq("id", project_id))
+    clean_id = unquote(project_id).strip()
+
+    # Find project by id OR name (case-insensitive fallback)
+    project = await engine.find_first(ProjectModel, filters=ComparisonFilter.eq("id", clean_id))
     if not project:
-        project = await engine.find_first(ProjectModel, filters=ComparisonFilter.eq("name", project_id))
+        project = await engine.find_first(ProjectModel, filters=ComparisonFilter.eq("name", clean_id))
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        all_projs = await engine.find_many(ProjectModel)
+        for p in all_projs:
+            if p.id == clean_id or p.name.strip().lower() == clean_id.lower():
+                project = p
+                break
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project '{clean_id}' not found")
 
     deleted_sessions_count = 0
     # 1. Find all sessions tied to this workspace and delete their data
     try:
         all_sessions = await engine.find_many(SessionModel)
+        proj_name_lower = project.name.strip().lower()
+        norm_p_path = os.path.normpath(project.local_folder_path).replace("\\", "/").lower() if project.local_folder_path else ""
+
         for s in all_sessions:
             ctx = s.context or {}
             ws_uri = getattr(s, "workspace_uri", "") or ctx.get("workspace_uri", "")
-            pid = ctx.get("project_id")
-            matches = (pid and (pid == project.id or pid == project.name)) or \
-                      (ws_uri and (ws_uri == project.local_folder_path or ws_uri == project.name or os.path.basename(ws_uri.rstrip(r'\/')) == project.name))
+            pid = str(ctx.get("project_id") or "")
+            norm_ws = os.path.normpath(ws_uri).replace("\\", "/").lower() if ws_uri else ""
+
+            matches = (pid and (pid == project.id or pid.lower() == proj_name_lower)) or \
+                      (norm_ws and (norm_ws == norm_p_path or os.path.basename(norm_ws) == proj_name_lower or norm_ws == proj_name_lower))
 
             if matches:
                 sid = s.session_id
@@ -210,14 +224,14 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
         if os.path.exists(local_nexau):
             shutil.rmtree(local_nexau, ignore_errors=True)
 
-    # 4. Delete the project record from DB (and any duplicates for this project name)
-    await engine.delete(ProjectModel, filters=ComparisonFilter.eq("id", project.id))
-    try:
-        dupes = await engine.find_many(ProjectModel, filters=ComparisonFilter.eq("name", project.name))
-        for d in dupes:
-            await engine.delete(ProjectModel, filters=ComparisonFilter.eq("id", d.id))
-    except Exception:
-        pass
+    # 4. Delete all project records from DB matching id or name (case-insensitive)
+    all_projs = await engine.find_many(ProjectModel)
+    for p in all_projs:
+        if p.id == project.id or p.name.strip().lower() == project.name.strip().lower():
+            try:
+                await engine.delete(ProjectModel, filters=ComparisonFilter.eq("id", p.id))
+            except Exception:
+                pass
 
     return {
         "status": "success",

@@ -206,7 +206,11 @@ export default function SettingsModal({
   };
 
   // Determine currently active project
-  const activeProject = projects.find(p => `project_${p.id}` === selectedNav || `project_${p.name}` === selectedNav) ||
+  const activeProject = projects.find(p => 
+    `project_${p.id}` === selectedNav || 
+    `project_${p.name}` === selectedNav || 
+    `project_${p.name.toLowerCase()}` === selectedNav.toLowerCase()
+  ) ||
     projects.find(p => p.name.toLowerCase() === (currentProjectName || 'mash').toLowerCase()) ||
     projects[0] || {
       id: 'default',
@@ -222,7 +226,10 @@ export default function SettingsModal({
     }
     setIsDeletingProject(true);
     try {
-      const ok = await deleteProject(activeProject.id);
+      const targetIdentifier = (activeProject.id && activeProject.id !== 'default') 
+        ? activeProject.id 
+        : activeProject.name;
+      const ok = await deleteProject(targetIdentifier);
       if (ok) {
         onProjectDeleted?.(activeProject.name);
         const updated = await fetchProjects();
