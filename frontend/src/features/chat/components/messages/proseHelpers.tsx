@@ -152,16 +152,10 @@ export function processTextNodes(children: any, onOpenFile?: (path: string) => v
   return children;
 }
 
-// Safely balance LaTeX delimiters during live streaming and strip protocol sentinels
+// Safely balance LaTeX delimiters during live streaming
 export function sanitizeMathString(content: string, isStreaming: boolean = false): string {
   if (!content) return content;
-  let text = content
-    .replace(/\[VERIFIED\]\s*/gi, '')
-    .replace(/\s*\[?(DONE|END|done|end)\]?\s*$/g, '');
-
-  if (/^\[?(DONE|END|done|end)\]?$/i.test(text.trim())) {
-    return '';
-  }
+  let text = content;
 
   if (isStreaming) {
     const lastOpenDisplay = text.lastIndexOf('\\[');
