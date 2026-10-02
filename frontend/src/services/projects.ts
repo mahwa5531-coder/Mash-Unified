@@ -83,23 +83,6 @@ export async function selectFolder(folderPath?: string): Promise<{
   }
 }
 
-export async function getQuickstartFolder(): Promise<{
-  status: string;
-  folder_path: string;
-  folder_name: string;
-}> {
-  try {
-    const res = await safeFetch(`${BASE_URL}/api/system/quickstart-folder`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) return { status: 'error', folder_path: '', folder_name: 'Quickstart' };
-    return await res.json();
-  } catch (err) {
-    return { status: 'error', folder_path: '', folder_name: 'Quickstart' };
-  }
-}
-
 export async function resolveFolder(folderName: string, sampleChildren?: string[]): Promise<{
   status: string;
   folder_path: string;

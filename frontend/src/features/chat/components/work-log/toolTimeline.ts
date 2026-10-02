@@ -8,17 +8,6 @@ export function isToolRunning(tool?: ToolCallItem, isStreaming?: boolean): boole
   return !!(isStreaming && tool.output === undefined);
 }
 
-export function formatToolDuration(tool?: ToolCallItem): string | null {
-  const secs = tool?.durationSeconds ?? ((tool as any)?.durationMs ? (tool as any).durationMs / 1000 : undefined);
-  if (secs !== undefined && secs > 0) {
-    if (secs < 1) {
-      return `${Math.round(secs * 1000)}ms`;
-    }
-    return `${secs.toFixed(1)}s`;
-  }
-  return null;
-}
-
 export function extractLineRange(args?: Record<string, any>): string | null {
   if (!args) return null;
   const start = args.StartLine ?? args.start_line ?? args.startLine;

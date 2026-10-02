@@ -62,6 +62,7 @@ export function ToolTimelineRow({
           <FilePill
             path={entry.data.filePath}
             label={entry.data.filename}
+            line={entry.data.lineRange}
             onOpenFile={onOpenFile}
           />
           <span className="inline-flex items-center gap-1 text-[11.5px] font-mono shrink-0 ml-1.5 font-medium select-none">

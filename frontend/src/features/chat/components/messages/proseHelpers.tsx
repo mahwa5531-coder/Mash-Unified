@@ -14,29 +14,6 @@ export function extractChildText(node: any): string {
   return '';
 }
 
-// Dynamic financial cell detector: recognizes all Unicode currency symbols (\p{Sc}), 
-// currency codes (INR, USD, EUR, etc.), accounting negative parens (e.g. ($4,000) or (₹1,50,000)),
-// Dr/Cr indicators, percentages, and Indian scales (Lakhs/Crores)
-export function isFinancialCell(raw: string): boolean {
-  const text = (raw || '').trim();
-  if (!text) return false;
-  if (/^[-−–—]$/.test(text) || /^(nil|n\/a|none)$/i.test(text)) return true;
-
-  let s = text;
-  if (s.startsWith('(') && s.endsWith(')')) {
-    s = s.slice(1, -1).trim();
-  }
-
-  s = s.replace(/^[-+−–]/, '').replace(/[-+−–]$/, '').trim();
-  s = s.replace(/^\p{Sc}\s*/u, '').replace(/\s*\p{Sc}$/u, '');
-  s = s.replace(/^(rs\.?|inr|usd|eur|gbp|aed|cad|aud|sgd|chf|jpy|cny)\s*/i, '');
-  s = s.replace(/\s*(rs\.?|inr|usd|eur|gbp|aed|cad|aud|sgd|chf|jpy|cny)$/i, '');
-  s = s.replace(/\s*(%|dr\.?|cr\.?|lakhs?|crores?|[kmb])\s*$/i, '').trim();
-
-  if (!s) return false;
-  return /^[\d,]+(\.\d+)?$/.test(s) || /^[\d\.]+(,\d+)?$/.test(s);
-}
-
 // Format file pill label and path cleanly
 export function formatFilePill(rawLabel: string, rawHref: string) {
   const rawPath = normalizePath(rawHref || rawLabel || '', false);

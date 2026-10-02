@@ -182,7 +182,7 @@ export default function RightSidebar({
     <TooltipProvider delayDuration={150}>
       <div 
         ref={sidebarRef}
-        className={`h-full bg-card text-card-foreground border-l border-white/[0.06] flex flex-col font-sans shrink-0 antialiased relative z-30 select-none ${
+        className={`h-full bg-[var(--bg-app)] text-[var(--text-primary)] border-l border-zinc-200/70 dark:border-white/[0.06] flex flex-col font-sans shrink-0 antialiased relative z-30 select-none ${
           isMaximized ? 'flex-1 w-full min-w-0' : (isResizing ? '' : 'transition-all duration-75')
         }`}
         style={isMaximized ? undefined : { width: `${width}px` }}
@@ -223,7 +223,7 @@ export default function RightSidebar({
         ) : !activeTab ? (
           <ViewerEmptyState setViewMode={setViewMode} />
         ) : (
-          <div className="flex-1 overflow-hidden flex flex-col bg-card text-card-foreground">
+          <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
             {/* Canonical FileBreadcrumbBar Primitive */}
             <FileBreadcrumbBar
               path={activeTab.path || activeTab.title || ''}
@@ -238,7 +238,7 @@ export default function RightSidebar({
             />
 
             {/* Safe File Viewer Body */}
-            <div className="flex-1 overflow-hidden bg-card">
+            <div className="flex-1 overflow-hidden bg-[var(--bg-app)]">
               {activeTab?.type === 'terminal' ? (
                 <TerminalViewer
                   activeTab={activeTab}

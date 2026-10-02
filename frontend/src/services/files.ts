@@ -23,11 +23,6 @@ export function getFileContentFromCache(filePath: string): string | undefined {
   return fileContentMemoryCache.get(cleanKey);
 }
 
-export function setFileContentInCache(filePath: string, content: string): void {
-  const cleanKey = normalizePath(filePath);
-  cacheFileContent(cleanKey, content);
-}
-
 export function invalidateFileCache(filePath?: string): void {
   if (filePath) {
     const cleanKey = normalizePath(filePath);
@@ -85,24 +80,6 @@ export async function fetchFileContent(filePath: string, sessionId?: string, byp
 
   inFlightFileFetches.set(cleanKey, fetchPromise);
   return fetchPromise;
-}
-
-export async function fetchExcelData(
-  filePath: string,
-  sheet?: string,
-  page: number = 0,
-  pageSize: number = 200
-): Promise<any> {
-  try {
-    let url = `${BASE_URL}/files/content?path=${encodeURIComponent(filePath)}&page=${page}&page_size=${pageSize}`;
-    if (sheet) url += `&sheet=${encodeURIComponent(sheet)}`;
-    const res = await safeFetch(url);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (err) {
-    console.warn("Failed to fetch Excel data:", err);
-    return null;
-  }
 }
 
 export async function openSystemFile(filePath: string, sessionId?: string): Promise<boolean> {

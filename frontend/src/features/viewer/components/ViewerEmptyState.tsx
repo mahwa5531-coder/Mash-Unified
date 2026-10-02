@@ -11,7 +11,7 @@ interface ViewerEmptyStateProps {
 
 export function ViewerEmptyState({ setViewMode }: ViewerEmptyStateProps) {
   return (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-card select-none">
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[var(--bg-app)] select-none">
           <div className="w-10 h-10 rounded-xl bg-muted/50 border border-border/40 flex items-center justify-center mb-3 text-muted-foreground shadow-2xs">
             <FileText size={18} />
           </div>

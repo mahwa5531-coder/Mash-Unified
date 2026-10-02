@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
-import { markSessionViewed, renameSession, deleteSession, SessionItem } from '@/services/sessions';
+import { markSessionViewed, renameSession, deleteSession, markSessionDeleted, SessionItem } from '@/services/sessions';
 import { ProjectItem, selectFolder, resolveFolder, createProject, deleteProject } from '@/services/projects';
 import { sessionStore } from '@/features/chat';
 import { SessionItemRow } from './SessionItemRow';
@@ -68,7 +68,6 @@ export default function Sidebar({
     openFolders,
     setOpenFolders,
     toggleFolder,
-    deletedSessionIds,
     pinnedSessions,
     workspaceSessions,
     directConversations,
@@ -180,7 +179,7 @@ export default function Sidebar({
 
   const handleDelete = (sessionId: string) => {
     setActiveMenuSessionId(null);
-    deletedSessionIds.current.add(sessionId);
+    markSessionDeleted(sessionId);
     setSessions(prev => prev.filter(s => s.session_id !== sessionId));
     sessionStore.delete(sessionId);
 

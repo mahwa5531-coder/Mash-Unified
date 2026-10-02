@@ -167,7 +167,6 @@ export default function Home() {
     <div className="flex flex-col h-screen w-full bg-[var(--bg-app)] overflow-hidden text-[var(--text-primary)] font-sans transition-colors">
       {/* Row 1: Window Frame Title Bar (Matches Desktop Window in Images 1 & 2) */}
       <WindowTitleBar
-        onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
         onToggleFullscreen={() => {
           if (typeof document !== 'undefined') {
             if (document.fullscreenElement) {
@@ -177,7 +176,6 @@ export default function Home() {
             }
           }
         }}
-        onResetSession={() => handleNewSession('No Repo')}
       />
 
       <ErrorBoundary

@@ -5,9 +5,7 @@ import { Minus, Square, Copy, X } from 'lucide-react';
 import { MashBrandIcon } from '@/primitives/MashBrandIcon';
 
 interface WindowTitleBarProps {
-  onToggleSidebar?: () => void;
   onToggleFullscreen?: () => void;
-  onResetSession?: () => void;
   title?: string;
 }
 
@@ -22,9 +20,7 @@ interface WindowTitleBarProps {
  * - Wired to Tauri, Electron, and PyWebView native window APIs with graceful browser fallback.
  */
 export function WindowTitleBar({
-  onToggleSidebar,
   onToggleFullscreen,
-  onResetSession,
   title = "Mash — Autonomous Financial Forensic Auditor",
 }: WindowTitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
@@ -48,8 +44,8 @@ export function WindowTitleBar({
         return;
       }
     }
-    // Browser fallback
-    if (onToggleSidebar) onToggleSidebar();
+    // In browser mode, window minimization cannot be forced by script without desktop IPC.
+    // Safe no-op without disruptive side-effects.
   };
 
   const handleMaximize = () => {
@@ -98,9 +94,13 @@ export function WindowTitleBar({
         w.pywebview.api.close();
         return;
       }
+      // Browser fallback: gracefully attempt script window close without wiping conversation context
+      try {
+        window.close();
+      } catch {
+        // Ignored in browsers that block script window closure
+      }
     }
-    // Browser reset session fallback
-    if (onResetSession) onResetSession();
   };
 
   return (

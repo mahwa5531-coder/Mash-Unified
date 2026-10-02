@@ -5,8 +5,6 @@ import React from 'react';
 import { FilePill as PrimitiveFilePill, FilePillProps } from '@/primitives';
 import { normalizePath } from '@/utils/normalizePath';
 
-export { FilePill as PrimitiveFilePill } from '@/primitives';
-
 /**
  * Work-log FilePill adapter: supports both primitive props ({ path, label, line })
  * and legacy work-log props ({ filename, filePath, lineRange }) with 100% type safety.

@@ -92,8 +92,6 @@ export function useSidebarData({
     });
   };
 
-  const deletedSessionIds = useRef<Set<string>>(new Set());
-
   // Data fetching
   const refreshData = useCallback(async () => {
     try {
@@ -103,10 +101,9 @@ export function useSidebarData({
       ]);
 
       if (fetchedSessions) {
-        const validSessions = fetchedSessions.filter(s => !deletedSessionIds.current.has(s.session_id));
-        setSessions(validSessions);
+        setSessions(fetchedSessions);
         try {
-          localStorage.setItem('nexau_cached_sessions', JSON.stringify(validSessions));
+          localStorage.setItem('nexau_cached_sessions', JSON.stringify(fetchedSessions));
         } catch {}
       }
 
@@ -233,7 +230,6 @@ export function useSidebarData({
     openFolders,
     setOpenFolders,
     toggleFolder,
-    deletedSessionIds,
     pinnedSessions,
     workspaceSessions,
     directConversations,

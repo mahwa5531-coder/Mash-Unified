@@ -26,7 +26,7 @@ export function ExplorerPanel({
   openFileTab,
 }: ExplorerPanelProps) {
   return (
-    <div className="flex-1 py-3 px-3 flex flex-col overflow-y-auto custom-scrollbar bg-card">
+    <div className="flex-1 py-3 px-3 flex flex-col overflow-y-auto custom-scrollbar bg-[var(--bg-app)]">
       {/* Group 1: Audit Deliverables (Present ONLY for sessions inside a project) */}
       {artifactsData.isProjectSession && (
         <CollapsibleSection

@@ -23,10 +23,6 @@ export function markSessionDeleted(sessionId: string): void {
   deletedSessionIds.add(sessionId);
 }
 
-export function isSessionDeleted(sessionId: string): boolean {
-  return deletedSessionIds.has(sessionId);
-}
-
 export async function fetchSessions(): Promise<SessionItem[]> {
   try {
     const res = await safeFetch(`${BASE_URL}/sessions`);
