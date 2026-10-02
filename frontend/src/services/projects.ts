@@ -21,6 +21,12 @@ export async function fetchProjects(): Promise<ProjectItem[]> {
   }
 }
 
+function notifyProjectsChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nexau:projects-updated'));
+  }
+}
+
 export async function createProject(name: string, localFolderPath: string): Promise<ProjectItem | null> {
   try {
     const res = await safeFetch(`${BASE_URL}/api/projects`, {
@@ -29,7 +35,9 @@ export async function createProject(name: string, localFolderPath: string): Prom
       body: JSON.stringify({ name, local_folder_path: localFolderPath }),
     });
     if (!res.ok) return null;
-    return await res.json();
+    const project = await res.json();
+    notifyProjectsChanged();
+    return project;
   } catch (err) {
     console.warn("Failed to create project:", err);
     return null;
@@ -44,7 +52,9 @@ export async function createQuickProject(name: string): Promise<ProjectItem | nu
       body: JSON.stringify({ name }),
     });
     if (!res.ok) return null;
-    return await res.json();
+    const project = await res.json();
+    notifyProjectsChanged();
+    return project;
   } catch (err) {
     console.warn("Failed to create quick project:", err);
     return null;
@@ -58,6 +68,9 @@ export async function renameProject(projectId: string, name: string): Promise<bo
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     });
+    if (res.ok) {
+      notifyProjectsChanged();
+    }
     return res.ok;
   } catch (err) {
     console.warn("Failed to rename project:", err);
@@ -70,6 +83,9 @@ export async function deleteProject(projectId: string): Promise<boolean> {
     const res = await safeFetch(`${BASE_URL}/api/projects/${encodeURIComponent(projectId)}`, {
       method: 'DELETE',
     });
+    if (res.ok) {
+      notifyProjectsChanged();
+    }
     return res.ok;
   } catch (err) {
     console.warn("Failed to delete project:", err);

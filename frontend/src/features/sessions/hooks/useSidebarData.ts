@@ -123,7 +123,14 @@ export function useSidebarData({
   useEffect(() => {
     refreshData();
     const interval = setInterval(refreshData, 10000);
-    return () => clearInterval(interval);
+    const onProjectsUpdated = () => {
+      refreshData();
+    };
+    window.addEventListener('nexau:projects-updated', onProjectsUpdated);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('nexau:projects-updated', onProjectsUpdated);
+    };
   }, [refreshData]);
 
   // Subscribe to live sessionStore
