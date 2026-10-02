@@ -1,6 +1,13 @@
 @import "tailwindcss";
 @import "../foundation/tokens.css";
 
+/* Streamdown + official plugins — Tailwind v4 must scan these or their
+   internal utility classes get purged (unstyled text, broken code blocks). */
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";
+@source "../node_modules/@streamdown/math/dist/*.js";
+@source "../node_modules/@streamdown/mermaid/dist/*.js";
+
 @custom-variant dark (&:where([data-theme="dark"], .dark, [data-theme="dark"] *, .dark *));
 
 @theme {
@@ -10,6 +17,15 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+
+  /* shadcn-style tokens required by streamdown's default components,
+     bridged onto the app's --m-* token system */
+  --color-background: var(--m-bg-app);
+  --color-card: var(--m-bg-surface);
+  --color-card-foreground: var(--m-text-primary);
+  --color-input: var(--m-border-subtle);
+  --color-primary: var(--m-accent);
+  --color-primary-foreground: var(--m-accent-foreground, #ffffff);
 }
 
 :root {
@@ -64,37 +80,9 @@ body {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.markdown-body { font-size: 14px; line-height: 1.6; color: var(--text-primary); }
-.markdown-body pre { background: var(--bg-surface); padding: 16px; border-radius: 8px; border: 1px solid var(--border-subtle); margin: 12px 0; overflow-x: auto; }
-.markdown-body code { font-family: var(--font-mono); font-size: 13px; }
-.markdown-body p { margin-bottom: 12px; }
-.markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: bold; margin-top: 24px; margin-bottom: 12px; color: var(--text-primary); }
-.markdown-body h1 { font-size: 1.5em; }
-.markdown-body h2 { font-size: 1.25em; }
-.markdown-body code:not(pre code) {
-  background-color: var(--bg-hover);
-  border: 1px solid var(--border-subtle);
-  padding: 0.15em 0.4em;
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.88em;
-  color: var(--text-primary);
-}
-.markdown-body table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
-.markdown-body th {
-  border-bottom: 1px solid var(--border-strong);
-  padding: 7px 12px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.markdown-body td {
-  border-bottom: 1px solid var(--border-subtle);
-  padding: 7px 12px;
-  color: var(--text-primary);
-}
-.markdown-body tr:last-child td { border-bottom: none; }
+/* .markdown-body rules removed with MarkdownFileViewer — AgentMarkdown
+   uses Tailwind utilities via the shared component map. */
+
 
 @import "katex/dist/katex.min.css";
 

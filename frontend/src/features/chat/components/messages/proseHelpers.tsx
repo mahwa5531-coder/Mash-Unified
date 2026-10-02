@@ -127,29 +127,6 @@ export function processTextNodes(children: any, onOpenFile?: (path: string) => v
   return children;
 }
 
-// Safely balance LaTeX delimiters during live streaming
-export function sanitizeMathString(content: string, isStreaming: boolean = false): string {
-  if (!content) return content;
-  let text = content;
+// NOTE: sanitizeMathString() was removed — streamdown's remend parser now
+// balances unterminated math delimiters natively during streaming.
 
-  if (isStreaming) {
-    const lastOpenDisplay = text.lastIndexOf('\\[');
-    const lastCloseDisplay = text.lastIndexOf('\\]');
-    if (lastOpenDisplay !== -1 && lastOpenDisplay > lastCloseDisplay) {
-      text = text + '\n\\]';
-    }
-
-    const lastOpenInline = text.lastIndexOf('\\(');
-    const lastCloseInline = text.lastIndexOf('\\)');
-    if (lastOpenInline !== -1 && lastOpenInline > lastCloseInline) {
-      text = text + '\\)';
-    }
-
-    const doubleDollarMatches = text.match(/(?<!\\)\$\$/g);
-    if (doubleDollarMatches && doubleDollarMatches.length % 2 === 1) {
-      text = text + '\n$$';
-    }
-  }
-
-  return text;
-}

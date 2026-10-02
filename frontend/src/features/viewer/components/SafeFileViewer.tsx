@@ -9,7 +9,7 @@ import { ImageViewer } from './renderers/ImageViewer';
 import { PdfViewer } from './renderers/PdfViewer';
 import { BinaryExcelFallback } from './renderers/BinaryExcelFallback';
 import { UnsupportedDocFallback } from './renderers/UnsupportedDocFallback';
-import { MarkdownFileViewer } from './renderers/MarkdownFileViewer';
+import { AgentMarkdown } from '@/components/markdown/AgentMarkdown';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -160,12 +160,14 @@ export default function SafeFileViewer({
       {/* Content Body */}
       <div className="flex-1 overflow-auto custom-scrollbar">
         {isMarkdown && viewMode === 'preview' ? (
-          <MarkdownFileViewer
-            content={content}
-            displayedContent={displayedContent}
-            isMassiveFile={isMassiveFile}
-            sessionQuery={sessionQuery}
-          />
+          <div className="min-h-full bg-zinc-50 dark:bg-[#121214] text-zinc-900 dark:text-zinc-100">
+            <AgentMarkdown
+              content={isMassiveFile ? displayedContent : (content || '// Empty markdown file')}
+              mode="artifact"
+              isStreaming={false}
+              sessionId={sessionId}
+            />
+          </div>
         ) : (
           <div className="flex-1 w-full h-full min-h-[350px] bg-white dark:bg-[#1c1c20] text-[12.5px] leading-relaxed select-text flex flex-col overflow-hidden">
             {viewMode === 'raw' ? (

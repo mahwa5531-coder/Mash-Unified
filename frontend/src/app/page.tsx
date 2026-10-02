@@ -86,6 +86,18 @@ export default function Home() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  // Support ?file=... query parameter to preview artifacts on load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const fileParam = params.get('file');
+      if (fileParam) {
+        setIsRightSidebarOpen(true);
+        setFileToOpen(fileParam);
+      }
+    }
+  }, []);
+
   // ponytail: stable callbacks to prevent unneeded re-mounts/re-renders of ChatCanvas and Sidebar
   const handleSelectSession = useCallback((sessionId: string, title?: string, repoName?: string) => {
     setSelectedSessionId(sessionId);
