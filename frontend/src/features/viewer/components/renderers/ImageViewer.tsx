@@ -12,12 +12,19 @@ interface ImageViewerProps {
 export function ImageViewer({ filename, path, sessionQuery }: ImageViewerProps) {
   const imgUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}${sessionQuery}`;
   return (
-    <div className="flex items-center justify-center h-full w-full p-6 bg-[var(--bg-app)] overflow-auto select-none">
+    <div className="flex items-center justify-center h-full w-full min-h-0 min-w-0 p-6 bg-[var(--bg-app)] overflow-auto select-none">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img 
         src={imgUrl} 
         alt={filename}
-        className="max-w-full max-h-full object-contain rounded-md shadow-sm select-none"
+        style={{
+          maxWidth: '100%',
+          maxHeight: '100%',
+          width: 'auto',
+          height: 'auto',
+          objectFit: 'contain',
+        }}
+        className="rounded-md shadow-sm select-none shrink-0"
       />
     </div>
   );

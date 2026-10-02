@@ -7,21 +7,16 @@ import React from 'react';
 import { CollapsibleSection } from './CollapsibleSection';
 import { FilePill } from '@/primitives/FilePill';
 import type { SessionArtifactsData } from '@/services/artifacts';
-import type { BackgroundTaskItem } from '@/services/tasks';
-import { Terminal } from 'lucide-react';
 
 interface ExplorerPanelProps {
   artifactsData: SessionArtifactsData;
   openSections: { 
     deliverables?: boolean; 
     workingPapers?: boolean; 
-    backgroundTasks?: boolean;
     [key: string]: boolean | undefined;
   };
-  toggleSection: (key: 'deliverables' | 'workingPapers' | 'backgroundTasks') => void;
+  toggleSection: (key: 'deliverables' | 'workingPapers') => void;
   openFileTab: (name: string, fullPath: string, type?: 'file' | 'image') => void;
-  backgroundTasks?: BackgroundTaskItem[];
-  openTerminalTab?: (taskId: string, title: string) => void;
 }
 
 export function ExplorerPanel({
@@ -29,8 +24,6 @@ export function ExplorerPanel({
   openSections,
   toggleSection,
   openFileTab,
-  backgroundTasks = [],
-  openTerminalTab,
 }: ExplorerPanelProps) {
   return (
     <div className="flex-1 py-3 px-3 flex flex-col overflow-y-auto custom-scrollbar bg-[var(--bg-app)]">
@@ -87,35 +80,6 @@ export function ExplorerPanel({
           </div>
         )}
       </CollapsibleSection>
-
-      {/* Group 3: Background Tasks */}
-      {backgroundTasks.length > 0 && (
-        <CollapsibleSection
-          title="Background Tasks"
-          count={backgroundTasks.length}
-          isOpen={openSections.backgroundTasks ?? true}
-          onToggle={() => toggleSection('backgroundTasks')}
-        >
-          <div className="flex flex-col items-start gap-1 py-1 px-0.5">
-            {backgroundTasks.map((t) => (
-              <button
-                key={t.pid}
-                type="button"
-                onClick={() => openTerminalTab?.(String(t.pid), t.command || `Task #${t.pid}`)}
-                className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/60 text-xs font-mono text-left group transition-colors cursor-pointer"
-                title={t.command || `Task #${t.pid}`}
-              >
-                <div className="flex items-center gap-1.5 truncate">
-                  <Terminal size={13} className="text-zinc-400 shrink-0" />
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.status === 'running' ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`} />
-                  <span className="truncate text-zinc-700 dark:text-zinc-300">{t.command || `Task #${t.pid}`}</span>
-                </div>
-                <span className="text-[10px] text-zinc-400 shrink-0 font-sans">{t.status}</span>
-              </button>
-            ))}
-          </div>
-        </CollapsibleSection>
-      )}
     </div>
   );
 }

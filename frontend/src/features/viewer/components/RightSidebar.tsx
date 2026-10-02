@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, MouseEvent as ReactMouseEvent } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import SafeFileViewer from '@/features/viewer/components/SafeFileViewer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -8,14 +8,11 @@ import { ViewerHeader } from './ViewerHeader';
 import { ExplorerPanel } from './ExplorerPanel';
 import { ViewerEmptyState } from './ViewerEmptyState';
 import { FileBreadcrumbBar } from '@/primitives';
-import { TerminalViewer } from './TerminalViewer';
 import { ViewerTabMenu } from './ViewerTabMenu';
-import { fetchBackgroundTasks, killBackgroundTask, BackgroundTaskItem } from '@/services/tasks';
 import { fetchSessionArtifactsData, SessionArtifactsData } from '@/services/artifacts';
 import { normalizePath } from '@/utils/normalizePath';
 import { useRightSidebarResize } from '../hooks/useRightSidebarResize';
 import { useViewerTabs } from '../hooks/useViewerTabs';
-import { useTerminalLogStream } from '../hooks/useTerminalLogStream';
 
 export interface RightSidebarProps {
   onToggle: () => void;
@@ -34,15 +31,13 @@ export default function RightSidebar({
   isMaximized: controlledIsMaximized,
   onToggleMaximize
 }: RightSidebarProps) {
-  // Accordion Sections State
+  // Accordion Sections State (Audit Deliverables & Working Papers only)
   const [openSections, setOpenSections] = useState({
     deliverables: true,
     workingPapers: true,
-    backgroundTasks: false,
-    artifacts: true,
   });
 
-  const toggleSection = (key: 'deliverables' | 'workingPapers' | 'backgroundTasks' | 'artifacts') => {
+  const toggleSection = (key: 'deliverables' | 'workingPapers') => {
     setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -69,24 +64,11 @@ export default function RightSidebar({
     activeTabId,
     setActiveTabId,
     tabContent,
-    setTabContent,
     isLoadingContent,
     openFileTab,
-    openTerminalTab,
     handleCloseTab,
     activeTab,
   } = useViewerTabs(sessionId);
-
-  // Atomised Terminal Log Streaming
-  const {
-    terminalStatuses,
-    terminalPreRef,
-  } = useTerminalLogStream({
-    activeTab,
-    viewMode,
-    tabContent,
-    setTabContent,
-  });
 
   // Data States
   const [artifactsData, setArtifactsData] = useState<SessionArtifactsData>({
@@ -95,9 +77,8 @@ export default function RightSidebar({
     workingPapers: [],
     items: [],
   });
-  const [backgroundTasks, setBackgroundTasks] = useState<BackgroundTaskItem[]>([]);
 
-  // Load Session Artifacts
+  // Load Session Artifacts (Deliverables & Working Papers)
   const loadArtifacts = useCallback(async () => {
     if (!sessionId) return;
     try {
@@ -113,39 +94,21 @@ export default function RightSidebar({
     }
   }, [sessionId]);
 
-  // Load Background Tasks
-  const loadTasks = useCallback(async () => {
-    try {
-      const tasks = await fetchBackgroundTasks(sessionId);
-      setBackgroundTasks(tasks);
-    } catch {}
-  }, [sessionId]);
-
-  // Polling / Initial Load
+  // Initial Load & Visibility Refresh
   useEffect(() => {
     loadArtifacts();
-    loadTasks();
-  }, [loadArtifacts, loadTasks]);
-
-  // Active background tasks
-  const effectiveTasks = useMemo(() => {
-    return backgroundTasks.filter(t => t.status === 'running');
-  }, [backgroundTasks]);
+  }, [loadArtifacts]);
 
   useEffect(() => {
     if (viewMode !== 'explorer') return;
 
-    const hasActiveTasks = effectiveTasks.length > 0;
-    const intervalMs = hasActiveTasks ? 3000 : 15000;
-
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
-      loadTasks();
-    }, intervalMs);
+      loadArtifacts();
+    }, 15000);
 
     const onVisibilityChange = () => {
       if (typeof document !== 'undefined' && !document.hidden && viewMode === 'explorer') {
-        loadTasks();
         loadArtifacts();
       }
     };
@@ -155,19 +118,7 @@ export default function RightSidebar({
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [viewMode, effectiveTasks.length, loadTasks, loadArtifacts]);
-
-  // Kill individual task
-  const handleKillTask = async (e: ReactMouseEvent, pid: number) => {
-    e.stopPropagation();
-    try {
-      setBackgroundTasks((prev) => prev.filter(t => t.pid !== pid));
-      await killBackgroundTask(pid);
-      loadTasks();
-    } catch (err) {
-      console.warn('Failed to kill task:', err);
-    }
-  };
+  }, [viewMode, loadArtifacts]);
 
   // Listen to fileToOpen prop from chat/workspace and open automatically
   useEffect(() => {
@@ -220,8 +171,6 @@ export default function RightSidebar({
             openSections={openSections}
             toggleSection={toggleSection}
             openFileTab={openFileTab}
-            backgroundTasks={backgroundTasks}
-            openTerminalTab={openTerminalTab}
           />
         ) : !activeTab ? (
           <ViewerEmptyState setViewMode={setViewMode} />
@@ -242,28 +191,18 @@ export default function RightSidebar({
 
             {/* Safe File Viewer Body */}
             <div className="flex-1 overflow-hidden bg-[var(--bg-app)]">
-              {activeTab?.type === 'terminal' ? (
-                <TerminalViewer
-                  activeTab={activeTab}
-                  terminalStatuses={terminalStatuses}
-                  tabContent={tabContent}
-                  handleKillTask={handleKillTask}
-                  terminalPreRef={terminalPreRef}
+              <ErrorBoundary scope="safe-file-viewer">
+                <SafeFileViewer
+                  filename={activeTab?.title || ''}
+                  path={activeTab?.path}
+                  sessionId={sessionId}
+                  content={activeTab ? tabContent[activeTab.id] || '' : ''}
+                  isLoading={isLoadingContent}
+                  viewMode={fileViewMode}
+                  onViewModeChange={setFileViewMode}
+                  hideToolbar={true}
                 />
-              ) : (
-                <ErrorBoundary scope="safe-file-viewer">
-                  <SafeFileViewer
-                    filename={activeTab?.title || ''}
-                    path={activeTab?.path}
-                    sessionId={sessionId}
-                    content={activeTab ? tabContent[activeTab.id] || '' : ''}
-                    isLoading={isLoadingContent}
-                    viewMode={fileViewMode}
-                    onViewModeChange={setFileViewMode}
-                    hideToolbar={true}
-                  />
-                </ErrorBoundary>
-              )}
+              </ErrorBoundary>
             </div>
           </div>
         )}

@@ -132,14 +132,9 @@ export function WorkspaceFolderRow({
       {isOpen && (
         <div className="flex flex-col pl-3 space-y-0.5 mt-0.5">
           {repoSessions.length === 0 ? (
-            <button
-              type="button"
-              onClick={() => onNewSession(repoName, projectMatch?.local_folder_path)}
-              className="flex items-center gap-1.5 pl-6 py-1.5 text-[11.5px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer text-left w-full rounded hover:bg-white/[0.04]"
-            >
-              <Plus size={11} className="text-zinc-500 shrink-0" />
-              <span>Start conversation</span>
-            </button>
+            <div className="pl-6 py-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 italic select-none">
+              No conversations yet
+            </div>
           ) : (
             repoSessions.map((s) => renderSessionItem(s))
           )}
