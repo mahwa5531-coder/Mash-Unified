@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { fetchTranscript } from '@/services/sessions';
-import { parseTranscriptLines } from '@/features/chat/utils/turns';
+import { parseSessionHistory } from '@/features/chat/utils/turns';
 import { sessionStore, type SessionRuntimeState } from '../state/sessionStore';
 import type { Message } from '@/types/chat';
 
@@ -66,7 +66,7 @@ export function useSessionHistory({
         s.loadedRawCount += olderLines.length;
         s.totalHistoryCount = resp.total || s.totalHistoryCount;
 
-        const olderMsgs = parseTranscriptLines(olderLines);
+        const olderMsgs = parseSessionHistory(olderLines);
         s.chatMessages = [...olderMsgs, ...s.chatMessages];
 
         if (activeSessionIdRef.current === curSid) {

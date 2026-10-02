@@ -5,7 +5,7 @@ import {
   clearSessionStore,
   SessionRuntimeState
 } from '../src/features/chat';
-import { parseTranscriptLines, buildTurns } from '../src/features/chat/utils/turns';
+import { parseSessionHistory, buildTurns } from '../src/features/chat/utils/turns';
 import { Message } from '../src/types/chat';
 
 // Helper to assert conditions cleanly
@@ -174,13 +174,13 @@ try {
           }
 
           case 'MALFORMED_TRANSCRIPT': {
-            // Test that parseTranscriptLines never crashes on arbitrary malformed items
+            // Test that parseSessionHistory never crashes on arbitrary malformed items
             try {
-              const parsed = parseTranscriptLines([action.payload]);
-              assert(Array.isArray(parsed), 'parseTranscriptLines must return array');
+              const parsed = parseSessionHistory([action.payload]);
+              assert(Array.isArray(parsed), 'parseSessionHistory must return array');
             } catch (err) {
               // Should not crash on invalid shapes
-              throw new Error(`parseTranscriptLines crashed on input: ${JSON.stringify(action.payload)}`);
+              throw new Error(`parseSessionHistory crashed on input: ${JSON.stringify(action.payload)}`);
             }
             break;
           }
@@ -246,7 +246,7 @@ try {
   s.totalHistoryCount = 2;
 
   // 3. Now the in-flight fetch returns!
-  const parsedHistory = parseTranscriptLines(mockHistoricLines);
+  const parsedHistory = parseSessionHistory(mockHistoricLines);
   s.chatMessages = [...parsedHistory, ...s.chatMessages];
   s.loadedRawCount += mockHistoricLines.length;
   s.totalHistoryCount = 4 + (s.chatMessages.length - parsedHistory.length);
@@ -260,13 +260,13 @@ try {
   assert(s.isStreaming === true, 'Stream must remain active');
   assert(s.loadedRawCount === 6, 'loadedRawCount must accurately reflect 6 lines');
 
-  console.log('✅ [RACE CONDITION TEST PASSED]: History successfully merged behind active in-flight stream with zero dropped messages!');
+  console.log('✁E[RACE CONDITION TEST PASSED]: History successfully merged behind active in-flight stream with zero dropped messages!');
 
-  console.log(`✅ [CHAOS TEST PASSED]: fast-check completed 100 property iterations across ${totalIterations} random sequences!`);
+  console.log(`✁E[CHAOS TEST PASSED]: fast-check completed 100 property iterations across ${totalIterations} random sequences!`);
   console.log(`📊 [RESOURCE AUDIT]: Peak memory during fuzzing was only ${highestMemoryUsageMb} MB (Strictly within < 2.5 GB limit).`);
   process.exit(0);
 } catch (err: any) {
-  console.error('❌ [CHAOS TEST FAILED]:', err.message);
+  console.error('❁E[CHAOS TEST FAILED]:', err.message);
   process.exit(1);
 }
 

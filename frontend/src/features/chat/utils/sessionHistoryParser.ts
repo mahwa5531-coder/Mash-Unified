@@ -1,7 +1,7 @@
 import { Message } from '@/types/chat';
 
-// ponytail: helper to transform raw backend transcript steps into structured chat messages
-export function parseTranscriptLines(rawLines: any[]): Message[] {
+// ponytail: transforms raw NexAU DB action records into structured chat Message[] for rendering
+export function parseSessionHistory(rawLines: any[]): Message[] {
   const parsedMsgs: Message[] = [];
 
   for (const line of rawLines) {

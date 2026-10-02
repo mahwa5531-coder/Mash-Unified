@@ -1,6 +1,6 @@
 import { Message, Turn } from '@/types/chat';
 
-export { parseTranscriptLines } from './transcriptParser';
+export { parseSessionHistory } from './sessionHistoryParser';
 
 // ponytail: compute chat turn groupings in linear O(N) time with stable keys to avoid 120fps GC thrashing
 export function buildTurns(chatMessages: Message[]): Turn[] {

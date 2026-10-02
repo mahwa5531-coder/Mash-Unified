@@ -7,7 +7,7 @@ import { BASE_URL } from '@/services/client';
 import { fetchTranscript, renameSession, markSessionViewed, queueSteeringMessage } from '@/services/sessions';
 import { streamQuery } from '@/services/stream';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
-import { parseTranscriptLines, buildTurns } from '@/features/chat/utils/turns';
+import { parseSessionHistory, buildTurns } from '@/features/chat/utils/turns';
 import {
   sessionStore,
   getOrCreateSessionState,
@@ -133,7 +133,7 @@ export function useChatStream({
           s.loadedRawCount = rawLines.length;
 
           if (rawLines.length > 0) {
-            const parsedMsgs = parseTranscriptLines(rawLines);
+            const parsedMsgs = parseSessionHistory(rawLines);
             if (s.isStreaming) {
               s.chatMessages = [...parsedMsgs, ...s.chatMessages];
             } else {
