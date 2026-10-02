@@ -19,6 +19,7 @@ interface SessionItemRowProps {
   onSessionClick: (s: SessionItem) => void;
   onOpenMenu: (e: ReactMouseEvent, sessionId: string) => void;
   onRenameSubmit: (sessionId: string) => void;
+  onCancelRename?: () => void;
 }
 
 export function SessionItemRow({
@@ -31,6 +32,7 @@ export function SessionItemRow({
   onSessionClick,
   onOpenMenu,
   onRenameSubmit,
+  onCancelRename,
 }: SessionItemRowProps) {
   const storeState = sessionStore.get(s.session_id);
   const showUnread = !isSelected && (s.has_unread || Boolean(storeState?.hasUnread));
@@ -43,8 +45,8 @@ export function SessionItemRow({
       onContextMenu={(e) => onOpenMenu(e, s.session_id)}
       className={`group/item relative h-[30px] mx-1 px-2.5 rounded-lg cursor-pointer flex justify-between items-center select-none transition-colors ${
         isSelected
-          ? 'bg-zinc-800 text-white font-medium shadow-2xs'
-          : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40'
+          ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs'
+          : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/[0.04] dark:hover:bg-zinc-800/40'
       }`}
     >
       {isEditing ? (
@@ -53,14 +55,17 @@ export function SessionItemRow({
           value={renameInput}
           onChange={(e) => setRenameInput(e.target.value)}
           onBlur={() => onRenameSubmit(s.session_id)}
-          onKeyDown={(e) => e.key === 'Enter' && onRenameSubmit(s.session_id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onRenameSubmit(s.session_id);
+            if (e.key === 'Escape') onCancelRename?.();
+          }}
           autoFocus
           className="bg-white dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 rounded px-1.5 py-0.5 text-[13px] text-zinc-900 dark:text-white outline-none w-full min-w-0"
         />
       ) : (
         <div className="flex items-center min-w-0 flex-1 mr-2 overflow-hidden">
           <span className={`truncate leading-snug transition-colors text-[13px] ${
-            isSelected ? 'text-white font-medium' : 'text-zinc-400 group-hover/item:text-zinc-200'
+            isSelected ? 'text-zinc-900 dark:text-white font-medium' : 'text-zinc-600 dark:text-zinc-400 group-hover/item:text-zinc-900 dark:group-hover/item:text-zinc-200'
           }`}>
             {generateCleanSessionTitle(s.custom_title || s.title || '', s.session_id)}
           </span>
@@ -83,7 +88,7 @@ export function SessionItemRow({
               <span className="w-[6.5px] h-[6.5px] rounded-full bg-[#2f81f7] shrink-0" />
             </div>
           ) : (
-            <span className={`text-[11.5px] font-mono shrink-0 group-hover/item:hidden ${isSelected ? 'text-zinc-400' : 'text-zinc-500'}`}>
+            <span className={`text-[11.5px] font-mono shrink-0 group-hover/item:hidden ${isSelected ? 'text-zinc-700 dark:text-zinc-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
               {formatRelativeTime(s.updated_at)}
             </span>
           )}
@@ -93,7 +98,7 @@ export function SessionItemRow({
             <button
               type="button"
               onClick={(e) => onOpenMenu(e, s.session_id)}
-              className="text-zinc-400 hover:text-white transition-colors cursor-pointer p-0.5 rounded hover:bg-white/[0.1]"
+              className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer p-0.5 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.1]"
               title="More options"
               aria-label="More options"
             >

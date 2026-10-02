@@ -111,24 +111,30 @@ export function WorkspacesSection({
       {/* Workspaces List with Dropdown Accordion */}
       {isSectionOpen && (
         <div className="flex flex-col space-y-0.5">
-          {entries.map(([repoName, repoSessions]) => {
-            const match = registeredProjects.find((p) => p.name === repoName);
-            const folderOpen = openFolders[repoName] ?? true;
+          {entries.length === 0 ? (
+            <div className="px-4 py-1 text-[12px] text-zinc-500 italic select-none">
+              No projects added
+            </div>
+          ) : (
+            entries.map(([repoName, repoSessions]) => {
+              const match = registeredProjects.find((p) => p.name === repoName);
+              const folderOpen = openFolders[repoName] ?? true;
 
-            return (
-              <WorkspaceFolderRow
-                key={repoName}
-                repoName={repoName}
-                repoSessions={repoSessions}
-                projectMatch={match}
-                isOpen={folderOpen}
-                onToggle={() => onToggleFolder(repoName)}
-                onNewSession={onNewSession}
-                onDeleteProject={onDeleteProject}
-                renderSessionItem={renderSessionItem}
-              />
-            );
-          })}
+              return (
+                <WorkspaceFolderRow
+                  key={repoName}
+                  repoName={repoName}
+                  repoSessions={repoSessions}
+                  projectMatch={match}
+                  isOpen={folderOpen}
+                  onToggle={() => onToggleFolder(repoName)}
+                  onNewSession={onNewSession}
+                  onDeleteProject={onDeleteProject}
+                  renderSessionItem={renderSessionItem}
+                />
+              );
+            })
+          )}
         </div>
       )}
     </div>

@@ -167,12 +167,22 @@ export default function Sidebar({
   };
 
   const handleRenameSubmit = async (sessionId: string) => {
-    if (renameInput.trim()) {
-      await renameSession(sessionId, renameInput.trim());
-      setSessions(prev =>
-        prev.map(s => s.session_id === sessionId ? { ...s, custom_title: renameInput.trim() } : s)
-      );
+    const trimmed = renameInput.trim();
+    if (trimmed) {
+      const target = sessions.find(s => s.session_id === sessionId);
+      const original = target?.custom_title || target?.title || '';
+      if (trimmed !== original) {
+        await renameSession(sessionId, trimmed);
+        setSessions(prev =>
+          prev.map(s => s.session_id === sessionId ? { ...s, custom_title: trimmed } : s)
+        );
+      }
     }
+    setEditingSessionId(null);
+    setActiveMenuSessionId(null);
+  };
+
+  const handleRenameCancel = () => {
     setEditingSessionId(null);
     setActiveMenuSessionId(null);
   };
@@ -208,6 +218,9 @@ export default function Sidebar({
     try {
       await deleteProject(targetId);
       refreshData();
+      if (selectedSessionRepo && projectName && selectedSessionRepo.toLowerCase() === projectName.toLowerCase()) {
+        onNewSession('No Repo');
+      }
     } catch (err) {
       console.warn("Failed to delete project:", err);
     }
@@ -281,6 +294,7 @@ export default function Sidebar({
         onSessionClick={handleSessionClick}
         onOpenMenu={handleOpenMenu}
         onRenameSubmit={handleRenameSubmit}
+        onCancelRename={handleRenameCancel}
       />
     );
   };
