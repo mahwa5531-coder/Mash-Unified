@@ -94,6 +94,9 @@ export default function Home() {
       if (fileParam) {
         setIsRightSidebarOpen(true);
         setFileToOpen(fileParam);
+        if (params.get('maximized') === 'true') {
+          setIsRightSidebarMaximized(true);
+        }
       }
     }
   }, []);
