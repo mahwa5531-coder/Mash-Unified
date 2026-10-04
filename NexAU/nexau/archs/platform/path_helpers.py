@@ -203,9 +203,9 @@ def get_local_temp_root() -> Path:
 
 
 def get_local_bash_tool_results_dir(session_id: str | None = None) -> Path:
-    """Return the base directory used for local shell stdout/stderr artifacts."""
-    if session_id:
-        return get_brain_dir(session_id) / ".system_generated" / _BASH_TOOL_RESULTS_DIR
+    """Return the base directory used for local shell stdout/stderr artifacts.
+    Always uses system temp root to keep session brain clean and free of raw stdout/stderr dumps.
+    """
     return get_local_temp_root() / _BASH_TOOL_RESULTS_DIR
 
 

@@ -46,15 +46,15 @@ export function TimelineRow(props: TimelineRowProps) {
         thinkingDurationSeconds={props.thinkingDurationSeconds}
         liveThinkingSeconds={props.liveThinkingSeconds}
         latchedThinkingSeconds={props.latchedThinkingSeconds}
-        isExpanded={!!props.expandedThoughts[entry.id] || Boolean(props.isStreaming && entry.data?.status === 'running')}
+        isExpanded={!!props.expandedThoughts[entry.id]}
         toggleThought={props.toggleThought}
         thoughtScrollRef={props.thoughtScrollRef}
       />
     );
   }
 
-  // 2. Command or Edit Groups
-  if (entry.type === 'command_group' || entry.type === 'edit_group') {
+  // 2. Command, Edit, or Exploration Groups
+  if (entry.type === 'command_group' || entry.type === 'edit_group' || entry.type === 'exploration_group') {
     return (
       <GroupTimelineRow
         entry={entry}

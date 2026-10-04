@@ -77,6 +77,7 @@ class LocalSandbox(BaseSandbox):
     """
 
     _shell_backend: ShellBackend = field(init=False, repr=False)
+    always_create_output_dir: bool = field(default=False)
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -461,37 +462,38 @@ class LocalSandbox(BaseSandbox):
                     stderr_file=f"{output_dir}/stderr.txt" if output_dir else None,
                 )
 
-            # Foreground mode: stdout/stderr
-            output_dir = self._prepare_output_dir(command)
-            stdout_path = f"{output_dir}/stdout.txt"
-            stderr_path = f"{output_dir}/stderr.txt"
-
-            fout = open(stdout_path, "wb")
-            ferr = open(stderr_path, "wb")
+            # Foreground mode: in-memory pipe with smart spill-to-disk
+            # ponytail: run foreground commands in-memory via communicate() to prevent disk clutter;
+            # spill to output_dir ONLY when output exceeds threshold (or always_create_output_dir is True).
+            process = subprocess.Popen(
+                launch_config.argv,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=cwd or str(work_dir),
+                env=self._build_local_envs(envs),
+                creationflags=launch_config.creationflags,
+                start_new_session=launch_config.start_new_session,
+            )
 
             try:
-                process = subprocess.Popen(
-                    launch_config.argv,
-                    stdin=subprocess.DEVNULL,
-                    stdout=fout,
-                    stderr=ferr,
-                    cwd=cwd or str(work_dir),
-                    env=self._build_local_envs(envs),
-                    creationflags=launch_config.creationflags,
-                    start_new_session=launch_config.start_new_session,
-                )
-
+                stdout_bytes, stderr_bytes = process.communicate(timeout=timeout_seconds)
+            except subprocess.TimeoutExpired:
+                self._graceful_kill(process)
                 try:
-                    process.wait(timeout=timeout_seconds)
-                except subprocess.TimeoutExpired:
-                    self._graceful_kill(process)
-                    fout.close()
-                    ferr.close()
+                    stdout_bytes, stderr_bytes = process.communicate(timeout=2.0)
+                except Exception:
+                    stdout_bytes, stderr_bytes = b"", b""
 
-                    duration_ms = int((time.time() - start_time) * 1000)
-                    stdout_raw = Path(stdout_path).read_bytes().decode("utf-8", errors="replace")
-                    stderr_raw = Path(stderr_path).read_bytes().decode("utf-8", errors="replace")
+                duration_ms = int((time.time() - start_time) * 1000)
+                stdout_raw = stdout_bytes.decode("utf-8", errors="replace")
+                stderr_raw = stderr_bytes.decode("utf-8", errors="replace")
 
+                total_len = len(stdout_raw) + len(stderr_raw)
+                if total_len >= self.output_char_threshold or self.always_create_output_dir:
+                    output_dir = self._prepare_output_dir(command)
+                    Path(f"{output_dir}/stdout.txt").write_text(stdout_raw, encoding="utf-8", errors="replace")
+                    Path(f"{output_dir}/stderr.txt").write_text(stderr_raw, encoding="utf-8", errors="replace")
                     t_stdout, t_stderr, was_truncated, o_out, o_err = smart_truncate_output(
                         stdout_raw,
                         stderr_raw,
@@ -500,40 +502,59 @@ class LocalSandbox(BaseSandbox):
                         head_chars=self.truncate_head_chars,
                         tail_chars=self.truncate_tail_chars,
                     )
+                    stdout_file = f"{output_dir}/stdout.txt"
+                    stderr_file = f"{output_dir}/stderr.txt"
+                else:
+                    from nexau.archs.sandbox.output_utils import clean_shell_output
 
-                    return CommandResult(
-                        status=SandboxStatus.TIMEOUT,
-                        stdout=t_stdout,
-                        stderr=t_stderr,
-                        exit_code=process.returncode or -1,
-                        duration_ms=duration_ms,
-                        error=f"Command timed out after {timeout}ms",
-                        truncated=was_truncated,
-                        original_stdout_length=o_out,
-                        original_stderr_length=o_err,
-                        output_dir=output_dir,
-                        stdout_file=f"{output_dir}/stdout.txt" if output_dir else None,
-                        stderr_file=f"{output_dir}/stderr.txt" if output_dir else None,
-                    )
-            finally:
-                if not fout.closed:
-                    fout.close()
-                if not ferr.closed:
-                    ferr.close()
+                    t_stdout = clean_shell_output(stdout_raw)
+                    t_stderr = clean_shell_output(stderr_raw)
+                    was_truncated = False
+                    o_out, o_err = None, None
+                    output_dir, stdout_file, stderr_file = None, None, None
+
+                return CommandResult(
+                    status=SandboxStatus.TIMEOUT,
+                    stdout=t_stdout,
+                    stderr=t_stderr,
+                    exit_code=process.returncode or -1,
+                    duration_ms=duration_ms,
+                    error=f"Command timed out after {timeout}ms",
+                    truncated=was_truncated,
+                    original_stdout_length=o_out,
+                    original_stderr_length=o_err,
+                    output_dir=output_dir,
+                    stdout_file=stdout_file,
+                    stderr_file=stderr_file,
+                )
 
             duration_ms = int((time.time() - start_time) * 1000)
+            stdout_raw = stdout_bytes.decode("utf-8", errors="replace")
+            stderr_raw = stderr_bytes.decode("utf-8", errors="replace")
 
-            stdout_raw = Path(stdout_path).read_bytes().decode("utf-8", errors="replace")
-            stderr_raw = Path(stderr_path).read_bytes().decode("utf-8", errors="replace")
+            total_len = len(stdout_raw) + len(stderr_raw)
+            if total_len >= self.output_char_threshold or self.always_create_output_dir:
+                output_dir = self._prepare_output_dir(command)
+                Path(f"{output_dir}/stdout.txt").write_text(stdout_raw, encoding="utf-8", errors="replace")
+                Path(f"{output_dir}/stderr.txt").write_text(stderr_raw, encoding="utf-8", errors="replace")
+                t_stdout, t_stderr, was_truncated, orig_stdout_len, orig_stderr_len = smart_truncate_output(
+                    stdout_raw,
+                    stderr_raw,
+                    output_dir,
+                    threshold=self.output_char_threshold,
+                    head_chars=self.truncate_head_chars,
+                    tail_chars=self.truncate_tail_chars,
+                )
+                stdout_file = f"{output_dir}/stdout.txt"
+                stderr_file = f"{output_dir}/stderr.txt"
+            else:
+                from nexau.archs.sandbox.output_utils import clean_shell_output
 
-            t_stdout, t_stderr, was_truncated, orig_stdout_len, orig_stderr_len = smart_truncate_output(
-                stdout_raw,
-                stderr_raw,
-                output_dir,
-                threshold=self.output_char_threshold,
-                head_chars=self.truncate_head_chars,
-                tail_chars=self.truncate_tail_chars,
-            )
+                t_stdout = clean_shell_output(stdout_raw)
+                t_stderr = clean_shell_output(stderr_raw)
+                was_truncated = False
+                orig_stdout_len, orig_stderr_len = None, None
+                output_dir, stdout_file, stderr_file = None, None, None
 
             return CommandResult(
                 status=SandboxStatus.SUCCESS if process.returncode == 0 else SandboxStatus.ERROR,
@@ -546,8 +567,8 @@ class LocalSandbox(BaseSandbox):
                 original_stdout_length=orig_stdout_len,
                 original_stderr_length=orig_stderr_len,
                 output_dir=output_dir,
-                stdout_file=f"{output_dir}/stdout.txt" if output_dir else None,
-                stderr_file=f"{output_dir}/stderr.txt" if output_dir else None,
+                stdout_file=stdout_file,
+                stderr_file=stderr_file,
             )
 
         except Exception as e:

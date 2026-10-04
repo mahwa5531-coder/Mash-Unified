@@ -86,6 +86,21 @@ def generate_clean_session_title(raw_text: str, sid: str = "") -> str:
     return t[:1].upper() + t[1:]
 
 
+def clean_user_steering_envelope(text: str) -> str:
+    """ponytail: Strip internal mid-flight steering protocol envelope from user prompt text."""
+    if not text or not isinstance(text, str):
+        return text or ""
+    if "<USER_STEERING>" in text or "[USER MID-FLIGHT INSTRUCTION]:" in text or "</USER_STEERING>" in text:
+        m = re.search(r'<USER_STEERING>\s*(?:\[USER MID-FLIGHT INSTRUCTION\]:)?\s*([\s\S]*?)(?:\s*Adapt your current plan and respond to this instruction immediately\.?)?\s*</USER_STEERING>', text, re.IGNORECASE)
+        if m and m.group(1).strip():
+            return m.group(1).strip()
+        cleaned = re.sub(r'</?USER_STEERING>', '', text, flags=re.IGNORECASE)
+        cleaned = re.sub(r'\[USER MID-FLIGHT INSTRUCTION\]:\s*', '', cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r'Adapt your current plan and respond to this instruction immediately\.?', '', cleaned, flags=re.IGNORECASE)
+        return cleaned.strip()
+    return text
+
+
 def _parse_epoch_seconds(val: Any) -> float:
     """Parse any datetime, ISO string, timestamp (ns, ms, sec) into unix epoch float seconds (UTC)."""
     if not val:
@@ -648,6 +663,13 @@ async def get_transcript(
                         })
                     continue
 
+                # Defensively strip mid-flight steering protocol envelope from user messages
+                if role_str == "user":
+                    combined_text = clean_user_steering_envelope(combined_text)
+                    for s in steps:
+                        if s.get("type") == "text" and isinstance(s.get("content"), str):
+                            s["content"] = clean_user_steering_envelope(s["content"])
+
                 if combined_text or thoughts or tools:
                     created_at_val = getattr(action, "created_at", None)
                     if isinstance(created_at_val, datetime):
@@ -683,17 +705,6 @@ async def get_transcript(
             start_idx = max(0, total_lines - limit - offset)
             end_idx = total_lines - offset if offset > 0 else total_lines
             lines = lines[start_idx:end_idx]
-
-        # ponytail: Write physical transcript.json into session logs directory so disk inspection always succeeds
-        try:
-            b_dir = get_session_brain_dir(session_id)
-            log_dir = b_dir / ".system_generated" / "logs"
-            if log_dir.is_dir():
-                import json
-                t_file = log_dir / "transcript.json"
-                t_file.write_text(json.dumps({"lines": lines, "total": total_lines}, indent=2, ensure_ascii=False), encoding="utf-8")
-        except Exception:
-            pass
 
         return {"lines": lines, "total": total_lines}
     except Exception as e:
@@ -944,8 +955,16 @@ async def get_session_queue(session_id: str):
 
 @router.delete("/sessions/{session_id}/queue")
 @router.delete("/api/sessions/{session_id}/queue")
-async def clear_session_queue(session_id: str):
-    """Clear all queued steering messages for a session."""
+async def clear_session_queue(session_id: str, index: int | None = None):
+    """Clear all queued steering messages for a session, or delete a single message by index."""
+    if index is not None:
+        try:
+            from nexau.archs.session.steering import remove_steering_message
+            remove_steering_message(session_id, index)
+        except Exception:
+            pass
+        queued = peek_steering_messages(session_id)
+        return {"status": "success", "session_id": session_id, "queued": queued, "count": len(queued)}
     clear_steering_messages(session_id)
     return {"status": "success", "session_id": session_id, "queued": [], "count": 0}
 

@@ -99,6 +99,18 @@ export default function RightSidebar({
     loadArtifacts();
   }, [loadArtifacts]);
 
+  // Listen for instant turn completion to refresh deliverables without waiting for timer
+  useEffect(() => {
+    const handleTurnDone = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      if (!customEvt.detail?.sessionId || customEvt.detail?.sessionId === sessionId) {
+        loadArtifacts();
+      }
+    };
+    window.addEventListener('mash:turn_completed', handleTurnDone);
+    return () => window.removeEventListener('mash:turn_completed', handleTurnDone);
+  }, [sessionId, loadArtifacts]);
+
   useEffect(() => {
     if (viewMode !== 'explorer') return;
 
@@ -175,7 +187,7 @@ export default function RightSidebar({
         ) : !activeTab ? (
           <ViewerEmptyState setViewMode={setViewMode} />
         ) : (
-          <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
+          <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-app)] dark:bg-black text-[var(--text-primary)]">
             {/* Canonical FileBreadcrumbBar Primitive */}
             <FileBreadcrumbBar
               path={activeTab.path || activeTab.title || ''}
@@ -190,7 +202,7 @@ export default function RightSidebar({
             />
 
             {/* Safe File Viewer Body */}
-            <div className="flex-1 overflow-hidden bg-[var(--bg-app)]">
+            <div className="flex-1 overflow-hidden bg-[var(--bg-app)] dark:bg-black">
               <ErrorBoundary scope="safe-file-viewer">
                 <SafeFileViewer
                   filename={activeTab?.title || ''}

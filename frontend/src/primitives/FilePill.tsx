@@ -49,6 +49,7 @@ export function FilePill({
   const hasSlash = cleanPath.includes('/') || cleanPath.includes('\\');
   const hasWildcard = cleanPath.includes('*') || cleanPath.includes('?');
   const isFullPath = hasSlash && !hasWildcard;
+  const isClickable = Boolean(!hasWildcard && (onOpenFile || onClick));
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -61,9 +62,10 @@ export function FilePill({
     <button
       type="button"
       onClick={handleClick}
-      title={`Open ${cleanPath}${lineSuffix}`}
+      title={isClickable ? `Open ${cleanPath}${lineSuffix}` : rawDisplay}
       className={cn(
-        "group inline-flex items-center gap-1.5 h-[21px] px-1.5 py-0 mx-0.5 rounded-[4px] font-mono text-[11px] leading-none select-none cursor-pointer align-baseline my-0 outline-none transition-all duration-150 active:scale-[0.98]",
+        "group inline-flex items-center gap-1.5 h-[21px] px-1.5 py-0 mx-0.5 rounded-[4px] font-mono text-[11px] leading-none select-none align-baseline my-0 outline-none transition-all duration-150",
+        isClickable ? "cursor-pointer active:scale-[0.98]" : "cursor-default",
         // Calm ghost styling: clean neutral surface, authentic file logo, subtle hover highlight
         "bg-zinc-100/90 hover:bg-zinc-200/90 dark:bg-white/[0.06] dark:hover:bg-white/[0.12]",
         "text-zinc-700 hover:text-zinc-950 dark:text-zinc-200 dark:hover:text-white",

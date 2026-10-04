@@ -14,18 +14,12 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
   const artifacts: ArtifactItem[] = [];
   const seenPaths = new Set<string>();
 
-  const classifyArtifact = (p: string): { isArtifact: boolean; type: 'plan' | 'walkthrough' | 'doc' | 'spreadsheet' | 'chart' } => {
-    // Strictly guard: only files belonging to the 2 authorized folders are deliverables/working papers
+  const classifyArtifact = (p: string): { isArtifact: boolean; type: 'plan' | 'walkthrough' | 'doc' } => {
+    // Strictly guard: only .md documents are standalone executive deliverables/working papers
     if (!isArtifactPath(p)) {
       return { isArtifact: false, type: 'doc' };
     }
     const lower = p.toLowerCase().replace(/\\/g, '/');
-    if (/\.(xlsx|xls|csv)$/i.test(lower)) {
-      return { isArtifact: true, type: 'spreadsheet' };
-    }
-    if (/\.(png|jpe?g|svg|webp)$/i.test(lower)) {
-      return { isArtifact: true, type: 'chart' };
-    }
     if (lower.includes('implementation_plan') || lower.includes('plan.md')) {
       return { isArtifact: true, type: 'plan' };
     }

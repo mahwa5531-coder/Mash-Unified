@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, memo } from 'react';
 import { Check, Copy, Undo2 } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
+import { cleanUserSteeringEnvelope } from '@/features/chat/utils/sessionHistoryParser';
 
 function formatUserTimestamp(ts?: string): string {
   if (!ts) return '';
@@ -35,7 +36,8 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
 
   // Check if content has an image markdown link or path
   const imgMatch = msg.content ? msg.content.match(/!\[([^\]]*)\]\(([^)]+)\)/) : null;
-  const cleanText = imgMatch ? msg.content.replace(imgMatch[0], '').trim() : msg.content;
+  const rawText = imgMatch ? msg.content.replace(imgMatch[0], '').trim() : msg.content;
+  const cleanText = cleanUserSteeringEnvelope(rawText);
   const imgSrc = imgMatch ? imgMatch[2] : null;
 
   useEffect(() => {
@@ -51,7 +53,7 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(msg.content);
+    navigator.clipboard.writeText(cleanText);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };

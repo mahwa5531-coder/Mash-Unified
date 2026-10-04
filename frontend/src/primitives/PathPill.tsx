@@ -20,7 +20,7 @@ export function PathPill({
   className,
   ...props
 }: PathPillProps) {
-  const clean = normalizePath(path.trim(), false);
+  const clean = normalizePath((path || '').trim(), false);
   const display = clean.replace(/\/+$/, '') || clean;
 
   return (

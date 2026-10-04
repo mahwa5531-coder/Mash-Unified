@@ -45,8 +45,10 @@ export async function fetchFileContent(filePath: string, sessionId?: string, byp
 
   const fetchPromise = (async () => {
     try {
+      const isCsv = /\.csv$/i.test(cleanKey);
       const qs = sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : '';
-      const res = await safeFetch(`${BASE_URL}/files/content?path=${encodeURIComponent(cleanKey)}${qs}`);
+      const url = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanKey)}${qs}${isCsv ? '&raw=true' : ''}`;
+      const res = await safeFetch(url);
       if (!res.ok) {
         if (res.status === 404) {
           try {
@@ -57,6 +59,11 @@ export async function fetchFileContent(filePath: string, sessionId?: string, byp
           }
         }
         return "Failed to load file content.";
+      }
+      if (isCsv) {
+        const csvContent = await res.text();
+        cacheFileContent(cleanKey, csvContent);
+        return csvContent;
       }
       const data = await res.json();
       if (data.type === 'excel' || data.type === 'univer') {

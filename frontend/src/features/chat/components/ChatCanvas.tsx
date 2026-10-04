@@ -47,6 +47,7 @@ export default function ChatCanvas({
     isHistoryLoaded,
     historyLoadError,
     retryLoadHistory,
+    queuedMessages,
     queuedMessage,
     turns,
     artifactsByTurnMsg,
@@ -169,10 +170,11 @@ export default function ChatCanvas({
     onChatBodyScroll(e.currentTarget);
   }, [onChatBodyScroll]);
 
-  const handleEditQueued = () => {
-    if (queuedMessage) {
-      setInputPrompt(queuedMessage);
-      discardQueued();
+  const handleEditQueued = (index = 0) => {
+    const msg = queuedMessages?.[index] || queuedMessage;
+    if (msg) {
+      setInputPrompt(msg);
+      discardQueued(index);
     }
   };
 
@@ -292,12 +294,13 @@ export default function ChatCanvas({
         <div className="max-w-3xl mx-auto w-full relative">
 
           <SteeringQueueBanner
+            queuedMessages={queuedMessages}
             queuedMessage={queuedMessage}
             isQueueExpanded={isQueueExpanded}
             onToggleExpand={() => setIsQueueExpanded((prev) => !prev)}
-            onInject={injectQueued}
-            onEdit={handleEditQueued}
-            onDiscard={discardQueued}
+            onInject={(idx) => injectQueued(idx ?? 0)}
+            onEdit={(idx) => handleEditQueued(idx ?? 0)}
+            onDiscard={(idx) => discardQueued(idx)}
           />
 
           {/* Floating Scroll-to-Bottom Button */}

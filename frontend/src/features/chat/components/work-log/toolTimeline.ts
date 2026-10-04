@@ -195,3 +195,121 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     };
   }
 }
+
+/**
+ * Group consecutive tools (>= 2) of the same category into tidy expandable group entries:
+ * - 2+ commands -> 'command_group' ("Ran 3 commands ›")
+ * - 2+ edits -> 'edit_group' ("Edited 3 files +25 -4 ›")
+ * - 2+ reads/searches -> 'exploration_group' ("Analyzed 4 files ›" or "Searched 3 times ›")
+ */
+export function groupTimelineEntries(entries: TimelineEntry[]): TimelineEntry[] {
+  const result: TimelineEntry[] = [];
+  let i = 0;
+
+  while (i < entries.length) {
+    const current = entries[i];
+
+    // 1. Group consecutive commands (>= 2)
+    if (current.type === 'command') {
+      const group: TimelineEntry[] = [current];
+      let j = i + 1;
+      while (j < entries.length && entries[j].type === 'command') {
+        group.push(entries[j]);
+        j++;
+      }
+      if (group.length > 1) {
+        const isRunning = group.some(e => isToolRunning(e.data?.tool));
+        const isCancelled = group.some(e => e.data?.tool?.status === 'cancelled');
+        result.push({
+          id: `cmd-group-${i}`,
+          type: 'command_group',
+          data: {
+            count: group.length,
+            isRunning,
+            isCancelled,
+          },
+          items: group,
+        });
+        i = j;
+        continue;
+      }
+    }
+
+    // 2. Group consecutive edits (>= 2)
+    if (current.type === 'edit') {
+      const group: TimelineEntry[] = [current];
+      let j = i + 1;
+      while (j < entries.length && entries[j].type === 'edit') {
+        group.push(entries[j]);
+        j++;
+      }
+      if (group.length > 1) {
+        const isRunning = group.some(e => isToolRunning(e.data?.tool));
+        const isCancelled = group.some(e => e.data?.tool?.status === 'cancelled');
+        let totalAdded = 0;
+        let totalDeleted = 0;
+        group.forEach(e => {
+          totalAdded += e.data?.added || 0;
+          totalDeleted += e.data?.deleted || 0;
+        });
+        result.push({
+          id: `edit-group-${i}`,
+          type: 'edit_group',
+          data: {
+            count: group.length,
+            added: totalAdded,
+            deleted: totalDeleted,
+            isRunning,
+            isCancelled,
+          },
+          items: group,
+        });
+        i = j;
+        continue;
+      }
+    }
+
+    // 3. Group consecutive file reads / searches / folder views (>= 2)
+    if (current.type === 'search' || current.type === 'file_read' || current.type === 'folder_view') {
+      const group: TimelineEntry[] = [current];
+      let j = i + 1;
+      while (
+        j < entries.length && 
+        (entries[j].type === 'search' || entries[j].type === 'file_read' || entries[j].type === 'folder_view')
+      ) {
+        group.push(entries[j]);
+        j++;
+      }
+      if (group.length > 1) {
+        const isRunning = group.some(e => isToolRunning(e.data?.tool));
+        const isCancelled = group.some(e => e.data?.tool?.status === 'cancelled');
+        const allReads = group.every(e => e.type === 'file_read');
+        const allSearches = group.every(e => e.type === 'search');
+        const label = allReads 
+          ? `${group.length} files` 
+          : allSearches 
+            ? `${group.length} searches` 
+            : `${group.length} files & searches`;
+        result.push({
+          id: `exploration-group-${i}`,
+          type: 'exploration_group',
+          data: {
+            count: group.length,
+            label,
+            isRunning,
+            isCancelled,
+          },
+          items: group,
+        });
+        i = j;
+        continue;
+      }
+    }
+
+    // Otherwise single item
+    result.push(current);
+    i++;
+  }
+
+  return result;
+}

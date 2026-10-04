@@ -10,6 +10,23 @@ function cleanAssistantContent(raw?: string): string {
     .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '');
 }
 
+// ponytail: strip internal mid-flight steering protocol envelopes from user prompt text
+export function cleanUserSteeringEnvelope(text?: string): string {
+  if (!text || typeof text !== 'string') return '';
+  if (text.includes('<USER_STEERING>') || text.includes('[USER MID-FLIGHT INSTRUCTION]:') || text.includes('</USER_STEERING>')) {
+    const match = text.match(/<USER_STEERING>[\s\S]*?(?:\[USER MID-FLIGHT INSTRUCTION\]:)?\s*([\s\S]*?)(?:\s*Adapt your current plan and respond to this instruction immediately\.?)?\s*<\/USER_STEERING>/i);
+    if (match && match[1] && match[1].trim()) {
+      return match[1].trim();
+    }
+    return text
+      .replace(/<\/?USER_STEERING>/gi, '')
+      .replace(/\[USER MID-FLIGHT INSTRUCTION\]:\s*/gi, '')
+      .replace(/Adapt your current plan and respond to this instruction immediately\.?/gi, '')
+      .trim();
+  }
+  return text;
+}
+
 // ponytail: transforms raw NexAU DB action records into structured chat Message[] for rendering
 export function parseSessionHistory(rawLines: any[]): Message[] {
   const parsedMsgs: Message[] = [];
@@ -36,6 +53,8 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
         } else if (typeof userText === 'string' && userText.trim().startsWith('[SYSTEM NOTICE:')) {
           continue;
         }
+
+        userText = cleanUserSteeringEnvelope(userText);
 
         parsedMsgs.push({
           role: 'user',

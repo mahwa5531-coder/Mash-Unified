@@ -108,7 +108,7 @@ export function QuotaBanner({
       </div>
 
       {/* Description text with dynamic renewal date/time */}
-      <p className="text-[13px] text-zinc-400 dark:text-[#a1a1aa] leading-relaxed mt-1.5 mb-3.5">
+      <p suppressHydrationWarning className="text-[13px] text-zinc-400 dark:text-[#a1a1aa] leading-relaxed mt-1.5 mb-3.5">
         {bodyText}
       </p>
 

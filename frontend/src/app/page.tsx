@@ -75,21 +75,14 @@ export default function Home() {
     }
   }, [isDark]);
 
-  // Prevent back button from escaping the SPA to about:blank
-  useEffect(() => {
-    history.replaceState({ mash: true }, '');
-    history.pushState({ mash: true }, '');
-    const onPopState = () => {
-      history.pushState({ mash: true }, '');
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
-
-  // Support ?file=... query parameter to preview artifacts on load
+  // Support ?file=... and ?session=... query parameters on load
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
+      const sessionParam = params.get('session') || params.get('sessionId');
+      if (sessionParam) {
+        setSelectedSessionId(sessionParam);
+      }
       const fileParam = params.get('file');
       if (fileParam) {
         setIsRightSidebarOpen(true);

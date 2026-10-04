@@ -42,12 +42,12 @@ export function FilePill(props: {
  */
 export function renderOutputWithLinks(text: string, onOpenFile?: (path: string) => void) {
   if (!text) return null;
-  const linkRegex = /(file:\/\/\/[^\s\)\"\']+)/g;
+  const linkRegex = /(file:\/\/\/[^\s\)\"\']+|[a-zA-Z]:[/\\][^\s\)\"\']+\.(?:txt|log|py|xlsx?|csv|json|md))/g;
   const parts = text.split(linkRegex);
   if (parts.length === 1) return text;
 
   return parts.map((part, idx) => {
-    if (part.startsWith('file:///')) {
+    if (part.startsWith('file:///') || /^[a-zA-Z]:[/\\]/.test(part)) {
       const cleanPath = normalizePath(part);
       const basename = cleanPath.split(/[/\\]/).pop() || cleanPath;
       return (

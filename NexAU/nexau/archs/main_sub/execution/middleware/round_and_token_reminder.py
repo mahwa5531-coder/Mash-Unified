@@ -113,7 +113,8 @@ class RoundAndTokenReminderMiddleware(Middleware):
         steering_blocks = [
             Message(
                 role=Role.USER,
-                content=[TextBlock(text=f"<USER_STEERING>\n[USER MID-FLIGHT INSTRUCTION]: {s_msg}\nAdapt your current plan and respond to this instruction immediately.\n</USER_STEERING>")]
+                content=[TextBlock(text=f"<USER_STEERING>\n[USER MID-FLIGHT INSTRUCTION]: {s_msg}\nAdapt your current plan and respond to this instruction immediately.\n</USER_STEERING>")],
+                metadata={"is_steering": True, "raw_user_message": s_msg}
             )
             for s_msg in steering_messages
         ]

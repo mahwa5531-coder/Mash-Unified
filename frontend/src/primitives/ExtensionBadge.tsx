@@ -18,8 +18,8 @@ export function ExtensionBadge({
   className,
   ...props
 }: ExtensionBadgeProps) {
-  const clean = extension.replace(/^\.+/, '').toLowerCase().trim();
-  const displayLabel = `.${clean}`;
+  const clean = (extension || '').replace(/^\.+/, '').toLowerCase().trim();
+  const displayLabel = clean ? `.${clean}` : '';
 
   return (
     <span

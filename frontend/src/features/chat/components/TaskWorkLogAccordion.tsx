@@ -8,6 +8,7 @@ import {
   formatDurationDisplay,
   parseToolItem,
   isToolRunning,
+  groupTimelineEntries,
 } from './work-log/toolTimeline';
 import type { ToolCallItem, ExecutionStep, TimelineEntry } from './work-log/types';
 
@@ -77,6 +78,15 @@ export default function TaskWorkLogAccordion({
     return () => clearInterval(interval);
   }, [isActivelyThinking, activeThinkingStep?.startTime, turnStartTime]);
 
+  // After doing its job (active thinking completes), ensure thoughts are grouped
+  const wasActivelyThinkingRef = useRef(isActivelyThinking);
+  useEffect(() => {
+    if (wasActivelyThinkingRef.current && !isActivelyThinking) {
+      setExpandedThoughts({});
+    }
+    wasActivelyThinkingRef.current = isActivelyThinking;
+  }, [isActivelyThinking]);
+
   // Seamless live streaming reasoning card auto-scroll
   useEffect(() => {
     if (isActivelyThinking && thoughtScrollRef.current) {
@@ -97,7 +107,6 @@ export default function TaskWorkLogAccordion({
 
     // Branch A: We have discrete structured execution steps from the agent run
     if (steps && steps.length > 0) {
-      const rawEntries: TimelineEntry[] = [];
       steps.forEach((step: any, sIdx) => {
         // 1. Unitised 'thinking' step or legacy step.thoughts
         if (step.type === 'thinking' || (step.thoughts && step.thoughts.length > 0)) {
@@ -105,13 +114,13 @@ export default function TaskWorkLogAccordion({
           if (thText) {
             const computedSecs = step.thinkingDurationSeconds 
               || Math.max(1, Math.min(60, Math.round(thText.length / 120)));
-            const lastEntry = rawEntries[rawEntries.length - 1];
+            const lastEntry = fullTimeline[fullTimeline.length - 1];
             if (lastEntry && lastEntry.type === 'thought') {
               lastEntry.data.text += '\n\n' + thText;
               lastEntry.data.durationSecs = (lastEntry.data.durationSecs || 0) + computedSecs;
               if (step.status === 'running') lastEntry.data.status = 'running';
             } else {
-              rawEntries.push({
+              fullTimeline.push({
                 id: step.id ? `thought-${step.id}-${sIdx}` : `thought-step-${sIdx}`,
                 type: 'thought',
                 data: {
@@ -124,21 +133,27 @@ export default function TaskWorkLogAccordion({
             }
           }
         } else if (step.type === 'tool') {
-          // 2. Unitised 'tool' step
-          rawEntries.push(parseToolItem(step, step.tool_call_id || (step.id ? `${step.id}_${sIdx}` : `tool_${sIdx}`)));
+          // 2. Unitised single 'tool' step -> independent unit (no merge across sequential steps)
+          fullTimeline.push(parseToolItem(step, step.tool_call_id || (step.id ? `${step.id}_${sIdx}` : `tool_${sIdx}`)));
         } else if (step.tools && step.tools.length > 0) {
-          // 3. Legacy step with tools array
-          step.tools.forEach((t: any, tIdx: number) => {
-            rawEntries.push(parseToolItem(t, `${sIdx}_${tIdx}`));
-          });
+          // 3. Step with tools array
+          if (step.tools.length === 1) {
+            // Single tool in this step -> independent unit
+            fullTimeline.push(parseToolItem(step.tools[0], `${sIdx}_0`));
+          } else {
+            // Multiple tools called in parallel within the same step -> group only this step's tools
+            const stepToolEntries = step.tools.map((t: any, tIdx: number) => parseToolItem(t, `${sIdx}_${tIdx}`));
+            const grouped = groupTimelineEntries(stepToolEntries);
+            fullTimeline.push(...grouped);
+          }
         }
       });
-      return rawEntries;
+      return fullTimeline;
     }
 
     // Branch B: Streaming or legacy flat messages fallback
     const rawToolEntries = tools.map((t, tIdx) => parseToolItem(t, tIdx));
-    const groupedTools = rawToolEntries;
+    const groupedTools = groupTimelineEntries(rawToolEntries);
 
     if (thoughts.length > 0) {
       const combinedThoughtText = thoughts.join('\n\n').trim();
@@ -226,10 +241,16 @@ export default function TaskWorkLogAccordion({
     />
   );
 
-  // 1. While actively streaming: render timeline steps + dynamic animated "Working..." or "Thinking for Xs..."
+  // 1. While actively streaming: render timeline steps + dynamic "Working..." at end when no tool is running
   if (isStreaming) {
-    const isActivelyThinkingNow = isActivelyThinking || (activeThinkingStep !== null);
-    const activeTool = tools.find(t => isToolRunning(t, isStreaming)) || (steps ? steps.find((s: any) => s.type === 'tool' && (s.status === 'running' || (isStreaming && !s.output))) : null);
+    const isAnyItemRunning = isActivelyThinking || groupedTimeline.some(entry => {
+      if (entry.type === 'thought' && entry.data?.status === 'running') return true;
+      if (entry.type === 'command_group' || entry.type === 'edit_group' || entry.type === 'exploration_group') {
+        return Boolean(entry.data?.isRunning);
+      }
+      if (entry.data?.tool && isToolRunning(entry.data.tool, isStreaming)) return true;
+      return false;
+    });
 
     return (
       <div className="w-full min-w-0 text-[13px] font-sans my-1 select-none">
@@ -238,25 +259,7 @@ export default function TaskWorkLogAccordion({
             {groupedTimeline.map((entry) => renderTimelineRow(entry, false))}
           </div>
         )}
-        {isActivelyThinkingNow && !groupedTimeline.some(e => e.type === 'thought') ? (
-          <div className="flex items-center text-xs text-zinc-400 dark:text-zinc-500 font-sans py-0.5 select-none">
-            <span>Thinking for {formatDurationDisplay(liveThinkingSeconds)}</span>
-            <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
-              <span>.</span>
-              <span>.</span>
-              <span>.</span>
-            </span>
-          </div>
-        ) : activeTool ? (
-          <div className="flex items-center text-xs text-zinc-400 dark:text-zinc-500 font-sans py-0.5 select-none">
-            <span>Running {activeTool.name || 'tool'}</span>
-            <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
-              <span>.</span>
-              <span>.</span>
-              <span>.</span>
-            </span>
-          </div>
-        ) : !hasAssistantContent ? (
+        {!isAnyItemRunning && !hasAssistantContent && (
           <div className="flex items-center text-xs text-zinc-400 dark:text-zinc-500 font-sans py-0.5 select-none">
             <span>Working</span>
             <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
@@ -265,7 +268,7 @@ export default function TaskWorkLogAccordion({
               <span>.</span>
             </span>
           </div>
-        ) : null}
+        )}
       </div>
     );
   }
@@ -290,24 +293,15 @@ export default function TaskWorkLogAccordion({
       {/* Chronological Timeline List revealed only when user expands */}
       {clusterOpen && (
         <div className="min-w-0 overflow-hidden mt-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
-          {hasThoughts && !hasTools ? (
-            <div
-              ref={thoughtScrollRef}
-              className="mt-1 mb-2 pl-3 border-l-2 border-zinc-300 dark:border-zinc-700/80 py-1 text-[12px] leading-relaxed max-h-56 overflow-y-auto custom-scrollbar italic font-sans text-zinc-500 dark:text-zinc-400 select-text whitespace-pre-wrap"
-            >
-              {thoughts.join('\n\n') || (steps ? steps.filter((s: any) => s.type === 'thinking').map((s: any) => s.content || (s.thoughts ? s.thoughts.join('\n\n') : '')).join('\n\n') : '')}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1 py-1 text-xs">
-              {groupedTimeline.length > 0 ? (
-                groupedTimeline.map((entry) => renderTimelineRow(entry, false))
-              ) : (
-                <div className="text-xs text-muted-foreground/80 py-1 px-1 font-sans">
-                  Completed response in {formattedTime}
-                </div>
-              )}
-            </div>
-          )}
+          <div className="flex flex-col gap-1 py-1 text-xs">
+            {groupedTimeline.length > 0 ? (
+              groupedTimeline.map((entry) => renderTimelineRow(entry, false))
+            ) : (
+              <div className="text-xs text-muted-foreground/80 py-1 px-1 font-sans">
+                Completed response in {formattedTime}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -1,60 +1,97 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
 import { fetchAuthMe, AuthUser } from '@/services/auth';
 import { BASE_URL, safeFetch } from '@/services/client';
-import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardAction, 
-  CardContent, 
-  CardFooter 
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
-interface DesktopSignInViewProps {
+export interface DesktopSignInViewProps {
   onAuthSuccess: (user: AuthUser) => void;
+  className?: string;
 }
 
-export default function DesktopSignInView({ onAuthSuccess }: DesktopSignInViewProps) {
-  const [email, setEmail] = useState('');
-  const [isPolling, setIsPolling] = useState(false);
-  const [noticeMsg, setNoticeMsg] = useState<string | null>(null);
+type SignInMode = 'idle' | 'business' | 'authenticated';
 
-  // Background polling: when browser sign-in is launched, poll /api/auth/me for completion
-  // The Cloud API sends the single-use mcode via localhost loopback or deep link,
-  // the Desktop backend exchanges it with Cloud for real JWT tokens, and this poller unlocks.
+export default function DesktopSignInView({ onAuthSuccess, className }: DesktopSignInViewProps) {
+  const [mode, setMode] = useState<SignInMode>('idle');
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [businessEmail, setBusinessEmail] = useState('');
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Stop polling helper
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    setIsAuthorizing(false);
+  }, []);
+
+  // Check auth status with backend
+  const checkAuthStatus = useCallback(async () => {
+    try {
+      const user = await fetchAuthMe();
+      if (user && user.authenticated) {
+        stopPolling();
+        setAuthUser(user);
+        setMode('authenticated');
+        setAuthError(null);
+        // Automatically transition into the workspace without forcing manual Next click!
+        setTimeout(() => {
+          onAuthSuccess(user);
+        }, 400);
+        return true;
+      }
+    } catch {
+      // Backend request error
+    }
+    return false;
+  }, [stopPolling, onAuthSuccess]);
+
+  // Window focus listener: immediately check if user signed in when returning from browser
   useEffect(() => {
-    if (!isPolling) return;
+    const handleWindowFocus = () => {
+      if (mode !== 'authenticated') {
+        checkAuthStatus();
+      }
+    };
+    window.addEventListener('focus', handleWindowFocus);
+    return () => window.removeEventListener('focus', handleWindowFocus);
+  }, [mode, checkAuthStatus]);
+
+  // Background polling while authorizing in browser
+  useEffect(() => {
+    if (!isAuthorizing) return;
+
     const startTime = Date.now();
-    const interval = setInterval(async () => {
-      // Auto-stop after 3 minutes to prevent infinite polling
+    pollTimerRef.current = setInterval(async () => {
+      // Auto-timeout after 3 minutes
       if (Date.now() - startTime > 180000) {
-        setIsPolling(false);
-        setNoticeMsg("Browser sign-in session timed out. Please try again.");
+        stopPolling();
+        setAuthError("Sign-in timed out or was not completed in the browser. Please try again.");
         return;
       }
 
-      try {
-        const user = await fetchAuthMe();
-        if (user && user.authenticated) {
-          setIsPolling(false);
-          onAuthSuccess(user);
-        }
-      } catch {
-        // keep polling silently until Cloud authentication completes
+      const succeeded = await checkAuthStatus();
+      if (succeeded) {
+        stopPolling();
       }
     }, 1500);
-    return () => clearInterval(interval);
-  }, [isPolling, onAuthSuccess]);
 
-  // ALL authentication delegates strictly to Google OAuth via Cloud Gateway.
-  // Nothing is authenticated or stored locally on the desktop.
-  const handleCloudGoogleAuth = async (hintEmail?: string) => {
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+  }, [isAuthorizing, checkAuthStatus, stopPolling]);
+
+  // Launch Google OAuth in browser via Cloud Gateway
+  const handleLaunchGoogleAuth = async (hintEmail?: string) => {
+    setAuthError(null);
     let cloudGatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL;
     if (!cloudGatewayUrl) {
       try {
@@ -63,85 +100,219 @@ export default function DesktopSignInView({ onAuthSuccess }: DesktopSignInViewPr
           const cfg = await res.json();
           if (cfg.gateway_url) cloudGatewayUrl = cfg.gateway_url;
         }
-      } catch {}
+      } catch {
+        setAuthError("Unable to reach local MASH connector. Ensure backend is running.");
+      }
     }
+
     cloudGatewayUrl = (cloudGatewayUrl || "https://api.mash.ai").replace(/\/+$/, "");
     const emailParam = hintEmail ? `?login_hint=${encodeURIComponent(hintEmail)}` : '';
+
     try {
       window.open(`${cloudGatewayUrl}/v1/auth/oauth/google${emailParam}`, '_blank');
     } catch (err) {
       console.warn("Failed to open browser:", err);
     }
-    setIsPolling(true);
-    setNoticeMsg("Connecting to Cloud & Google OAuth... Complete sign-in in your browser to unlock desktop.");
+
+    setIsAuthorizing(true);
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleCloudGoogleAuth(email.trim());
+  // Previous button handler: resets state back to fresh default signin
+  const handlePrevious = () => {
+    stopPolling();
+    setMode('idle');
+    setBusinessEmail('');
+    setAuthError(null);
   };
+
+  // Next button handler: enters the workspace when authenticated
+  const handleNext = () => {
+    if (authUser && authUser.authenticated) {
+      onAuthSuccess(authUser);
+    }
+  };
+
+  // Keyboard shortcut: Enter key triggers Next if authenticated
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && mode === 'authenticated' && authUser) {
+        onAuthSuccess(authUser);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mode, authUser, onAuthSuccess]);
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-[#0a0a0c] text-white p-4 font-sans select-none">
-      <Card className="w-full max-w-[400px] rounded-2xl bg-[#161618] border border-zinc-800/90 shadow-2xl py-6 gap-5">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold text-white">
-            Sign in to MASH
-          </CardTitle>
-          <CardDescription className="text-sm text-zinc-400 mt-1 leading-snug">
-            Authenticate securely with your Google Workspace account via Cloud Gateway to access your audit workspace.
-          </CardDescription>
-        </CardHeader>
+    <div className={cn("flex flex-col min-h-screen w-full items-center justify-between bg-[#0e0e11] text-white p-6 sm:p-10 font-sans select-none", className)}>
+      
+      {/* Spacer to balance vertical centering */}
+      <div className="h-6 w-full shrink-0" />
 
-        <form onSubmit={handleLoginSubmit}>
-          <CardContent className="space-y-4">
-            {noticeMsg && (
-              <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-2 text-xs text-blue-400 text-left">
-                {noticeMsg}
+      {/* Main Centered Content */}
+      <div className="flex flex-col items-center justify-center w-full max-w-[360px] my-auto space-y-6">
+        
+        {/* Welcome Heading (Pure typography, zero logo) */}
+        <h1 className="text-[23px] sm:text-[25px] font-semibold text-white tracking-tight text-center">
+          Welcome to MASH
+        </h1>
+
+        {/* Centered Modal Card */}
+        <div className="w-full rounded-2xl bg-[#17171a] border border-zinc-800/80 p-5 sm:p-6 shadow-2xl flex flex-col gap-3.5 transition-all">
+          
+          {/* STATE 1: AUTHENTICATED SUCCESS */}
+          {mode === 'authenticated' && authUser ? (
+            <div className="py-2 flex flex-col items-center text-center space-y-3">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400">
+                <CheckCircle2 size={22} />
               </div>
-            )}
-
-            <div className="space-y-1.5 text-left">
-              <Label htmlFor="email" className="text-sm font-medium text-white">
-                Work Email (Optional)
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="auditor@firm.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-10 rounded-lg bg-[#1c1c1f] border-zinc-800 text-white placeholder:text-zinc-500 focus-visible:ring-1 focus-visible:ring-zinc-700"
-              />
+              <div className="space-y-1">
+                <div className="text-sm font-semibold text-white">Signed in successfully</div>
+                <div className="text-xs text-zinc-400 font-mono truncate max-w-[260px]">
+                  {authUser.email || authUser.name}
+                </div>
+              </div>
+              <p className="text-[11px] text-zinc-500">
+                Click <strong>Next</strong> below to enter your workspace.
+              </p>
             </div>
-          </CardContent>
-
-          <CardFooter className="pt-4 border-t border-zinc-800/80 flex flex-col gap-2.5">
-            <button
-              type="submit"
-              disabled={isPolling}
-              className="w-full h-10 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 font-medium text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+          ) : mode === 'business' ? (
+            /* STATE 2: BUSINESS ACCOUNT DOMAIN */
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (businessEmail.trim()) handleLaunchGoogleAuth(businessEmail.trim());
+              }}
+              className="space-y-3"
             >
-              {isPolling ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin text-zinc-900" />
-                  Connecting to Cloud...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                  </svg>
-                  Continue with Google
-                </span>
+              <div className="text-xs font-medium text-zinc-400 text-center mb-0.5">
+                Business SSO
+              </div>
+              <input
+                type="email"
+                autoFocus
+                required
+                placeholder="auditor@firm.com"
+                value={businessEmail}
+                onChange={(e) => setBusinessEmail(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl bg-[#202024] border border-zinc-800 text-white placeholder:text-zinc-500 text-xs sm:text-[13px] focus:outline-none focus:border-blue-500 transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={isAuthorizing}
+                className="w-full h-10 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs sm:text-[13px] font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-70"
+              >
+                {isAuthorizing ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Waiting for SSO in browser...</span>
+                  </>
+                ) : (
+                  <span>Continue with SSO</span>
+                )}
+              </button>
+            </form>
+          ) : (
+            /* STATE 3: DEFAULT SIGN IN (Always stays visible even after clicking Google!) */
+            <>
+              <div className="text-xs font-medium text-zinc-400 text-center mb-0.5">
+                Sign in
+              </div>
+
+              {/* Primary Blue: Continue with Google */}
+              <button
+                type="button"
+                onClick={() => handleLaunchGoogleAuth()}
+                className="w-full h-10 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs sm:text-[13px] font-medium transition-colors flex items-center justify-center gap-2.5 cursor-pointer shadow-sm active:scale-[0.99]"
+              >
+                {isAuthorizing ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin text-white" />
+                    <span>Authorizing in browser...</span>
+                  </>
+                ) : (
+                  <>
+                    {/* White Google G icon */}
+                    <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 24 24">
+                      <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
+                    </svg>
+                    <span>Continue with Google</span>
+                  </>
+                )}
+              </button>
+
+              {/* Secondary Dark: Use business account */}
+              <button
+                type="button"
+                onClick={() => {
+                  stopPolling();
+                  setMode('business');
+                }}
+                className="w-full h-10 rounded-xl bg-[#262629] hover:bg-[#303035] text-zinc-200 text-xs sm:text-[13px] font-medium transition-colors flex items-center justify-center cursor-pointer active:scale-[0.99]"
+              >
+                Use business account
+              </button>
+
+              {/* Subtle status notice while waiting for browser */}
+              {isAuthorizing && (
+                <div className="pt-1 text-center animate-in fade-in duration-150">
+                  <div className="text-[11px] text-zinc-400">
+                    Browser window opened. Sign in there, or{' '}
+                    <button
+                      type="button"
+                      onClick={handlePrevious}
+                      className="text-blue-400 hover:underline cursor-pointer font-medium"
+                    >
+                      cancel
+                    </button>
+                    .
+                  </div>
+                </div>
               )}
-            </button>
-          </CardFooter>
-        </form>
-      </Card>
+            </>
+          )}
+
+          {/* Connection Error Message if backend unreachable */}
+          {authError && (
+            <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] leading-tight text-center">
+              {authError}
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* Bottom Footer Controls: Previous & Next */}
+      <div className="flex flex-col items-center gap-2.5 pb-2 shrink-0">
+        <button
+          type="button"
+          onClick={handlePrevious}
+          disabled={mode === 'idle' && !isAuthorizing}
+          className={cn(
+            "text-xs transition-colors select-none",
+            (mode !== 'idle' || isAuthorizing)
+              ? "text-zinc-400 hover:text-white cursor-pointer"
+              : "text-zinc-600 cursor-default opacity-50"
+          )}
+        >
+          Previous
+        </button>
+
+        <button
+          type="button"
+          disabled={mode !== 'authenticated'}
+          onClick={handleNext}
+          className={cn(
+            "w-44 h-8 rounded-lg text-xs font-medium transition-all flex items-center justify-center select-none",
+            mode === 'authenticated'
+              ? "bg-white text-zinc-900 hover:bg-zinc-100 cursor-pointer shadow-md"
+              : "bg-zinc-800/60 text-zinc-500 cursor-not-allowed border border-zinc-800/40"
+          )}
+        >
+          Next
+        </button>
+      </div>
+
     </div>
   );
 }

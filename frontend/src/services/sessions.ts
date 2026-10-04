@@ -116,6 +116,31 @@ export async function queueSteeringMessage(
   }
 }
 
+export async function fetchSessionQueue(sessionId: string): Promise<string[]> {
+  try {
+    const res = await safeFetch(`${BASE_URL}/sessions/${sessionId}/queue`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.queued) ? data.queued : [];
+  } catch (err) {
+    console.warn("Failed to fetch session queue:", err);
+    return [];
+  }
+}
+
+export async function removeSessionQueueItem(sessionId: string, index?: number): Promise<boolean> {
+  try {
+    const url = index !== undefined
+      ? `${BASE_URL}/sessions/${sessionId}/queue?index=${index}`
+      : `${BASE_URL}/sessions/${sessionId}/queue`;
+    const res = await safeFetch(url, { method: "DELETE" });
+    return res.ok;
+  } catch (err) {
+    console.warn("Failed to remove session queue item:", err);
+    return false;
+  }
+}
+
 export async function uploadSessionFile(
   sessionId: string,
   file: File

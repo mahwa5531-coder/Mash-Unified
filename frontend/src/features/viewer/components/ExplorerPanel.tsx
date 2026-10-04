@@ -46,7 +46,7 @@ export function ExplorerPanel({
                   key={item.path || idx}
                   path={item.path}
                   label={item.name}
-                  onOpenFile={() => openFileTab(item.name, item.path)}
+                  onOpenFile={() => openFileTab(item.name, item.path, item.type === 'image' ? 'image' : 'file')}
                   className="max-w-full"
                 />
               ))}
@@ -73,7 +73,7 @@ export function ExplorerPanel({
                 key={item.path || idx}
                 path={item.path}
                 label={item.name}
-                onOpenFile={() => openFileTab(item.name, item.path)}
+                onOpenFile={() => openFileTab(item.name, item.path, item.type === 'image' ? 'image' : 'file')}
                 className="max-w-full"
               />
             ))}

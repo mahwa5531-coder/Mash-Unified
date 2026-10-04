@@ -17,7 +17,8 @@ export interface SessionRuntimeState {
   turnStartTime: number;
   thinkingDuration: number | null;
   abortController: AbortController | null;
-  queuedMessage: string | null;
+  queuedMessages: string[];
+  queuedMessage?: string | null;
   inputPrompt: string;
   isHistoryLoaded: boolean;
   historyLoadError?: boolean;
@@ -68,6 +69,7 @@ export function getOrCreateSessionState(sid: string): SessionRuntimeState {
     turnStartTime: 0,
     thinkingDuration: null,
     abortController: null,
+    queuedMessages: [],
     queuedMessage: null,
     inputPrompt: '',
     isHistoryLoaded: false,

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Message } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
-import { fetchTranscript, renameSession, markSessionViewed, queueSteeringMessage } from '@/services/sessions';
+import { fetchTranscript, renameSession, markSessionViewed, queueSteeringMessage, fetchSessionQueue, removeSessionQueueItem } from '@/services/sessions';
 import { streamQuery } from '@/services/stream';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
 import { parseSessionHistory, buildTurns } from '@/features/chat/utils/turns';
@@ -79,6 +79,24 @@ export function useChatStream({
     scrollContainerRef,
   });
 
+  const handleSendMessageRef = useRef<((...args: any[]) => Promise<void>) | null>(null);
+  const dispatchSendMessage = useCallback(
+    (...args: any[]) => {
+      if (handleSendMessageRef.current) {
+        return handleSendMessageRef.current(...args);
+      }
+      return Promise.resolve();
+    },
+    []
+  );
+
+  // 3. Atomised Chat Steering
+  const steering = useChatSteering({
+    activeSessionIdRef,
+    sessionId,
+    onSendMessage: dispatchSendMessage,
+  });
+
   // Handle autoscroll tracking
   useEffect(() => {
     const el = scrollRef.current;
@@ -113,9 +131,24 @@ export function useChatStream({
     setChatMessages(state.chatMessages);
     setIsStreaming(state.isStreaming);
     setInputPrompt(state.inputPrompt);
+    steering.setQueuedMessages(state.queuedMessages || []);
     history.setIsHistoryLoaded(state.isHistoryLoaded);
     history.setHistoryLoadError(state.historyLoadError ?? false);
     history.updatePaginationState(state);
+
+    // Rehydrate any unconsumed queued messages from backend on refresh / session switch
+    fetchSessionQueue(sessionId).then((backendQueue) => {
+      const s = sessionStore.get(sessionId);
+      if (!s) return;
+      if (backendQueue && backendQueue.length > 0 && (!s.queuedMessages || s.queuedMessages.length === 0)) {
+        s.queuedMessages = [...backendQueue];
+        s.queuedMessage = backendQueue[0] || null;
+        if (activeSessionIdRef.current === sessionId) {
+          steering.setQueuedMessages([...backendQueue]);
+        }
+        notifyStoreListeners();
+      }
+    }).catch(() => {});
 
     const PAGE_SIZE = 100;
     if (!state.isHistoryLoaded || (!state.isStreaming && state.chatMessages.length === 0)) {
@@ -235,12 +268,12 @@ export function useChatStream({
     const targetSession = getOrCreateSessionState(activeSid);
 
     if (targetSession.isStreaming && !isRetry && !isImmediate) {
-      targetSession.queuedMessage = userText;
+      targetSession.queuedMessages = [...(targetSession.queuedMessages || []), userText];
+      targetSession.queuedMessage = targetSession.queuedMessages[0] || null;
       if (activeSid === activeSessionIdRef.current) {
-        steering.setQueuedMessage(userText);
+        steering.setQueuedMessages([...targetSession.queuedMessages]);
       }
       notifyStoreListeners();
-      queueSteeringMessage(activeSid, userText).catch(() => {});
       return;
     }
 
@@ -255,10 +288,6 @@ export function useChatStream({
           body: JSON.stringify({ session_id: activeSid, user_id: 'default_user', force: true }),
         });
       } catch {}
-      targetSession.queuedMessage = null;
-      if (activeSid === activeSessionIdRef.current) {
-        steering.setQueuedMessage(null);
-      }
     }
 
     const currentStamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -518,6 +547,7 @@ export function useChatStream({
       );
     } finally {
       const s = sessionStore.get(activeSid);
+      let nextQueuedMsg: string | null = null;
       if (s) {
         s.isStreaming = false;
         s.abortController = null;
@@ -535,23 +565,38 @@ export function useChatStream({
             setChatMessages(next);
           }
         }
+        const wasAborted = s.wasUserAborted;
         s.wasUserAborted = false;
+
+        // Auto-send next queued message if user had one waiting
+        if (!wasAborted && s.queuedMessages && s.queuedMessages.length > 0) {
+          nextQueuedMsg = s.queuedMessages.shift() || null;
+          s.queuedMessage = s.queuedMessages[0] || null;
+          if (activeSid === activeSessionIdRef.current) {
+            steering.setQueuedMessages([...s.queuedMessages]);
+          }
+        }
       }
       if (activeSid === activeSessionIdRef.current) {
         setIsStreaming(false);
         flushActiveStreamBuffer();
       }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mash:turn_completed', { detail: { sessionId: activeSid } }));
+      }
       notifyStoreListeners();
       markSessionViewed(activeSid).catch(() => {});
+
+      // Auto-dispatch next queued message to honor "Sends after agent finishes working"
+      if (nextQueuedMsg) {
+        removeSessionQueueItem(activeSid, 0).catch(() => {});
+        setTimeout(() => {
+          handleSendMessage(undefined, undefined, nextQueuedMsg!, false, activeSid);
+        }, 80);
+      }
     }
   };
-
-  // 3. Atomised Chat Steering
-  const steering = useChatSteering({
-    activeSessionIdRef,
-    sessionId,
-    onSendMessage: handleSendMessage,
-  });
+  handleSendMessageRef.current = handleSendMessage;
 
   const handleStopStreaming = useCallback(async () => {
     const curSid = activeSessionIdRef.current;
@@ -680,7 +725,7 @@ export function useChatStream({
       const s = sessionStore.get(curSid);
       if (s) {
         setIsStreaming(s.isStreaming);
-        steering.setQueuedMessage(s.queuedMessage);
+        steering.setQueuedMessages(s.queuedMessages || []);
       }
     });
   }, [steering]);
@@ -693,6 +738,7 @@ export function useChatStream({
     isHistoryLoaded: history.isHistoryLoaded,
     historyLoadError: history.historyLoadError,
     retryLoadHistory: history.retryLoadHistory,
+    queuedMessages: steering.queuedMessages,
     queuedMessage: steering.queuedMessage,
     turns,
     artifactsByTurnMsg,

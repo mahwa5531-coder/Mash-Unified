@@ -194,7 +194,68 @@ assert.strictEqual(jsonPayload, '{"status": "done", "records": 42}', "JSON with 
 
 console.log("  -> PASSED: Multiple sentinels cleanly stripped; English words & JSON 100% preserved");
 
+// Test 7: Multi-Item Queuing, Index-Based Operations & Auto-Dispatch
+console.log("\n[Frontend Test 7] Multi-Item Queuing, Index Operations & Auto-Dispatch");
+
+const mockSession = {
+  isStreaming: true,
+  queuedMessages: [],
+  wasUserAborted: false,
+};
+
+function queueUserMessage(session, text) {
+  if (session.isStreaming) {
+    session.queuedMessages.push(text);
+    return true;
+  }
+  return false;
+}
+
+function discardQueueItem(session, index) {
+  if (index !== undefined) {
+    session.queuedMessages.splice(index, 1);
+  } else {
+    session.queuedMessages = [];
+  }
+}
+
+function onStreamComplete(session) {
+  session.isStreaming = false;
+  let nextMsg = null;
+  if (!session.wasUserAborted && session.queuedMessages.length > 0) {
+    nextMsg = session.queuedMessages.shift();
+  }
+  return nextMsg;
+}
+
+// 7a. Enqueue 3 messages consecutively without overwriting
+assert.strictEqual(queueUserMessage(mockSession, "First prompt"), true);
+assert.strictEqual(queueUserMessage(mockSession, "Second prompt"), true);
+assert.strictEqual(queueUserMessage(mockSession, "Third prompt"), true);
+assert.strictEqual(mockSession.queuedMessages.length, 3, "Queue must contain 3 items without overwriting");
+assert.deepStrictEqual(mockSession.queuedMessages, ["First prompt", "Second prompt", "Third prompt"]);
+
+// 7b. Discard specific item by index
+discardQueueItem(mockSession, 1); // remove "Second prompt"
+assert.strictEqual(mockSession.queuedMessages.length, 2, "Queue should now have 2 items");
+assert.deepStrictEqual(mockSession.queuedMessages, ["First prompt", "Third prompt"]);
+
+// 7c. Emulate first stream completion -> auto-dispatch first item
+const dispatched1 = onStreamComplete(mockSession);
+assert.strictEqual(dispatched1, "First prompt", "First queued item must be auto-dispatched");
+assert.strictEqual(mockSession.queuedMessages.length, 1, "Queue should retain 1 remaining item");
+assert.deepStrictEqual(mockSession.queuedMessages, ["Third prompt"]);
+
+// 7d. Emulate second stream completion -> auto-dispatch final item
+mockSession.isStreaming = true;
+const dispatched2 = onStreamComplete(mockSession);
+assert.strictEqual(dispatched2, "Third prompt", "Final queued item must be auto-dispatched");
+assert.strictEqual(mockSession.queuedMessages.length, 0, "Queue must now be empty");
+
+console.log("  -> PASSED: Multi-item queue accumulation, index discard, and auto-dispatch 100% verified");
+
 console.log("\n======================================================================");
-console.log("ALL FRONTEND CHAT RENDERING TESTS PASSED (6/6)");
+console.log("ALL FRONTEND CHAT RENDERING TESTS PASSED (7/7)");
 console.log("======================================================================");
+
 

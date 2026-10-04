@@ -9,6 +9,7 @@ import {
   WebLink
 } from '@/primitives';
 import TableContainer from '@/components/renderers/TableContainer';
+import CalloutBlockquote from '@/components/renderers/CalloutBlockquote';
 import { normalizePath } from '@/utils/normalizePath';
 import { BASE_URL } from '@/services/client';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
@@ -81,7 +82,7 @@ export function useAgentMarkdownComponents({
 
     /** Audit callout styling for blockquotes (feature #3). */
     blockquote({ children, node: _node, ...props }: any) {
-      return <AuditCallout {...props}>{children}</AuditCallout>;
+      return <CalloutBlockquote {...props}>{children}</CalloutBlockquote>;
     },
 
     /** Workpaper table container with Excel copy + CSV export (feature parity). */
@@ -133,8 +134,8 @@ export function useAgentMarkdownComponents({
     h1({ children, node: _node, ...props }: any) {
       return (
         <h1 className={isChat
-          ? "mt-7 mb-3.5 text-[19px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0"
-          : "mt-8 mb-4 text-[18px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0"
+          ? "mt-7 mb-3.5 text-[22px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0"
+          : "mt-8 mb-4 text-[22px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0"
         } {...props}>
           {processTextNodes(children, onOpenFile)}
         </h1>
@@ -144,8 +145,8 @@ export function useAgentMarkdownComponents({
     h2({ children, node: _node, ...props }: any) {
       return (
         <h2 className={isChat
-          ? "mt-6 mb-3 text-[16px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/70 dark:border-white/[0.08] pb-2"
-          : "mt-7 mb-3.5 text-[16px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/70 dark:border-white/[0.08] pb-2.5"
+          ? "mt-6 mb-2.5 text-[17.5px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/60 dark:border-white/[0.08] pb-1.5"
+          : "mt-7 mb-3 text-[17.5px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/60 dark:border-white/[0.08] pb-2"
         } {...props}>
           {processTextNodes(children, onOpenFile)}
         </h2>
@@ -154,7 +155,7 @@ export function useAgentMarkdownComponents({
 
     h3({ children, node: _node, ...props }: any) {
       return (
-        <h3 className="mt-5 mb-2.5 text-[14.5px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
+        <h3 className="mt-5 mb-2 text-[15px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h3>
       );
@@ -162,7 +163,7 @@ export function useAgentMarkdownComponents({
 
     h4({ children, node: _node, ...props }: any) {
       return (
-        <h4 className="mt-4 mb-2 text-[12.5px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 first:mt-0" {...props}>
+        <h4 className="mt-4 mb-1.5 text-[13px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h4>
       );
@@ -196,10 +197,10 @@ export function useAgentMarkdownComponents({
 
       const isFileUri = href.startsWith('file:///') || href.startsWith('file://');
       const isWinPath = /^[a-zA-Z]:[/\\]/.test(href);
-      const isRelativeFile = /\.(xlsx?|xlsm|csv|json|md|markdown|txt|log|py|tsx?|jsx?|mjs|sql|ya?ml|toml|xml|env|html|css|pdf|png|jpe?g|svg|webp|gif|j2|jinja2?)$/i.test(href.split('#')[0]);
-      const isLocalPath = (href.startsWith('/') || href.startsWith('./') || href.startsWith('../')) && isFullFilePath(href);
+      const isUnixAbsPath = /^\/(?:Users|home|tmp|var|etc)\//.test(href);
+      const isFullFile = isFileUri || isWinPath || isUnixAbsPath || isFullFilePath(href);
 
-      if (isFileUri || isWinPath || isRelativeFile || isLocalPath || isFullFilePath(href)) {
+      if (isFullFile) {
         const rawLabel = extractChildText(children);
         const { filePath, display } = formatFilePill(rawLabel || href, href);
         return <FilePill path={filePath} label={display} onOpenFile={onOpenFile} />;
@@ -226,14 +227,14 @@ export function useAgentMarkdownComponents({
       const caption = alt && alt.trim() ? alt.trim() : null;
 
       return (
-        <div
+        <span
           onClick={() => {
             onImageClick?.({ src: resolvedSrc, alt: caption || '', path: cleanPath });
           }}
-          className="my-3 rounded-xl overflow-hidden border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#141414] p-2.5 shadow-xs group/img cursor-pointer transition-all hover:border-zinc-300 dark:hover:border-white/[0.15]"
+          className="block my-3 rounded-xl overflow-hidden border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#141414] p-2.5 shadow-xs group/img cursor-pointer transition-all hover:border-zinc-300 dark:hover:border-white/[0.15]"
           title={caption ? `Click to inspect: ${caption}` : 'Click to inspect image'}
         >
-          <div className="relative overflow-hidden rounded-lg bg-black/[0.02] dark:bg-white/[0.02] flex items-center justify-center min-h-[120px] max-h-[500px]">
+          <span className="relative block overflow-hidden rounded-lg bg-black/[0.02] dark:bg-white/[0.02] flex items-center justify-center min-h-[120px] max-h-[500px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={resolvedSrc}
@@ -242,13 +243,13 @@ export function useAgentMarkdownComponents({
               loading="lazy"
               {...props}
             />
-          </div>
+          </span>
           {caption && (
-            <div className="text-center text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium truncate px-2">
+            <span className="block text-center text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium truncate px-2">
               {caption}
-            </div>
+            </span>
           )}
-        </div>
+        </span>
       );
     },
   }), [isChat, sessionId, onOpenFile, onImageClick]);

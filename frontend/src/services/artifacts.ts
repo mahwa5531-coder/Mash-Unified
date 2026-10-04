@@ -5,7 +5,7 @@ import { BASE_URL, safeFetch } from './client';
 export interface ArtifactFileItem {
   name: string;
   path: string;
-  type: 'walkthrough' | 'plan' | 'doc' | 'code' | 'sheet';
+  type: 'walkthrough' | 'plan' | 'doc' | 'code' | 'sheet' | 'image' | 'pdf';
   group?: 'deliverables' | 'working_papers';
   size?: number;
   mtime?: number;
@@ -25,10 +25,12 @@ export interface SessionArtifactsData {
 function parseArtifactItem(raw: any, defaultGroup: 'deliverables' | 'working_papers' = 'working_papers'): ArtifactFileItem {
   const name = raw.name || raw.path?.split(/[/\\]/).pop() || '';
   const lower = name.toLowerCase();
-  let type: 'walkthrough' | 'plan' | 'doc' | 'code' | 'sheet' = 'doc';
+  let type: 'walkthrough' | 'plan' | 'doc' | 'code' | 'sheet' | 'image' | 'pdf' = 'doc';
   if (lower.includes('walkthrough')) type = 'walkthrough';
   else if (lower.includes('plan')) type = 'plan';
   else if (/\.(xlsx?|csv|xlsm)$/.test(lower)) type = 'sheet';
+  else if (/\.(png|jpe?g|svg|webp|gif|bmp)$/.test(lower)) type = 'image';
+  else if (/\.pdf$/.test(lower)) type = 'pdf';
   else if (/\.(py|ts|tsx|js|sql|sh|ps1|json|ya?ml)$/.test(lower)) type = 'code';
 
   return {

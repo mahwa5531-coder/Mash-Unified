@@ -7,9 +7,9 @@ import { BASE_URL } from '@/services/client';
 import { useIsDarkMode } from '@/hooks/useIsDarkMode';
 import { ImageViewer } from './renderers/ImageViewer';
 import { PdfViewer } from './renderers/PdfViewer';
-import { BinaryExcelFallback } from './renderers/BinaryExcelFallback';
-import { UnsupportedDocFallback } from './renderers/UnsupportedDocFallback';
+import { FileViewerNotice } from './renderers/FileViewerNotice';
 import { AgentMarkdown } from '@/components/markdown/AgentMarkdown';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -75,7 +75,8 @@ export default function SafeFileViewer({
   const cleanName = (path || filename || '').toLowerCase();
   const isImage = /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/.test(cleanName);
   const isMarkdown = /\.md$/i.test(cleanName);
-  const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods|csv)$/i.test(cleanName);
+  const isCsv = /\.csv$/i.test(cleanName);
+  const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods)$/i.test(cleanName);
   const isPdf = /\.pdf$/i.test(cleanName);
   const isUnsupported = /\.(docx|doc|pptx|ppt|zip|tar|gz|7z|rar|exe|bin|iso|dmg|dll|so|dylib)$/i.test(cleanName);
 
@@ -85,6 +86,9 @@ export default function SafeFileViewer({
   }, [cleanName]);
 
   const isMassiveFile = (content?.length || 0) > MASSIVE_FILE_LIMIT;
+  const MONACO_SAFE_LIMIT = 200 * 1024; // 200 KB max for Monaco AST tokenization
+  const isHeavyFile = (content?.length || 0) > MONACO_SAFE_LIMIT;
+  const [forceMonaco, setForceMonaco] = React.useState(false);
 
   const displayedContent = useMemo(() => {
     if (!content) return '// Empty file';
@@ -105,38 +109,48 @@ export default function SafeFileViewer({
     );
   }
 
-  if (isImage) {
-    return <ImageViewer filename={filename} path={path} sessionQuery={sessionQuery} />;
+  const isFileNotFound = Boolean(
+    content && (
+      content.includes('not found on local disk') ||
+      content.includes('File not found') ||
+      content.includes('Failed to load file content') ||
+      content.startsWith('Error loading file:')
+    )
+  );
+
+  if (isFileNotFound) {
+    return <FileViewerNotice message="File not found" />;
   }
 
-  if (isBinaryExcel) {
-    return (
-      <BinaryExcelFallback
-        filename={filename}
-        path={path}
-        sessionId={sessionId}
-        sessionQuery={sessionQuery}
-      />
-    );
+  if (isCsv || isBinaryExcel || isUnsupported) {
+    return <FileViewerNotice message="File format not supported" />;
+  }
+
+  if (isImage) {
+    return <ImageViewer filename={filename} path={path} sessionQuery={sessionQuery} />;
   }
 
   if (isPdf) {
     return <PdfViewer filename={filename} path={path} sessionId={sessionId} sessionQuery={sessionQuery} />;
   }
 
-  if (isUnsupported) {
-    return (
-      <UnsupportedDocFallback
-        filename={filename}
-        cleanName={cleanName}
-        path={path}
-        sessionQuery={sessionQuery}
-      />
-    );
-  }
+  const handleEditorWillMount = (monaco: any) => {
+    monaco.editor.defineTheme('pitch-black', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': '#000000',
+        'editorGutter.background': '#000000',
+        'editor.lineHighlightBackground': '#09090b',
+        'editorLineNumber.foreground': '#52525b',
+        'editorLineNumber.activeForeground': '#a1a1aa',
+      },
+    });
+  };
 
   return (
-    <div className="flex flex-col h-full bg-zinc-100/60 dark:bg-[#121215] overflow-hidden">
+    <div className="flex flex-col h-full bg-zinc-100/60 dark:bg-black overflow-hidden">
       {/* Massive File Backend Truncation Shield */}
       {isMassiveFile && (
         <div className="px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/25 flex items-center justify-between text-xs text-amber-600 dark:text-amber-400 select-none shrink-0 gap-2">
@@ -169,44 +183,69 @@ export default function SafeFileViewer({
             />
           </div>
         ) : (
-          <div className="flex-1 w-full h-full min-h-[350px] bg-white dark:bg-[#1c1c20] text-[12.5px] leading-relaxed select-text flex flex-col overflow-hidden">
-            {viewMode === 'raw' ? (
+          <div className="flex-1 w-full h-full min-h-[350px] bg-white dark:bg-black text-[12.5px] leading-relaxed select-text flex flex-col overflow-hidden">
+            {isHeavyFile && !forceMonaco && (
+              <div className="px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/20 flex items-center justify-between text-xs text-blue-600 dark:text-blue-400 select-none shrink-0 gap-2">
+                <span>Fast Virtualized View ({Math.round((content?.length || 0) / 1024)} KB) — Zero-freeze instant rendering</span>
+                <button
+                  type="button"
+                  onClick={() => setForceMonaco(true)}
+                  className="px-2.5 py-0.5 rounded bg-blue-500/20 hover:bg-blue-500/30 text-blue-700 dark:text-blue-300 font-medium transition-colors cursor-pointer text-[11px]"
+                >
+                  Load in Monaco
+                </button>
+              </div>
+            )}
+            {(viewMode === 'raw' || (isHeavyFile && !forceMonaco)) ? (
               <pre 
                 style={{ contentVisibility: 'auto', containIntrinsicSize: '0 500px' }}
-                className="p-5 font-mono text-[12.5px] leading-relaxed select-text whitespace-pre overflow-x-auto text-zinc-800 dark:text-zinc-200 h-full overflow-auto bg-white dark:bg-[#1c1c20]"
+                className="p-5 font-mono text-[12.5px] leading-relaxed select-text whitespace-pre overflow-x-auto text-zinc-800 dark:text-zinc-200 h-full overflow-auto bg-white dark:bg-black"
               >
                 {displayedContent}
               </pre>
             ) : (
-              <MonacoEditor
-                height="100%"
-                language={monacoLang}
-                theme={isDark ? 'vs-dark' : 'light'}
-                value={displayedContent}
-                options={{
-                  readOnly: true,
-                  domReadOnly: true,
-                  minimap: { enabled: false },
-                  fontSize: 12.5,
-                  lineHeight: 1.6,
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                  lineNumbers: 'on',
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  wordWrap: 'off',
-                  renderLineHighlight: 'none',
-                  contextmenu: true,
-                  folding: true,
-                  overviewRulerLanes: 0,
-                  stopRenderingLineAfter: 10000,
-                  scrollbar: {
-                    vertical: 'visible',
-                    horizontal: 'auto',
-                    verticalScrollbarSize: 8,
-                    horizontalScrollbarSize: 8,
-                  },
-                }}
-              />
+              <ErrorBoundary
+                scope="monaco-editor"
+                fallback={
+                  <pre 
+                    style={{ contentVisibility: 'auto', containIntrinsicSize: '0 500px' }}
+                    className="p-5 font-mono text-[12.5px] leading-relaxed select-text whitespace-pre overflow-x-auto text-zinc-800 dark:text-zinc-200 h-full overflow-auto bg-white dark:bg-black"
+                  >
+                    {displayedContent}
+                  </pre>
+                }
+              >
+                <MonacoEditor
+                  height="100%"
+                  language={monacoLang}
+                  theme={isDark ? 'pitch-black' : 'light'}
+                  beforeMount={handleEditorWillMount}
+                  value={displayedContent}
+                  options={{
+                    readOnly: true,
+                    domReadOnly: true,
+                    minimap: { enabled: false },
+                    fontSize: 12.5,
+                    lineHeight: 1.6,
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    lineNumbers: 'on',
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    wordWrap: 'off',
+                    renderLineHighlight: 'none',
+                    contextmenu: true,
+                    folding: true,
+                    overviewRulerLanes: 0,
+                    stopRenderingLineAfter: 10000,
+                    scrollbar: {
+                      vertical: 'visible',
+                      horizontal: 'auto',
+                      verticalScrollbarSize: 8,
+                      horizontalScrollbarSize: 8,
+                    },
+                  }}
+                />
+              </ErrorBoundary>
             )}
           </div>
         )}

@@ -86,7 +86,7 @@ export function useViewerTabs(sessionId?: string) {
 
     const isImg = type === 'image' || /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/i.test(normalizedPath || name);
     const isPdf = /\.pdf$/i.test(normalizedPath || name);
-    const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods|csv)$/i.test(normalizedPath || name);
+    const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods)$/i.test(normalizedPath || name);
     const isUnsupported = UNSUPPORTED_DOC_REGEX.test(normalizedPath || name);
     const tabId = isImg ? `img-${normalizedPath}` : `file-${normalizedPath}`;
 
@@ -182,7 +182,7 @@ export function useViewerTabs(sessionId?: string) {
     if (activeTab && activeTab.type === 'file' && activeTab.path) {
       const isPdf = /\.pdf$/i.test(activeTab.path);
       const isUnsupported = UNSUPPORTED_DOC_REGEX.test(activeTab.path);
-      const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods|csv)$/i.test(activeTab.path);
+      const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods)$/i.test(activeTab.path);
       if (isPdf || isUnsupported || isBinaryExcel) return;
 
       const tabId = activeTab.id;

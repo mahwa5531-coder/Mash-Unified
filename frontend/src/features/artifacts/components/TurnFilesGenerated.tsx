@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, FileText } from 'lucide-react';
 import { FilePill } from '@/primitives/FilePill';
+import { PathPill } from '@/primitives/PathPill';
 import { cn } from '@/lib/utils';
 import { EditedFileItem } from '@/types/artifacts';
 
@@ -35,6 +36,10 @@ export function TurnFilesGenerated({
   if (!files || files.length === 0) return null;
 
   const count = files.length;
+  const isScratchOnly = files.every(f => (f.dir || f.path || '').toLowerCase().includes('scratch'));
+  const headerLabel = isScratchOnly 
+    ? `${count} supporting calculation file${count > 1 ? 's' : ''}`
+    : `${count} file${count > 1 ? 's' : ''} generated in this turn`;
 
   return (
     <div className={cn(
@@ -48,7 +53,7 @@ export function TurnFilesGenerated({
           className="flex items-center gap-1.5 cursor-pointer text-[13px]"
         >
           <span className="text-zinc-700 dark:text-zinc-300 font-medium">
-            {count} file{count > 1 ? 's' : ''} generated in this turn
+            {headerLabel}
           </span>
           <ChevronDown 
             size={13} 
@@ -76,10 +81,10 @@ export function TurnFilesGenerated({
       {isOpen && (
         <div className="flex flex-col gap-1 mt-2.5 pt-0.5">
           {files.map((file, idx) => {
-            const rawDir = file.dir || '';
-            const cleanDir = rawDir
-              ? (rawDir.replace(/\\/g, '/').startsWith('/') ? rawDir.replace(/\\/g, '/') : `/${rawDir.replace(/\\/g, '/')}`)
-              : '';
+            const parts = (file.path || '').replace(/\\/g, '/').split('/');
+            const filename = file.filename || parts[parts.length - 1] || file.path;
+            const dirPart = file.dir || parts.slice(0, -1).join('/');
+            const cleanDir = dirPart ? (dirPart.startsWith('/') ? dirPart : `/${dirPart}`) : '';
 
             return (
               <div
@@ -97,18 +102,18 @@ export function TurnFilesGenerated({
                 title={`Click anywhere to open ${file.path}`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  {/* Canonical FilePill */}
+                  {/* Canonical FilePill showing file name (clickable) */}
                   <FilePill 
                     path={file.path} 
-                    label={file.filename} 
+                    label={filename} 
                     onClick={(e) => {
                       e.stopPropagation();
                       onOpenFile?.(file.path);
                     }} 
                   />
-                  {/* Ghost Folder Directory Path - Decreased Size & Calm Tone */}
+                  {/* Ghost file path on side of FilePill */}
                   {cleanDir && (
-                    <span className="text-[10.5px] font-mono text-zinc-400/80 dark:text-zinc-500/70 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 transition-colors truncate">
+                    <span className="text-[11.5px] font-mono text-zinc-400/80 dark:text-zinc-500/70 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 transition-colors truncate">
                       {cleanDir}
                     </span>
                   )}

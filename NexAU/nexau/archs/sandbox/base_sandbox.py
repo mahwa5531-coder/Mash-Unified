@@ -316,7 +316,7 @@ def smart_truncate_output(
         head = text[:head_chars]
         tail = text[-tail_chars:]
         omitted = len(text) - head_chars - tail_chars
-        return f"{head}\n\n... [{omitted:,} characters omitted] ...\n(Full output: {output_dir}/{stream_name}.txt)\n\n{tail}"
+        return f"{head}\n\n... [{omitted:,} characters omitted due to output size limit] ...\n\n{tail}"
 
     truncated_stdout = _truncate_stream(stdout, "stdout")
     truncated_stderr = _truncate_stream(stderr, "stderr")

@@ -32,7 +32,7 @@ export function formatFilePill(rawLabel: string, rawHref: string) {
   return { filePath, display };
 }
 
-// Detect if a string is a valid file path with recognized extension
+// Detect if a string is a valid full absolute file path with recognized extension
 export function isFullFilePath(raw: string): boolean {
   if (!raw || typeof raw !== 'string') return false;
   const clean = normalizePath(raw.trim());
@@ -41,9 +41,20 @@ export function isFullFilePath(raw: string): boolean {
 
   const FILE_EXT_REGEX = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|pyw|ipynb|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|db|sqlite|md|markdown|txt|log|html|css|scss|xml|xbrl|sh|bash|zsh|ps1|rs|go|c|cpp|h|java|zip|tar|gz|png|jpe?g|gif|svg|webp)$/i;
 
+  if (!FILE_EXT_REGEX.test(clean)) return false;
+
   const parts = clean.split(/[/\\]/);
   const filename = parts.pop() || '';
-  return FILE_EXT_REGEX.test(clean) && filename.length > 0 && !filename.startsWith('.');
+  if (!filename || filename.startsWith('.')) return false;
+
+  // Must be an absolute full path with a drive letter, unix root, or file:// URI
+  const isAbsolute = (
+    /^[a-zA-Z]:[/\\]/.test(clean) ||
+    /^\/(?:Users|home|tmp|var|etc)\//.test(clean) ||
+    clean.startsWith('file://')
+  );
+
+  return isAbsolute;
 }
 
 // Detect if a string is a standalone file extension

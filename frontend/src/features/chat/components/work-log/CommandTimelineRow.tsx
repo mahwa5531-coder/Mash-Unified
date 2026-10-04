@@ -33,61 +33,77 @@ export function CommandTimelineRow({
   const toolId = String(entry.data?.tool?.id || entry.id);
   const rawOutput = entry.data?.tool?.output || '';
   const outputText = rawOutput.trim();
-  const hasOutput = outputText.length > 0 && outputText !== 'Done.';
-  const isFailed = entry.data?.tool?.status === 'failed' || /error|failed|command not found/i.test(outputText);
+
+  let displayOutput = outputText;
+  let parsedError: string | null = null;
+  if (outputText.startsWith('{') && outputText.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(outputText);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.error) {
+          parsedError = typeof parsed.error === 'string' ? parsed.error : parsed.error.message || JSON.stringify(parsed.error);
+        }
+        if (parsed.returnDisplay || parsed.content) {
+          displayOutput = parsed.returnDisplay || parsed.content;
+        }
+      }
+    } catch {}
+  }
+
+  const isFailed = entry.data?.tool?.status === 'failed' || Boolean(parsedError) || (!parsedError && /error:|command not found|fatal:/i.test(displayOutput));
 
   return (
-    <div key={entry.id} className={cn("flex flex-col min-w-0 max-w-full my-0.5", isChild ? "px-3 py-1 hover:bg-muted/40 transition-colors" : "")}>
-      <div
-        onClick={() => hasOutput && setExpandedCmdIndex(isCmdExpanded ? null : toolId)}
-        className={cn(
-          "flex items-center justify-between text-xs py-0.5 group select-none transition-colors w-full",
-          hasOutput ? "cursor-pointer" : "cursor-default"
-        )}
+    <div key={entry.id} className={cn("flex flex-col text-xs select-none transition-colors", isChild ? "pl-2 py-0.5" : "my-0.5")}>
+      <button
+        type="button"
+        onClick={() => setExpandedCmdIndex(isCmdExpanded ? null : toolId)}
+        className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-normal py-0.5 cursor-pointer select-none transition-colors group text-left w-fit"
       >
-        <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
-          <span className="inline-flex items-center gap-1 text-muted-foreground font-sans shrink-0">
-            {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
-            {isCancelled ? 'Cancelled' : isRunning ? 'Running' : 'Ran'}
-          </span>
-          <span className="font-mono text-foreground font-medium truncate max-w-xl">{entry.data?.cmd}</span>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {hasOutput && (
-            <ChevronRight size={11} className={cn("text-muted-foreground group-hover:text-foreground transition-transform shrink-0", isCmdExpanded && "rotate-90")} />
+        {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
+        <span className="font-sans text-[12px]">
+          {isCancelled ? 'Cancelled' : isRunning ? 'Running' : 'Ran'}
+        </span>
+        <span className="font-mono font-medium text-foreground text-[12px] truncate max-w-md">
+          {entry.data?.cmd}
+        </span>
+        <ChevronRight
+          size={11}
+          className={cn(
+            "text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 transition-transform duration-200 shrink-0",
+            isCmdExpanded && "rotate-90"
           )}
-        </div>
-      </div>
+        />
+      </button>
 
-      {hasOutput && isCmdExpanded && (
-        <div className="py-1 overflow-hidden transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
-          <div className="w-full rounded-lg border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-100/40 dark:bg-white/[0.02] p-2 font-mono text-[11px] transition-colors duration-200 shadow-none">
-            <div className="text-muted-foreground mb-1 flex items-center justify-between border-b border-zinc-200/60 dark:border-white/[0.05] pb-1 text-[10.5px]">
+      {isCmdExpanded && (
+        <div className="mt-1 mb-2 pl-3 transition-all">
+          <div className="w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-950 p-2.5 font-mono text-[11px] text-zinc-200">
+            <div className="text-zinc-400 mb-1.5 flex items-center justify-between border-b border-zinc-800 pb-1 text-[10.5px]">
               <div className="flex items-center gap-1.5 truncate">
-                <span className="text-muted-foreground/60 truncate text-[10px]">...\Mash &gt;</span>
-                <span className="text-foreground/90 font-medium truncate text-[10.5px]">{entry.data?.fullCmd}</span>
+                <span className="text-zinc-500 truncate text-[10px]">...\Mash &gt;</span>
+                <span className="text-zinc-200 font-medium truncate text-[10.5px]">{entry.data?.fullCmd || entry.data?.cmd}</span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleCopy(outputText || entry.data?.fullCmd, toolId);
+                    handleCopy(displayOutput || entry.data?.fullCmd || entry.data?.cmd || '', toolId);
                   }}
-                  className="p-0.5 text-muted-foreground hover:text-foreground rounded hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                  className="p-1 text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800 transition-colors cursor-pointer"
                   title="Copy command/output"
                 >
-                  {copiedId === toolId ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                  {copiedId === toolId ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
                 </button>
                 {isFailed ? (
-                  <AlertCircle size={12} className="text-rose-500" />
+                  <AlertCircle size={12} className="text-rose-400" />
                 ) : (
-                  <Check size={12} className="text-emerald-500/80" />
+                  <Check size={12} className="text-emerald-400/90" />
                 )}
               </div>
             </div>
-            <pre className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-tight max-h-24 overflow-y-auto custom-scrollbar font-mono text-[10.5px]">
-              {renderOutputWithLinks(outputText, onOpenFile)}
+            <pre className="text-zinc-300 whitespace-pre-wrap leading-tight max-h-36 overflow-y-auto custom-scrollbar font-mono text-[10.5px] select-text">
+              {displayOutput ? renderOutputWithLinks(displayOutput, onOpenFile) : <span className="text-zinc-500">Done (no output)</span>}
             </pre>
           </div>
         </div>

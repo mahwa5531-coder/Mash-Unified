@@ -38,3 +38,13 @@ def clear_steering_messages(session_id: str) -> None:
     """Clear steering mailbox for a session."""
     with _LOCK:
         _STEERING_MAILBOXES.pop(session_id, None)
+
+
+def remove_steering_message(session_id: str, index: int) -> None:
+    """Remove a specific steering message by index."""
+    with _LOCK:
+        if session_id in _STEERING_MAILBOXES:
+            msgs = _STEERING_MAILBOXES[session_id]
+            if 0 <= index < len(msgs):
+                msgs.pop(index)
+
