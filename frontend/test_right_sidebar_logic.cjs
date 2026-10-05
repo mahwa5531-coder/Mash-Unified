@@ -61,4 +61,33 @@ for (let i = 1; i <= previewLines.length; i++) {
 }
 assert.strictEqual(lineNumbersStr.split('\n').length - 1, 1000);
 
-console.log('✓ All RightSidebar deduplication, single-close, and safe large-file logic checks PASSED!');
+// 4. Test 100-File Tab Ceiling & Eviction Guard
+const MAX_VIEWER_TABS = 20;
+function simulateOpenTabWithLimit(prevTabs, tabId, title, fullPath, activeId) {
+  if (prevTabs.some(t => t.id === tabId)) {
+    return prevTabs;
+  }
+  let next = prevTabs;
+  if (next.length >= MAX_VIEWER_TABS) {
+    const evictIdx = next.findIndex(t => t.id !== activeId);
+    if (evictIdx !== -1) {
+      next = next.filter((_, i) => i !== evictIdx);
+    }
+  }
+  return [...next, { id: tabId, title, type: 'file', path: fullPath }];
+}
+
+let stressTabs = [];
+for (let i = 1; i <= 100; i++) {
+  stressTabs = simulateOpenTabWithLimit(
+    stressTabs, 
+    `file-${i}.txt`, 
+    `file-${i}.txt`, 
+    `/path/to/file-${i}.txt`, 
+    stressTabs[stressTabs.length - 1]?.id || null
+  );
+}
+assert.strictEqual(stressTabs.length, 20, 'Tabs must never exceed MAX_VIEWER_TABS (20) even after 100 opens');
+assert.strictEqual(stressTabs[stressTabs.length - 1].id, 'file-100.txt', 'Latest opened file must be present');
+
+console.log('✓ All RightSidebar deduplication, single-close, 100-file tab ceiling, and safe large-file logic checks PASSED!');

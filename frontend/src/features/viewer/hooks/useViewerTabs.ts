@@ -13,6 +13,8 @@ interface SessionRightSidebarMemory {
   mode: 'explorer' | 'editor';
 }
 
+const MAX_VIEWER_TABS = 20;
+const MAX_SIDEBAR_MEMORY_SESSIONS = 6;
 const globalRightSidebarMemory = new Map<string, SessionRightSidebarMemory>();
 
 export function useViewerTabs(sessionId?: string) {
@@ -69,9 +71,13 @@ export function useViewerTabs(sessionId?: string) {
     }
   }, [sessionId]);
 
-  // Keep globalRightSidebarMemory synchronized on any tab changes
+  // Keep globalRightSidebarMemory synchronized on any tab changes (with LRU eviction guard)
   useEffect(() => {
     if (sessionId) {
+      if (globalRightSidebarMemory.size >= MAX_SIDEBAR_MEMORY_SESSIONS && !globalRightSidebarMemory.has(sessionId)) {
+        const oldest = globalRightSidebarMemory.keys().next().value;
+        if (oldest) globalRightSidebarMemory.delete(oldest);
+      }
       globalRightSidebarMemory.set(sessionId, {
         tabs: openTabs,
         activeId: activeTabId,
@@ -80,7 +86,7 @@ export function useViewerTabs(sessionId?: string) {
     }
   }, [sessionId, openTabs, activeTabId, viewMode]);
 
-  // Atomic Tab Opening (Guarantees zero duplicate tabs)
+  // Atomic Tab Opening (Guarantees zero duplicate tabs and enforces MAX_VIEWER_TABS ceiling)
   const openFileTab = useCallback((name: string, fullPath: string, type: 'file' | 'image' = 'file') => {
     const normalizedPath = normalizePath(fullPath);
 
@@ -94,7 +100,21 @@ export function useViewerTabs(sessionId?: string) {
       if (prev.some(t => t.id === tabId)) {
         return prev;
       }
-      return [...prev, { id: tabId, title: name, type: isImg ? 'image' : 'file', path: normalizedPath }];
+      let next = prev;
+      if (next.length >= MAX_VIEWER_TABS) {
+        const evictIdx = next.findIndex(t => t.id !== activeTabId);
+        if (evictIdx !== -1) {
+          const evicted = next[evictIdx];
+          setTabContent(c => {
+            if (!(evicted.id in c)) return c;
+            const copy = { ...c };
+            delete copy[evicted.id];
+            return copy;
+          });
+          next = next.filter((_, i) => i !== evictIdx);
+        }
+      }
+      return [...next, { id: tabId, title: name, type: isImg ? 'image' : 'file', path: normalizedPath }];
     });
 
     setActiveTabId(tabId);
@@ -123,7 +143,21 @@ export function useViewerTabs(sessionId?: string) {
     const tabId = `terminal-${taskId}`;
     setOpenTabs(prev => {
       if (prev.some(t => t.id === tabId)) return prev;
-      return [...prev, { id: tabId, title, type: 'terminal' }];
+      let next = prev;
+      if (next.length >= MAX_VIEWER_TABS) {
+        const evictIdx = next.findIndex(t => t.id !== activeTabId);
+        if (evictIdx !== -1) {
+          const evicted = next[evictIdx];
+          setTabContent(c => {
+            if (!(evicted.id in c)) return c;
+            const copy = { ...c };
+            delete copy[evicted.id];
+            return copy;
+          });
+          next = next.filter((_, i) => i !== evictIdx);
+        }
+      }
+      return [...next, { id: tabId, title, type: 'terminal' }];
     });
     setActiveTabId(tabId);
     setViewMode('editor');

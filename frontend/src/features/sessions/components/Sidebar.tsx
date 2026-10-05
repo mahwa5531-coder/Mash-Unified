@@ -197,11 +197,13 @@ export default function Sidebar({
       onNewSession();
     }
 
-    deleteSession(sessionId).catch(err => {
-      console.warn("Failed to delete session on backend:", err);
-    });
-
-    onDeleteSession?.(sessionId);
+    if (onDeleteSession) {
+      onDeleteSession(sessionId);
+    } else {
+      deleteSession(sessionId).catch(err => {
+        console.warn("Failed to delete session on backend:", err);
+      });
+    }
   };
 
   const handleCopyId = (sessionId: string) => {
@@ -216,10 +218,12 @@ export default function Sidebar({
     if (!confirmDelete) return;
     const targetId = projectId || projectName!;
     try {
-      await deleteProject(targetId);
-      refreshData();
-      if (selectedSessionRepo && projectName && selectedSessionRepo.toLowerCase() === projectName.toLowerCase()) {
-        onNewSession('No Repo');
+      const ok = await deleteProject(targetId);
+      if (ok) {
+        refreshData();
+        if (selectedSessionRepo && projectName && selectedSessionRepo.toLowerCase() === projectName.toLowerCase()) {
+          onNewSession('No Repo');
+        }
       }
     } catch (err) {
       console.warn("Failed to delete project:", err);

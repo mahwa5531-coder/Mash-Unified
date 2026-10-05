@@ -51,13 +51,21 @@ export async function createQuickProject(name: string): Promise<ProjectItem | nu
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      let errMsg = `Failed to create quick project (${res.status})`;
+      try {
+        const parsed = JSON.parse(errText);
+        if (parsed.detail) errMsg = parsed.detail;
+      } catch {}
+      throw new Error(errMsg);
+    }
     const project = await res.json();
     notifyProjectsChanged();
     return project;
-  } catch (err) {
+  } catch (err: any) {
     console.warn("Failed to create quick project:", err);
-    return null;
+    throw err;
   }
 }
 

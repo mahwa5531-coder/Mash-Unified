@@ -69,21 +69,16 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
           // Dynamic summaries derived from file type and context (zero hardcoded static boilerplate)
           let dynamicSummary = meta?.Summary || meta?.summary;
           if (!dynamicSummary) {
-            if (type === 'spreadsheet') {
-              dynamicSummary = `Financial spreadsheet deliverable (${rawExt.toUpperCase()})`;
-            } else if (type === 'chart') {
-              dynamicSummary = `Visual data chart generated for reporting analysis (${rawExt.toUpperCase()})`;
-            } else if (type === 'plan') {
+            if (type === 'plan') {
               dynamicSummary = `Implementation plan for review and execution verification`;
+            } else if (type === 'walkthrough') {
+              dynamicSummary = `Walkthrough documentation and execution results`;
             } else {
               dynamicSummary = `${friendlyTitle} documentation and analysis findings`;
             }
           }
 
           const isFeedbackRequested = Boolean(meta?.RequestFeedback ?? meta?.requestFeedback ?? meta?.request_feedback);
-          const thumbnailUrl = type === 'chart' 
-            ? `${BASE_URL}/files/content?path=${encodeURIComponent(pathStr)}${msg.sessionId ? `&session_id=${encodeURIComponent(msg.sessionId)}` : ''}`
-            : undefined;
 
           artifacts.push({
             id: pathStr,
@@ -91,7 +86,6 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
             summary: dynamicSummary,
             filePath: pathStr,
             type,
-            thumbnailUrl,
             requestFeedback: isFeedbackRequested,
           });
         }
@@ -119,14 +113,10 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
         
         let dynamicSummary = lastSentence.replace(/^#+\s*/, '').trim();
         if (!dynamicSummary) {
-          if (type === 'spreadsheet') dynamicSummary = `Financial spreadsheet deliverable (${rawExt.toUpperCase()})`;
-          else if (type === 'chart') dynamicSummary = `Visual data chart (${rawExt.toUpperCase()})`;
+          if (type === 'plan') dynamicSummary = `Implementation plan for review and execution verification`;
+          else if (type === 'walkthrough') dynamicSummary = `Walkthrough documentation`;
           else dynamicSummary = `${friendlyTitle} documentation`;
         }
-
-        const thumbnailUrl = type === 'chart' 
-          ? `${BASE_URL}/files/content?path=${encodeURIComponent(linkPath)}${msg.sessionId ? `&session_id=${encodeURIComponent(msg.sessionId)}` : ''}`
-          : undefined;
 
         artifacts.push({
           id: linkPath,
@@ -134,7 +124,6 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
           summary: dynamicSummary,
           filePath: linkPath,
           type,
-          thumbnailUrl,
           requestFeedback: false,
         });
       }

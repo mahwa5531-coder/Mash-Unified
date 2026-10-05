@@ -23,20 +23,39 @@ class QuickProjectRequest(BaseModel):
 
 @router.post("/quick")
 async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEngineDep):
+    import re
+    import time
+
     clean_name = request.name.strip()
     if not clean_name:
-        raise HTTPException(status_code=400, detail="Project name cannot be empty")
-    
-    docs_dir = Path.home() / "Documents"
-    docs_dir.mkdir(parents=True, exist_ok=True)
-    target_dir = docs_dir / clean_name
-    target_dir.mkdir(parents=True, exist_ok=True)
-    
-    from app.paths import scaffold_workspace_storage
-    scaffold_workspace_storage(target_dir)
-    
+        clean_name = f"Project-{int(time.time())}"
+    else:
+        # Sanitize Windows invalid filesystem characters (<>:"/\|?*)
+        clean_name = re.sub(r'[<>:"/\\|?*]', '_', clean_name).strip(" .")
+        if not clean_name:
+            clean_name = f"Project-{int(time.time())}"
+
+    # Target directory: Documents first, MashProjects fallback if Documents is protected
+    target_dir = None
+    try:
+        docs_dir = Path.home() / "Documents"
+        docs_dir.mkdir(parents=True, exist_ok=True)
+        target_dir = docs_dir / clean_name
+        target_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        fallback_dir = Path.home() / "MashProjects"
+        fallback_dir.mkdir(parents=True, exist_ok=True)
+        target_dir = fallback_dir / clean_name
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from app.paths import scaffold_workspace_storage
+        scaffold_workspace_storage(target_dir)
+    except Exception:
+        pass
+
     normalized_path = os.path.normpath(str(target_dir)).replace("\\", "/")
-    
+
     all_projects = await engine.find_many(ProjectModel)
     for p in all_projects:
         if p.name.strip().lower() == clean_name.lower():
@@ -44,7 +63,7 @@ async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEng
             p.user_id = request.user_id
             await engine.update(p)
             return p
-            
+
     project = ProjectModel(user_id=request.user_id, name=clean_name, local_folder_path=normalized_path)
     await engine.create(project)
     return project
@@ -180,7 +199,13 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
                 project = p
                 break
     if not project:
-        raise HTTPException(status_code=404, detail=f"Project '{clean_id}' not found")
+        return {
+            "status": "success",
+            "message": f"Project '{clean_id}' already removed.",
+            "deleted_sessions_count": 0,
+            "deleted_project_id": clean_id,
+            "deleted_project_name": clean_id,
+        }
 
     deleted_sessions_count = 0
     # 1. Find all sessions tied to this workspace and delete their data

@@ -64,7 +64,6 @@ async def ensure_valid_token() -> str | None:
         gateway_url = (
             os.getenv("CLOUD_GATEWAY_URL")
             or os.getenv("GATEWAY_URL")
-            or os.getenv("OPENAI_BASE_URL")
             or os.getenv("NEXAU_CLOUD_API_URL")
             or config.model.gateway_url
         )
@@ -156,33 +155,19 @@ async def get_current_user_auth() -> dict[str, Any]:
     """Returns the current active user authentication state and metadata."""
     meta = get_auth_metadata()
     vault = load_secure_vault()
-    if meta.get("authenticated") and vault is not None:
+    if meta.get("authenticated") and vault is not None and meta.get("email"):
         return {
             "authenticated": True,
             "email": meta.get("email"),
-            "name": meta.get("name"),
+            "name": meta.get("name") or "User",
             "plan": meta.get("plan", "pro"),
             "credits_remaining": meta.get("credits_remaining", 500),
             "accounts": meta.get("accounts", []),
             "has_access_token": bool(vault.get("access_token") or vault.get("api_key")),
         }
 
-    mash_env = os.getenv("MASH_ENV", "production").lower()
-    auth_required = os.getenv("MASH_AUTH_REQUIRED", "").lower() in ("true", "1", "yes") or mash_env == "production"
-    if auth_required:
-        return {
-            "authenticated": False,
-        }
-
-    # ponytail: Return local authenticated auditor profile when in offline dev mode
     return {
-        "authenticated": True,
-        "email": meta.get("email") or "auditor@mash.local",
-        "name": meta.get("name") or "Audit Lead",
-        "plan": meta.get("plan", "enterprise"),
-        "credits_remaining": meta.get("credits_remaining", 999999),
-        "accounts": meta.get("accounts", []),
-        "has_access_token": True,
+        "authenticated": False,
     }
 
 
@@ -272,8 +257,8 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
                     payload.access_token = data.get("access_token")
                     payload.refresh_token = data.get("refresh_token")
                     payload.expires_at = now + data.get("expires_in", 3600)
-                    payload.email = user_info.get("email", payload.email or "auditor@mash.ai")
-                    payload.name = user_info.get("display_name", payload.name or "Auditor")
+                    payload.email = user_info.get("email") or payload.email
+                    payload.name = user_info.get("display_name") or payload.name or "User"
                     logger.info("Successfully exchanged mcode with Cloud API for %s", payload.email)
                 elif resp.status_code == 400 and meta.get("authenticated"):
                     # Other channel won the dual-channel race; desktop is already authenticated

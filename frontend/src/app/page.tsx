@@ -118,6 +118,12 @@ export default function Home() {
   }, []);
 
   const handleDeleteSession = useCallback((sessionId: string) => {
+    const state = sessionStore.get(sessionId);
+    if (state?.abortController) {
+      try {
+        state.abortController.abort();
+      } catch (_) {}
+    }
     setAllSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
     sessionStore.delete(sessionId);
     if (selectedSessionId === sessionId) {

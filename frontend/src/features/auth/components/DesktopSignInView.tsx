@@ -222,12 +222,22 @@ export default function DesktopSignInView({ onAuthSuccess, className }: DesktopS
               {/* Primary Blue: Continue with Google */}
               <button
                 type="button"
-                onClick={() => handleLaunchGoogleAuth()}
-                className="w-full h-10 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs sm:text-[13px] font-medium transition-colors flex items-center justify-center gap-2.5 cursor-pointer shadow-sm active:scale-[0.99]"
+                onClick={() => {
+                  if (isAuthorizing) {
+                    handlePrevious();
+                  } else {
+                    handleLaunchGoogleAuth();
+                  }
+                }}
+                className={cn(
+                  "w-full h-10 rounded-xl text-white text-xs sm:text-[13px] font-medium transition-colors flex items-center justify-center gap-2.5 cursor-pointer shadow-sm active:scale-[0.99]",
+                  isAuthorizing ? "bg-[#1d4ed8]" : "bg-[#2563eb] hover:bg-[#1d4ed8]"
+                )}
+                title={isAuthorizing ? "Click to cancel browser authorization" : "Continue with Google"}
               >
                 {isAuthorizing ? (
                   <>
-                    <Loader2 size={14} className="animate-spin text-white" />
+                    <Loader2 size={14} className="animate-spin text-white shrink-0" />
                     <span>Authorizing in browser...</span>
                   </>
                 ) : (
@@ -244,11 +254,15 @@ export default function DesktopSignInView({ onAuthSuccess, className }: DesktopS
               {/* Secondary Dark: Use business account */}
               <button
                 type="button"
+                disabled={isAuthorizing}
                 onClick={() => {
                   stopPolling();
                   setMode('business');
                 }}
-                className="w-full h-10 rounded-xl bg-[#262629] hover:bg-[#303035] text-zinc-200 text-xs sm:text-[13px] font-medium transition-colors flex items-center justify-center cursor-pointer active:scale-[0.99]"
+                className={cn(
+                  "w-full h-10 rounded-xl bg-[#262629] text-zinc-200 text-xs sm:text-[13px] font-medium transition-colors flex items-center justify-center select-none",
+                  isAuthorizing ? "opacity-50 cursor-not-allowed" : "hover:bg-[#303035] cursor-pointer active:scale-[0.99]"
+                )}
               >
                 Use business account
               </button>

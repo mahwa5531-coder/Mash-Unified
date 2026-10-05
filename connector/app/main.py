@@ -74,18 +74,23 @@ def _build_agent_config() -> AgentConfig:
     app_cfg = AppConfig.load()
     vault = load_secure_vault() or {}
 
-    cloud_gateway = os.getenv("CLOUD_GATEWAY_URL") or os.getenv("GATEWAY_URL") or app_cfg.model.gateway_url
+    cloud_gateway = (
+        os.getenv("CLOUD_GATEWAY_URL")
+        or os.getenv("GATEWAY_URL")
+        or app_cfg.model.gateway_url
+        or "https://api.mash.ai"
+    )
     custom_base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("LLM_BASE_URL")
     custom_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("NVIDIA_API_KEY") or os.getenv("OPENROUTER_API_KEY")
     custom_model = os.getenv("OPENAI_MODEL") or os.getenv("LLM_MODEL")
 
     if cloud_gateway:
-        # In cloud gateway mode: vault access_token is authoritative; fall back to custom_key / local test
+        # In cloud gateway mode: vault access_token is authoritative; fall back to custom_key or bearer placeholder
         active_key = (
             vault.get("access_token")
             or vault.get("api_key")
             or custom_key
-            or "sk-local-test"
+            or "bearer-pending-auth"
         )
     else:
         active_key = (

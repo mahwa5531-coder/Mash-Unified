@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FilePill } from '@/primitives/FilePill';
 import { isToolRunning } from './toolTimeline';
@@ -26,6 +26,7 @@ export function ToolTimelineRow({
   if (entry.type === 'file_read' || entry.type === 'folder_view') {
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
+    const isFailed = entry.data?.tool?.status === 'failed';
     const filePath = entry.data?.filePath || entry.data?.filename || entry.data?.folderPath || entry.data?.foldername || 'file';
 
     return (
@@ -37,8 +38,9 @@ export function ToolTimelineRow({
         )}
       >
         {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
-        <span className="font-sans text-[12px] text-zinc-500 dark:text-zinc-400 shrink-0">
-          {isCancelled ? 'Cancelled' : isRunning ? 'Analysing' : 'Analysed'}
+        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
+        <span className={cn("font-sans text-[12px] shrink-0", isFailed ? "text-rose-500 font-medium" : "text-zinc-500 dark:text-zinc-400")}>
+          {isFailed ? 'Failed' : isCancelled ? 'Cancelled' : isRunning ? 'Analysing' : 'Analysed'}
         </span>
         <FilePill path={filePath} onOpenFile={onOpenFile} />
         {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
@@ -50,6 +52,7 @@ export function ToolTimelineRow({
   if (entry.type === 'edit') {
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
+    const isFailed = entry.data?.tool?.status === 'failed';
     const filePath = entry.data?.filePath || entry.data?.filename || 'file';
 
     return (
@@ -61,8 +64,9 @@ export function ToolTimelineRow({
         )}
       >
         {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
-        <span className="font-sans text-[12px] text-zinc-500 dark:text-zinc-400 shrink-0">
-          {isCancelled ? 'Cancelled' : isRunning ? 'Editing' : 'Edited'}
+        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
+        <span className={cn("font-sans text-[12px] shrink-0", isFailed ? "text-rose-500 font-medium" : "text-zinc-500 dark:text-zinc-400")}>
+          {isFailed ? 'Failed' : isCancelled ? 'Cancelled' : isRunning ? 'Editing' : 'Edited'}
         </span>
         <FilePill path={filePath} onOpenFile={onOpenFile} />
         {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
@@ -74,6 +78,7 @@ export function ToolTimelineRow({
   if (entry.type === 'search') {
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
+    const isFailed = entry.data?.tool?.status === 'failed';
     const pattern = entry.data?.pattern || 'query';
 
     return (
@@ -85,8 +90,9 @@ export function ToolTimelineRow({
         )}
       >
         {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
-        <span className="font-sans text-[12px] text-zinc-500 dark:text-zinc-400 shrink-0">
-          {isCancelled ? 'Cancelled' : isRunning ? 'Analysing' : 'Analysed'}
+        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
+        <span className={cn("font-sans text-[12px] shrink-0", isFailed ? "text-rose-500 font-medium" : "text-zinc-500 dark:text-zinc-400")}>
+          {isFailed ? 'Failed' : isCancelled ? 'Cancelled' : isRunning ? 'Analysing' : 'Analysed'}
         </span>
         <span className="font-mono text-[11px] text-zinc-700 dark:text-zinc-300 truncate max-w-sm">
           "{pattern}"

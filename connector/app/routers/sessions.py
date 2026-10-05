@@ -990,6 +990,7 @@ async def delete_session(
 
             await eng.delete(AgentRunActionModel, filters=ComparisonFilter.eq("session_id", session_id))
             await eng.delete(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
+            clear_steering_messages(session_id)
 
             if not brain_dir:
                 brain_dir = str(get_session_brain_dir(session_id, project_id))

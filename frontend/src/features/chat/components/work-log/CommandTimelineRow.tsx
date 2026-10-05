@@ -60,8 +60,9 @@ export function CommandTimelineRow({
         className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-normal py-0.5 cursor-pointer select-none transition-colors group text-left w-fit"
       >
         {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
-        <span className="font-sans text-[12px]">
-          {isCancelled ? 'Cancelled' : isRunning ? 'Running' : 'Ran'}
+        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
+        <span className={cn("font-sans text-[12px]", isFailed && "text-rose-500 font-medium")}>
+          {isCancelled ? 'Cancelled' : isRunning ? 'Running' : isFailed ? 'Failed' : 'Ran'}
         </span>
         <span className="font-mono font-medium text-foreground text-[12px] truncate max-w-md">
           {entry.data?.cmd}

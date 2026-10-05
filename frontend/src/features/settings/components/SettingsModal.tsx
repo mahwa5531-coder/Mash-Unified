@@ -203,14 +203,14 @@ export default function SettingsModal({
             <div className="bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-semibold shrink-0 shadow-xs">
-                  {((authInfo?.name || 'Malli Malli').charAt(0) || 'M').toUpperCase()}
+                  {((authInfo?.name || authInfo?.email || 'User').charAt(0) || 'U').toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs font-medium text-zinc-900 dark:text-white truncate">
-                    {authInfo?.name || 'Malli Malli'}
+                    {authInfo?.name || 'Authenticated User'}
                   </div>
                   <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono truncate">
-                    {authInfo?.email || 'malli@gmail.com'}
+                    {authInfo?.email || ''}
                   </div>
                   <div className="text-[10.5px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
                     Plan: MASH {authInfo?.plan?.toUpperCase() || 'PRO'}

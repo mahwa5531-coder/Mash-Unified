@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { ChevronRight, AlertCircle, WifiOff, Play, Copy, Check } from 'lucide-react';
+import { ChevronRight, AlertCircle, WifiOff, Play, RotateCcw, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface ExecutionStatusDisclosureProps {
@@ -21,12 +21,14 @@ export function ExecutionStatusDisclosure({
   onRetry,
   onContinue,
 }: ExecutionStatusDisclosureProps) {
-  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorOpen, setErrorOpen] = useState(true);
   const [abortedOpen, setAbortedOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  if (error) {
-    const lower = error.toLowerCase();
+  const effectiveError = error || (status === 'error' ? 'Agent execution was interrupted or encountered an unexpected error.' : null);
+
+  if (effectiveError) {
+    const lower = effectiveError.toLowerCase();
     const isNetworkError = lower.includes('network') || lower.includes('wifi') || lower.includes('failed to fetch') || lower.includes('offline') || lower.includes('timed out');
 
     return (
@@ -38,12 +40,12 @@ export function ExecutionStatusDisclosure({
           className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-[#8a8a8e] hover:text-zinc-900 dark:hover:text-zinc-200 font-normal py-0.5 px-1 -mx-1 rounded-[6px] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] transition-all cursor-pointer select-none my-0.5 w-fit group"
         >
           {isNetworkError ? (
-            <span className="text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 font-sans flex items-center gap-1">
+            <span className="text-amber-500 dark:text-amber-400 group-hover:text-amber-600 dark:group-hover:text-amber-300 font-sans flex items-center gap-1 font-medium">
               <WifiOff size={11} className="shrink-0" />
               <span>Disconnected</span>
             </span>
           ) : (
-            <span className="text-rose-500 dark:text-rose-400 group-hover:text-rose-600 dark:group-hover:text-rose-300 font-sans flex items-center gap-1">
+            <span className="text-rose-500 dark:text-rose-400 group-hover:text-rose-600 dark:group-hover:text-rose-300 font-sans flex items-center gap-1 font-medium">
               <AlertCircle size={11} className="shrink-0" />
               <span>Terminated</span>
             </span>
@@ -57,7 +59,7 @@ export function ExecutionStatusDisclosure({
         </button>
 
         {errorOpen && (
-          <div className="w-full rounded-lg border border-zinc-200/70 dark:border-white/[0.06] bg-zinc-100/40 dark:bg-white/[0.02] p-2.5 font-mono text-[11px] my-1 shadow-none transition-colors">
+          <div className="w-full rounded-lg border border-rose-500/20 dark:border-rose-500/25 bg-rose-500/[0.03] dark:bg-rose-950/[0.15] p-2.5 font-mono text-[11px] my-1 shadow-none transition-colors">
             <div className="text-muted-foreground mb-1.5 flex items-center justify-between border-b border-zinc-200/60 dark:border-white/[0.05] pb-1.5 text-[10.5px]">
               <div className="flex items-center gap-1.5 truncate">
                 {isNetworkError ? (
@@ -80,7 +82,7 @@ export function ExecutionStatusDisclosure({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigator.clipboard.writeText(error);
+                    navigator.clipboard.writeText(effectiveError);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1500);
                   }}
@@ -90,29 +92,40 @@ export function ExecutionStatusDisclosure({
                   {copied ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
                 </button>
 
-                {(onContinue || onRetry) && (
+                {onContinue && (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (onContinue) {
-                        onContinue();
-                      } else if (onRetry) {
-                        onRetry();
-                      }
+                      onContinue();
                     }}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-sky-500/15 hover:bg-sky-500/25 text-sky-600 dark:text-sky-300 font-sans font-medium transition-colors cursor-pointer text-[10.5px] border border-sky-500/25 shadow-2xs"
-                    title="Continue execution from where it was interrupted without repeating completed work"
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-500/15 hover:bg-sky-500/25 text-sky-600 dark:text-sky-300 font-sans font-medium transition-colors cursor-pointer text-[10.5px] border border-sky-500/25 shadow-2xs"
+                    title="Continue execution from where it was interrupted"
                   >
                     <Play size={10} className="fill-current" />
                     <span>Continue</span>
+                  </button>
+                )}
+
+                {onRetry && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRetry();
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-200/80 hover:bg-zinc-300/80 dark:bg-white/10 dark:hover:bg-white/15 text-zinc-700 dark:text-zinc-200 font-sans font-medium transition-colors cursor-pointer text-[10.5px] border border-zinc-300 dark:border-white/10 shadow-2xs"
+                    title="Retry the prompt from the beginning"
+                  >
+                    <RotateCcw size={10} />
+                    <span>Retry</span>
                   </button>
                 )}
               </div>
             </div>
 
             <pre className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto custom-scrollbar font-mono text-[10.5px]">
-              {error}
+              {effectiveError}
             </pre>
           </div>
         )}

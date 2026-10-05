@@ -33,6 +33,8 @@ export function QuickProjectModal({
       if (created) {
         onProjectCreated(created);
         onClose();
+      } else {
+        setError("Could not create project. Please check local folder permissions.");
       }
     } catch (err: any) {
       setError(err?.message || "Failed to create quick project");

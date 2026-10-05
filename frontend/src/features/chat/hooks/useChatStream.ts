@@ -545,6 +545,24 @@ export function useChatStream({
         },
         targetSession.abortController?.signal
       );
+    } catch (err: any) {
+      console.warn("Stream exception:", err);
+      const s = sessionStore.get(activeSid);
+      if (s) {
+        const next = [...s.chatMessages];
+        const idx = findTargetAssistantIdx(next, s.activeTurnId);
+        if (idx >= 0 && next[idx].status !== 'aborted') {
+          next[idx] = {
+            ...next[idx],
+            status: 'error',
+            error: err?.message || 'Agent execution encountered an error.',
+          };
+          s.chatMessages = next;
+          if (activeSid === activeSessionIdRef.current) {
+            setChatMessages(next);
+          }
+        }
+      }
     } finally {
       const s = sessionStore.get(activeSid);
       let nextQueuedMsg: string | null = null;
@@ -554,7 +572,7 @@ export function useChatStream({
         const totalElapsed = s.turnStartTime > 0 ? Math.max(1, Math.round((Date.now() - s.turnStartTime) / 1000)) : undefined;
         const next = [...s.chatMessages];
         const idx = findTargetAssistantIdx(next, s.activeTurnId);
-        if (idx >= 0 && next[idx].status !== 'aborted') {
+        if (idx >= 0 && next[idx].status !== 'aborted' && next[idx].status !== 'error') {
           next[idx] = {
             ...next[idx],
             status: s.wasUserAborted ? 'aborted' : 'completed',

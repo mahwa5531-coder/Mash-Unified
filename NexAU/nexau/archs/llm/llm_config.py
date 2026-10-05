@@ -172,7 +172,7 @@ class LLMConfig:
             if key:
                 return key
 
-        raise ValueError("API key not found in environment variables")
+        return "bearer-pending-auth"
 
     def to_openai_params(self) -> dict[str, Any]:
         """Convert to OpenAI client parameters."""

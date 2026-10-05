@@ -86,7 +86,7 @@ export default function SafeFileViewer({
   }, [cleanName]);
 
   const isMassiveFile = (content?.length || 0) > MASSIVE_FILE_LIMIT;
-  const MONACO_SAFE_LIMIT = 200 * 1024; // 200 KB max for Monaco AST tokenization
+  const MONACO_SAFE_LIMIT = 500 * 1024; // 500 KB max for Monaco AST tokenization
   const isHeavyFile = (content?.length || 0) > MONACO_SAFE_LIMIT;
   const [forceMonaco, setForceMonaco] = React.useState(false);
 
@@ -122,7 +122,7 @@ export default function SafeFileViewer({
     return <FileViewerNotice message="File not found" />;
   }
 
-  if (isCsv || isBinaryExcel || isUnsupported) {
+  if (isBinaryExcel || isUnsupported) {
     return <FileViewerNotice message="File format not supported" />;
   }
 
