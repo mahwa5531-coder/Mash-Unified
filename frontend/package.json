@@ -10,7 +10,7 @@
     "test:chat": "node tests/test_chat_scenarios.mjs",
     "test:sidebar": "node test_right_sidebar_logic.cjs",
     "test:fuzz": "npx tsx --tsconfig tsconfig.json tests/fuzz_session_store.ts",
-    "test": "node tests/test_chat_scenarios.mjs && node test_right_sidebar_logic.cjs"
+    "test": "node tests/test_chat_scenarios.mjs && node test_right_sidebar_logic.cjs && node tests/test_virtualized_markdown_logic.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

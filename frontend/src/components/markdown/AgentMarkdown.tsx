@@ -10,6 +10,7 @@ import type { LightboxImageData } from '@/features/chat/components/messages/Imag
 import { useAgentMarkdownComponents } from './useAgentMarkdownComponents';
 import CodeBlock from '@/components/renderers/CodeBlock';
 import MermaidRenderer from '@/components/renderers/MermaidRenderer';
+import { splitMarkdownBlocks } from './splitMarkdownBlocks';
 
 /**
  * AgentMarkdown — the single unified markdown renderer for the whole app.
@@ -104,6 +105,79 @@ export interface AgentMarkdownProps {
   className?: string;
 }
 
+interface MarkdownBlockStreamdownProps {
+  content: string;
+  isStreaming: boolean;
+  isChat: boolean;
+  components: any;
+  isLargeDoc: boolean;
+}
+
+const MarkdownBlockStreamdown = memo(function MarkdownBlockStreamdown({
+  content,
+  isStreaming,
+  isChat,
+  components,
+  isLargeDoc,
+}: MarkdownBlockStreamdownProps) {
+  const [isVisible, setIsVisible] = React.useState(!isLargeDoc);
+  const blockRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!isLargeDoc) return;
+    const el = blockRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      {
+        rootMargin: '1000px 0px 1000px 0px',
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isLargeDoc]);
+
+  return (
+    <div
+      ref={blockRef}
+      style={{
+        contentVisibility: 'auto',
+        containIntrinsicSize: '0 60px',
+      }}
+      className="my-1.5"
+    >
+      {isVisible ? (
+        <Streamdown
+          mode={isStreaming ? 'streaming' : 'static'}
+          plugins={{
+            math: mathPlugin,
+            renderers: [
+              { component: StreamdownMermaidBlock, language: 'mermaid' },
+              { component: LatexBlock, language: LATEX_LANGUAGES },
+              { component: StreamdownCodeBlock, language: allOtherLanguages },
+            ],
+          }}
+          remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
+          controls={false}
+          components={components}
+          urlTransform={safeUrlTransform}
+          caret={isChat && isStreaming ? 'block' : undefined}
+          codeBlockMaxHeight={isChat ? 400 : 0}
+          tableMaxHeight={isChat ? 300 : 0}
+        >
+          {content}
+        </Streamdown>
+      ) : (
+        <div style={{ height: '60px' }} className="w-full" />
+      )}
+    </div>
+  );
+});
+
 export const AgentMarkdown = memo(function AgentMarkdown({
   content,
   mode,
@@ -118,6 +192,8 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   if (!content) return null;
 
   const isChat = mode === 'chat';
+  const blocks = React.useMemo(() => splitMarkdownBlocks(content, 35), [content]);
+  const isLargeDoc = blocks.length > 40;
 
   return (
     <div className={cn(
@@ -127,26 +203,20 @@ export const AgentMarkdown = memo(function AgentMarkdown({
         : "p-5 md:p-6 leading-[1.75] text-[13.5px] bg-[var(--bg-surface)]",
       className
     )}>
-      <Streamdown
-        mode={isStreaming ? 'streaming' : 'static'}
-        plugins={{
-          math: mathPlugin,
-          renderers: [
-            { component: StreamdownMermaidBlock, language: 'mermaid' },
-            { component: LatexBlock, language: LATEX_LANGUAGES },
-            { component: StreamdownCodeBlock, language: allOtherLanguages },
-          ],
-        }}
-        remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
-        controls={false}
-        components={components}
-        urlTransform={safeUrlTransform}
-        caret={isChat && isStreaming ? 'block' : undefined}
-        codeBlockMaxHeight={isChat ? 400 : 0}
-        tableMaxHeight={isChat ? 300 : 0}
-      >
-        {content}
-      </Streamdown>
+      {blocks.map((blockText, idx) => {
+        const isLast = idx === blocks.length - 1;
+        const blockStreaming = isStreaming && isLast;
+        return (
+          <MarkdownBlockStreamdown
+            key={idx}
+            content={blockText}
+            isStreaming={blockStreaming}
+            isChat={isChat}
+            components={components}
+            isLargeDoc={isLargeDoc}
+          />
+        );
+      })}
     </div>
   );
 });
