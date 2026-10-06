@@ -42,7 +42,8 @@ class MAShClient:
         if not base_url:
             config = AppConfig.load()
             base_url = (
-                os.getenv("CLOUD_GATEWAY_URL")
+                os.getenv("MASH_API_BASE_URL")
+                or os.getenv("CLOUD_GATEWAY_URL")
                 or os.getenv("GATEWAY_URL")
                 or os.getenv("NEXAU_CLOUD_API_URL")
                 or config.model.gateway_url
