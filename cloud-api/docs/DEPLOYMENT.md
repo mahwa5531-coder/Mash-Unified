@@ -29,7 +29,7 @@ NEXAU_BIFROST_API_KEY=<key from your Bifrost deployment>
 # local auth mode (this API mints its own JWTs):
 NEXAU_AUTH_HS256_SECRET=$(openssl rand -hex 32)   # >= 32 bytes, secret-file variant available
 
-# public origin used in emailed signup/reset links:
+# public origin used for web application:
 NEXAU_APP_BASE_URL=https://app.your-domain.example
 ```
 
@@ -64,10 +64,8 @@ what), §11 (every payment key).
 | Key | Default | What it does |
 |---|---|---|
 | `NEXAU_HTTP_ADDR` | `:8080` | listen address |
-| `NEXAU_ALLOWED_ORIGINS` | — | CORS/WS allow-list (browsers need it; native desktop doesn't) |
+| `NEXAU_ALLOWED_ORIGINS` | — | CORS allow-list (browsers need it; native desktop doesn't) |
 | `NEXAU_AUTH_MODE` | `local` | `local` (this API mints JWTs) or `jwks` (external IdP) |
-| `NEXAU_AUTH_SIGNUP_ENABLED` | `true` | self-serve signup + email verification |
-| `NEXAU_SMTP_HOST/PORT/USERNAME/PASSWORD` | — | outbound mail (signup verify / password reset) |
 | `NEXAU_RATE_REQ_PER_MIN_USER/TENANT` | see `.env.example` | rate-limit budgets |
 
 ## 3. Bring-up
@@ -97,13 +95,8 @@ set -a; . ./.env; set +a
 # liveness (no auth required)
 curl -fsS localhost:8080/health
 
-# auth round-trip (local mode; adjust for your provisioned user)
-TOKEN=$(curl -s localhost:8080/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"dev@nexau.test","password":"<password>"}' | jq -r .access_token)
-
 # authed call through the full stack (api → bifrost)
-curl -fsS localhost:8080/v1/chat/completions \
+curl -fsS localhost:8080/v1/agent/chat/completions \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"ping"}]}' | head -c 400
 
@@ -141,5 +134,4 @@ expiry) — no real money ever moves. See `PAYMENT-GATEWAY.md` §11.
 |---|---|---|
 | Unit + scenario | `go test ./internal/... -race` | every package, including the payment race storms |
 | HTTP e2e | `go test ./tests/... -race` | full request lifecycle over real HTTP |
-| Validation matrix | `go test ./validation/... -race` | 45 fault/security/load sections, 219 tests |
 | PG integration | `NEXAU_TEST_DATABASE_URL=… go test ./internal/store/repos/...` | real-SQL truth (uniqueness, row locks, exactly-once) |

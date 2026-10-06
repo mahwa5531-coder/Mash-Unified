@@ -188,6 +188,13 @@ func (c *Client) Health(ctx context.Context) error {
 	return fmt.Errorf("bifrost health: status %d", resp.StatusCode)
 }
 
+// CloseIdleConnections closes any idle keep-alive connections held by the transport.
+func (c *Client) CloseIdleConnections() {
+	if tr, ok := c.http.Transport.(*http.Transport); ok {
+		tr.CloseIdleConnections()
+	}
+}
+
 // CircuitState reports the upstream circuit-breaker state for ops surfaces
 // ("disabled", "closed", "open", "half_open").
 func (c *Client) CircuitState() string { return c.cb.stateName() }

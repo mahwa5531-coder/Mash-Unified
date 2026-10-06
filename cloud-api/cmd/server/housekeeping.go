@@ -18,16 +18,11 @@ type housekeepingDeps struct {
 	sessions       *repos.SessionsRepo
 	runs           *repos.RunsRepo
 	refresh        *repos.RefreshTokensRepo
-	recovery       *repos.RecoveryTokensRepo
 	pg             *store.Postgres
 	metrics        *observability.Metrics
 	mgr            *agent.Manager
 	stuckAfter     time.Duration
 	sessionIdleTTL time.Duration
-	// unverifiedRetention bounds how long unverified local accounts live
-	// before the sweep purges them (pre-hijacking hygiene, 2026-09-19
-	// audit finding 3). 0 disables the purge.
-	unverifiedRetention time.Duration
 }
 
 // startHousekeeping launches the periodic maintenance loop: idle-session
@@ -131,29 +126,6 @@ func (h *housekeeper) sweep(ctx context.Context) {
 	}
 	cancel()
 
-	// Recovery-token retention (7 days past expiry/consumption).
-	if d.recovery != nil {
-		rctx, rcancel := context.WithTimeout(ctx, 30*time.Second)
-		if n, err := d.recovery.SweepExpired(rctx, 7*24*time.Hour); err != nil {
-			observability.LogWarn("housekeeping: recovery sweep failed", "error", err)
-		} else if n > 100 {
-			observability.LogInfo("housekeeping: recovery tokens purged", "count", n)
-		}
-		rcancel()
-	}
-
-	// Unverified-account purge (pre-hijacking hygiene): bounds the
-	// lifetime of attacker-seeded husk accounts. Data-safe by
-	// construction — the SQL only touches run-less unverified accounts.
-	if d.recovery != nil && d.unverifiedRetention > 0 {
-		pctx, pcancel := context.WithTimeout(ctx, 30*time.Second)
-		if n, err := d.recovery.PurgeUnverifiedAccounts(pctx, d.unverifiedRetention); err != nil {
-			observability.LogWarn("housekeeping: unverified-account purge failed", "error", err)
-		} else if n > 0 {
-			observability.LogInfo("housekeeping: unverified accounts purged", "count", n)
-		}
-		pcancel()
-	}
 }
 
 func (h *housekeeper) sampleMetrics(ctx context.Context) {

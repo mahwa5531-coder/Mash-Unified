@@ -96,6 +96,39 @@ func (a *API) handleGoogleOAuthBegin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
+// handleGoogleOAuthStart: POST /v1/auth/google/start
+func (a *API) handleGoogleOAuthStart(w http.ResponseWriter, r *http.Request) {
+	if a.authSvc.Google == nil {
+		writeError(w, r, domain.ErrOAuthDisabled())
+		return
+	}
+	ip := clientIP(r, a.cfg.TrustProxyHeaders)
+	if !a.ipAdmit(r, ip, oauthThrottleKey, a.cfg.Auth.MaxOAuthPerIP) {
+		w.Header().Set("Retry-After", "60")
+		writeError(w, r, domain.ErrRateLimited(60_000, "oauth_ip"))
+		return
+	}
+
+	redirect, state, tx, err := a.authSvc.BeginGoogleOAuth(r.Context())
+	if err != nil {
+		writeError(w, r, domain.AsError(err))
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthTxCookie,
+		Value:    tx,
+		Path:     "/v1/auth",
+		MaxAge:   int(a.cfg.Auth.OAuthStateTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   a.cfg.Auth.OAuthCookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
+	writeOK(w, map[string]any{
+		"auth_url": redirect,
+		"state":    state,
+	})
+}
+
 // handleGoogleOAuthCallback: GET /v1/auth/oauth/google/callback?code&state
 //
 // Errors redirect to the web login page (?error=code) when configured — the

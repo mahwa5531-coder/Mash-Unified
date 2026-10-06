@@ -176,3 +176,38 @@ func sha256Hex(b []byte) string {
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])[:26]
 }
+
+// NormalizeUsage converts Bifrost usage to canonical domain TokenUsage.
+func NormalizeUsage(u *bifrost.Usage) *domain.TokenUsage {
+	if u == nil {
+		return nil
+	}
+	t := &domain.TokenUsage{
+		InputTokens:      u.PromptTokens,
+		OutputTokens:     u.CompletionTokens,
+		TotalTokens:      u.TotalTokens,
+		ReasoningTokens:  0,
+		CacheReadTokens:  0,
+		CacheWriteTokens: 0,
+	}
+	if u.PromptTokensDetails != nil {
+		t.CacheReadTokens = u.PromptTokensDetails.CachedReadTokens
+		t.CacheWriteTokens = u.PromptTokensDetails.CachedWriteTokens
+	}
+	if u.CompletionDetails != nil {
+		t.ReasoningTokens = u.CompletionDetails.ReasoningTokens
+	}
+	cached := t.CacheReadTokens + t.CacheWriteTokens
+	if cached > 0 && cached <= t.InputTokens {
+		t.InputTokens = u.PromptTokens - cached
+	}
+	if u.Cost != nil {
+		t.InputCost = u.Cost.InputTokensCost + u.Cost.RequestCost
+		t.OutputCost = u.Cost.OutputTokensCost
+		t.TotalCost = u.Cost.TotalCost
+		if t.TotalCost == 0 {
+			t.TotalCost = t.InputCost + t.OutputCost
+		}
+	}
+	return t
+}

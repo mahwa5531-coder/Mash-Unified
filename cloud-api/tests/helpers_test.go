@@ -1,13 +1,13 @@
 package tests
 
 import (
+	"bufio"
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
-
-	"github.com/nexau-cloud/nexau-api/internal/streaming"
 )
 
 func jsonUnmarshal(b []byte, v any) error { return json.Unmarshal(b, v) }
@@ -30,41 +30,69 @@ func readAll(t *testing.T, resp *http.Response) string {
 	return string(b)
 }
 
-// readOne pulls the next event frame (or nil on stream end / timeout).
-func readOne(t *testing.T, resp *http.Response) *sseEvent {
-	t.Helper()
-	var carry []byte
-	buf := make([]byte, 32<<10)
-	deadline := time.Now().Add(8 * time.Second)
-	for time.Now().Before(deadline) {
-		n, err := resp.Body.Read(buf)
-		if n > 0 {
-			carry = append(carry, buf[:n]...)
-			for {
-				idx := indexTerminator(carry)
-				if idx < 0 {
-					break
-				}
-				frame := string(carry[:idx])
-				carry = carry[idx+2:]
-				if line, ok := cutPrefix(frame, "data: "); ok {
-					env, derr := streaming.DecodeEnvelope([]byte(line))
-					if derr == nil {
-						return &sseEvent{env: *env, at: time.Now()}
-					}
-				}
-			}
-		}
-		if err != nil {
-			return nil
-		}
-	}
-	return nil
-}
-
 func cutPrefix(s, p string) (string, bool) {
 	if len(s) >= len(p) && s[:len(p)] == p {
 		return s[len(p):], true
 	}
 	return "", false
+}
+
+// waitFor polls until cond or timeout; returns whether cond was met.
+func waitFor(t *testing.T, d time.Duration, cond func() bool) bool {
+	t.Helper()
+	deadline := time.Now().Add(d)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return true
+		}
+		time.Sleep(15 * time.Millisecond)
+	}
+	return cond()
+}
+
+// readRawSSE collects raw data lines (OpenAI pass-through surface).
+func readRawSSE(t *testing.T, resp *http.Response, maxWait time.Duration) []string {
+	t.Helper()
+	defer resp.Body.Close()
+
+	ch := make(chan []string, 1)
+	go func() {
+		var lines []string
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "data: ") {
+				val := strings.TrimPrefix(line, "data: ")
+				lines = append(lines, val)
+				if val == "[DONE]" {
+					break
+				}
+			}
+		}
+		ch <- lines
+	}()
+
+	select {
+	case lines := <-ch:
+		return lines
+	case <-time.After(maxWait):
+		return nil
+	}
+}
+
+// readPartialSSE reads up to count chunks and closes the body promptly.
+func readPartialSSE(t *testing.T, resp *http.Response, count int) {
+	t.Helper()
+	defer resp.Body.Close()
+	scanner := bufio.NewScanner(resp.Body)
+	read := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "data: ") {
+			read++
+			if read >= count {
+				return
+			}
+		}
+	}
 }

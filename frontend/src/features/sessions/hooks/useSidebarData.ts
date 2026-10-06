@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { fetchSessions, SessionItem } from '@/services/sessions';
 import { fetchProjects, ProjectItem } from '@/services/projects';
 import { subscribeToSessionStore } from '@/features/chat';
@@ -182,47 +182,76 @@ export function useSidebarData({
     return () => clearTimeout(timer);
   }, [selectedSessionId, selectedSessionTitle, selectedSessionRepo]);
 
-  // Group sessions by workspace and pinned status
-  const visibleSessions = sessions.filter(s => !archivedIds.has(s.session_id));
-  const pinnedSessions = visibleSessions.filter(s => pinnedSessionIds.has(s.session_id));
-  const unpinnedSessions = visibleSessions.filter(s => !pinnedSessionIds.has(s.session_id));
+  // ponytail: Memoized O(S + P) workspace grouping with pre-indexed project lookup map
+  const { pinnedSessions, workspaceSessions, directConversations } = useMemo(() => {
+    const projectPathMap = new Map<string, ProjectItem>();
+    const projectNameMap = new Map<string, ProjectItem>();
+    const workspaceMap: Record<string, SessionItem[]> = {};
 
-  const workspaceSessions: Record<string, SessionItem[]> = {};
-  const directConversations: SessionItem[] = [];
-
-  registeredProjects.forEach(p => {
-    workspaceSessions[p.name] = [];
-  });
-
-  unpinnedSessions.forEach(session => {
-    const uri = session.workspace_uri;
-    if (!uri || uri === 'No Repo') {
-      directConversations.push(session);
-      return;
+    for (let i = 0; i < registeredProjects.length; i++) {
+      const p = registeredProjects[i];
+      workspaceMap[p.name] = [];
+      projectNameMap.set(p.name.toLowerCase(), p);
+      if (p.local_folder_path) {
+        const norm = p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+        projectPathMap.set(norm, p);
+      }
     }
 
-    const normUri = uri.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-    const matchedProject = registeredProjects.find(p => {
-      const normPath = p.local_folder_path ? p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() : '';
-      return (
-        normPath === normUri ||
-        p.name.toLowerCase() === uri.toLowerCase() ||
-        normPath.endsWith('/' + uri.toLowerCase()) ||
-        normUri.endsWith('/' + p.name.toLowerCase())
+    const pinned: SessionItem[] = [];
+    const direct: SessionItem[] = [];
+
+    for (let i = 0; i < sessions.length; i++) {
+      const s = sessions[i];
+      if (archivedIds.has(s.session_id)) continue;
+
+      if (pinnedSessionIds.has(s.session_id)) {
+        pinned.push(s);
+        continue;
+      }
+
+      const uri = s.workspace_uri;
+      if (!uri || uri === 'No Repo') {
+        direct.push(s);
+        continue;
+      }
+
+      const normUri = uri.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+      let matched = projectPathMap.get(normUri) || projectNameMap.get(normUri);
+
+      if (!matched) {
+        for (let j = 0; j < registeredProjects.length; j++) {
+          const p = registeredProjects[j];
+          const pNameLower = p.name.toLowerCase();
+          const normPath = p.local_folder_path ? p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() : '';
+          if (
+            (normPath && normPath.endsWith('/' + normUri)) ||
+            (normPath && normUri.endsWith('/' + pNameLower))
+          ) {
+            matched = p;
+            break;
+          }
+        }
+      }
+
+      const targetGroupName = matched ? matched.name : (
+        uri.includes('/') || uri.includes('\\')
+          ? uri.split(/[/\\]/).filter(Boolean).pop() || uri
+          : uri
       );
-    });
 
-    const targetGroupName = matchedProject ? matchedProject.name : (
-      uri.includes('/') || uri.includes('\\')
-        ? uri.split(/[/\\]/).filter(Boolean).pop() || uri
-        : uri
-    );
-
-    if (!workspaceSessions[targetGroupName]) {
-      workspaceSessions[targetGroupName] = [];
+      if (!workspaceMap[targetGroupName]) {
+        workspaceMap[targetGroupName] = [];
+      }
+      workspaceMap[targetGroupName].push(s);
     }
-    workspaceSessions[targetGroupName].push(session);
-  });
+
+    return {
+      pinnedSessions: pinned,
+      workspaceSessions: workspaceMap,
+      directConversations: direct,
+    };
+  }, [sessions, registeredProjects, pinnedSessionIds, archivedIds]);
 
   return {
     sessions,

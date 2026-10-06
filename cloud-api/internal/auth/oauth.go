@@ -43,6 +43,7 @@ import (
 
 	"github.com/nexau-cloud/nexau-api/internal/domain"
 	"github.com/nexau-cloud/nexau-api/internal/ids"
+	"github.com/nexau-cloud/nexau-api/internal/store"
 	"github.com/nexau-cloud/nexau-api/internal/store/repos"
 )
 
@@ -380,31 +381,28 @@ func (s *Service) resolveGoogleUser(ctx context.Context, ident *GoogleIdentity) 
 	return nil, domain.ErrInternal(errors.New("oauth resolution did not converge"))
 }
 
-// notifyLinked best-effort informs the account owner that a Google identity
-// was linked (the audit's "victim never notified" gap). Failure never fails
-// the sign-in — the link itself is already committed and legitimate under the
-// verified-gate.
-func (s *Service) notifyLinked(ctx context.Context, u *domain.User) {
-	if s.Mail == nil || u == nil || u.Email == "" {
-		return
-	}
-	nctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-	defer cancel()
-	if err := s.Mail.SendOAuthLinked(nctx, u.Email); err != nil {
-		slog.WarnContext(ctx, "auth: oauth-link notification failed", "error", err)
-	}
-}
+// notifyLinked best-effort informs the account owner that a Google identity was linked.
+func (s *Service) notifyLinked(ctx context.Context, u *domain.User) {}
 
 // resolveTenant picks the first active membership (login parity).
 func (s *Service) resolveTenant(ctx context.Context, userID string) (string, string, error) {
 	ms, err := s.Tenants.Memberships(ctx, userID)
 	if err != nil {
-		return "", "", storeMapError(err)
+		return "", "", store.MapDBError(err)
 	}
 	if len(ms) == 0 {
 		return "", "", domain.ErrForbidden("user has no active tenant membership")
 	}
 	return ms[0].TenantID, ms[0].Role, nil
+}
+
+// validEmail performs basic format validation.
+func validEmail(s string) bool {
+	if len(s) < 3 || len(s) > 254 {
+		return false
+	}
+	i := strings.IndexByte(s, '@')
+	return i > 0 && i < len(s)-1 && !strings.Contains(s, " ")
 }
 
 // LookupEmail powers POST /v1/auth/lookup (the login screen's email step).
@@ -417,14 +415,14 @@ func (s *Service) LookupEmail(ctx context.Context, email string) (exists bool, p
 	}
 	u, err := s.Users.ByEmail(ctx, email)
 	if err != nil {
-		return false, "", storeMapError(err)
+		return false, "", store.MapDBError(err)
 	}
 	if u == nil || u.Status != "active" {
 		return false, "", nil
 	}
 	p := u.AuthProvider
 	if p == "" {
-		p = "local"
+		p = "google"
 	}
 	return true, p, nil
 }
@@ -445,7 +443,7 @@ func (s *Service) ExchangeWebGrant(ctx context.Context, grant string) (*WebSessi
 	}
 	u, err := s.Users.ByID(ctx, g.UserID)
 	if err != nil {
-		return nil, storeMapError(err)
+		return nil, store.MapDBError(err)
 	}
 	if u == nil || u.Status != "active" {
 		return nil, domain.ErrUnauthorized(errors.New("account not active"))

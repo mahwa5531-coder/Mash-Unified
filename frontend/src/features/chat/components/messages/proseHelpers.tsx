@@ -85,6 +85,10 @@ const FILE_PATH_IN_PROSE_REGEX = /((?:file:\/\/\/?|[a-zA-Z]:[/\\]|\/(?:Users|hom
 
 export function processTextNodes(children: any, onOpenFile?: (path: string) => void): any {
   if (typeof children === 'string') {
+    // ponytail: O(1) fast-path bailout for ordinary text with no audit tags or file paths
+    if (!children.includes('[') && !children.includes('/') && !children.includes('\\') && !children.includes(':')) {
+      return children;
+    }
     const parts = children.split(STATUS_TAG_REGEX);
     return parts.map((part, idx) => {
       const match = part.match(/^\[(COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|VERIFIED|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\]$/);

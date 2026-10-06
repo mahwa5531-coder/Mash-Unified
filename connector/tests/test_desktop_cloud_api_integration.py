@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Exhaustive Integration Test Battery: Desktop Code ↔ Cloud API Layer.
+"""Exhaustive Integration Test Battery: Desktop Code ↁECloud API Layer.
 
 Verifies every combination of connection, authentication, token rotation,
 OpenAI routing, AG-UI envelope streaming, rate limiting, circuit breaking,
@@ -220,14 +220,14 @@ async def test_sliding_token_refresh_valid_no_network_call():
 # ==============================================================================
 
 def test_cloud_gateway_url_routing_agent_completions():
-    """Scenario 2.1: Verify base_url always ends in /v1/agent so NexAU's OpenAI client
-    appends /chat/completions and hits POST /v1/agent/chat/completions (not 404)."""
+    """Scenario 2.1: Verify base_url always ends in /v1 so NexAU's OpenAI client
+    appends /chat/completions and hits POST /v1/chat/completions (OpenAI standard)."""
     test_cases = [
-        ("https://api.mash.ai", "https://api.mash.ai/v1/agent"),
-        ("https://api.mash.ai/", "https://api.mash.ai/v1/agent"),
-        ("https://api.mash.ai/v1", "https://api.mash.ai/v1/agent"),
-        ("https://api.mash.ai/v1/", "https://api.mash.ai/v1/agent"),
-        ("https://api.mash.ai/v1/agent", "https://api.mash.ai/v1/agent"),
+        ("https://api.mash.ai", "https://api.mash.ai/v1"),
+        ("https://api.mash.ai/", "https://api.mash.ai/v1"),
+        ("https://api.mash.ai/v1", "https://api.mash.ai/v1"),
+        ("https://api.mash.ai/v1/", "https://api.mash.ai/v1"),
+        ("https://api.mash.ai/v1/agent", "https://api.mash.ai/v1"),
     ]
 
     for input_url, expected_base in test_cases:
@@ -405,7 +405,7 @@ async def test_rate_limiting_429_backoff_extraction():
     """Scenario 5.1: Cloud API returns 429 when tenant rate limit is exceeded.
     Desktop client extracts Retry-After backoff window."""
     cloud_url = "https://api.mash.ai"
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(
             429,
             headers={"Retry-After": "4"},
@@ -418,7 +418,7 @@ async def test_rate_limiting_429_backoff_extraction():
     )
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{cloud_url}/v1/agent/chat/completions", json={"messages": []})
+        resp = await client.post(f"{cloud_url}/v1/chat/completions", json={"messages": []})
         assert resp.status_code == 429
         assert resp.headers.get("Retry-After") == "4"
         body = resp.json()
@@ -431,7 +431,7 @@ async def test_circuit_breaker_503_backoff_handling():
     """Scenario 5.2: Cloud API upstream gateway trips circuit breaker.
     Desktop receives 503 UPSTREAM_CIRCUIT_OPEN with retry_after_ms."""
     cloud_url = "https://api.mash.ai"
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(
             503,
             json={
@@ -444,7 +444,7 @@ async def test_circuit_breaker_503_backoff_handling():
     )
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{cloud_url}/v1/agent/chat/completions", json={"messages": []})
+        resp = await client.post(f"{cloud_url}/v1/chat/completions", json={"messages": []})
         assert resp.status_code == 503
         data = resp.json()
         assert data["error"] == "UPSTREAM_CIRCUIT_OPEN"
@@ -604,7 +604,7 @@ async def test_mid_stream_token_expiry_auto_refresh_retry():
     )
 
     # First completion call gets 401, second gets 200
-    route = respx.post(f"{cloud_url}/v1/agent/chat/completions")
+    route = respx.post(f"{cloud_url}/v1/chat/completions")
     route.side_effect = [
         httpx.Response(401, json={"error": "TOKEN_EXPIRED"}),
         httpx.Response(200, json={"choices": [{"message": {"content": "Retry Succeeded"}}]}),
@@ -613,10 +613,10 @@ async def test_mid_stream_token_expiry_auto_refresh_retry():
     # Client executes with auto-retry
     async with httpx.AsyncClient() as client:
         token = await ensure_valid_token()
-        resp = await client.post(f"{cloud_url}/v1/agent/chat/completions", headers={"Authorization": f"Bearer {token}"})
+        resp = await client.post(f"{cloud_url}/v1/chat/completions", headers={"Authorization": f"Bearer {token}"})
         if resp.status_code == 401:
             token = await ensure_valid_token()
-            resp = await client.post(f"{cloud_url}/v1/agent/chat/completions", headers={"Authorization": f"Bearer {token}"})
+            resp = await client.post(f"{cloud_url}/v1/chat/completions", headers={"Authorization": f"Bearer {token}"})
             
         assert resp.status_code == 200
         assert resp.json()["choices"][0]["message"]["content"] == "Retry Succeeded"
@@ -685,13 +685,13 @@ def test_tool_failure_envelope_status_handling():
 
 def test_utf8_financial_currency_and_symbols_preservation():
     """Scenario 7.9: Statutory currency symbols (₹, €, $, £, ¥) and audit checkmarks pass through intact."""
-    audit_summary = "Reconciliation: Bank balance ₹1,45,20,000.00 (€160,000.00 / $175,000.00 / £135,000.00) [✓ VERIFIED]"
+    audit_summary = "Reconciliation: Bank balance ₹1,45,20,000.00 (€160,000.00 / $175,000.00 / £135,000.00) [✁EVERIFIED]"
     encoded = json.dumps({"type": "TEXT_MESSAGE_CONTENT", "data": {"delta": audit_summary}})
     decoded = json.loads(encoded)
     
     assert "₹1,45,20,000.00" in decoded["data"]["delta"]
     assert "€160,000.00" in decoded["data"]["delta"]
-    assert "✓ VERIFIED" in decoded["data"]["delta"]
+    assert "✁EVERIFIED" in decoded["data"]["delta"]
 
 
 @pytest.mark.anyio
@@ -699,7 +699,7 @@ def test_utf8_financial_currency_and_symbols_preservation():
 async def test_quota_exceeded_403_handling():
     """Scenario 7.10: Monthly token quota exhausted returns 403 QUOTA_EXCEEDED."""
     cloud_url = "https://api.mash.ai"
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(
             403,
             json={
@@ -710,7 +710,7 @@ async def test_quota_exceeded_403_handling():
     )
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{cloud_url}/v1/agent/chat/completions", json={"messages": []})
+        resp = await client.post(f"{cloud_url}/v1/chat/completions", json={"messages": []})
         assert resp.status_code == 403
         data = resp.json()
         assert data["error"] == "QUOTA_EXCEEDED"
@@ -722,7 +722,7 @@ async def test_quota_exceeded_403_handling():
 async def test_suspended_tenant_403_handling():
     """Scenario 7.11: Suspended tenant organization returns 403 TENANT_SUSPENDED."""
     cloud_url = "https://api.mash.ai"
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(
             403,
             json={
@@ -733,7 +733,7 @@ async def test_suspended_tenant_403_handling():
     )
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{cloud_url}/v1/agent/chat/completions", json={"messages": []})
+        resp = await client.post(f"{cloud_url}/v1/chat/completions", json={"messages": []})
         assert resp.status_code == 403
         assert resp.json()["error"] == "TENANT_SUSPENDED"
 
@@ -743,7 +743,7 @@ async def test_suspended_tenant_403_handling():
 async def test_internal_server_500_normalization():
     """Scenario 7.12: Upstream 500 error sanitizes stack trace and returns client-safe error."""
     cloud_url = "https://api.mash.ai"
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(
             500,
             json={
@@ -755,7 +755,7 @@ async def test_internal_server_500_normalization():
     )
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{cloud_url}/v1/agent/chat/completions", json={"messages": []})
+        resp = await client.post(f"{cloud_url}/v1/chat/completions", json={"messages": []})
         assert resp.status_code == 500
         data = resp.json()
         assert "stack" not in data # Zero internal leak
@@ -801,13 +801,13 @@ async def test_idempotency_key_replay_header_preservation():
     cloud_url = "https://api.mash.ai"
     idem_key = "idem_run_fixed_asset_reconcile_01"
     
-    route = respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    route = respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(200, json={"id": "run_01", "status": "completed"})
     )
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{cloud_url}/v1/agent/chat/completions",
+            f"{cloud_url}/v1/chat/completions",
             headers={"Idempotency-Key": idem_key},
             json={"messages": []}
         )
@@ -828,7 +828,7 @@ def test_thinking_budget_parameter_propagation():
 async def test_empty_message_validation_error_400():
     """Scenario 7.16: Cloud API rejects empty message payload with domain validation error."""
     cloud_url = "https://api.mash.ai"
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(
             400,
             json={
@@ -839,7 +839,55 @@ async def test_empty_message_validation_error_400():
     )
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{cloud_url}/v1/agent/chat/completions", json={"messages": []})
+        resp = await client.post(f"{cloud_url}/v1/chat/completions", json={"messages": []})
         assert resp.status_code == 400
         assert resp.json()["error"] == "VALIDATION_FAILED"
+
+
+# ==============================================================================
+# SUITE 8: MAShClient, Rolling Quotas & Telemetry Headers
+# ==============================================================================
+
+@pytest.mark.anyio
+@respx.mock
+async def test_mash_client_get_me_rolling_quotas():
+    """Scenario 8.1: MAShClient queries /v1/me and parses rolling window token quotas."""
+    from app.client import MAShClient
+    cloud_url = "https://api.mash.ai"
+    respx.get(f"{cloud_url}/v1/me").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "user": {"id": "usr_01", "email": "auditor@mash.ai"},
+                "tenant": {"id": "ten_01", "name": "KPMG"},
+                "plan": {"id": "pln_pro", "code": "pro", "name": "Pro"},
+                "subscription_status": "active",
+                "quota": {
+                    "currency": "normalized_tokens",
+                    "windows": [
+                        {"window": "5h", "quota_tokens": 1000000, "used_tokens": 420000, "percent": 42},
+                        {"window": "weekly", "quota_tokens": 10000000, "used_tokens": 6100000, "percent": 61},
+                    ],
+                },
+            },
+        )
+    )
+
+    client = MAShClient(base_url=cloud_url)
+    data = await client.get_me("jwt_access_token")
+    assert data["plan"]["code"] == "pro"
+    assert len(data["quota"]["windows"]) == 2
+    assert data["quota"]["windows"][0]["percent"] == 42
+
+
+def test_bifrost_headers_include_request_id():
+    """Scenario 8.2: _build_bifrost_headers injects X-Request-ID and X-Session-ID."""
+    from nexau.archs.main_sub.execution.llm_caller import _build_bifrost_headers
+    from nexau.archs.llm.llm_config import LLMConfig
+    cfg = LLMConfig(session_id="sess_kpmg_test_123")
+    headers = _build_bifrost_headers(cfg)
+
+    assert "X-Request-ID" in headers
+    assert headers["X-Request-ID"].startswith("req_")
+    assert headers.get("X-Session-ID") == "sess_kpmg_test_123"
 

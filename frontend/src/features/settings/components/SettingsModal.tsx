@@ -214,7 +214,8 @@ export default function SettingsModal({
                   </div>
                   <div className="text-[10.5px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
                     Plan: MASH {authInfo?.plan?.toUpperCase() || 'PRO'}
-                    {authInfo?.credits_remaining !== undefined ? ` • ${authInfo.credits_remaining} credits` : ''}
+                    {authInfo?.subscription_status ? ` (${authInfo.subscription_status})` : ''}
+                    {authInfo?.credits_remaining !== undefined && !authInfo?.quota ? ` • ${authInfo.credits_remaining} credits` : ''}
                   </div>
                 </div>
               </div>
@@ -229,6 +230,36 @@ export default function SettingsModal({
                 <span>Sign Out</span>
               </button>
             </div>
+
+            {authInfo?.quota?.windows && authInfo.quota.windows.length > 0 && (
+              <div className="mt-2.5 space-y-2">
+                {authInfo.quota.windows.map((win) => (
+                  <div key={win.window} className="bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-3 text-xs">
+                    <div className="flex justify-between items-center mb-1 text-[11px]">
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                        {win.window === '5h' ? '5-Hour Burst Budget' : 'Weekly Token Quota'}
+                      </span>
+                      <span className="font-mono text-zinc-500 dark:text-zinc-400">
+                        {win.percent}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          win.percent >= 90 ? 'bg-red-500' : win.percent >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(win.percent, 100)}%` }}
+                      />
+                    </div>
+                    {win.resets_at && (
+                      <div className="text-[10px] text-zinc-400 mt-1">
+                        Unlocks at {new Date(win.resets_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
         </div>

@@ -227,3 +227,60 @@ func parseBoundedInt(s string, min, max, fallback int) int {
 	}
 	return n
 }
+
+// handleBillingSubscription: GET /v1/billing/subscription
+func (a *API) handleBillingSubscription(w http.ResponseWriter, r *http.Request) {
+	idn := auth.FromIdentity(r.Context())
+	if idn == nil {
+		writeError(w, r, domain.ErrUnauthorized(nil))
+		return
+	}
+	if a.subscriptions == nil {
+		writeOK(w, map[string]any{
+			"status": idn.SubscriptionStatus,
+			"plan":   idn.Limits,
+		})
+		return
+	}
+	sub, err := a.subscriptions.Effective(r.Context(), idn.Tenant.ID)
+	if err != nil {
+		writeError(w, r, domain.AsError(err))
+		return
+	}
+	if sub == nil {
+		writeOK(w, map[string]any{
+			"status": "none",
+			"plan":   nil,
+		})
+		return
+	}
+	writeOK(w, map[string]any{
+		"subscription_id":      sub.ID,
+		"status":               sub.Status,
+		"plan_id":              sub.PlanID,
+		"plan_code":            sub.Plan.Code,
+		"plan_name":            sub.Plan.Name,
+		"limits":               sub.Plan.Limits,
+		"current_period_start": sub.CurrentPeriodStart,
+		"current_period_end":   sub.CurrentPeriodEnd,
+	})
+}
+
+// handleBillingSubscriptionCancel: POST /v1/billing/subscription/cancel
+func (a *API) handleBillingSubscriptionCancel(w http.ResponseWriter, r *http.Request) {
+	idn := auth.FromIdentity(r.Context())
+	if idn == nil {
+		writeError(w, r, domain.ErrUnauthorized(nil))
+		return
+	}
+	if a.subscriptions != nil {
+		if err := a.subscriptions.Cancel(r.Context(), idn.Tenant.ID); err != nil {
+			writeError(w, r, domain.AsError(err))
+			return
+		}
+	}
+	writeOK(w, map[string]any{
+		"canceled": true,
+		"message":  "Subscription will not renew at the end of the current billing period.",
+	})
+}

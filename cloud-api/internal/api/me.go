@@ -61,11 +61,10 @@ func (a *API) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{
 		"version": "v1",
 		"transports": map[string]any{
-			"runs":   "POST /v1/agent/sessions/{session_id}/runs",
-			"stream": "WS /v1/agent/sessions/{session_id}/stream",
-			"compat": "POST /v1/agent/chat/completions",
-			"cancel": "POST /v1/agent/runs/{run_id}/cancel",
-			"events": "AG-UI envelope (event_id, run_id, sequence, type, data)",
+			"responses": "POST /v1/responses",
+			"compat":    "POST /v1/agent/chat/completions",
+			"cancel":    "POST /v1/agent/chat/completions/cancel",
+			"models":    "GET /v1/models",
 		},
 		"limits": map[string]any{
 			"max_request_bytes": a.cfg.MaxBodyBytes,
@@ -76,11 +75,95 @@ func (a *API) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 		"stream": map[string]any{
 			"idle_timeout_s": int(a.cfg.StreamIdleTimeout.Seconds()),
 			"max_duration_s": int(a.cfg.StreamMaxDuration.Seconds()),
-			"replay":         "resume{run_id, last_sequence} over the session WebSocket",
 		},
-		"heartbeat_interval_s": int(a.cfg.WSHeartbeatInterval.Seconds()),
-		"models":               models,
-		"restricted":           idn.Restricted,
-		"server_time":          time.Now().UTC(),
+		"models":      models,
+		"restricted":  idn.Restricted,
+		"server_time": time.Now().UTC(),
+	})
+}
+
+// handleModels: GET /v1/models
+func (a *API) handleModels(w http.ResponseWriter, r *http.Request) {
+	idn := auth.FromIdentity(r.Context())
+	if idn == nil {
+		writeError(w, r, domain.ErrUnauthorized(nil))
+		return
+	}
+	models := []map[string]any{
+		{
+			"id":          "mash-agent",
+			"object":      "model",
+			"name":        "MASh Agent",
+			"description": "Default multi-turn auditor agent model",
+			"capabilities": map[string]any{
+				"streaming": true,
+				"tools":     true,
+				"vision":    true,
+			},
+		},
+	}
+	for _, m := range idn.Models {
+		if m != "" && m != "mash-agent" {
+			models = append(models, map[string]any{
+				"id":     m,
+				"object": "model",
+				"name":   m,
+				"capabilities": map[string]any{
+					"streaming": true,
+					"tools":     true,
+				},
+			})
+		}
+	}
+	writeOK(w, map[string]any{
+		"object": "list",
+		"data":   models,
+	})
+}
+
+// handleMePlan: GET /v1/me/plan
+func (a *API) handleMePlan(w http.ResponseWriter, r *http.Request) {
+	idn := auth.FromIdentity(r.Context())
+	if idn == nil {
+		writeError(w, r, domain.ErrUnauthorized(nil))
+		return
+	}
+	writeOK(w, map[string]any{
+		"status": idn.SubscriptionStatus,
+		"limits": idn.Limits,
+		"models": idn.Models,
+	})
+}
+
+// handleMeUsage: GET /v1/me/usage
+func (a *API) handleMeUsage(w http.ResponseWriter, r *http.Request) {
+	idn := auth.FromIdentity(r.Context())
+	if idn == nil {
+		writeError(w, r, domain.ErrUnauthorized(nil))
+		return
+	}
+	now := time.Now().UTC()
+	var usedTokens int64
+	if a.usage != nil {
+		if tokens, err := a.usage.MonthToDateTokens(r.Context(), idn.Tenant.ID); err == nil {
+			usedTokens = tokens
+		}
+	}
+	quota := idn.Limits.MonthlyTokenQuota
+	usedPercent := 0.0
+	if quota > 0 {
+		usedPercent = float64(usedTokens) / float64(quota) * 100
+		if usedPercent > 100 {
+			usedPercent = 100
+		}
+	}
+	writeOK(w, map[string]any{
+		"user_id":           idn.User.ID,
+		"tenant_id":         idn.Tenant.ID,
+		"period":            now.Format("2006-01"),
+		"used_tokens":       usedTokens,
+		"quota_tokens":      quota,
+		"used_percent":      usedPercent,
+		"remaining_percent": 100.0 - usedPercent,
 	})
 }

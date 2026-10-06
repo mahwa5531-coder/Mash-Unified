@@ -2,8 +2,11 @@ package repos
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -242,4 +245,47 @@ func (r *DevicesRepo) UpsertDevice(ctx context.Context, userID, deviceID, name, 
 		return "", err
 	}
 	return id, nil
+}
+
+// ErrEmailTaken marks a duplicate signup (unique lower(email) violation).
+var ErrEmailTaken = errors.New("email already registered")
+
+// slugify keeps [a-z0-9], collapsing everything else to single dashes.
+func slugify(s string) string {
+	var b strings.Builder
+	lastDash := true
+	for _, r := range strings.ToLower(s) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastDash = false
+		default:
+			if !lastDash {
+				b.WriteByte('-')
+				lastDash = true
+			}
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		out = "tenant"
+	}
+	return out
+}
+
+// shortRand returns n random hex characters (crypto/rand).
+func shortRand(n int) string {
+	b := make([]byte, (n+1)/2)
+	if _, err := rand.Read(b); err != nil {
+		return (hex.EncodeToString([]byte(time.Now().String())) + "0000000000000000")[:n]
+	}
+	return hex.EncodeToString(b)[:n]
+}
+
+// IsEmailTaken reports a duplicate-signup signal.
+func IsEmailTaken(err error) bool { return errors.Is(err, ErrEmailTaken) }
+
+// AsDomain maps database errors to domain errors.
+func AsDomain(err error) *domain.Error {
+	return store.MapDBError(err)
 }

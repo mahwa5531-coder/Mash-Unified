@@ -214,3 +214,63 @@ func (s *rawSSERawSink) Finish() {
 	_ = sse.Event([]byte("[DONE]"))
 	sse.Close()
 }
+
+// handleResponses: POST /v1/responses
+// Canonical MASh inference endpoint. Speaks OpenAI Responses / Completions format
+// with model alias resolution ("mash-agent" -> default model), raw SSE streaming,
+// server-side rate limits, entitlements, and authoritative usage accounting.
+func (a *API) handleResponses(w http.ResponseWriter, r *http.Request) {
+	a.handleChatCompletions(w, r)
+}
+
+// handleChatCompletionsCancel: POST /v1/agent/chat/completions/cancel
+func (a *API) handleChatCompletionsCancel(w http.ResponseWriter, r *http.Request) {
+	idn := auth.FromIdentity(r.Context())
+	if idn == nil {
+		writeError(w, r, domain.ErrUnauthorized(nil))
+		return
+	}
+	var body struct {
+		RunID string `json:"run_id"`
+	}
+	_ = decodeJSON(r, &body)
+	if body.RunID != "" && a.runs != nil {
+		_, _ = a.runs.CancelRun(r.Context(), idn, body.RunID)
+	}
+	writeOK(w, map[string]any{"cancelled": true})
+}
+
+func validIdemKey(k string) error {
+	if k == "" || len(k) > 256 {
+		return errInvalid
+	}
+	for i := 0; i < len(k); i++ {
+		c := k[i]
+		ok := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+			c == '_' || c == '-' || c == '.' || c == '/'
+		if !ok {
+			return errInvalid
+		}
+	}
+	return nil
+}
+
+type strErr string
+
+func (e strErr) Error() string { return string(e) }
+
+const errInvalid = strErr("invalid")
+
+func jsonErrText(err error) string {
+	if err == nil {
+		return ""
+	}
+	if _, ok := err.(errTrailingJSON); ok {
+		return "body contains trailing JSON"
+	}
+	msg := err.Error()
+	if len(msg) > 160 {
+		msg = msg[:160] // validation hints must never leak internal detail
+	}
+	return msg
+}

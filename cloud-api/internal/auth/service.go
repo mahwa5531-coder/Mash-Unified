@@ -22,9 +22,7 @@ import (
 type UsersStore interface {
 	ByEmail(ctx context.Context, email string) (*domain.User, error)
 	ByID(ctx context.Context, id string) (*domain.User, error)
-	PasswordHash(ctx context.Context, userID string) (string, error)
 	TouchLogin(ctx context.Context, id string) error
-	UpdatePasswordHash(ctx context.Context, id string, hash string) error
 }
 
 type TenantsStore interface {
@@ -48,17 +46,6 @@ type Service struct {
 	Tenants     TenantsStore
 	RefreshRepo RefreshStore
 	Redis       redis.UniversalClient
-
-	// Signup & recovery collaborators (nil in pure IdP mode → endpoints unmounted).
-	Registrar         AccountStore
-	Recovery          RecoveryStore
-	Mail              Mailer
-	RequireVerified   bool          // login gate for unverified accounts
-	VerifyTTL         time.Duration // verification token lifetime
-	ResetTTL          time.Duration // reset token lifetime
-	ResendCooldown    time.Duration // per (purpose,email) send cooldown
-	MinPasswordLength int
-	AppBaseURL        string // website base for emailed links
 
 	// Google OAuth + web-to-desktop handshake (nil/sealed = disabled).
 	Google         *GoogleProvider // nil → OAuth endpoints 503
@@ -88,47 +75,6 @@ type TokenPair struct {
 	// RefreshID is the server-side id of the issued refresh token
 	// (for linking rotations; not part of the client contract).
 	RefreshID string `json:"-"`
-}
-
-// Login authenticates email+password and issues a fresh token family.
-func (s *Service) Login(ctx context.Context, email, password, userAgent string) (*TokenPair, error) {
-	u, err := s.Users.ByEmail(ctx, email)
-	if err != nil {
-		return nil, store.MapDBError(err)
-	}
-	if u == nil || u.Status != "active" {
-		// Uniform error: no account enumeration.
-		return nil, domain.ErrValidation("invalid email or password")
-	}
-	// Email-verification gate (local mode): unverified accounts cannot
-	// obtain tokens — distinct code so clients can route to the verify UX.
-	if s.RequireVerified && !u.EmailVerified {
-		return nil, domain.ErrEmailNotVerified()
-	}
-	hash, err := s.usersPasswordHash(ctx, u.ID)
-	if err != nil || hash == "" {
-		return nil, domain.ErrValidation("invalid email or password")
-	}
-	if !bcryptCompare(hash, password) {
-		return nil, domain.ErrValidation("invalid email or password")
-	}
-
-	// Resolve default tenant (first active membership).
-	memberships, err := s.Tenants.Memberships(ctx, u.ID)
-	if err != nil {
-		return nil, store.MapDBError(err)
-	}
-	if len(memberships) == 0 {
-		return nil, domain.ErrForbidden("user has no active tenant membership")
-	}
-	tenantID := memberships[0].TenantID
-	role := memberships[0].Role
-
-	if err := s.Users.TouchLogin(ctx, u.ID); err != nil {
-		slog.WarnContext(ctx, "auth: touch login failed", "error", err)
-	}
-
-	return s.issueTokens(ctx, u, tenantID, role, "", userAgent, "")
 }
 
 // Refresh rotates a refresh token. Reuse of a consumed token revokes the
@@ -201,7 +147,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken, userAgent string) (
 // Logout revokes one refresh token (and blacklists the presented access token
 // jti when revocation checking is on).
 func (s *Service) Logout(ctx context.Context, refreshToken, accessJTI string, accessTTL time.Duration) error {
-	if refreshToken != "" {
+	if refreshToken != "" && s.RefreshRepo != nil {
 		if _, _, err := s.RefreshRepo.Consume(ctx, HashToken(refreshToken)); err != nil {
 			if !repos.IsReuseSignal(err) {
 				return store.MapDBError(err)
@@ -215,6 +161,26 @@ func (s *Service) Logout(ctx context.Context, refreshToken, accessJTI string, ac
 		}
 		if ttl > 0 {
 			s.Redis.Set(ctx, "auth:blacklist:"+accessJTI, "1", ttl)
+		}
+	}
+	return nil
+}
+
+// LogoutAll revokes all refresh tokens and sessions for the user.
+func (s *Service) LogoutAll(ctx context.Context, userID, accessJTI string, accessTTL time.Duration) error {
+	if userID != "" && s.RefreshRepo != nil {
+		if _, err := s.RefreshRepo.RevokeUser(ctx, userID, "logout-all"); err != nil {
+			return store.MapDBError(err)
+		}
+	}
+	if s.RevocationCheck && accessJTI != "" && s.Redis != nil {
+		ttl := accessTTL
+		if ttl <= 0 {
+			ttl = s.AccessTTL
+		}
+		if ttl > 0 {
+			s.Redis.Set(ctx, "auth:blacklist:"+accessJTI, "1", ttl)
+			s.Redis.Set(ctx, "auth:blacklist:user:"+userID, "1", ttl)
 		}
 	}
 	return nil
@@ -306,14 +272,4 @@ func sanitizeUA(ua string) string {
 		ua = ua[:256]
 	}
 	return ua
-}
-
-// bcryptCompare is isolated for testability.
-var bcryptCompare = func(hash, password string) bool {
-	return bcryptOK(hash, password)
-}
-
-// usersPasswordHash loads the stored bcrypt hash via the storage seam.
-func (s *Service) usersPasswordHash(ctx context.Context, userID string) (string, error) {
-	return s.Users.PasswordHash(ctx, userID)
 }

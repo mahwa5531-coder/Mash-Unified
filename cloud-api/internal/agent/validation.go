@@ -158,8 +158,12 @@ func (r *RunRequest) fingerprint() string {
 
 // ToBifrost converts the validated request into the upstream shape.
 func (r *RunRequest) ToBifrost() *bifrost.ChatRequest {
+	targetModel := r.Model
+	if targetModel == "mash-agent" || targetModel == "default" || targetModel == "" {
+		targetModel = "openai/gpt-4o-mini"
+	}
 	req := &bifrost.ChatRequest{
-		Model:               r.Model,
+		Model:               targetModel,
 		Messages:            r.Messages,
 		Stream:              r.Stream,
 		Fallbacks:           r.Fallbacks,
@@ -202,19 +206,21 @@ var allowedRoles = map[string]bool{
 // Validate enforces every payload invariant (spec §7 step 12–13). Errors are
 // domain errors ready for the client.
 func (r *RunRequest) Validate(l Limits) *domain.Error {
-	// Model: "provider/model" shape, bounded length, safe charset.
+	// Model: "provider/model" shape or "mash-agent" alias, bounded length, safe charset.
 	if r.Model == "" {
 		return domain.ErrValidation("model is required")
 	}
 	if len(r.Model) > l.MaxModelLen {
 		return domain.ErrValidation("model exceeds maximum length")
 	}
-	provider, model, hasSlash := strings.Cut(r.Model, "/")
-	if !hasSlash || provider == "" || model == "" {
-		return domain.ErrValidation(`model must be "provider/model"`)
-	}
-	if err := ids.Validate(r.Model, l.MaxModelLen); err != nil {
-		return domain.ErrValidation("model contains invalid characters")
+	if r.Model != "mash-agent" && r.Model != "default" {
+		provider, model, hasSlash := strings.Cut(r.Model, "/")
+		if !hasSlash || provider == "" || model == "" {
+			return domain.ErrValidation(`model must be "provider/model" or "mash-agent"`)
+		}
+		if err := ids.Validate(r.Model, l.MaxModelLen); err != nil {
+			return domain.ErrValidation("model contains invalid characters")
+		}
 	}
 
 	// Messages: presence, count, roles, content shape.

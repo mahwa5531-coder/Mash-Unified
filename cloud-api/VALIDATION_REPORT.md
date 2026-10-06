@@ -2,6 +2,8 @@
 
 Generated: **2026-09-28 16:50:02 UTC** · Suite: `go test ./validation/ -race -count=1` (spec: *Production Validation and Failure-Test Specification*, §1–§45)
 
+> **Historical Archive Note:** This report records the historical validation runs prior to pruning legacy email/password auth routes and legacy server-side agent session/run/WebSocket machinery. The current active test suite is located in `tests/` and package unit tests.
+
 ## Verdict summary
 
 | Status | Sections |

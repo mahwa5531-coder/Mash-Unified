@@ -109,15 +109,10 @@ def _build_agent_config() -> AgentConfig:
         default_base_url = "http://mock"
     elif cloud_gateway:
         clean_gw = cloud_gateway.rstrip("/")
-        # If it's a trycloudflare tunnel or local Ollama endpoint, route directly to OpenAI-compatible /v1
-        if "trycloudflare.com" in clean_gw or "ollama" in clean_gw:
-            default_base_url = clean_gw if clean_gw.endswith("/v1") else f"{clean_gw}/v1"
-        elif clean_gw.endswith("/v1/agent"):
-            default_base_url = clean_gw
-        elif clean_gw.endswith("/v1"):
-            default_base_url = f"{clean_gw}/agent"
-        else:
-            default_base_url = f"{clean_gw}/v1/agent"
+        if clean_gw.endswith("/v1/agent"):
+            clean_gw = clean_gw[:-6]
+        # ponytail: Point directly to OpenAI-compatible /v1 root (hits /v1/chat/completions)
+        default_base_url = clean_gw if clean_gw.endswith("/v1") else f"{clean_gw}/v1"
     elif custom_base_url:
         default_base_url = custom_base_url
     elif active_key.startswith("sk-or-"):

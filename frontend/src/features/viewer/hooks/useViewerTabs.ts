@@ -96,6 +96,7 @@ export function useViewerTabs(sessionId?: string) {
     const isUnsupported = UNSUPPORTED_DOC_REGEX.test(normalizedPath || name);
     const tabId = isImg ? `img-${normalizedPath}` : `file-${normalizedPath}`;
 
+    let evictedId: string | null = null;
     setOpenTabs(prev => {
       if (prev.some(t => t.id === tabId)) {
         return prev;
@@ -104,18 +105,21 @@ export function useViewerTabs(sessionId?: string) {
       if (next.length >= MAX_VIEWER_TABS) {
         const evictIdx = next.findIndex(t => t.id !== activeTabId);
         if (evictIdx !== -1) {
-          const evicted = next[evictIdx];
-          setTabContent(c => {
-            if (!(evicted.id in c)) return c;
-            const copy = { ...c };
-            delete copy[evicted.id];
-            return copy;
-          });
+          evictedId = next[evictIdx].id;
           next = next.filter((_, i) => i !== evictIdx);
         }
       }
       return [...next, { id: tabId, title: name, type: isImg ? 'image' : 'file', path: normalizedPath }];
     });
+
+    if (evictedId) {
+      setTabContent(c => {
+        if (!(evictedId! in c)) return c;
+        const copy = { ...c };
+        delete copy[evictedId!];
+        return copy;
+      });
+    }
 
     setActiveTabId(tabId);
     setViewMode('editor');
@@ -136,29 +140,34 @@ export function useViewerTabs(sessionId?: string) {
         });
       }
     }
-  }, [sessionId]);
+  }, [activeTabId, sessionId]);
 
   // Terminal Tab Opener
   const openTerminalTab = useCallback((taskId: string, title: string) => {
     const tabId = `terminal-${taskId}`;
+    let evictedId: string | null = null;
     setOpenTabs(prev => {
       if (prev.some(t => t.id === tabId)) return prev;
       let next = prev;
       if (next.length >= MAX_VIEWER_TABS) {
         const evictIdx = next.findIndex(t => t.id !== activeTabId);
         if (evictIdx !== -1) {
-          const evicted = next[evictIdx];
-          setTabContent(c => {
-            if (!(evicted.id in c)) return c;
-            const copy = { ...c };
-            delete copy[evicted.id];
-            return copy;
-          });
+          evictedId = next[evictIdx].id;
           next = next.filter((_, i) => i !== evictIdx);
         }
       }
       return [...next, { id: tabId, title, type: 'terminal' }];
     });
+
+    if (evictedId) {
+      setTabContent(c => {
+        if (!(evictedId! in c)) return c;
+        const copy = { ...c };
+        delete copy[evictedId!];
+        return copy;
+      });
+    }
+
     setActiveTabId(tabId);
     setViewMode('editor');
 

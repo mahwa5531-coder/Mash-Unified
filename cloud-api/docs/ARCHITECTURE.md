@@ -126,81 +126,43 @@ NexaU Cloud API
 ```
 DESKTOP (authoritative)              CLOUD (authoritative)
 ────────────────────────────         ────────────────────────────
-agent loop / executor                identity (users, tenants, memberships)
-tool execution (local files…)        authorization (roles, subscription, entitlements)
-skills                              session/run metadata + event replay buffer
-local session/agent state            rate limits, idempotency, quotas
+agent loop / executor                identity (Google OAuth: users, tenants, memberships)
+tool execution (local files…)        authorization (roles, subscription, entitlements, balance)
+skills                               rate limits, concurrency slots, idempotency
+local session/agent state (SQLite)   OpenAI-compatible chat completions proxy
 audit workspace                      authoritative usage/billing records
 NexAU access + refresh credential    Bifrost credential custody
-                                     streaming relay + cancellation relay
+                                     streaming relay (raw SSE) + cancellation relay
 ```
 
-Crossing the boundary: **HTTPS/WSS only**, with `Authorization: Bearer <NEXAU_ACCESS_TOKEN>`.
+Crossing the boundary: **HTTPS only**, with `Authorization: Bearer <NEXAU_ACCESS_TOKEN>`.
 Never crossing to the desktop: provider keys, Bifrost keys, internal DB details, stack traces.
 
 ## 4. Integration Contract
 
 ### 4.1 Primary LLM surface (desktop → cloud)
 
-`POST /v1/agent/sessions/{session_id}/runs` — body is the canonical OpenAI Chat
-Completions request the desktop already produces (messages/tools/params), plus:
+`POST /v1/agent/chat/completions` — OpenAI-compatible pass-through and completions gateway.
+
+Body is the canonical OpenAI Chat Completions request shape the desktop produces:
 
 ```jsonc
 {
   "model": "anthropic/claude-sonnet-4-5",
-  "messages": [ {"role":"user","content":"…"} ],   // UMP-serialized OpenAI form
+  "messages": [ {"role":"user","content":"…"} ],
   "tools": [ … ], "tool_choice": "auto",
-  "temperature": 0.7, "max_tokens": 4096, "stream": true,
-  "session_id": "sess_…",        // path param, must match
-  "turn_id": "turn_…",           // optional client correlation id
-  "idempotency_key": "…"         // optional, or Idempotency-Key header
+  "temperature": 0.7, "max_tokens": 4096, "stream": true
 }
 ```
 
-- `stream:false` → JSON `RunResponse` (OpenAI-compatible completion + run envelope).
-- `stream:true` → SSE of NexAU event envelopes (§4.3).
+- `stream:false` → JSON `ChatCompletionResponse` from Bifrost.
+- `stream:true` → raw SSE stream (`data: {...}\n\n` ... `data: [DONE]\n\n`).
+- Rate limiting, subscription/credit checks, idempotency, and concurrency limits are enforced server-side.
+- Desktop disconnect / client cancel aborts upstream Bifrost inference via context cancellation.
 
-### 4.2 Raw compatibility surface
+*Note on pruned routes*: Server-side agent session management (`/sessions`, `/sessions/{id}/runs`, `/runs/{id}`, and WebSocket `/stream`) has been pruned. NexAU Desktop manages its own local SQLite sessions, tool executions, and state history, communicating with Cloud API solely for authentication and raw LLM inference.
 
-`POST /v1/agent/chat/completions` — OpenAI-compatible pass-through (raw SSE chunk
-bytes forwarded verbatim after validation; implicit session). Lets the existing
-NexAU `LLMConfig(api_type="openai_chat_completion")` point
-`OPENAI_BASE_URL` at the cloud with zero desktop changes; still metered,
-rate-limited, entitlement-checked.
-
-### 4.3 Event envelope (cloud → desktop, transport-neutral)
-
-```jsonc
-{
-  "event_id": "evt_01J…",          // server-authoritative, ULID-style
-  "session_id": "sess_…",
-  "run_id": "run_…",
-  "sequence": 42,                  // per-run monotonic, gap-free
-  "type": "TEXT_MESSAGE_CONTENT",  // AG-UI vocabulary — preserved from NexAU
-  "timestamp": "2026-09-10T07:00:00.000Z",
-  "data": { … }                    // AG-UI-compatible payload
-}
-```
-
-Emitted per LLM run: `RUN_STARTED`, `TEXT_MESSAGE_START/CONTENT/END`,
-`THINKING_TEXT_MESSAGE_START/CONTENT/END`, `TOOL_CALL_START/ARGS/END`,
-`USAGE_UPDATE`, `MODEL_CALL_FINISHED`, `RUN_FINISHED`, `RUN_ERROR`.
-Transport-specific: `heartbeat` (SSE comment / WS ping frame), `RESUME_OK`.
-
-### 4.4 WebSocket protocol (persistent desktop connection)
-
-`GET /v1/agent/sessions/{session_id}/stream` (upgrade; `Authorization` header)
-
-- C→S: `{"type":"run.create","request":{…}}`, `{"type":"run.cancel","run_id":"…"}`,
-  `{"type":"resume","run_id":"…","last_sequence":N}`, `{"type":"ack","run_id":"…","sequence":N}`,
-  `{"type":"ping"}`.
-- S→C: event envelopes + `{"type":"resume.ok",…}` / `{"type":"resume.missed",…}` +
-  close codes (1000 normal, 1001 going away, 1008 policy, 1011 internal).
-- Replay: Redis Stream per run (`MAXLEN` bounded, TTL window); reconnecting client
-  resumes by `last_sequence` from **any** API instance (no sticky sessions) —
-  subscribe-live-first, then replay-dedup-merge ordering.
-
-### 4.5 Usage accounting contract
+### 4.2 Usage accounting contract
 
 Authoritative usage = Bifrost `BifrostLLMUsage` (last chunk / final body) →
 normalized to NexAU `TokenUsage` + Bifrost cost fields → async batch insert into
@@ -213,7 +175,6 @@ Client-supplied token counts are never billed.
 |---|---|---|
 | Agent loop / tools / skills | NexAU desktop (all) | — |
 | Message request shape | OpenAI Chat Completions (both sides) | envelope + run metadata |
-| Event vocabulary | AG-UI (NexAU) | sequence/event_id envelope, replay |
 | LLM transport to Bifrost | — | shared-client relay + normalization |
 | Auth tokens | — | JWT (JWKS or HS256) + rotating refresh tokens |
 | Usage shape | NexAU `TokenUsage` | persistence, attribution, billing fields |
@@ -223,7 +184,7 @@ Client-supplied token counts are never billed.
 - **Safe to retry:** failures occurring **before any stream byte is forwarded**
   (connect error, 502/503/504, 429 with Retry-After) — max 2 retries, backoff+jitter.
 - **Unsafe to retry (never retried):** any failure after first forwarded byte;
-  mid-stream disconnects (surfaced as `RUN_ERROR` + partial-run status);
+  mid-stream disconnects (surfaced as error event + partial-run status);
   4xx validation/auth/entitlement errors.
 - **Idempotency:** `Idempotency-Key` (header or body) dedupes logical run creation
   via Redis `SET NX PX`; duplicates of completed runs return the original outcome.
@@ -232,15 +193,11 @@ Client-supplied token counts are never billed.
 ## 7. Scale & correctness model
 
 - N identical instances behind LB; correctness from PostgreSQL (source of truth) +
-  Redis (distributed limits, idempotency, replay buffer, live fan-out) — no
-  process-local correctness state. WS connections may land on any instance.
-- Per-connection: 1 reader + 1 writer goroutine, bounded send queue (default 512),
-  slow-consumer eviction. Per-run: producer goroutine with hard lifecycle.
-- Bounded everywhere: pools, queues, body size, event buffer, WS frame size,
-  in-flight requests (semaphore), goroutines tracked and joined at shutdown.
-```
+  Redis (distributed limits, idempotency) — no process-local correctness state.
+- Per-stream: one goroutine with hard lifecycle (stream idle timeout and max duration watchdog).
+- Bounded everywhere: pools, queues, body size, in-flight requests (semaphore), goroutines tracked and joined at shutdown.
 
-## 8. Web login & desktop handshake (Google OAuth, 2026-09-18)
+## 8. Web login & desktop handshake (Google OAuth)
 
 The cloud API is the OAuth **client** (server-side confidential application,
 RFC 6749 §4.1). The web login page is a separate frontend; the desktop never
@@ -271,8 +228,54 @@ Redis additions: `auth:oauth:state:<state>`, `auth:web:grant:<grant>`,
 `auth:desktop:code:<code>` — all single-use, TTL-bounded, fail-closed consume.
 All four public surfaces are per-IP throttled; `/v1/auth/lookup` (the login
 screen's email-resolution step) is a deliberate, bounded enumeration surface
-returning `{exists, auth_provider}`. Wire-level proof: validation §42 (14
-tests: full journey, tampered/replayed state, missing tx cookie, forged ID
+returning `{exists, auth_provider}`. Verified end-to-end by integration tests
+(full journey, tampered/replayed state, missing tx cookie, forged ID
 token, unverified email, dual-channel single winner, expiry, lookup matrix,
 rate limits, link-not-duplicate, token-leak scan, concurrent provision,
 auth gate, web-session shape).
+
+---
+
+## 9. MASh Production Architecture & Identifier Separation
+
+MASh is designed from the ground up as a desktop-first agentic SaaS for professional auditors.
+
+### 9.1 Boundary Guarantees
+1. **Zero Cloud Transcripts / Documents**: The cloud API does NOT persist conversation history, prompts, completions, tool call arguments, or client financial documents. All audit transcripts and working papers live solely in the desktop client's local SQLite database and workspace.
+2. **Credential Custody**: Desktop clients never possess API keys for Google, Anthropic, OpenAI, or Bifrost. All inference flows through `https://api.mash.audit/v1/responses` authenticated via MASh bearer tokens.
+3. **Model Abstraction**: Desktop applications request `"mash-agent"` (or `"default"`). The Cloud API transparently validates and maps this alias to the operator-configured upstream model deployment (e.g. `openai/gpt-4o-mini` or `anthropic/claude-sonnet-4-5`) before forwarding to private Bifrost.
+
+### 9.2 Identifier Taxonomy
+The architecture strictly decouples identifiers across different layers:
+- `user_id`: Customer identity in PostgreSQL (`usr_...`).
+- `auth_session_id`: Cryptographic hash / JTI representing an authenticated device session.
+- `device_id`: Physical / logical installation identifier of the desktop client (`dev_...`).
+- `client_session_id`: Desktop conversation identifier (passed optionally via `X-Session-ID` for log correlation; never stored as conversation state).
+- `run_id`: Single agent turn/execution (generated per request `run_...` or correlated via `X-Run-ID`).
+- `llm_call_id`: Upstream inference completion ID from Bifrost/provider (`cmpl_...`).
+- `request_id`: Transient HTTP correlation ID (`req_...`) traced through all middleware and log records.
+
+---
+
+## 10. Core Lifecycles
+
+### 10.1 Authentication & Sliding Session Lifecycle
+1. User logs in via Google OAuth 2.0 / OIDC (`POST /v1/auth/google/start` or `/v1/auth/oauth/google`).
+2. MASh validates ID token signature against Google JWKS and resolves identity by Google `sub`.
+3. Cloud API mints a short-lived access token (~60 min) and cryptographically hashed refresh token (~30 days).
+4. Desktop exchanges the 60-second web code (`POST /v1/auth/desktop/exchange`) for the token pair.
+5. On access token expiry, desktop calls `POST /v1/auth/refresh`. Old refresh token is revoked, new refresh token is issued (sliding idle expiry bounded by absolute max duration).
+6. Central revocation: `POST /v1/auth/logout-all` invalidates all refresh tokens in PostgreSQL and blacklists user tokens in Redis.
+
+### 10.2 Inference & Stream Relay Lifecycle
+1. Desktop sends `POST /v1/responses` with `model: "mash-agent"` and OpenAI-compatible messages.
+2. Cloud API executes:
+   - Rate limiting & concurrency slot acquisition (`ratelimit`).
+   - Subscription & entitlement check (active subscription or positive prepaid balance).
+   - Input validation (body size, message count, tool schema).
+   - Model alias translation (`mash-agent` → upstream Bifrost deployment).
+3. Cloud proxies request to private Bifrost gateway.
+4. Response stream is relayed as Server-Sent Events (`text/event-stream`).
+5. On final chunk, authoritative token usage is emitted to the asynchronous usage recorder (`metering.Recorder`).
+6. Usage record is batch-inserted into PostgreSQL `usage_records` with deduplication (`UNIQUE(run_id, call_seq)`).
+

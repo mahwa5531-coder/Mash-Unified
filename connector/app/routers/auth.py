@@ -34,17 +34,19 @@ from nexau.archs.platform.crypto_vault import (
 )
 from nexau.archs.platform.app_config import AppConfig
 
+from app.client import MAShClient
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-async def ensure_valid_token() -> str | None:
+async def ensure_valid_token(force_refresh: bool = False) -> str | None:
     """Ensures a valid access_token is available with sliding refresh token rotation.
     
-    1. If access_token is valid with >= 5 mins remaining before expires_at, returns it.
-    2. If expired or expiring soon, uses the 30-day refresh_token to contact the Cloud
-       Gateway at /api/auth/refresh, updating the vault with the newly issued access_token
+    1. If access_token is valid with >= 5 mins remaining before expires_at (and not force_refresh), returns it.
+    2. If expired, expiring soon, or force_refresh=True, uses the 30-day refresh_token to contact the Cloud
+       Gateway at /v1/auth/refresh, updating the vault with the newly issued access_token
        and refreshed expiration window.
     3. Fallback: returns decrypted access_token, api_key, or env LLM_API_KEY.
     """
@@ -55,58 +57,67 @@ async def ensure_valid_token() -> str | None:
     now = int(time.time())
 
     # 1. Valid access token with at least 5 minutes remaining
-    if access_token and now < (expires_at - 300):
+    if not force_refresh and access_token and now < (expires_at - 300):
         return access_token
 
-    # 2. Expired or expiring soon: rotate using sliding refresh_token
+    # 2. Expired or expiring soon: rotate using sliding refresh_token via centralized MAShClient
     if refresh_token:
-        config = AppConfig.load()
-        gateway_url = (
-            os.getenv("CLOUD_GATEWAY_URL")
-            or os.getenv("GATEWAY_URL")
-            or os.getenv("NEXAU_CLOUD_API_URL")
-            or config.model.gateway_url
-        )
-        if gateway_url:
-            clean_url = gateway_url.rstrip("/")
-            try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    # Try /v1/auth/refresh (Cloud API standard) with fallback to /api/auth/refresh
-                    resp = await client.post(
-                        f"{clean_url}/v1/auth/refresh",
-                        json={"refresh_token": refresh_token},
-                        headers={"Content-Type": "application/json"},
-                    )
-                    if resp.status_code == 404:
-                        resp = await client.post(
-                            f"{clean_url}/api/auth/refresh",
-                            json={"refresh_token": refresh_token},
-                            headers={"Content-Type": "application/json"},
-                        )
-
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        new_access = data.get("access_token")
-                        if new_access:
-                            vault["access_token"] = new_access
-                            vault["refresh_token"] = data.get("refresh_token", refresh_token)
-                            vault["expires_at"] = data.get("expires_at") or (now + 3600)
-                            meta = get_auth_metadata()
-                            if "credits_remaining" in data:
-                                meta["credits_remaining"] = data["credits_remaining"]
-                            save_secure_vault(vault, meta)
-                            logger.info("Successfully rotated access token via refresh token.")
-                            return new_access
-                    else:
-                        logger.warning(
-                            "Cloud token refresh returned status %s: %s",
-                            resp.status_code,
-                            resp.text,
-                        )
-            except Exception as e:
-                logger.error("Failed to connect to cloud gateway for token refresh: %s", e)
+        try:
+            client = MAShClient()
+            data = await client.refresh_access_token(refresh_token)
+            new_access = data.get("access_token")
+            if new_access:
+                vault["access_token"] = new_access
+                vault["refresh_token"] = data.get("refresh_token", refresh_token)
+                vault["expires_at"] = data.get("expires_at") or (now + 3600)
+                meta = get_auth_metadata()
+                if "credits_remaining" in data:
+                    meta["credits_remaining"] = data["credits_remaining"]
+                save_secure_vault(vault, meta)
+                logger.info("Successfully rotated access token via refresh token.")
+                return new_access
+        except Exception as e:
+            logger.warning("Cloud gateway token refresh failed: %s", e)
 
     return access_token or vault.get("api_key") or os.getenv("LLM_API_KEY")
+
+
+async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | None:
+    """Syncs authoritative user identity, plan, models, and rolling quotas from Cloud API /v1/me.
+    
+    ponytail: Single entrypoint to sync cloud quota windows into local metadata.
+    """
+    if not token:
+        token = await ensure_valid_token()
+    if not token:
+        return None
+
+    try:
+        client = MAShClient()
+        data = await client.get_me(token)
+        meta = get_auth_metadata()
+
+        plan_info = data.get("plan")
+        if isinstance(plan_info, dict) and plan_info.get("code"):
+            meta["plan"] = plan_info["code"]
+        elif isinstance(plan_info, str):
+            meta["plan"] = plan_info
+
+        if "subscription_status" in data:
+            meta["subscription_status"] = data["subscription_status"]
+        if "models" in data:
+            meta["models"] = data["models"]
+        if "limits" in data:
+            meta["limits"] = data["limits"]
+        if "quota" in data:
+            meta["quota"] = data["quota"]
+
+        vault = load_secure_vault() or {}
+        save_secure_vault(vault, meta)
+        return data
+    except Exception as e:
+        logger.debug("Cloud /v1/me sync skipped or offline: %s", e)
+        return None
 
 
 class LoginPayload(BaseModel):
@@ -156,11 +167,21 @@ async def get_current_user_auth() -> dict[str, Any]:
     meta = get_auth_metadata()
     vault = load_secure_vault()
     if meta.get("authenticated") and vault is not None and meta.get("email"):
+        token = vault.get("access_token")
+        # Proactively sync rolling quota position if not present
+        if token and not meta.get("quota"):
+            await sync_user_account_state(token)
+            meta = get_auth_metadata()
+
         return {
             "authenticated": True,
             "email": meta.get("email"),
             "name": meta.get("name") or "User",
             "plan": meta.get("plan", "pro"),
+            "subscription_status": meta.get("subscription_status", "active"),
+            "quota": meta.get("quota"),
+            "limits": meta.get("limits"),
+            "models": meta.get("models", []),
             "credits_remaining": meta.get("credits_remaining", 500),
             "accounts": meta.get("accounts", []),
             "has_access_token": bool(vault.get("access_token") or vault.get("api_key")),
@@ -169,6 +190,13 @@ async def get_current_user_auth() -> dict[str, Any]:
     return {
         "authenticated": False,
     }
+
+
+@router.post("/sync")
+async def sync_auth_state() -> dict[str, Any]:
+    """Explicitly triggers sync with Cloud API /v1/me to refresh rolling quota and plan."""
+    data = await sync_user_account_state()
+    return {"status": "ok" if data else "offline", "data": data}
 
 
 @router.get("/callback", response_class=HTMLResponse)

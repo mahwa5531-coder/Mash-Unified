@@ -34,7 +34,6 @@ import (
 	"github.com/nexau-cloud/nexau-api/internal/ratelimit"
 	"github.com/nexau-cloud/nexau-api/internal/store"
 	"github.com/nexau-cloud/nexau-api/internal/store/repos"
-	"github.com/nexau-cloud/nexau-api/internal/streaming"
 )
 
 func main() {
@@ -108,7 +107,6 @@ func run() error {
 	subs := repos.NewSubscriptions(pg.Pool)
 	ents := repos.NewEntitlements(pg.Pool)
 	refresh := repos.NewRefreshTokens(pg.Pool)
-	recovery := repos.NewRecoveryTokens(pg.Pool)
 	sessionsRepo := repos.NewSessions(pg.Pool)
 	runsRepo := repos.NewRuns(pg.Pool)
 	usageRepo := repos.NewUsage(pg.Pool)
@@ -121,14 +119,6 @@ func run() error {
 	resolver := &auth.IdentityResolver{
 		Users: users, Tenants: tenants, Subs: subs, Ents: ents,
 		Redis: rd.Client, CacheTTL: 30 * time.Second,
-	}
-	// Signup & recovery collaborators — local mode only (jwks deployments
-	// manage identities at the IdP; config force-disables the endpoints).
-	var registrar auth.AccountStore
-	var recoveryStore auth.RecoveryStore
-	var mailer auth.Mailer = auth.LogMailer{}
-	if cfg.Auth.Mode != "jwks" {
-		registrar, recoveryStore, mailer = recovery, recovery, buildMailer(cfg)
 	}
 
 	// Google OAuth ("Continue with Google") — mounted only when fully
@@ -154,16 +144,6 @@ func run() error {
 		DeviceTTL:       cfg.Auth.DeviceTokenTTL,
 		RevocationCheck: cfg.Auth.RevocationCheck,
 
-		Registrar:         registrar,
-		Recovery:          recoveryStore,
-		Mail:              mailer,
-		RequireVerified:   cfg.Auth.RequireVerified,
-		VerifyTTL:         cfg.Auth.VerifyTokenTTL,
-		ResetTTL:          cfg.Auth.ResetTokenTTL,
-		ResendCooldown:    cfg.Auth.ResendCooldown,
-		MinPasswordLength: cfg.Auth.MinPasswordLength,
-		AppBaseURL:        cfg.Auth.AppBaseURL,
-
 		Google:         google,
 		OAuth:          oauthStore,
 		Devices:        devices,
@@ -187,12 +167,7 @@ func run() error {
 		FlushInterval: cfg.Meter.FlushInterval, RetryMax: cfg.Meter.RetryMax,
 	}, metrics)
 
-	// 9. Event bus (replay streams + live fan-out).
-	bus := streaming.NewBus(rd.Client, streaming.Config{
-		MaxEventsPerRun: cfg.Replay.MaxEventsPerRun, Window: cfg.Replay.Window,
-	})
-
-	// 10. Bifrost client (shared transport, cloud-side credential only).
+	// 9. Bifrost client (shared transport, cloud-side credential only).
 	bf := bifrost.NewClient(bifrost.TransportConfig{
 		BaseURL: cfg.Bifrost.BaseURL, APIKey: cfg.Bifrost.APIKey,
 		DialTimeout: cfg.BifrostDialTimeout, TLSTimeout: cfg.BifrostTLSTimeout,
@@ -209,10 +184,10 @@ func run() error {
 		},
 	}, metrics)
 
-	// 11. Run manager + agent services.
+	// 10. Run manager + agent services.
 	mgr := agent.NewManager(rd.Client, limiter, cfg.Rate.RunConcurrencyTimeout, metrics)
 	runSvc := agent.NewService(agent.Config{
-		Sessions: sessionsRepo, Runs: runsRepo, Bifrost: bf, Bus: bus,
+		Sessions: sessionsRepo, Runs: runsRepo, Bifrost: bf,
 		Meter: meter, Idem: idem, Manager: mgr, Limiter: limiter,
 		Limits: agent.Limits{
 			MaxMessages: cfg.MaxMessages, MaxTools: cfg.MaxTools, MaxModelLen: cfg.MaxModelLen,
@@ -226,9 +201,8 @@ func run() error {
 		SetupTimeout: 15 * time.Second,
 		Metrics:      metrics,
 	})
-	sessSvc := agent.NewSessionService(sessionsRepo, cfg.SessionIdleTTL)
 
-	// 11b. Payments (prepaid credit top-ups; docs/PAYMENT-GATEWAY.md).
+	// 10b. Payments (prepaid credit top-ups; docs/PAYMENT-GATEWAY.md).
 	// Provider modes: disabled (nil service, routes answer 503), mock
 	// (dev/tests, fixed secrets, no network), razorpay (production).
 	var paySvc *payment.Service
@@ -265,8 +239,8 @@ func run() error {
 			"packs", len(paySvc.Packs()), "order_ttl", cfg.Payments.OrderTTL.String())
 	}
 
-	// 12. HTTP surface.
-	apiHandler := api.New(cfg, authSvc, authMW, sessSvc, runSvc, usageRepo, pg, rd, bf, meter, limiter, metrics, otel, paySvc)
+	// 11. HTTP surface.
+	apiHandler := api.New(cfg, authSvc, authMW, runSvc, usageRepo, pg, rd, bf, meter, limiter, metrics, otel, paySvc).WithSubscriptions(subs)
 
 	chain := middleware.Chain(middleware.Options{
 		MaxBodyBytes: cfg.MaxBodyBytes, MaxInFlight: cfg.MaxConcurrentReqs,
@@ -282,16 +256,12 @@ func run() error {
 		MaxHeaderBytes:    cfg.MaxHeaderBytes,
 	}
 
-	// 13. Background housekeeping + metrics sampler.
+	// 12. Background housekeeping + metrics sampler.
 	hk := startHousekeeping(rootCtx, housekeepingDeps{
 		sessions: sessionsRepo, runs: runsRepo, refresh: refresh,
-		recovery: recovery,
 		pg:       pg, metrics: metrics, mgr: mgr,
 		stuckAfter:     cfg.StreamMaxDuration + 5*time.Minute,
 		sessionIdleTTL: cfg.SessionIdleTTL,
-		// Purge only applies in local mode (jwks deployments manage
-		// identities at the IdP and the repo is nil there).
-		unverifiedRetention: cfg.Auth.UnverifiedRetention,
 	}, logger)
 	defer hk.stop()
 
@@ -335,20 +305,16 @@ func run() error {
 	// 14a. Stop accepting new connections.
 	_ = srv.Shutdown(shutdownCtx)
 
-	// 14b. Close WebSocket connections (1001 Going Away) — after Shutdown
-	// returns, hijacked connections are the only live handlers.
-	apiHandler.ShutdownWS()
-
-	// 14c. Cancel remaining runs; producers finalize (usage, run rows).
+	// 13b. Cancel remaining runs; producers finalize (usage, run rows).
 	mgr.Shutdown(remaining())
 
-	// 14d. Drain the usage metering queue (bounded by the remaining grace).
+	// 13c. Drain the usage metering queue (bounded by the remaining grace).
 	meter.Close(remaining())
 
-	// 14e. Flush telemetry.
+	// 13d. Flush telemetry.
 	otel.Shutdown(shutdownCtx)
 
-	// 14f-14g. Close Redis, then PostgreSQL (deferred above).
+	// 13e-13f. Close Redis, then PostgreSQL (deferred above).
 	logger.Info("shutdown complete")
 	return nil
 }
@@ -366,19 +332,5 @@ func buildVerifier(cfg *config.Config) (auth.Verifier, *auth.LocalSigner, error)
 		return jwks, nil, nil
 	default:
 		return nil, nil, errors.New("config: unsupported auth mode " + cfg.Auth.Mode)
-	}
-}
-
-// buildMailer selects the transactional-mail backend. The "log" default emits
-// metadata-only events (never the credential link — 2026-09-19 audit, finding
-// 2); NEXAU_MAIL_LOG_LINKS=true re-enables link logging for local development.
-func buildMailer(cfg *config.Config) auth.Mailer {
-	if cfg.Mail.Mode != "smtp" {
-		return auth.LogMailer{LogLinks: cfg.Mail.LogLinks}
-	}
-	return auth.SMTPMailer{
-		Host: cfg.Mail.Host, Port: cfg.Mail.Port,
-		Username: cfg.Mail.Username, Password: cfg.Mail.Password,
-		From: cfg.Mail.From, SSL: cfg.Mail.SSL,
 	}
 }

@@ -24,7 +24,7 @@ machine — that is what "fully managed, not BYOK" means in the wire topology:
 ```
 ┌──────────────────────┐   HTTPS + user JWT   ┌──────────────────────┐  internal HTTP + 1 key  ┌──────────┐
 │  NexaU Desktop app   │ ───────────────────> │  NexaU Cloud API     │ ─────────────────────> │ Bifrost  │──> 23+ LLMs
-│  (local, user PC)   │    SSE / WebSocket    │  (stateless, N pods) │  POST /v1/chat/         │ (gateway)│
+│  (local, user PC)   │       SSE / HTTP     │  (stateless, N pods) │  POST /v1/chat/         │ (gateway)│
 └──────────────────────┘                      └──────────────────────┘  completions             └──────────┘
   holds: access + refresh        ▲                     ▲                                       ▲
   tokens only (DPAPI vault)      │                     │                                       │
@@ -34,10 +34,10 @@ machine — that is what "fully managed, not BYOK" means in the wire topology:
 
 | Question | Answer | Where it is enforced |
 |---|---|---|
-| Does the desktop call Bifrost? | **No.** No Bifrost address exists in any client-facing response. | `internal/bifrost/` is server-side only; `/v1/config` (`internal/api/me.go:51`) returns transports/limits only |
+| Does the desktop call Bifrost? | **No.** No Bifrost address exists in any client-facing response. | `internal/bifrost/` is server-side only; `/v1/config` returns transports/limits only |
 | What does the desktop call? | The Cloud API base URL, e.g. `https://api.mash.ai` | `README.md` endpoint table |
-| What credential does the desktop hold? | Its own JWT access token (1 h) + rotating refresh token (30 d) in the OS vault | `internal/auth/service.go:80` (`TokenPair`) |
-| What credential does the API use for Bifrost? | One global Bearer key, env-injected, server-side only | `.env.example` lines 7–12 |
+| What credential does the desktop hold? | Its own JWT access token (1 h) + rotating refresh token (30 d) in the OS vault | `internal/auth/service.go` (`TokenPair`) |
+| What credential does the API use for Bifrost? | One global Bearer key, env-injected, server-side only | `.env.example` |
 | If Bifrost scales to 100 replicas? | Invisible to both API and desktop (K8s Service VIP / LB in front of Bifrost; the API has one URL) | `docs/ARCHITECTURE.md` |
 
 ---
@@ -49,29 +49,21 @@ machine — that is what "fully managed, not BYOK" means in the wire topology:
 - **Transport**: HTTPS (TLS 1.2+). Plain HTTP is a dev-only convenience.
 - **Auth header** on every authenticated call:
   `Authorization: Bearer <access_token>` — enforced by
-  `internal/auth/middleware.go` (`authMW.Require(...)` wiring in
-  `internal/api/router.go:102-149`).
+  `internal/auth/middleware.go`.
 - **Base URL**: one per deployment (e.g. `https://api.mash.ai`). The desktop
   stores nothing else network-related. `GET /v1/config` (authed) returns every
   limit/timing value the desktop should obey at runtime — request sizes, model
-  entitlements, idle/stream timeouts, heartbeat interval
-  (`internal/api/me.go:51-86`) — so hard-coding tunables in the client is
-  unnecessary.
+  entitlements, idle/stream timeouts.
 - **CORS/origins**: CORS is a browser concept; a native desktop HTTP client
   needs **no** origin allow-list. `NEXAU_ALLOWED_ORIGINS` exists only for the
-  Next.js dev UI and WebSocket browsers.
-- **Streaming**: two transports, both first-class:
-  - **SSE**: `POST /v1/agent/sessions/{session_id}/runs` with `stream:true` →
-    AG-UI event envelopes (`internal/api/runs.go`, `internal/streaming/sse.go`).
-  - **WebSocket**: `GET /v1/agent/sessions/{session_id}/stream` with
-    `run.create` / `run.cancel` / `resume` / `ack` / `ping` frames
-    (`internal/streaming/websocket.go`). Reconnect + resume works from **any**
-    API replica: events live in a bounded Redis Stream per run; the client
-    resumes by `last_sequence`.
-- **Compatibility surface**: `POST /v1/agent/chat/completions` is an
-  OpenAI-compatible pass-through (raw provider SSE bytes) — any existing
-  OpenAI-style client works by changing only the base URL and using the NexaU
-  access token instead of an OpenAI key.
+  web UI.
+- **Primary LLM completions surface**:
+  `POST /v1/agent/chat/completions` is the primary transport used by the desktop.
+  It is an OpenAI-compatible pass-through (raw provider SSE bytes when `stream:true`
+  or JSON response when `stream:false`) — any existing OpenAI-style client
+  (or NexAU's internal LLM caller) works by changing only the base URL and using
+  the NexaU access token instead of an OpenAI key. Rate limits, entitlement
+  checks, and authoritative token metering are enforced server-side.
 
 ### 2.1 What the desktop sends vs. what it must never invent
 
@@ -217,16 +209,10 @@ channel), `ACCOUNT_INACTIVE`, `VALIDATION_ERROR`.
 ```jsonc
 GET  /v1/me                                   // server-authoritative identity, limits, models
 GET  /v1/config                               // limits, endpoints, timing for the client
-POST /v1/agent/sessions                       // open a session
-POST /v1/agent/sessions/{id}/runs             // create a run; "stream": true → SSE
-GET  /v1/agent/sessions/{id}/stream            // WebSocket (run.create / resume / ack / ping)
-POST /v1/agent/runs/{id}/cancel               // cancel anywhere in the fleet
-GET  /v1/agent/runs/{id}                      // status → resume decisions
+POST /v1/agent/chat/completions               // OpenAI-compatible chat completions (raw SSE stream or JSON)
+POST /v1/agent/chat/completions/cancel        // cancel in-flight chat completion
 GET  /v1/usage?from&to&by_model               // tenant usage aggregates
 ```
-Event envelope (AG-UI, transport-neutral): `event_id`, `session_id`, `run_id`,
-`sequence` (monotonic, gap-free), `type` (`TEXT_MESSAGE_*`, `TOOL_CALL_*`,
-`RUN_*`, `USAGE_UPDATE`, `MODEL_CALL_FINISHED`), `timestamp`, `data`.
 
 ---
 
@@ -286,9 +272,7 @@ each row maps to a **finished, tested** cloud endpoint above.
 - [ ] **Vault write**: store the `TokenPair` in the DPAPI vault; keep your
       existing `ensure_valid_token()` sliding refresh pointed at
       `POST /v1/auth/refresh` (persist the **new** pair atomically per call).
-- [ ] **Run/stream clients**: SSE consumer for
-      `POST …/runs` (`stream:true`) and/or the WebSocket client with
-      `resume{run_id, last_sequence}` reconnect logic.
+- [ ] **Chat completions client**: standard OpenAI-format client calling `POST /v1/agent/chat/completions` with `stream: true` (reading `data: {...}` chunks) or `stream: false`.
 - [ ] **Startup entitlement fetch**: `GET /v1/config` once at boot; obey the
       returned limits/timeouts instead of hard-coding.
 
@@ -302,9 +286,7 @@ each row maps to a **finished, tested** cloud endpoint above.
 | User lingered > 60 s | same code | web page mints a fresh mcode; retry with the new one |
 | Access token expired | 401 `UNAUTHORIZED` | refresh; retry once; if refresh fails → vault clear → login again |
 | Refresh token reused (rotation race) | family revoked; 401s | full re-login (this is the theft-detection working) |
-| **Token revoked while a WS is live (logout elsewhere, 2026-09-19)** | WS close **1008** `authorization no longer valid` on the next heartbeat (≤ a few seconds) | the same token is also 401 on HTTP — treat as forced logout: clear the vault, require re-login |
-| **WS outlived the access token (2026-09-19)** | same WS close **1008** after token expiry + 30 s grace | refresh and reconnect with the fresh token, then `resume{run_id, last_sequence}` — in-flight runs were cancelled at close |
-| Stream dropped | WS close 1011 / `RESYNC_REQUIRED` | reconnect to any replica, `resume{run_id, last_sequence}` |
+| Stream dropped mid-flight | SSE disconnect / network error | retry request if appropriate; incomplete runs are safely metered up to disconnection |
 | Rate limited | 429 + `Retry-After` | honor the header; never hammer |
 | Redis/PG degraded (rare) | 503 `DEPENDENCY_UNAVAILABLE` | back off with jitter |
 | Bifrost gateway failing (cloud protects itself) | 503 `UPSTREAM_CIRCUIT_OPEN`, `details.retry_after_ms` present | back off for `retry_after_ms` (typically seconds); the cloud auto-recovers — probe after the hint, no user action needed |

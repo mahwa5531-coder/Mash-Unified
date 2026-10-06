@@ -31,6 +31,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/nexau-cloud/nexau-api/internal/domain"
+	"github.com/nexau-cloud/nexau-api/internal/store"
 )
 
 // desktopCodeRe pins the wire format: mcode_ + 64 lowercase hex chars.
@@ -99,7 +100,7 @@ func (s *Service) ExchangeDesktopCode(ctx context.Context, rawCode, deviceID, de
 
 	u, err := s.Users.ByID(ctx, dc.UserID)
 	if err != nil {
-		return nil, storeMapError(err)
+		return nil, store.MapDBError(err)
 	}
 	if u == nil || u.Status != "active" {
 		return nil, &domain.Error{Code: "ACCOUNT_INACTIVE", Message: "Account is not active.", HTTP: http.StatusUnauthorized}
@@ -123,7 +124,7 @@ func (s *Service) ExchangeDesktopCode(ctx context.Context, rawCode, deviceID, de
 	if s.Devices != nil {
 		devID, err := s.Devices.UpsertDevice(ctx, u.ID, deviceID, name, plat)
 		if err != nil {
-			return nil, storeMapError(err)
+			return nil, store.MapDBError(err)
 		}
 		deviceID = devID
 	}

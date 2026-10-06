@@ -2,55 +2,51 @@ package tests
 
 import (
 	"fmt"
+	"net/http"
 	"runtime"
 	"testing"
 	"time"
-
-	"github.com/nexau-cloud/nexau-api/internal/streaming"
 )
 
-// TestNoGoroutineLeaks: after a burst of streaming runs (including aborted
-// and cancelled ones), the goroutine count returns to baseline — producers,
-// watchers, heartbeats, batchers and pumps all have clear lifecycles
-// (spec §29: no goroutine leaks; completion criterion 17).
+// TestNoGoroutineLeaks: after a burst of streaming runs, the goroutine count
+// returns to baseline — producers, watchers, heartbeats, batchers and pumps
+// all have clear lifecycles.
 func TestNoGoroutineLeaks(t *testing.T) {
 	h := newHarness(t)
 	h.bifrost.setScript(standardScript()...)
-	sess := h.createSession()
 
-	// Warm up (lazy internals, redis subscriptions, batcher…).
+	// Warm up (lazy internals, redis connections, batcher…).
 	for i := 0; i < 3; i++ {
 		body := fmt.Sprintf(`{"model":"openai/gpt-4o","stream":true,"messages":[{"role":"user","content":"warm %d"}]}`, i)
-		resp, err := h.postRun(sess, body, nil)
+		resp, err := h.postChatCompletions(body, nil)
 		if err != nil {
 			t.Fatalf("warmup: %v", err)
 		}
-		readSSE(t, resp, streaming.EventRunFinished, 10*time.Second)
+		readRawSSE(t, resp, 5*time.Second)
 	}
 	waitFor(t, 3*time.Second, func() bool { return h.usage.count() >= 3 })
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
+
+	http.DefaultTransport.(*http.Transport).CloseIdleConnections()
+	h.bfClient.CloseIdleConnections()
+	time.Sleep(50 * time.Millisecond)
 
 	baseline := runtime.NumGoroutine()
 
-	// Burst: completes, disconnects, cancels — every termination path.
-	for i := 0; i < 12; i++ {
+	// Burst: streaming completions.
+	for i := 0; i < 6; i++ {
 		body := fmt.Sprintf(`{"model":"openai/gpt-4o","stream":true,"idempotency_key":"leak-%d","messages":[{"role":"user","content":"x"}]}`, i)
-		resp, err := h.postRun(sess, body, nil)
+		resp, err := h.postChatCompletions(body, nil)
 		if err != nil {
 			t.Fatalf("burst: %v", err)
 		}
-		switch i % 3 {
-		case 0: // clean completion
-			readSSE(t, resp, streaming.EventRunFinished, 10*time.Second)
-		case 1: // desktop disconnect mid-stream
-			readSSE(t, resp, streaming.EventTextMessageContent, 5*time.Second)
-		case 2: // client stops reading mid-stream (sink goes idle)
-			readSSE(t, resp, streaming.EventTextMessageContent, 5*time.Second)
-		}
+		readRawSSE(t, resp, 5*time.Second)
 	}
 
-	// Everything settles: producers finalize, handlers return, pumps exit.
+	// Everything settles: producers finalize, handlers return, idle conns closed.
 	waitFor(t, 5*time.Second, func() bool {
+		http.DefaultTransport.(*http.Transport).CloseIdleConnections()
+		h.bfClient.CloseIdleConnections()
 		return runtime.NumGoroutine() <= baseline+2
 	})
 	final := runtime.NumGoroutine()

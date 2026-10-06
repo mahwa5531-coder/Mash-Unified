@@ -103,8 +103,12 @@ const CodeBlock = memo(function CodeBlock({
   const [copied, setCopied] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const isDark = useIsDarkMode();
-  const lines = code.split('\n');
-  const lineCount = lines.length;
+  
+  // ponytail: allocation-free O(N) line counter avoids allocating thousands of throwaway substrings per render
+  let lineCount = 1;
+  for (let i = 0; i < code.length; i++) {
+    if (code.charCodeAt(i) === 10) lineCount++;
+  }
   const isLong = lineCount > 45;
 
   const handleCopy = () => {

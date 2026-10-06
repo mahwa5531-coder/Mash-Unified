@@ -2,49 +2,12 @@ package api
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/nexau-cloud/nexau-api/internal/auth"
 	"github.com/nexau-cloud/nexau-api/internal/domain"
 )
-
-// handleLogin: POST /v1/auth/login {email, password}
-//
-// Rate-limited per source IP BEFORE any credential lookup (no user
-// enumeration, no bcrypt work for flooded sources). Failures are uniform.
-func (a *API) handleLogin(w http.ResponseWriter, r *http.Request) {
-	ip := clientIP(r, a.cfg.TrustProxyHeaders)
-	if a.ipLimited(r, ip) {
-		w.Header().Set("Retry-After", "60")
-		writeError(w, r, domain.ErrRateLimited(60_000, "login_ip"))
-		return
-	}
-
-	var body struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	if err := decodeJSON(r, &body); err != nil || body.Email == "" || body.Password == "" {
-		writeError(w, r, domain.ErrValidation("email and password are required"))
-		return
-	}
-	if len(body.Email) > 320 || len(body.Password) > 256 {
-		writeError(w, r, domain.ErrValidation("email or password exceeds the allowed length"))
-		return
-	}
-	body.Email = strings.TrimSpace(strings.ToLower(body.Email))
-
-	ua := r.Header.Get("User-Agent")
-	pair, err := a.authSvc.Login(r.Context(), body.Email, body.Password, ua)
-	if err != nil {
-		a.countLoginFailure(r, ip)
-		writeError(w, r, domain.AsError(err))
-		return
-	}
-	writeOK(w, pair)
-}
 
 // handleRefresh: POST /v1/auth/refresh {refresh_token}
 // Per-IP throttled (2026-09-19 audit, cluster A): rotation is a PG-write +
@@ -100,27 +63,39 @@ func (a *API) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}{true})
 }
 
-// loginThrottleKey is the per-IP failed-login window.
-func loginThrottleKey(ip string) string { return "rl:login:ip:" + ip }
-
-// ipLimited enforces the per-IP login throttle: sources that produced too
-// many FAILED attempts inside the window are locked out (fail-open on Redis
-// loss — availability, with the alarm counter from the limiter).
-func (a *API) ipLimited(r *http.Request, ip string) bool {
-	if a.lim == nil || a.cfg.Auth.MaxFailedLoginsPerIP <= 0 || ip == "" {
-		return false
-	}
-	return a.lim.Count(r.Context(), loginThrottleKey(ip), 15*time.Minute) >=
-		int64(a.cfg.Auth.MaxFailedLoginsPerIP)
-}
-
-// countLoginFailure records one failed attempt in the throttle window.
-func (a *API) countLoginFailure(r *http.Request, ip string) {
-	if a.lim == nil || a.cfg.Auth.MaxFailedLoginsPerIP <= 0 || ip == "" {
+// handleLogoutAll: POST /v1/auth/logout-all
+func (a *API) handleLogoutAll(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromClaims(r.Context())
+	if claims == nil || claims.Subject == "" {
+		writeError(w, r, domain.ErrUnauthorized(nil))
 		return
 	}
-	a.lim.Hit(r.Context(), loginThrottleKey(ip), 15*time.Minute,
-		strconv.FormatInt(time.Now().UnixNano(), 36))
+	jti := claims.TokenID
+	ttl := time.Until(claims.ExpiresAt)
+	if err := a.authSvc.LogoutAll(r.Context(), claims.Subject, jti, ttl); err != nil {
+		writeError(w, r, domain.AsError(err))
+		return
+	}
+	writeOK(w, struct {
+		LoggedOutAll bool `json:"logged_out_all"`
+	}{true})
+}
+
+// handleAuthSession: GET /v1/auth/session
+func (a *API) handleAuthSession(w http.ResponseWriter, r *http.Request) {
+	claims := auth.FromClaims(r.Context())
+	if claims == nil {
+		writeError(w, r, domain.ErrUnauthorized(nil))
+		return
+	}
+	writeOK(w, map[string]any{
+		"authenticated": true,
+		"user_id":       claims.Subject,
+		"tenant_id":     claims.TenantID,
+		"device_id":     claims.DeviceID,
+		"role":          claims.Role,
+		"expires_at":    claims.ExpiresAt,
+	})
 }
 
 // clientIP extracts the source address. X-Forwarded-For is honored only when

@@ -13,12 +13,11 @@ produced these items live in git history (see "Audit history" below).
    committed default — schedule a maintenance window; all access tokens
    invalidate and clients re-authenticate.
 3. Set `NEXAU_APP_BASE_URL` to the https website origin (loopback exempt in
-   dev); verify the SMTP relay offers STARTTLS — the mailer refuses cleartext.
-4. Optionally tune `NEXAU_AUTH_REFRESH_PER_IP`, `NEXAU_AUTH_OAUTH_PER_IP`,
-   `NEXAU_AUTH_UNVERIFIED_RETENTION` (defaults: 60, 60, 72h).
-5. Never set `NEXAU_MAIL_LOG_LINKS=true` outside a local dev machine.
-6. Confirm the load balancer: read-timeout > 15m (long streams), WS
-   upgrade-header passthrough, `X-Accel-Buffering: no` for SSE.
+   dev).
+4. Optionally tune `NEXAU_AUTH_REFRESH_PER_IP`, `NEXAU_AUTH_OAUTH_PER_IP`
+   (defaults: 60, 60).
+5. Confirm the load balancer: read-timeout > 15m (long streams),
+   `X-Accel-Buffering: no` for SSE.
 
 ## Ops-runbook items (deployment layer, not code)
 

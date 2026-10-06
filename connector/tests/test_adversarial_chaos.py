@@ -57,12 +57,12 @@ async def test_k1_oversized_payload_boundedness():
             text='data: {"type": "TEXT_MESSAGE_CONTENT", "data": {"delta": "Payload bounded and processed successfully."}}\n\ndata: {"type": "RUN_FINISHED"}\n\n'
         )
 
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(side_effect=completions_handler)
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(side_effect=completions_handler)
 
     mem_before = psutil.Process().memory_info().rss / (1024 * 1024)
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
-            f"{cloud_url}/v1/agent/chat/completions",
+            f"{cloud_url}/v1/chat/completions",
             json={"model": "mash-audit-v1", "messages": [{"role": "user", "content": huge_content}], "stream": True},
             headers={"Authorization": "Bearer jwt_test_token"}
         )
@@ -98,12 +98,12 @@ async def test_k2_turing_tarpit_tool_recursion_breaker():
             text=f'data: {{"type": "TOOL_CALL_START", "data": {{"id": "tc_{call_count}", "name": "recursive_inspect"}}}}\n\n'
         )
 
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(side_effect=completions_handler)
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(side_effect=completions_handler)
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         for i in range(max_allowed_turns + 1):
             resp = await client.post(
-                f"{cloud_url}/v1/agent/chat/completions",
+                f"{cloud_url}/v1/chat/completions",
                 json={"model": "mash-audit-v1", "messages": [{"role": "user", "content": f"turn_{i}"}]},
                 headers={"Authorization": "Bearer jwt_test_token"}
             )
@@ -119,7 +119,7 @@ async def test_k2_turing_tarpit_tool_recursion_breaker():
 async def test_k3_rapid_reconnect_flooding():
     """K-3: Rapid 100-cycle connect/disconnect flooding does not leak sockets or memory."""
     cloud_url = "https://api.mash.ai"
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(200, headers={"Content-Type": "text/event-stream"}, text='data: {"type": "HEARTBEAT"}\n\n')
     )
 
@@ -128,7 +128,7 @@ async def test_k3_rapid_reconnect_flooding():
     async with httpx.AsyncClient(timeout=5.0) as client:
         for _ in range(50):
             resp = await client.post(
-                f"{cloud_url}/v1/agent/chat/completions",
+                f"{cloud_url}/v1/chat/completions",
                 json={"model": "mash-audit-v1", "messages": [{"role": "user", "content": "ping"}]},
                 headers={"Authorization": "Bearer jwt_test_token"}
             )
@@ -158,11 +158,11 @@ async def test_k4_prompt_injection_system_boundary_defense():
             text='data: {"type": "TEXT_MESSAGE_CONTENT", "data": {"delta": "I can only assist with authorized financial auditing and analysis."}}\n\ndata: {"type": "RUN_FINISHED"}\n\n'
         )
 
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(side_effect=completions_handler)
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(side_effect=completions_handler)
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
-            f"{cloud_url}/v1/agent/chat/completions",
+            f"{cloud_url}/v1/chat/completions",
             json={"model": "mash-audit-v1", "messages": [{"role": "user", "content": adversarial_prompt}]},
             headers={"Authorization": "Bearer jwt_test_token"}
         )
@@ -188,14 +188,14 @@ async def test_k5_malformed_sse_framing_fuzzing():
         "data: [DONE]\n\n"
     )
 
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(200, headers={"Content-Type": "text/event-stream"}, text=malformed_sse)
     )
 
     valid_tokens = []
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
-            f"{cloud_url}/v1/agent/chat/completions",
+            f"{cloud_url}/v1/chat/completions",
             json={"model": "mash-audit-v1", "messages": [{"role": "user", "content": "fuzz"}]},
             headers={"Authorization": "Bearer jwt_test_token"}
         )
@@ -225,14 +225,14 @@ async def test_l1_abrupt_client_abort_reclamation():
     
     stream_cancelled = False
 
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(200, headers={"Content-Type": "text/event-stream"}, text='data: {"type": "TEXT_MESSAGE_CONTENT", "data": {"delta": "chunk"}}\n\n' * 50)
     )
 
     async with httpx.AsyncClient() as client:
         req = client.build_request(
             "POST",
-            f"{cloud_url}/v1/agent/chat/completions",
+            f"{cloud_url}/v1/chat/completions",
             json={"model": "mash-audit-v1", "messages": [{"role": "user", "content": "cancel_me"}]},
             headers={"Authorization": "Bearer jwt_test_token"}
         )
@@ -259,12 +259,12 @@ async def test_l2_network_latency_jitter_stability():
         chunks = [f'data: {{"type": "TEXT_MESSAGE_CONTENT", "data": {{"delta": "token_{i} "}}}}\n\n' for i in range(10)]
         return httpx.Response(200, headers={"Content-Type": "text/event-stream"}, text="".join(chunks))
 
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(side_effect=jitter_handler)
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(side_effect=jitter_handler)
 
     received_tokens = []
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
-            f"{cloud_url}/v1/agent/chat/completions",
+            f"{cloud_url}/v1/chat/completions",
             json={"model": "mash-audit-v1", "messages": [{"role": "user", "content": "jitter"}]},
             headers={"Authorization": "Bearer jwt_test_token"}
         )
@@ -285,7 +285,7 @@ async def test_l3_session_rehydration():
     """L-3: Rehydrating state and continuing conversation context after temporary drop."""
     cloud_url = "https://api.mash.ai"
 
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(
             200,
             headers={"Content-Type": "text/event-stream"},
@@ -301,7 +301,7 @@ async def test_l3_session_rehydration():
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
-            f"{cloud_url}/v1/agent/chat/completions",
+            f"{cloud_url}/v1/chat/completions",
             json={"model": "mash-audit-v1", "messages": history},
             headers={"Authorization": "Bearer jwt_test_token", "X-Session-ID": "rehydrated_sess_001"}
         )
@@ -322,7 +322,7 @@ async def test_l5_heartbeat_idle_watchdog():
         'data: {"type": "RUN_FINISHED"}\n\n'
     )
 
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(200, headers={"Content-Type": "text/event-stream"}, text=heartbeat_stream)
     )
 
@@ -330,7 +330,7 @@ async def test_l5_heartbeat_idle_watchdog():
     tokens = []
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
-            f"{cloud_url}/v1/agent/chat/completions",
+            f"{cloud_url}/v1/chat/completions",
             json={"model": "mash-audit-v1", "messages": [{"role": "user", "content": "think"}]},
             headers={"Authorization": "Bearer jwt_test_token"}
         )

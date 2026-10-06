@@ -72,6 +72,7 @@ export default function ConversationHistory({
   }, [sessions, archivedSessionIds]);
 
   const filteredSessions = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return sessions.filter((s) => {
       // Archive tab filter
       const isArchived = Boolean(archivedSessionIds?.has(s.session_id));
@@ -79,11 +80,11 @@ export default function ConversationHistory({
       if (viewTab === 'archived' && !isArchived) return false;
 
       // 1. Text filter
-      const title = (s.custom_title || s.title || '').toLowerCase();
-      const repo = (s.workspace_uri || '').toLowerCase();
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch = !q || title.includes(q) || repo.includes(q);
-      if (!matchesSearch) return false;
+      if (q) {
+        const title = (s.custom_title || s.title || '').toLowerCase();
+        const repo = (s.workspace_uri || '').toLowerCase();
+        if (!title.includes(q) && !repo.includes(q)) return false;
+      }
 
       // 2. Section filter
       const isWorkspace = s.section === 'workspace' && s.workspace_uri && s.workspace_uri !== 'No Repo';

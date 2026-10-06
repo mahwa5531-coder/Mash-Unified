@@ -219,7 +219,14 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
             const resBlock = step.content.find((b: any) => b.type === 'tool_result');
             if (resBlock) outputText = resBlock.content || '';
           }
-          const target = prevMsg.tools.find((t: any) => t.id === toolId);
+          // ponytail: reverse scan finds the matching tool call in O(1) time at the tail
+          let target: any = null;
+          for (let ti = prevMsg.tools.length - 1; ti >= 0; ti--) {
+            if (prevMsg.tools[ti].id === toolId) {
+              target = prevMsg.tools[ti];
+              break;
+            }
+          }
           if (target) {
             target.output = outputText || 'Done.';
             target.status = 'completed';
@@ -234,19 +241,24 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
           }
           if (prevMsg.steps) {
             let matchedStep = false;
-            for (const s of prevMsg.steps) {
-              if (Array.isArray(s.tools)) {
-                const st = s.tools.find((t: any) => t.id === toolId);
-                if (st) {
-                  st.output = outputText || 'Done.';
-                  st.status = 'completed';
-                  matchedStep = true;
-                }
-              }
+            for (let si = prevMsg.steps.length - 1; si >= 0; si--) {
+              const s = prevMsg.steps[si];
               if (s.type === 'tool' && (s.tool_call_id === toolId || s.id === toolId)) {
                 s.output = outputText || 'Done.';
                 s.status = 'completed';
                 matchedStep = true;
+                break;
+              }
+              if (Array.isArray(s.tools)) {
+                for (let ti = s.tools.length - 1; ti >= 0; ti--) {
+                  if (s.tools[ti].id === toolId) {
+                    s.tools[ti].output = outputText || 'Done.';
+                    s.tools[ti].status = 'completed';
+                    matchedStep = true;
+                    break;
+                  }
+                }
+                if (matchedStep) break;
               }
             }
             if (!matchedStep && outputText) {

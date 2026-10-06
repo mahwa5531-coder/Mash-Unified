@@ -28,7 +28,15 @@ export function buildTurns(chatMessages: Message[]): Turn[] {
         currentTurn.aiMsgs.push(msg);
       } else {
         // Consolidate multiple assistant responses within the same turn into one unified message
-        const existing = currentTurn.aiMsgs[0];
+        // ponytail: clone existing message once to preserve state immutability
+        const rawExisting = currentTurn.aiMsgs[0];
+        const existing: Message = {
+          ...rawExisting,
+          thoughts: rawExisting.thoughts ? [...rawExisting.thoughts] : [],
+          tools: rawExisting.tools ? [...rawExisting.tools] : [],
+          steps: rawExisting.steps ? [...rawExisting.steps] : [],
+        };
+        currentTurn.aiMsgs[0] = existing;
 
         // Merge thoughts chronologically without duplicates
         if (msg.thoughts && msg.thoughts.length > 0) {
@@ -41,16 +49,21 @@ export function buildTurns(chatMessages: Message[]): Turn[] {
           }
         }
 
-        // Merge tools by id
+        // Merge tools by id with O(1) index lookup
         if (msg.tools && msg.tools.length > 0) {
-          const existingToolIds = new Set((existing.tools || []).map((t: any) => t.id));
+          if (!existing.tools) existing.tools = [];
+          const toolIndexMap = new Map<string, number>();
+          for (let ti = 0; ti < existing.tools.length; ti++) {
+            const tid = existing.tools[ti]?.id;
+            if (tid) toolIndexMap.set(tid, ti);
+          }
           for (const tl of msg.tools) {
-            if (tl.id && existingToolIds.has(tl.id)) {
-              const idx = existing.tools.findIndex((t: any) => t.id === tl.id);
-              if (idx >= 0) existing.tools[idx] = { ...existing.tools[idx], ...tl };
+            if (tl.id && toolIndexMap.has(tl.id)) {
+              const idx = toolIndexMap.get(tl.id)!;
+              existing.tools[idx] = { ...existing.tools[idx], ...tl };
             } else {
               existing.tools.push(tl);
-              if (tl.id) existingToolIds.add(tl.id);
+              if (tl.id) toolIndexMap.set(tl.id, existing.tools.length - 1);
             }
           }
         }

@@ -32,7 +32,6 @@ import (
 	"github.com/nexau-cloud/nexau-api/internal/middleware"
 	"github.com/nexau-cloud/nexau-api/internal/observability"
 	"github.com/nexau-cloud/nexau-api/internal/ratelimit"
-	"github.com/nexau-cloud/nexau-api/internal/streaming"
 )
 
 // fakeBifrost is a scripted upstream: it emits SSE chunks with configurable
@@ -91,6 +90,9 @@ func newFakeBifrost(t *testing.T) *fakeBifrost {
 			}
 			fmt.Fprintf(w, "data: %s\n\n", c.data)
 			flusher.Flush()
+			if c.data == "[DONE]" {
+				return
+			}
 		}
 		// Drain-and-hold: keep the stream open so late behavior (cancellation,
 		// disconnect) is observable unless the script itself terminates.
@@ -125,11 +127,11 @@ func (fb *fakeBifrost) wasCanceled() bool {
 // usage in the final chunk (Bifrost standardization).
 func standardScript() []scriptChunk {
 	return []scriptChunk{
-		{data: `{"id":"cmpl_1","object":"chat.completion.chunk","model":"openai/gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":"Revenue"}}]}`, delay: 30 * time.Millisecond},
-		{data: `{"id":"cmpl_1","choices":[{"index":0,"delta":{"content":" is up"}}]}`, delay: 150 * time.Millisecond},
-		{data: `{"id":"cmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"tcall_1","type":"function","function":{"name":"read_excel","arguments":"{}"}}]}}]}`, delay: 150 * time.Millisecond},
-		{data: `{"id":"cmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":100,"completion_tokens":40,"total_tokens":140,"prompt_tokens_details":{"cached_read_tokens":20},"cost":{"input_tokens_cost":0.001,"output_tokens_cost":0.002,"total_cost":0.003}},"extra_fields":{"provider":"openai","model_deployment":"gpt-4o-2024","latency_ms":321}}`, delay: 150 * time.Millisecond},
-		{data: `{"id":"cmpl_1","choices":[{"index":0,"delta":{}}]}`, delay: 10 * time.Millisecond},
+		{data: `{"id":"cmpl_1","object":"chat.completion.chunk","model":"openai/gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":"Revenue"}}]}`, delay: 5 * time.Millisecond},
+		{data: `{"id":"cmpl_1","choices":[{"index":0,"delta":{"content":" is up"}}]}`, delay: 5 * time.Millisecond},
+		{data: `{"id":"cmpl_1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"tcall_1","type":"function","function":{"name":"read_excel","arguments":"{}"}}]}}]}`, delay: 5 * time.Millisecond},
+		{data: `{"id":"cmpl_1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":100,"completion_tokens":40,"total_tokens":140,"prompt_tokens_details":{"cached_read_tokens":20},"cost":{"input_tokens_cost":0.001,"output_tokens_cost":0.002,"total_cost":0.003}},"extra_fields":{"provider":"openai","model_deployment":"gpt-4o-2024","latency_ms":321}}`, delay: 5 * time.Millisecond},
+		{data: `{"id":"cmpl_1","choices":[{"index":0,"delta":{}}]}`, delay: 5 * time.Millisecond},
 		{data: `[DONE]`, delay: 0},
 	}
 }
@@ -308,6 +310,7 @@ type harness struct {
 	token    string
 	cfg      *config.Config
 	mgr      *agent.Manager
+	bfClient *bifrost.Client
 }
 
 func newHarness(t *testing.T) *harness {
@@ -357,14 +360,13 @@ func newHarness(t *testing.T) *harness {
 	meter := metering.New(usageW, metering.Config{QueueSize: cfg.Meter.QueueSize, BatchSize: cfg.Meter.BatchSize, FlushInterval: cfg.Meter.FlushInterval, RetryMax: cfg.Meter.RetryMax}, metrics)
 	t.Cleanup(func() { meter.Close(2 * time.Second) })
 
-	bus := streaming.NewBus(rdb, streaming.Config{MaxEventsPerRun: cfg.Replay.MaxEventsPerRun, Window: cfg.Replay.Window})
 	limiter := ratelimit.New(rdb, true, metrics)
 	idem := idempotency.New(rdb, cfg.IdempotencyTTL)
 	bfClient := bifrost.NewClient(bifrost.TransportConfig{BaseURL: fb.srv.URL, MaxRetries: 0}, metrics)
 
 	mgr := agent.NewManager(rdb, limiter, cfg.Rate.RunConcurrencyTimeout, metrics)
 	runSvc := agent.NewService(agent.Config{
-		Sessions: sessions, Runs: runs, Bifrost: bfClient, Bus: bus,
+		Sessions: sessions, Runs: runs, Bifrost: bfClient,
 		Meter: meter, Idem: idem, Manager: mgr, Limiter: limiter,
 		Limits: agent.Limits{MaxMessages: cfg.MaxMessages, MaxTools: cfg.MaxTools, MaxModelLen: cfg.MaxModelLen},
 		Rate: agent.RateRules{
@@ -375,7 +377,6 @@ func newHarness(t *testing.T) *harness {
 		SetupTimeout: 5 * time.Second,
 		Metrics:      metrics,
 	})
-	sessSvc := agent.NewSessionService(sessions, cfg.SessionIdleTTL)
 
 	signer := auth.NewLocalSigner(testSecret, cfg.Auth.Issuer, cfg.Auth.Audience, 0, time.Hour)
 	idn := &auth.Identity{
@@ -390,7 +391,7 @@ func newHarness(t *testing.T) *harness {
 		AuthTimeout: cfg.AuthTimeout,
 	}
 
-	apiH := api.New(cfg, &auth.Service{}, authMW, sessSvc, runSvc, nil, nil, nil, nil, meter, limiter, metrics, nil, nil)
+	apiH := api.New(cfg, &auth.Service{}, authMW, runSvc, nil, nil, nil, nil, meter, limiter, metrics, nil, nil)
 	chain := middleware.Chain(middleware.Options{
 		MaxBodyBytes: cfg.MaxBodyBytes, MaxInFlight: 64, AllowedOrigins: cfg.AllowedOrigins,
 	}, metrics)
@@ -406,6 +407,7 @@ func newHarness(t *testing.T) *harness {
 	return &harness{
 		t: t, srv: srv, bifrost: fb, sessions: sessions, runs: runs, usage: usageW,
 		meter: meter, mr: mr, signer: signer, token: token, cfg: cfg, mgr: mgr,
+		bfClient: bfClient,
 	}
 }
 
@@ -435,10 +437,10 @@ func (h *harness) createForeignSession() string {
 	return sess.ID
 }
 
-// postRun issues a run-creation request; stream bodies are read by the caller.
-func (h *harness) postRun(sessionID string, body string, extraHeaders map[string]string) (*http.Response, error) {
+// postChatCompletions issues an OpenAI-compatible completion request.
+func (h *harness) postChatCompletions(body string, extraHeaders map[string]string) (*http.Response, error) {
 	h.t.Helper()
-	req, err := http.NewRequest(http.MethodPost, h.srv.URL+"/v1/agent/sessions/"+sessionID+"/runs", strings.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, h.srv.URL+"/v1/agent/chat/completions", strings.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -448,64 +450,6 @@ func (h *harness) postRun(sessionID string, body string, extraHeaders map[string
 		req.Header.Set(k, v)
 	}
 	return http.DefaultClient.Do(req)
-}
-
-// sseEvent is one parsed desktop-side event.
-type sseEvent struct {
-	env streaming.Envelope
-	at  time.Time
-}
-
-// readSSE consumes the SSE stream until the terminal event or deadline.
-func readSSE(t *testing.T, resp *http.Response, stopOn string, maxWait time.Duration) []sseEvent {
-	t.Helper()
-	defer resp.Body.Close()
-	events := make(chan sseEvent, 128)
-	go func() {
-		buf := make([]byte, 64<<10)
-		var carry []byte
-		for {
-			n, err := resp.Body.Read(buf)
-			if n > 0 {
-				carry = append(carry, buf[:n]...)
-				for {
-					idx := indexTerminator(carry)
-					if idx < 0 {
-						break
-					}
-					frame := string(carry[:idx])
-					carry = carry[idx+2:]
-					if line, ok := strings.CutPrefix(frame, "data: "); ok {
-						env, derr := streaming.DecodeEnvelope([]byte(line))
-						if derr == nil {
-							events <- sseEvent{env: *env, at: time.Now()}
-						}
-					}
-				}
-			}
-			if err != nil {
-				close(events)
-				return
-			}
-		}
-	}()
-
-	deadline := time.After(maxWait)
-	var out []sseEvent
-	for {
-		select {
-		case ev, ok := <-events:
-			if !ok {
-				return out
-			}
-			out = append(out, ev)
-			if stopOn != "" && ev.env.Type == stopOn {
-				return out
-			}
-		case <-deadline:
-			return out
-		}
-	}
 }
 
 func indexTerminator(b []byte) int {

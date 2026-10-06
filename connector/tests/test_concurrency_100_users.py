@@ -59,7 +59,7 @@ async def test_100_concurrent_users_streaming_isolation():
             text=sse_body,
         )
 
-    respx.post(f"{cloud_url}/v1/agent/chat/completions").mock(side_effect=cloud_completions_handler)
+    respx.post(f"{cloud_url}/v1/chat/completions").mock(side_effect=cloud_completions_handler)
 
     async def single_user_client(client: httpx.AsyncClient, user_idx: int):
         user_id = f"auditor_usr_{user_idx:03d}"
@@ -81,7 +81,7 @@ async def test_100_concurrent_users_streaming_isolation():
 
         tokens = []
         resp = await client.post(
-            f"{cloud_url}/v1/agent/chat/completions",
+            f"{cloud_url}/v1/chat/completions",
             headers=headers,
             json=payload,
         )
@@ -112,7 +112,7 @@ async def test_100_concurrent_users_streaming_isolation():
     # Verification 1: All 100 users completed
     assert len(results) == 100, f"Expected 100 completed streams, got {len(results)}"
 
-    # Verification 2: Strict isolation — zero token leakage between users
+    # Verification 2: Strict isolation  Ezero token leakage between users
     for res in results:
         idx = res["user_idx"]
         expected_unique_marker = f"[AUDITOR_{idx}_TOKEN_1]"

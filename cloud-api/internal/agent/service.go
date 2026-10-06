@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -24,14 +23,7 @@ import (
 	"github.com/nexau-cloud/nexau-api/internal/ratelimit"
 	"github.com/nexau-cloud/nexau-api/internal/reqctx"
 	"github.com/nexau-cloud/nexau-api/internal/store"
-	"github.com/nexau-cloud/nexau-api/internal/streaming"
 )
-
-// EventSink is where a run's events are delivered: the SSE writer or a
-// WebSocket connection. Transport-neutral by design (spec §9).
-type EventSink interface {
-	SendEvent(env *streaming.Envelope) error
-}
 
 // RateRules carry the request-rate dimensions (config defaults; plan values
 // override when set).
@@ -55,7 +47,6 @@ type Service struct {
 	runs     RunsStore
 	usage    UsageQuery
 	bifrost  BifrostClient
-	bus      Bus
 	meter    *metering.Recorder
 	idem     *idempotency.Store
 	mgr      *Manager
@@ -102,20 +93,12 @@ type BifrostClient interface {
 	CompletionStream(ctx context.Context, req *bifrost.ChatRequest) (*bifrost.StreamReader, error)
 }
 
-type Bus interface {
-	Publish(ctx context.Context, env *streaming.Envelope) error
-	Replay(ctx context.Context, runID string, afterSequence int64, maxBytes int64) ([]*streaming.Envelope, int64, bool, error)
-	Retain(ctx context.Context, runID string)
-	SubscribeLive(ctx context.Context, sessionID string) (*streaming.Live, error)
-}
-
 // Config wires the service.
 type Config struct {
 	Sessions         SessionsStore
 	Runs             RunsStore
 	Usage            UsageQuery
 	Bifrost          BifrostClient
-	Bus              Bus
 	Meter            *metering.Recorder
 	Idem             *idempotency.Store
 	Manager          *Manager
@@ -147,7 +130,6 @@ func NewService(cfg Config) *Service {
 		runs:             cfg.Runs,
 		usage:            cfg.Usage,
 		bifrost:          cfg.Bifrost,
-		bus:              cfg.Bus,
 		meter:            cfg.Meter,
 		idem:             cfg.Idem,
 		mgr:              cfg.Manager,
@@ -164,16 +146,6 @@ func NewService(cfg Config) *Service {
 
 // Manager exposes the run manager (cancel path, shutdown).
 func (s *Service) Manager() *Manager { return s.mgr }
-
-// BusReplay replays buffered run events (WS resume path).
-func (s *Service) BusReplay(ctx context.Context, runID string, afterSequence, maxBytes int64) ([]*streaming.Envelope, int64, bool, error) {
-	return s.bus.Replay(ctx, runID, afterSequence, maxBytes)
-}
-
-// SubscribeLive attaches to a session's live event feed.
-func (s *Service) SubscribeLive(ctx context.Context, sessionID string) (*streaming.Live, error) {
-	return s.bus.SubscribeLive(ctx, sessionID)
-}
 
 // RunResponse is the stream=false reply: the OpenAI-compatible completion
 // plus the cloud run envelope.
@@ -577,196 +549,6 @@ func (s *Service) completeSync(ctx context.Context, idn *auth.Identity, run *dom
 	return out
 }
 
-// ProduceStream runs the streaming producer to completion. Called on the
-// SSE handler goroutine (sink = SSE writer) or detached for WS runs.
-func (s *Service) ProduceStream(idn *auth.Identity, handle *StreamHandle, req *RunRequest, sink EventSink) {
-	defer handle.Finish()
-	ctx := handle.ctx
-	run := handle.Run
-
-	mapper := NewMapper(run.ID, run.SessionID, run.SessionID, req.TurnID, req.Model)
-	seq := int64(0)
-
-	// Poison-pill containment (2026-09-18 post-mortem audit): on the WS
-	// path this producer runs DETACHED (wshandler.go) — the Recovery
-	// middleware cannot reach it, and an unrecovered panic in ANY of the
-	// ~300 lines below would kill the entire process (every live stream
-	// and connection on this pod; a deterministic trigger = crash loop —
-	// the incident.io / Google Service Control pattern). Contain, log the
-	// stack, and finalize the run as failed. http.ErrAbortHandler is
-	// re-panicked: it is the transport's own legitimate abort signal.
-	defer func() {
-		if rec := recover(); rec != nil {
-			if rec == http.ErrAbortHandler {
-				panic(rec)
-			}
-			observability.LogError("run producer panic contained",
-				"panic", rec,
-				"run_id", run.ID,
-				"tenant_id", run.TenantID,
-				"stack", string(debug.Stack()))
-			// Best-effort terminal event + row finalization. Each
-			// leg is independently panic-guarded: the sink may be
-			// the poison source, and a panic inside THIS deferred
-			// function would escape containment entirely.
-			func() {
-				defer func() { _ = recover() }() // dead sink: drop silently
-				if mapper != nil {
-					s.emitFinal(ctx, run, sink, mapper, seq, &finalState{
-						status: domain.RunFailed, code: "INTERNAL",
-						message: "The run hit an internal error and was terminated.",
-					})
-				}
-			}()
-			func() {
-				defer func() {
-					if r2 := recover(); r2 != nil {
-						observability.LogError("panic-path finalize also panicked",
-							"panic", r2, "run_id", run.ID)
-					}
-				}()
-				s.finalize(ctx, idn, run, req, outcomeData{status: domain.RunFailed, errCode: "INTERNAL"})
-			}()
-		}
-	}()
-
-	// Bifrost context: idle watchdog + total-duration cap.
-	bctx := bifrost.WithIdleTimeout(ctx, s.timing.IdleTimeout)
-	bctx, durCancel := context.WithTimeout(bctx, s.timing.MaxDuration)
-	defer durCancel()
-
-	reader, err := s.bifrost.CompletionStream(bctx, req.ToBifrost())
-	if err != nil {
-		// Failure before any byte: no billable side effect, clean error path.
-		de := domain.AsError(err)
-		s.emitFinal(ctx, run, sink, mapper, seq, &finalState{
-			status: domain.RunFailed, code: de.Code, message: safeMessage(de),
-		})
-		s.finalize(ctx, idn, run, req, outcomeData{status: domain.RunFailed, errCode: de.Code})
-		return
-	}
-	defer reader.Close()
-
-	// RUN_STARTED opens the event stream.
-	seq = s.emit(ctx, run, mapper.StartEnvelope(), seq, sink)
-	_ = s.runs.SetFirstEvent(ctx, run.TenantID, run.ID)
-
-	for {
-		chunk, _, done, err := reader.Next()
-		if err != nil {
-			reason, by, cancelled := CauseInfo(ctx)
-			if isSinkDead(sink) && !cancelled {
-				// Desktop disconnected: propagate upstream cancellation
-				// (spec §20) and finalize as disconnected.
-				handle.Cancel(&cancelCause{reason: CancelDisconnect, by: by})
-				reason = CancelDisconnect
-				cancelled = true
-			}
-			if cancelled {
-				status := domain.RunCancelled
-				if reason == CancelDisconnect {
-					status = domain.RunDisconnected
-				}
-				s.emitFinal(ctx, run, sink, mapper, seq, &finalState{
-					status: status, cancelled: true, reason: reason, by: by,
-				})
-				// Meter what was actually consumed before the cancellation:
-				// the mapper carries provider-reported interim usage
-				// (input tokens and partial output). Dropping it under-billed
-				// cancelled runs by design (2026-09-19 audit finding).
-				out := mapper.Outcome()
-				s.finalize(ctx, idn, run, req, outcomeData{
-					status: status, cancelReason: reason, cancelBy: byOr(by, "system"),
-					model: out.Model, provider: out.Provider, usage: out.Usage, latencyMS: out.LatencyMS,
-				})
-				return
-			}
-			de := domain.AsError(err)
-			s.emitFinal(ctx, run, sink, mapper, seq, &finalState{
-				status: domain.RunFailed, code: de.Code, message: safeMessage(de),
-			})
-			s.finalize(ctx, idn, run, req, outcomeData{status: domain.RunFailed, errCode: de.Code})
-			return
-		}
-		if done {
-			// Clean end: close lifecycles + bookends + usage.
-			for _, env := range mapper.Finish("") {
-				seq = s.emit(ctx, run, env, seq, sink)
-			}
-			out := mapper.Outcome()
-			s.finalize(ctx, idn, run, req, outcomeData{
-				status: domain.RunCompleted, model: out.Model, provider: out.Provider,
-				usage: out.Usage, latencyMS: out.LatencyMS,
-			})
-			return
-		}
-		if chunk != nil {
-			for _, env := range mapper.MapChunk(chunk) {
-				seq = s.emit(ctx, run, env, seq, sink)
-			}
-		}
-	}
-}
-
-// emit assigns the sequence, forwards to the sink and the bus. Order is
-// total: one producer, sequential calls. Sink death is recorded by the sink
-// itself (SSE write error / WS eviction) and handled at the next observation.
-func (s *Service) emit(ctx context.Context, run *domain.Run, env *streaming.Envelope, seq int64, sink EventSink) int64 {
-	seq++
-	env.Sequence = seq
-	if sink != nil {
-		if err := sink.SendEvent(env); err != nil {
-			// Sink is gone: events continue to the bus (replay stays intact),
-			// the producer loop observes cancellation at the next boundary.
-			observability.LogDebug("agent: sink write failed; continuing to bus",
-				"run_id", run.ID, "error", err)
-		}
-	}
-	if s.bus != nil {
-		// Durable publication: the replay buffer must not lose events when
-		// the direct client vanished between SSE write and publish.
-		if err := s.bus.Publish(context.WithoutCancel(ctx), env); err != nil {
-			observability.LogWarn("agent: bus publish failed", "run_id", run.ID, "error", err)
-		}
-	}
-	if s.m != nil {
-		s.m.EventsForwarded.Add(ctx, 1, observability.Attr("type", env.Type))
-	}
-	return seq
-}
-
-// finalState labels the terminal event emission.
-type finalState struct {
-	status    string
-	code      string
-	message   string
-	cancelled bool
-	reason    string
-	by        string
-}
-
-// emitFinal closes the run's event stream from the mapper state. The
-// without-cancel context keeps the bus publishable after client departure.
-func (s *Service) emitFinal(ctx context.Context, run *domain.Run, sink EventSink, mapper *Mapper, seq int64, st *finalState) {
-	ctx = context.WithoutCancel(ctx)
-	var events []*streaming.Envelope
-	switch {
-	case st.cancelled && st.status == domain.RunDisconnected:
-		events = mapper.FinishError("CLIENT_DISCONNECTED", "The desktop connection was lost.")
-	case st.cancelled && st.reason == CancelUser:
-		events = mapper.FinishError("RUN_CANCELLED", "The run was cancelled.")
-		events = append(events, mapper.CancelEnvelope(st.by))
-	case st.cancelled:
-		events = mapper.FinishError("RUN_CANCELLED", "The run was aborted: "+st.reason)
-	default:
-		events = mapper.FinishError(st.code, st.message)
-	}
-	for _, env := range events {
-		seq = s.emit(ctx, run, env, seq, sink)
-	}
-	_ = seq
-}
-
 // outcomeData is the finalization fact set.
 type outcomeData struct {
 	status       string
@@ -822,10 +604,6 @@ func (s *Service) finalize(ctx context.Context, idn *auth.Identity, run *domain.
 		s.m.RunsCompleted.Add(ctx, 1, observability.Attr("status", out.status))
 	}
 
-	// Replay window retention + cleanup.
-	if s.bus != nil {
-		s.bus.Retain(ctx, run.ID)
-	}
 	s.mgr.Deregister(run.ID)
 	s.mgr.ReleaseSlots(ctx, idn.Tenant.ID, idn.User.ID)
 	if s.idem != nil && run.IdempotencyKey != "" {
@@ -916,15 +694,9 @@ func (s *Service) bifrostCompletion(ctx context.Context, req *RunRequest) (*bifr
 	return s.bifrost.Completion(ctx, req.ToBifrost())
 }
 
-func isSinkDead(sink EventSink) bool {
-	if c, ok := sink.(interface{ Closed() bool }); ok {
-		return c.Closed()
-	}
-	return false
-}
 
 func modelAllowed(allowlist []string, model string) bool {
-	if len(allowlist) == 0 {
+	if len(allowlist) == 0 || model == "mash-agent" || model == "default" {
 		return true
 	}
 	for _, pattern := range allowlist {

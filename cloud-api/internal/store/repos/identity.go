@@ -192,6 +192,14 @@ func (r *SubscriptionsRepo) Effective(ctx context.Context, tenantID string) (*do
 	return s, nil
 }
 
+// Cancel marks the tenant's active subscription to cancel at the end of the period.
+func (r *SubscriptionsRepo) Cancel(ctx context.Context, tenantID string) error {
+	_, err := r.Pool.Exec(ctx, `
+		UPDATE subscriptions SET cancel_at_period_end = TRUE, updated_at = now()
+		WHERE tenant_id = $1 AND status IN ('trialing','active')`, tenantID)
+	return err
+}
+
 // EntitlementsRepo reads tenant entitlement overrides.
 type EntitlementsRepo struct{ Pool *pgxpool.Pool }
 

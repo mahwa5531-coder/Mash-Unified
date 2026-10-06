@@ -51,12 +51,19 @@ export default function ChatComposer({
     setLocalPrompt(inputPrompt);
   }, [inputPrompt]);
 
-  // Auto-resize textarea to fit content cleanly up to 220px
+  // Auto-resize textarea to fit content cleanly up to 220px without layout thrashing
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 220)}px`;
+    const el = textareaRef.current;
+    if (!el) return;
+    if (!localPrompt) {
+      el.style.height = 'auto';
+      return;
     }
+    const rafId = requestAnimationFrame(() => {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 220)}px`;
+    });
+    return () => cancelAnimationFrame(rafId);
   }, [localPrompt]);
 
   const handleSendClick = () => {

@@ -128,10 +128,8 @@ human-visible on `GET /health/ready`:
 
 | Surface | Behavior while OPEN |
 |---|---|
-| `POST /v1/agent/sessions/{id}/runs` (SSE) | HTTP 200 stream ends with `RUN_ERROR` event: `code=UPSTREAM_CIRCUIT_OPEN` |
-| WS `run.create` | `RUN_ERROR` envelope with the same code |
 | OpenAI-compat `POST /v1/agent/chat/completions` | HTTP 503, body `error.code=UPSTREAM_CIRCUIT_OPEN`, `error.details.retry_after_ms` |
-| Auth, sessions, replay, `/health/*` | **unaffected** |
+| Auth, `/health/*`, payments | **unaffected** |
 
 `retry_after_ms` is the remaining cooldown at rejection time — a safe
 backoff hint. The circuit self-heals; the desktop only needs polite backoff,
