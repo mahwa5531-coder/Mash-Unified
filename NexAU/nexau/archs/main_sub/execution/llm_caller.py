@@ -891,6 +891,14 @@ def call_llm_with_openai_chat_completion(
         r = kwargs["extra_body"].get("reasoning")
         if isinstance(r, dict) and "effort" in r and "max_tokens" in r:
             r.pop("max_tokens", None)
+
+    if llm_config:
+        req_headers = _build_bifrost_headers(llm_config, model_call_params)
+        if req_headers:
+            existing_extra_headers = dict(kwargs.get("extra_headers") or {})
+            existing_extra_headers.update(req_headers)
+            kwargs["extra_headers"] = existing_extra_headers
+
     stream_requested = bool(kwargs.pop("stream", False) or getattr(llm_config, "stream", False))
 
     should_trace = tracer is not None and get_current_span() is not None
@@ -1017,6 +1025,14 @@ async def call_llm_with_openai_chat_completion_async(
         r = kwargs["extra_body"].get("reasoning")
         if isinstance(r, dict) and "effort" in r and "max_tokens" in r:
             r.pop("max_tokens", None)
+
+    if llm_config:
+        req_headers = _build_bifrost_headers(llm_config, model_call_params)
+        if req_headers:
+            existing_extra_headers = dict(kwargs.get("extra_headers") or {})
+            existing_extra_headers.update(req_headers)
+            kwargs["extra_headers"] = existing_extra_headers
+
     stream_requested = bool(kwargs.pop("stream", False) or getattr(llm_config, "stream", False))
 
     should_trace = tracer is not None and get_current_span() is not None
