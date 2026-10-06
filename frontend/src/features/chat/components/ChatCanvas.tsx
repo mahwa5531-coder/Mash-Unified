@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, History } from 'lucide-react';
 import ChatComposer from '@/features/chat/components/ChatComposer';
-import QuotaBanner from '@/features/chat/components/QuotaBanner';
+import { QuotaBanner } from '@/primitives';
+import { classifyError } from '@/lib/errorClassification';
 import UserMessage from '@/features/chat/components/messages/UserMessage';
 import AssistantMessage from '@/features/chat/components/messages/AssistantMessage';
 import { ScrollToBottomButton } from '@/features/chat/components/ScrollToBottomButton';
@@ -136,14 +137,8 @@ export default function ChatCanvas({
 
   // Trigger quota banner ONLY if backend/model returns a rate limit or quota exceeded error
   useEffect(() => {
-    const errorText = (lastAiMsg?.error || '').toLowerCase();
-    if (
-      errorText.includes("quota exceeded") ||
-      errorText.includes("rate limit") ||
-      errorText.includes("quota reached") ||
-      errorText.includes("insufficient_quota") ||
-      errorText.includes("429")
-    ) {
+    const classified = classifyError(lastAiMsg?.error);
+    if (classified?.category === 'quota') {
       setShowQuotaBanner(true);
     }
   }, [lastAiMsg?.error]);
@@ -317,7 +312,6 @@ export default function ChatCanvas({
                 open={showQuotaBanner}
                 onOpenChange={setShowQuotaBanner}
                 onSeePlans={() => onOpenSettings?.('plans')}
-                onEnableOverages={() => onOpenSettings?.('account')}
                 onDismiss={() => setShowQuotaBanner(false)}
               />
             </div>

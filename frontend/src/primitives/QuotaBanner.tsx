@@ -15,7 +15,6 @@ export interface QuotaBannerProps {
   description?: string;
   /** Action callbacks */
   onSeePlans?: () => void;
-  onEnableOverages?: () => void;
   onDismiss?: () => void;
   className?: string;
 }
@@ -23,9 +22,9 @@ export interface QuotaBannerProps {
 /**
  * QuotaBanner Primitive
  * 
- * Faithful 1:1 implementation matching the Antigravity/Mash quota completion banner.
+ * Faithful implementation matching the Antigravity/Mash quota completion banner.
  * Sits directly above the chat composer dock.
- * Displays dynamic baseline quota refresh date/time and provides 'See Plans' & 'Enable Overages' actions.
+ * Displays dynamic baseline quota refresh date/time and provides 'See Plans' action.
  */
 export function QuotaBanner({
   open = true,
@@ -34,7 +33,6 @@ export function QuotaBanner({
   refreshDate,
   description,
   onSeePlans,
-  onEnableOverages,
   onDismiss,
   className,
 }: QuotaBannerProps) {
@@ -63,7 +61,7 @@ export function QuotaBanner({
     onOpenChange?.(false);
   };
 
-  const bodyText = description || `Your plan's baseline quota will refresh on ${formattedRefreshTime}. To continue using this model now, enable AI Credit overages.`;
+  const bodyText = description || `Your plan's baseline quota will refresh on ${formattedRefreshTime}. To continue running autonomous turns now, switch models or upgrade tier.`;
 
   return (
     <div
@@ -117,17 +115,9 @@ export function QuotaBanner({
         <button
           type="button"
           onClick={onSeePlans}
-          className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.06] transition-colors cursor-pointer"
+          className="px-4 py-1.5 rounded-lg text-xs font-medium text-white bg-white/10 hover:bg-white/15 active:bg-white/20 border border-white/10 transition-colors cursor-pointer shadow-xs"
         >
           See Plans
-        </button>
-
-        <button
-          type="button"
-          onClick={onEnableOverages}
-          className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-white bg-[#1a73e8] hover:bg-[#1557b0] active:bg-[#174ea6] transition-colors cursor-pointer shadow-xs"
-        >
-          Enable Overages
         </button>
       </div>
     </div>

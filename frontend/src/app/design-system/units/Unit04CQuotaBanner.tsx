@@ -58,7 +58,6 @@ export function Unit04CQuotaBanner({
               title="Baseline model quota reached"
               refreshDate={new Date(Date.now() + 24 * 3600 * 1000)}
               onSeePlans={() => onSelectComponent('QuotaBanner: Clicked See Plans')}
-              onEnableOverages={() => onSelectComponent('QuotaBanner: Clicked Enable Overages')}
               onDismiss={() => {
                 setQuotaBannerOpen(false);
                 onSelectComponent('QuotaBanner: Dismissed');
