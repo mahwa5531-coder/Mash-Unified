@@ -118,6 +118,19 @@ class MAShClient:
             resp.raise_for_status()
             return resp.json()
 
+    async def get_usage(self, access_token: str) -> dict[str, Any]:
+        """Fetches live token usage and percentage against quota from cloud."""
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            resp = await client.get(
+                f"{self.base_url}/v1/me/usage",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json",
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()
+
     async def get_config(self, access_token: str | None = None) -> dict[str, Any]:
         """Fetches client integration configuration from cloud."""
         headers: dict[str, str] = {"Accept": "application/json"}

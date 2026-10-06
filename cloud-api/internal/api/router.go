@@ -121,6 +121,8 @@ func (a *API) Router() http.Handler {
 	mux.Handle("POST /v1/responses", a.authMW.Require(http.HandlerFunc(a.handleResponses)))
 	mux.Handle("POST /v1/agent/chat/completions", a.authMW.Require(http.HandlerFunc(a.handleChatCompletions)))
 	mux.Handle("POST /v1/agent/chat/completions/cancel", a.authMW.Require(http.HandlerFunc(a.handleChatCompletionsCancel)))
+	mux.Handle("POST /v1/chat/completions", a.authMW.Require(http.HandlerFunc(a.handleChatCompletions)))
+	mux.Handle("POST /v1/chat/completions/cancel", a.authMW.Require(http.HandlerFunc(a.handleChatCompletionsCancel)))
 
 	// Usage.
 	mux.Handle("GET /v1/usage", a.authMW.Require(http.HandlerFunc(a.handleUsage)))

@@ -97,6 +97,13 @@ async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | 
         data = await client.get_me(token)
         meta = get_auth_metadata()
 
+        user_info = data.get("user")
+        if isinstance(user_info, dict):
+            if user_info.get("email"):
+                meta["email"] = user_info["email"]
+            if user_info.get("display_name"):
+                meta["name"] = user_info["display_name"]
+
         plan_info = data.get("plan")
         if isinstance(plan_info, dict) and plan_info.get("code"):
             meta["plan"] = plan_info["code"]
@@ -111,6 +118,14 @@ async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | 
             meta["limits"] = data["limits"]
         if "quota" in data:
             meta["quota"] = data["quota"]
+
+        # Also fetch live usage from /v1/me/usage if available
+        try:
+            usage_data = await client.get_usage(token)
+            if usage_data:
+                meta["usage"] = usage_data
+        except Exception as ue:
+            logger.debug("Cloud /v1/me/usage sync skipped: %s", ue)
 
         vault = load_secure_vault() or {}
         save_secure_vault(vault, meta)
@@ -180,6 +195,7 @@ async def get_current_user_auth() -> dict[str, Any]:
             "plan": meta.get("plan", "pro"),
             "subscription_status": meta.get("subscription_status", "active"),
             "quota": meta.get("quota"),
+            "usage": meta.get("usage"),
             "limits": meta.get("limits"),
             "models": meta.get("models", []),
             "credits_remaining": meta.get("credits_remaining", 500),

@@ -223,12 +223,13 @@ export default function Home() {
                 onToggle={() => setIsSidebarOpen(false)}
                 isHistoryActive={isHistoryActive}
                 onOpenHistory={handleOpenHistory}
-                onOpenSettings={() => { setSettingsTab('appearance'); setIsSettingsOpen(true); }}
+                onOpenSettings={(tab?: string) => { setSettingsTab(tab || 'appearance'); setIsSettingsOpen(true); }}
                 width={sidebarWidth}
                 onWidthChange={setSidebarWidth}
                 archivedSessionIds={archivedSessionIds}
                 onToggleArchive={handleToggleArchive}
                 onDeleteSession={handleDeleteSession}
+                authUser={authUser}
               />
             )}
 

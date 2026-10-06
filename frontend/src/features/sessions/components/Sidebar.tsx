@@ -15,6 +15,7 @@ import { QuickProjectModal } from './QuickProjectModal';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
 import { useSidebarResize } from '../hooks/useSidebarResize';
 import { useSidebarData } from '../hooks/useSidebarData';
+import type { AuthUser } from '@/services/auth';
 
 interface SidebarProps {
   selectedSessionId: string | null;
@@ -23,7 +24,7 @@ interface SidebarProps {
   onSelectSession: (sessionId: string, title?: string, repoName?: string) => void;
   onNewSession: (repoName?: string, folderPath?: string) => void;
   onToggle: () => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (tab?: string) => void;
   isHistoryActive?: boolean;
   onOpenHistory?: () => void;
   width?: number;
@@ -31,6 +32,7 @@ interface SidebarProps {
   archivedSessionIds?: Set<string>;
   onToggleArchive?: (sessionId: string) => void;
   onDeleteSession?: (sessionId: string) => void;
+  authUser?: AuthUser | null;
 }
 
 export default function Sidebar({ 
@@ -48,6 +50,7 @@ export default function Sidebar({
   archivedSessionIds: externalArchivedSessionIds,
   onToggleArchive: externalOnToggleArchive,
   onDeleteSession,
+  authUser,
 }: SidebarProps) {
   // Atomised Resizing
   const { width: effectiveWidth, startResizing } = useSidebarResize({
@@ -387,8 +390,8 @@ export default function Sidebar({
         />
       )}
 
-      {/* Fixed Footer - Settings */}
-      <SidebarFooter onOpenSettings={onOpenSettings} />
+      {/* Fixed Footer - Settings & Account Badge */}
+      <SidebarFooter onOpenSettings={onOpenSettings} authUser={authUser} />
 
       {/* Quick Project Creation Modal */}
       <QuickProjectModal

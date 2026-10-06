@@ -15,6 +15,16 @@ export interface QuotaInfo {
   windows?: QuotaWindow[];
 }
 
+export interface UsageInfo {
+  user_id?: string;
+  tenant_id?: string;
+  period?: string;
+  used_tokens?: number;
+  quota_tokens?: number;
+  used_percent?: number;
+  remaining_percent?: number;
+}
+
 export interface AuthUser {
   authenticated: boolean;
   email?: string;
@@ -22,6 +32,7 @@ export interface AuthUser {
   plan?: string;
   subscription_status?: string;
   quota?: QuotaInfo;
+  usage?: UsageInfo;
   limits?: Record<string, number>;
   models?: string[];
   credits_remaining?: number;
