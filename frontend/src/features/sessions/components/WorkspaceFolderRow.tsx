@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { ChevronDown, Folder, FolderOpen, MoreVertical, Plus, ExternalLink, Trash2 } from 'lucide-react';
+import { Folder, FolderOpen, MoreVertical, Plus, ExternalLink, Trash2 } from 'lucide-react';
 import { SessionItem } from '@/services/sessions';
 import { ProjectItem } from '@/services/projects';
 import { openSystemFile } from '@/services/files';
@@ -39,24 +39,20 @@ export function WorkspaceFolderRow({
       {/* Ghost Project Folder Row: Clean neutral text, outlined folder, right-aligned hover actions */}
       <div 
         onClick={onToggle}
-        className="group/folder h-[30px] mx-1 px-2 rounded-md cursor-pointer flex items-center justify-between text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors"
+        className="group/folder h-[30px] mx-1 px-2.5 rounded-lg cursor-pointer flex items-center justify-between text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors"
       >
-        {/* Left: Dropdown chevron + Folder Icon + Project Name */}
+        {/* Left: Folder Icon (toggles between Folder and FolderOpen) + Project Name */}
         <div className="flex items-center min-w-0 flex-1 overflow-hidden">
-          <ChevronDown
-            size={11}
-            className={`mr-1 text-zinc-500 shrink-0 transition-transform duration-150 ${isOpen ? '' : '-rotate-90'}`}
-          />
           {isOpen ? (
-            <FolderOpen size={13} className="mr-1.5 text-zinc-400 shrink-0 transition-colors" />
+            <FolderOpen size={14} className="mr-2 text-zinc-300 shrink-0 transition-colors" />
           ) : (
-            <Folder size={13} className="mr-1.5 text-zinc-400 shrink-0 transition-colors" />
+            <Folder size={14} className="mr-2 text-zinc-400 group-hover/folder:text-zinc-300 shrink-0 transition-colors" />
           )}
-          <span className="text-[13px] truncate font-normal tracking-wide text-zinc-400 group-hover/folder:text-zinc-200 transition-colors">
+          <span className="text-[13px] truncate font-medium tracking-normal text-zinc-300 group-hover/folder:text-white transition-colors">
             {repoName}
           </span>
           {repoSessions.length > 0 && (
-            <span className="text-[10px] font-mono text-zinc-500 ml-1.5 opacity-70">
+            <span className="text-[10px] font-mono text-zinc-500 ml-2 opacity-70">
               {repoSessions.length}
             </span>
           )}

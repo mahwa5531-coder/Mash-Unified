@@ -12,6 +12,8 @@ import { PinnedSection } from './PinnedSection';
 import { WorkspacesSection } from './WorkspacesSection';
 import { DirectConversationsSection } from './DirectConversationsSection';
 import { QuickProjectModal } from './QuickProjectModal';
+import { DeleteSessionConfirmDialog } from './DeleteSessionConfirmDialog';
+import { DeleteProjectConfirmDialog } from './DeleteProjectConfirmDialog';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
 import { useSidebarResize } from '../hooks/useSidebarResize';
 import { useSidebarData } from '../hooks/useSidebarData';
@@ -108,6 +110,10 @@ export default function Sidebar({
   // Quick Project Modal State
   const [isQuickProjectModalOpen, setIsQuickProjectModalOpen] = useState(false);
 
+  // Deletion Confirmation States
+  const [sessionToDelete, setSessionToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string; path?: string; sessionCount: number } | null>(null);
+
   const handleSessionClick = async (session: SessionItem) => {
     const title = generateCleanSessionTitle(session.custom_title || session.title || '', session.session_id);
     
@@ -190,8 +196,17 @@ export default function Sidebar({
     setActiveMenuSessionId(null);
   };
 
-  const handleDelete = (sessionId: string) => {
+  const handleDeleteClick = (sessionId: string) => {
     setActiveMenuSessionId(null);
+    const target = sessions.find(s => s.session_id === sessionId);
+    const title = generateCleanSessionTitle(target?.custom_title || target?.title || '', sessionId);
+    setSessionToDelete({ id: sessionId, title });
+  };
+
+  const confirmDeleteSession = () => {
+    if (!sessionToDelete) return;
+    const sessionId = sessionToDelete.id;
+    setSessionToDelete(null);
     markSessionDeleted(sessionId);
     setSessions(prev => prev.filter(s => s.session_id !== sessionId));
     sessionStore.delete(sessionId);
@@ -214,17 +229,30 @@ export default function Sidebar({
     setActiveMenuSessionId(null);
   };
 
-  const handleDeleteProjectClick = async (e: React.MouseEvent, projectId?: string, projectName?: string) => {
+  const handleDeleteProjectClick = (e: React.MouseEvent, projectId?: string, projectName?: string) => {
     e.stopPropagation();
     if (!projectId && !projectName) return;
-    const confirmDelete = window.confirm(`Delete workspace "${projectName}"? This removes its associated sessions from MASH.`);
-    if (!confirmDelete) return;
     const targetId = projectId || projectName!;
+    const name = projectName || projectId!;
+    const matchedProject = registeredProjects.find(p => p.id === targetId || p.name.toLowerCase() === name.toLowerCase());
+    const count = workspaceSessions[name]?.length ?? 0;
+    setProjectToDelete({
+      id: targetId,
+      name,
+      path: matchedProject?.local_folder_path,
+      sessionCount: count,
+    });
+  };
+
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete) return;
+    const { id, name } = projectToDelete;
+    setProjectToDelete(null);
     try {
-      const ok = await deleteProject(targetId);
+      const ok = await deleteProject(id);
       if (ok) {
         refreshData();
-        if (selectedSessionRepo && projectName && selectedSessionRepo.toLowerCase() === projectName.toLowerCase()) {
+        if (selectedSessionRepo && name && selectedSessionRepo.toLowerCase() === name.toLowerCase()) {
           onNewSession('No Repo');
         }
       }
@@ -386,7 +414,7 @@ export default function Sidebar({
           togglePin={togglePin}
           handleCopyId={handleCopyId}
           handleArchive={handleArchive}
-          handleDelete={handleDelete}
+          handleDelete={handleDeleteClick}
         />
       )}
 
@@ -398,6 +426,24 @@ export default function Sidebar({
         isOpen={isQuickProjectModalOpen}
         onClose={() => setIsQuickProjectModalOpen(false)}
         onProjectCreated={handleQuickProjectCreated}
+      />
+
+      {/* Delete Session Confirmation Modal */}
+      <DeleteSessionConfirmDialog
+        isOpen={Boolean(sessionToDelete)}
+        sessionTitle={sessionToDelete?.title}
+        onConfirm={confirmDeleteSession}
+        onCancel={() => setSessionToDelete(null)}
+      />
+
+      {/* Delete Project Confirmation Modal */}
+      <DeleteProjectConfirmDialog
+        isOpen={Boolean(projectToDelete)}
+        projectName={projectToDelete?.name || ''}
+        projectPath={projectToDelete?.path}
+        sessionCount={projectToDelete?.sessionCount || 0}
+        onConfirm={confirmDeleteProject}
+        onCancel={() => setProjectToDelete(null)}
       />
     </div>
   );

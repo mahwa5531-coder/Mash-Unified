@@ -115,12 +115,6 @@ export function WindowTitleBar({
           <MashBrandIcon size={14} className="text-cyan-600 dark:text-cyan-400 shrink-0" />
           <span>MASH</span>
         </div>
-        <span className="text-[10px] text-zinc-400 dark:text-zinc-600 font-normal hidden sm:inline-block">
-          |
-        </span>
-        <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[320px] font-normal hidden sm:inline-block">
-          {title}
-        </span>
       </div>
 
       {/* Center Draggable Spacer */}
