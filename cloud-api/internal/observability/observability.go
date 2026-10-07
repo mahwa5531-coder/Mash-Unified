@@ -73,8 +73,8 @@ func Setup(ctx context.Context, cfg LogOTelConfig) (*OTel, *slog.Logger, error) 
 	slog.SetDefault(logger)
 
 	otelBundle := &OTel{
-		Tracer: otel.GetTracerProvider().Tracer("nexau-cloud-api"),
-		Meter:  otel.GetMeterProvider().Meter("nexau-cloud-api"),
+		Tracer: otel.GetTracerProvider().Tracer("mash-cloud-api"),
+		Meter:  otel.GetMeterProvider().Meter("mash-cloud-api"),
 	}
 
 	res, err := sdkresource.Merge(
@@ -104,7 +104,7 @@ func Setup(ctx context.Context, cfg LogOTelConfig) (*OTel, *slog.Logger, error) 
 				sdktrace.WithSampler(sdktrace.TraceIDRatioBased(cfg.TraceRatio)),
 			)
 			otel.SetTracerProvider(tp)
-			otelBundle.Tracer = tp.Tracer("nexau-cloud-api")
+			otelBundle.Tracer = tp.Tracer("mash-cloud-api")
 			otelBundle.shutdownFns = append(otelBundle.shutdownFns, tp.Shutdown)
 		}
 	}
@@ -143,7 +143,7 @@ func Setup(ctx context.Context, cfg LogOTelConfig) (*OTel, *slog.Logger, error) 
 		}
 		mp := sdkmetric.NewMeterProvider(opts...)
 		otel.SetMeterProvider(mp)
-		otelBundle.Meter = mp.Meter("nexau-cloud-api")
+		otelBundle.Meter = mp.Meter("mash-cloud-api")
 		otelBundle.shutdownFns = append(otelBundle.shutdownFns, mp.Shutdown)
 	}
 

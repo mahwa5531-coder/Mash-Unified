@@ -14,8 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/nexau-cloud/nexau-api/internal/ids"
-	"github.com/nexau-cloud/nexau-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/ids"
+	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
 // PaymentsRepo implements payment.Store.

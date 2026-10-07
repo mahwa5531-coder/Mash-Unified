@@ -1,12 +1,12 @@
-// Package auth implements token verification, identity resolution and the
-// login/refresh/logout flows. Two verification backends are supported:
+// Package auth implements Google-OAuth-only identity: token verification,
+// identity resolution, refresh rotation and the web-to-desktop handshake.
 //
-//   - local:  HS256 access tokens minted by this API (self-contained).
-//   - jwks:   RS*/ES* tokens minted by an external identity provider.
-//   - hybrid: both (external IdP tokens + locally minted tokens).
-//
-// Refresh tokens are always opaque, hash-stored server-side, rotated on every
-// use, with family-based reuse detection.
+// There is exactly one way into the system: Google OAuth 2.0 / OIDC
+// (oauth.go). The browser completes the Google flow, receives a single-use
+// grant, and the desktop exchanges a 60-second pairing code for its token
+// pair (desktop_code.go). Session access tokens are HS256, minted locally;
+// refresh tokens are opaque, hash-stored, rotated on every use, with
+// family-based reuse detection.
 package auth
 
 import "time"
@@ -22,11 +22,19 @@ type Claims struct {
 	Audience  string    // aud
 	IssuedAt  time.Time // iat
 	ExpiresAt time.Time // exp
-	Method    string    // how this token was verified: "local" | "jwks"
+	Method    string    // how this token was verified ("local")
 }
 
 // Identity is the server-authoritative context for one request: everything
 // the authorization layer needs, resolved from PostgreSQL (never the client).
+// PlanInfo names the subscribed tier for display ("Free"/"Pro"). Derived
+// server-side from the effective subscription — never client-supplied.
+type PlanInfo struct {
+	ID   string `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
 type Identity struct {
 	User       UserInfo
 	Tenant     TenantInfo
@@ -36,6 +44,8 @@ type Identity struct {
 	Restricted bool
 	// Plan-enforced limits (merged with tenant overrides).
 	Limits Limits
+	// Plan names the subscribed tier (zero value when no subscription).
+	Plan PlanInfo
 	// Subscription state for authorization decisions.
 	SubscriptionStatus string
 }
@@ -44,6 +54,7 @@ type UserInfo struct {
 	ID              string `json:"id"`
 	Email           string `json:"email"`
 	DisplayName     string `json:"display_name"`
+	AvatarURL       string `json:"avatar_url,omitempty"`
 	Status          string `json:"status"`
 	IsPlatformAdmin bool   `json:"is_platform_admin"`
 	EmailVerified   bool   `json:"email_verified,omitempty"`
@@ -63,12 +74,13 @@ type MembershipInfo struct {
 
 // Limits mirrors domain.PlanLimits but keeps this package storage-free.
 type Limits struct {
-	RequestsPerMinuteUser   int64
-	RequestsPerMinuteTenant int64
-	ConcurrentRunsUser      int64
-	ConcurrentRunsTenant    int64
-	MaxRequestBytes         int64
-	MonthlyTokenQuota       int64
+	RequestsPerMinuteUser    int64
+	RequestsPerMinuteTenant  int64
+	ConcurrentRequestsUser   int64
+	ConcurrentRequestsTenant int64
+	MaxRequestBytes          int64
+	Window5hTokens           int64 // rolling 5-hour normalized-token budget
+	WindowWeeklyTokens       int64 // rolling 7-day normalized-token budget
 }
 
 // CanRun checks account/tenant/subscription state. Returns a stable domain

@@ -3,47 +3,39 @@ package repos
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
+	"encoding/base64"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
-	"github.com/nexau-cloud/nexau-api/internal/ids"
-	"github.com/nexau-cloud/nexau-api/internal/store"
+	"github.com/mash-cloud/mash-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/ids"
+	"github.com/mash-cloud/mash-api/internal/store"
 )
 
-// OAuthUsersRepo provisions and links OAuth identities ("Continue with
-// Google" on the web login). Three resolution cases, all arbitrated by the
-// unique indexes so concurrent callbacks for the same subject converge on one
-// user row exactly once:
+// OAuthUsersRepo provisions Google OAuth identities ("Continue with Google"
+// on the web login). Two resolution cases, arbitrated by the unique indexes
+// so concurrent callbacks for the same subject converge on one user row
+// exactly once:
 //
-//  1. subject known   (auth_provider='google' AND external_subject=sub) → login
-//  2. email known     (VERIFIED account with a password)              → link
-//  3. nobody known                                                      → provision
-//     (user + personal tenant + owner membership + trialing subscription,
-//     one transaction — mirrors CreateAccount's atomic shape)
+//  1. subject known (auth_provider='google' AND external_subject=sub) → login
+//     (profile fields refresh from the current ID token: avatar_url, and
+//     display_name only while it is still empty)
+//  2. nobody known → provision (user + personal tenant + owner membership +
+//     trialing subscription, one transaction)
 //
-// ANTI PRE-HIJACKING (2026-09-19 audit, finding 3): case 2 links ONLY onto an
-// account whose email address was already VERIFIED. An unverified local
-// account with the same email may be attacker-seeded (attacker registers
-// victim@example.com with their own password; the verification mail goes to
-// the real victim and is ignored) — auto-linking a Google identity onto it
-// handed the attacker a persistent backdoor while the victim believed Google
-// owned the account. Unverified matches return ErrOAuthAccountUnverified: the
-// email owner must first prove mailbox control (email verification, or a
-// password reset — which flips the flag) before linking.
+// An email match with a DIFFERENT Google subject is ErrIdentityConflict:
+// the mailbox belongs to another identity and is never auto-re-linked (the
+// identity anchor is the Google sub, never the email).
 //
 // Race arbitration:
-//   - concurrent case-3 for the same subject  → uq_users_external_subject
+//   - concurrent case-2 for the same subject → uq_users_external_subject
 //     rejects the loser → ErrOAuthSubjectRace → the caller re-runs and lands
 //     in case 1;
-//   - concurrent case-3 for the same email    → uq_users_email_lower rejects
-//     the loser → ErrEmailTaken → the caller re-runs and lands in case 2;
-//   - case 2 onto an email already bound to a DIFFERENT Google subject →
-//     ErrIdentityConflict (operator-visible, never silently re-linked).
+//   - concurrent case-2 for the same email   → uq_users_email_lower rejects
+//     the loser → ErrEmailTaken → the caller re-runs and lands in the
+//     conflict check.
 type OAuthUsersRepo struct{ Pool *pgxpool.Pool }
 
 func NewOAuthUsers(p *pgxpool.Pool) *OAuthUsersRepo { return &OAuthUsersRepo{Pool: p} }
@@ -52,104 +44,60 @@ func NewOAuthUsers(p *pgxpool.Pool) *OAuthUsersRepo { return &OAuthUsersRepo{Poo
 // provision (transient by construction: the retry finds case 1).
 var ErrOAuthSubjectRace = errors.New("oauth subject provision race")
 
-// ErrIdentityConflict marks an email already linked to a different external
+// ErrIdentityConflict marks an email already linked to a different Google
 // subject (never auto-re-linked; the user must sign in the original way).
 var ErrIdentityConflict = errors.New("identity conflict")
 
-// ErrOAuthAccountUnverified marks the pre-hijacking defense: the email match
-// is an UNVERIFIED local account, so the link is refused until the mailbox is
-// proven (verification or password reset).
-var ErrOAuthAccountUnverified = errors.New("oauth target account unverified")
-
-// OAuthOutcome distinguishes what FindOrCreateGoogleUser did — the service
-// layer uses it to send the link notification only on an actual link.
-type OAuthOutcome int
-
-const (
-	OAuthLoggedIn    OAuthOutcome = iota // case 1: known subject, plain sign-in
-	OAuthLinked                          // case 2: Google identity linked to a password account
-	OAuthProvisioned                     // case 3: fresh account created
-)
-
-// FindOrCreateGoogleUser resolves one verified Google identity per the three
-// cases above and returns the (possibly just-created) user plus the outcome.
-// displayName refreshes an empty display_name on login/link (Google is the
-// source of truth for the profile name).
-func (r *OAuthUsersRepo) FindOrCreateGoogleUser(ctx context.Context, sub, email, displayName string) (*domain.User, OAuthOutcome, error) {
-	// Case 1: the Google subject is already known → login.
+// FindOrCreateGoogleUser resolves one verified Google identity per the cases
+// above and returns the (possibly just-created) user.
+func (r *OAuthUsersRepo) FindOrCreateGoogleUser(ctx context.Context, sub, email, displayName, avatarURL string) (*domain.User, error) {
+	// Case 1: the Google subject is already known → login + profile refresh.
 	if u, err := r.bySubject(ctx, sub); err != nil || u != nil {
-		return u, OAuthLoggedIn, err
+		if u != nil {
+			if err := r.refreshProfile(ctx, u.ID, displayName, avatarURL); err != nil {
+				return u, nil // profile refresh is best-effort; the login stands
+			}
+		}
+		return u, err
 	}
 
+	// Email conflict check: the mailbox belongs to a different identity.
+	var existingSubject string
+	err := r.Pool.QueryRow(ctx,
+		`SELECT external_subject FROM users WHERE lower(email) = lower($1)`, email).
+		Scan(&existingSubject)
+	switch {
+	case err == nil:
+		if existingSubject != sub {
+			return nil, ErrIdentityConflict
+		}
+		// Same subject reachable by email: re-run case 1 (row committed between
+		// the two queries — concurrent callback race).
+		return r.bySubject(ctx, sub)
+	case !store.IsNotFound(err):
+		return nil, err
+	}
+
+	// Case 2: provision atomically.
 	tx, err := r.Pool.Begin(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	defer tx.Rollback(ctx)
 
-	// Serialize concurrent resolvers of the same subject/email inside the
-	// transaction: the SELECTs below take row locks when they match.
-	// Case 2: same email, another provider → link the Google identity.
-	var id, existingSubject string
-	var hasSubject, emailVerified bool
-	err = tx.QueryRow(ctx, `
-                SELECT id,
-                       external_subject IS NOT NULL AND external_subject <> '' AS has_subject,
-                       COALESCE(external_subject, ''),
-                       email_verified
-                FROM users WHERE lower(email) = lower($1) FOR UPDATE`, email).
-		Scan(&id, &hasSubject, &existingSubject, &emailVerified)
-	switch {
-	case err == nil:
-		if hasSubject && existingSubject != sub {
-			// A different Google identity owns this email.
-			return nil, 0, ErrIdentityConflict
-		}
-		if !emailVerified {
-			// Pre-hijacking defense: the local account with this
-			// email never proved mailbox control — refuse the link.
-			return nil, 0, ErrOAuthAccountUnverified
-		}
-		if _, err := tx.Exec(ctx, `
-                        UPDATE users SET
-                                auth_provider = 'google',
-                                external_subject = $2,
-                                email_verified = TRUE,
-                                display_name = CASE WHEN display_name = '' THEN $3 ELSE display_name END,
-                                updated_at = now()
-                        WHERE id = $1`, id, sub, displayName); err != nil {
-			return nil, 0, err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE users SET last_login_at = now() WHERE id = $1`, id); err != nil {
-			return nil, 0, err
-		}
-		if err := tx.Commit(ctx); err != nil {
-			return nil, 0, err
-		}
-		u, err := r.bySubject(ctx, sub)
-		return u, OAuthLinked, err
-
-	case store.IsNotFound(err):
-		// Case 3: provision atomically.
-
-	default:
-		return nil, 0, err
-	}
-
 	userID, tenantID := ids.UserID(), ids.TenantID()
 	if _, err := tx.Exec(ctx, `
-                INSERT INTO users (id, email, display_name, password_hash, status, auth_provider, external_subject, email_verified)
-                VALUES ($1, $2, $3, NULL, 'active', 'google', $4, TRUE)`,
-		userID, email, displayName, sub); err != nil {
+		INSERT INTO users (id, email, display_name, avatar_url, status, auth_provider, external_subject, email_verified)
+		VALUES ($1, $2, $3, $4, 'active', 'google', $5, TRUE)`,
+		userID, email, displayName, avatarURL, sub); err != nil {
 		if store.IsUniqueViolation(err) {
 			// Same-subject race → the winner exists now (case 1).
-			// Same-email race → case 2 on retry.
 			if r.subjectExists(ctx, sub) {
-				return nil, 0, ErrOAuthSubjectRace
+				return nil, ErrOAuthSubjectRace
 			}
-			return nil, 0, ErrEmailTaken
+			return nil, ErrEmailTaken
 		}
-		return nil, 0, err
+		return nil, err
 	}
 
 	local := email
@@ -162,32 +110,48 @@ func (r *OAuthUsersRepo) FindOrCreateGoogleUser(ctx context.Context, sub, email,
 		name = local
 	}
 	if _, err := tx.Exec(ctx, `
-                INSERT INTO tenants (id, slug, name, status) VALUES ($1, $2, $3, 'active')`,
+		INSERT INTO tenants (id, slug, name, status) VALUES ($1, $2, $3, 'active')`,
 		tenantID, slug, name); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	if _, err := tx.Exec(ctx, `
-                INSERT INTO tenant_members (tenant_id, user_id, role, status)
-                VALUES ($1, $2, 'owner', 'active')`, tenantID, userID); err != nil {
-		return nil, 0, err
+		INSERT INTO tenant_members (tenant_id, user_id, role, status)
+		VALUES ($1, $2, 'owner', 'active')`, tenantID, userID); err != nil {
+		return nil, err
 	}
 	if _, err := tx.Exec(ctx, `
-                INSERT INTO subscriptions (id, tenant_id, plan_id, status, current_period_start, current_period_end)
-                SELECT $1, $2, id, 'trialing', now(), now() + interval '30 days'
-                FROM plans WHERE id = 'pln_free'`,
+		INSERT INTO subscriptions (id, tenant_id, plan_id, status, current_period_start, current_period_end)
+		SELECT $1, $2, id, 'trialing', now(), now() + interval '30 days'
+		FROM plans WHERE id = 'pln_free'`,
 		"sub_"+shortRand(20), tenantID); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE users SET last_login_at = now() WHERE id = $1`, userID); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	return &domain.User{
-		ID: userID, Email: email, DisplayName: displayName, Status: "active",
-		AuthProvider: "google", EmailVerified: true,
-	}, OAuthProvisioned, nil
+		ID: userID, Email: email, DisplayName: displayName, AvatarURL: avatarURL,
+		Status: "active", AuthProvider: "google", ExternalSubject: sub,
+		EmailVerified: true,
+	}, nil
+}
+
+// refreshProfile updates the Google-sourced profile fields on login.
+// avatar_url refreshes unconditionally (Google rotates picture URLs);
+// display_name only fills an empty value (the user may have personalized it
+// locally... there is no local profile editor yet, but the rule is cheap).
+func (r *OAuthUsersRepo) refreshProfile(ctx context.Context, userID, displayName, avatarURL string) error {
+	_, err := r.Pool.Exec(ctx, `
+		UPDATE users SET
+			avatar_url = $2,
+			display_name = CASE WHEN display_name = '' THEN $3 ELSE display_name END,
+			last_login_at = now(),
+			updated_at = now()
+		WHERE id = $1`, userID, avatarURL, displayName)
+	return err
 }
 
 // bySubject loads a Google-linked user.
@@ -207,7 +171,38 @@ func (r *OAuthUsersRepo) subjectExists(ctx context.Context, sub string) bool {
 	return err == nil
 }
 
-// ---- devices -------------------------------------------------------------------
+// ---- helpers ------------------------------------------------------------------
+
+// slugify produces a tenant-slug-safe rendering of an email local part.
+func slugify(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '.' || r == '_' || r == '-' || r == '+':
+			// collapse to '-'
+			b.WriteByte('-')
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		out = "user"
+	}
+	if len(out) > 32 {
+		out = out[:32]
+	}
+	return out
+}
+
+// shortRand returns n random bytes, base64 (URL) encoded.
+func shortRand(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+// ---- devices ------------------------------------------------------------------
 
 // DevicesRepo registers desktop devices on handshake exchange.
 type DevicesRepo struct{ Pool *pgxpool.Pool }
@@ -224,8 +219,8 @@ func (r *DevicesRepo) UpsertDevice(ctx context.Context, userID, deviceID, name, 
 		err := r.Pool.QueryRow(ctx, `SELECT user_id FROM devices WHERE id = $1`, deviceID).Scan(&owner)
 		if err == nil && owner == userID {
 			_, err := r.Pool.Exec(ctx, `
-                                UPDATE devices SET name = $3, platform = $4, last_seen_at = now()
-                                WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL`,
+				UPDATE devices SET name = $3, platform = $4, last_seen_at = now()
+				WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL`,
 				deviceID, userID, name, platform)
 			if err != nil {
 				return "", err
@@ -239,53 +234,10 @@ func (r *DevicesRepo) UpsertDevice(ctx context.Context, userID, deviceID, name, 
 	}
 	id := ids.DeviceID()
 	_, err := r.Pool.Exec(ctx, `
-                INSERT INTO devices (id, user_id, name, platform) VALUES ($1, $2, $3, $4)`,
+		INSERT INTO devices (id, user_id, name, platform) VALUES ($1, $2, $3, $4)`,
 		id, userID, name, platform)
 	if err != nil {
 		return "", err
 	}
 	return id, nil
-}
-
-// ErrEmailTaken marks a duplicate signup (unique lower(email) violation).
-var ErrEmailTaken = errors.New("email already registered")
-
-// slugify keeps [a-z0-9], collapsing everything else to single dashes.
-func slugify(s string) string {
-	var b strings.Builder
-	lastDash := true
-	for _, r := range strings.ToLower(s) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
-			b.WriteRune(r)
-			lastDash = false
-		default:
-			if !lastDash {
-				b.WriteByte('-')
-				lastDash = true
-			}
-		}
-	}
-	out := strings.Trim(b.String(), "-")
-	if out == "" {
-		out = "tenant"
-	}
-	return out
-}
-
-// shortRand returns n random hex characters (crypto/rand).
-func shortRand(n int) string {
-	b := make([]byte, (n+1)/2)
-	if _, err := rand.Read(b); err != nil {
-		return (hex.EncodeToString([]byte(time.Now().String())) + "0000000000000000")[:n]
-	}
-	return hex.EncodeToString(b)[:n]
-}
-
-// IsEmailTaken reports a duplicate-signup signal.
-func IsEmailTaken(err error) bool { return errors.Is(err, ErrEmailTaken) }
-
-// AsDomain maps database errors to domain errors.
-func AsDomain(err error) *domain.Error {
-	return store.MapDBError(err)
 }

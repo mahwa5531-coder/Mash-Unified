@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/domain"
 )
 
 // Typed sentinel errors. The service never returns raw strings: every

@@ -9,9 +9,9 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
-	"github.com/nexau-cloud/nexau-api/internal/store"
-	"github.com/nexau-cloud/nexau-api/internal/store/repos"
+	"github.com/mash-cloud/mash-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/store"
+	"github.com/mash-cloud/mash-api/internal/store/repos"
 )
 
 // IdentityResolver turns verified claims into the full server-authoritative
@@ -95,7 +95,7 @@ func (r *IdentityResolver) load(ctx context.Context, userID, tenantID string) (*
 
 	id := &Identity{
 		User: UserInfo{
-			ID: u.ID, Email: u.Email, DisplayName: u.DisplayName,
+			ID: u.ID, Email: u.Email, DisplayName: u.DisplayName, AvatarURL: u.AvatarURL,
 			Status: u.Status, IsPlatformAdmin: u.IsPlatformAdmin,
 			EmailVerified: u.EmailVerified,
 		},
@@ -107,15 +107,32 @@ func (r *IdentityResolver) load(ctx context.Context, userID, tenantID string) (*
 	if err != nil {
 		return nil, store.MapDBError(err)
 	}
+	if sub == nil {
+		// No effective trial/paid subscription (canceled, expired, or never
+		// subscribed): every tenant degrades to the public Free plan — a
+		// canceled Pro falls back to Free limits instead of a hard block.
+		fb, ferr := r.Subs.FreeFallback(ctx)
+		if ferr != nil {
+			return nil, store.MapDBError(ferr)
+		}
+		if fb != nil {
+			fb.TenantID = tenantID
+			sub = fb
+		}
+		// fb == nil: no public free plan configured — keep the fail-closed
+		// SUBSCRIPTION_INACTIVE posture (403 on LLM, /v1/me still renders).
+	}
 	if sub != nil {
 		id.SubscriptionStatus = sub.Status
+		id.Plan = PlanInfo{ID: sub.Plan.ID, Code: sub.Plan.Code, Name: sub.Plan.Name}
 		id.Limits = Limits{
-			RequestsPerMinuteUser:   sub.Plan.Limits.RequestsPerMinuteUser,
-			RequestsPerMinuteTenant: sub.Plan.Limits.RequestsPerMinuteTenant,
-			ConcurrentRunsUser:      sub.Plan.Limits.ConcurrentRunsUser,
-			ConcurrentRunsTenant:    sub.Plan.Limits.ConcurrentRunsTenant,
-			MaxRequestBytes:         sub.Plan.Limits.MaxRequestBytes,
-			MonthlyTokenQuota:       sub.Plan.Limits.MonthlyTokenQuota,
+			RequestsPerMinuteUser:    sub.Plan.Limits.RequestsPerMinuteUser,
+			RequestsPerMinuteTenant:  sub.Plan.Limits.RequestsPerMinuteTenant,
+			ConcurrentRequestsUser:   sub.Plan.Limits.ConcurrentRequestsUser,
+			ConcurrentRequestsTenant: sub.Plan.Limits.ConcurrentRequestsTenant,
+			MaxRequestBytes:          sub.Plan.Limits.MaxRequestBytes,
+			Window5hTokens:           sub.Plan.Limits.Window5hTokens,
+			WindowWeeklyTokens:       sub.Plan.Limits.WindowWeeklyTokens,
 		}
 	}
 
@@ -146,7 +163,3 @@ func (r *IdentityResolver) Invalidate(ctx context.Context, userID, tenantID stri
 	}
 	r.Redis.Del(ctx, identityCacheKey(userID, tenantID))
 }
-
-// BumpVersion is a no-op placeholder for future cache-versioning; TTL bounds
-// staleness to CacheTTL today.
-func (r *IdentityResolver) BumpVersion(ctx context.Context, userID string) {}

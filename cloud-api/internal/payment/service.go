@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/observability"
+	"github.com/mash-cloud/mash-api/internal/observability"
 )
 
 // Admitter is the narrow rate-limit seam (satisfied by *ratelimit.Limiter).

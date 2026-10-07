@@ -1,7 +1,7 @@
 package razorpay
 
 import (
-	"github.com/nexau-cloud/nexau-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
 // signature.go — fail-closed wrappers around the module's single HMAC

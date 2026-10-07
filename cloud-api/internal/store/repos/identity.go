@@ -9,29 +9,22 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
-	"github.com/nexau-cloud/nexau-api/internal/store"
+	"github.com/mash-cloud/mash-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/store"
 )
 
-// UsersRepo persists users.
+// UsersRepo persists users (Google OAuth identities only).
 type UsersRepo struct{ Pool *pgxpool.Pool }
 
 func NewUsers(p *pgxpool.Pool) *UsersRepo { return &UsersRepo{Pool: p} }
 
-const userCols = `id, email, display_name, status, is_platform_admin, auth_provider, email_verified, created_at, updated_at`
+const userCols = `id, email, display_name, avatar_url, status, is_platform_admin, auth_provider, external_subject, email_verified, created_at, updated_at`
 
 func scanUser(row pgx.Row) (*domain.User, error) {
 	u := &domain.User{}
-	err := row.Scan(&u.ID, &u.Email, &u.DisplayName, &u.Status, &u.IsPlatformAdmin, &u.AuthProvider, &u.EmailVerified, &u.CreatedAt, &u.UpdatedAt)
-	return u, err
-}
-
-func (r *UsersRepo) ByEmail(ctx context.Context, email string) (*domain.User, error) {
-	u, err := scanUser(r.Pool.QueryRow(ctx,
-		`SELECT `+userCols+` FROM users WHERE lower(email) = lower($1)`, email))
-	if store.IsNotFound(err) {
-		return nil, nil
-	}
+	err := row.Scan(&u.ID, &u.Email, &u.DisplayName, &u.AvatarURL, &u.Status,
+		&u.IsPlatformAdmin, &u.AuthProvider, &u.ExternalSubject, &u.EmailVerified,
+		&u.CreatedAt, &u.UpdatedAt)
 	return u, err
 }
 
@@ -44,47 +37,8 @@ func (r *UsersRepo) ByID(ctx context.Context, id string) (*domain.User, error) {
 	return u, err
 }
 
-// ByExternalSubject resolves an IdP-managed identity.
-func (r *UsersRepo) ByExternalSubject(ctx context.Context, provider, subject string) (*domain.User, error) {
-	u, err := scanUser(r.Pool.QueryRow(ctx,
-		`SELECT `+userCols+` FROM users WHERE auth_provider = $1 AND external_subject = $2`,
-		provider, subject))
-	if store.IsNotFound(err) {
-		return nil, nil
-	}
-	return u, err
-}
-
-func (r *UsersRepo) Create(ctx context.Context, u *domain.User, passwordHash *string) error {
-	_, err := r.Pool.Exec(ctx, `
-                INSERT INTO users (id, email, display_name, password_hash, status, is_platform_admin, auth_provider, external_subject, email_verified)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		u.ID, u.Email, u.DisplayName, passwordHash, u.Status, u.IsPlatformAdmin, u.AuthProvider, "", u.EmailVerified)
-	return err
-}
-
-// SetEmailVerified flips the verification flag (recovery flow).
-func (r *UsersRepo) SetEmailVerified(ctx context.Context, userID string) error {
-	_, err := r.Pool.Exec(ctx, `UPDATE users SET email_verified = TRUE, updated_at = now() WHERE id = $1`, userID)
-	return err
-}
-
 func (r *UsersRepo) TouchLogin(ctx context.Context, id string) error {
 	_, err := r.Pool.Exec(ctx, `UPDATE users SET last_login_at = now(), updated_at = now() WHERE id = $1`, id)
-	return err
-}
-
-// PasswordHash loads the stored bcrypt hash for login verification (auth
-// service seam; COALESCE keeps the SQL a single row even for IdP-only users).
-func (r *UsersRepo) PasswordHash(ctx context.Context, userID string) (string, error) {
-	var h string
-	err := r.Pool.QueryRow(ctx,
-		`SELECT COALESCE(password_hash, '') FROM users WHERE id = $1`, userID).Scan(&h)
-	return h, err
-}
-
-func (r *UsersRepo) UpdatePasswordHash(ctx context.Context, id string, hash string) error {
-	_, err := r.Pool.Exec(ctx, `UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`, id, hash)
 	return err
 }
 
@@ -192,12 +146,39 @@ func (r *SubscriptionsRepo) Effective(ctx context.Context, tenantID string) (*do
 	return s, nil
 }
 
-// Cancel marks the tenant's active subscription to cancel at the end of the period.
-func (r *SubscriptionsRepo) Cancel(ctx context.Context, tenantID string) error {
-	_, err := r.Pool.Exec(ctx, `
-		UPDATE subscriptions SET cancel_at_period_end = TRUE, updated_at = now()
-		WHERE tenant_id = $1 AND status IN ('trialing','active')`, tenantID)
-	return err
+// FreeFallback loads the public Free plan as a synthetic ACTIVE subscription
+// — the entitlement every tenant degrades to when no trial/paid subscription
+// is effective (canceled, expired, or none): a canceled Pro must fall back to
+// Free limits, never to a hard block. The synthetic row carries no ID or
+// periods — it is an entitlement, not a billing record; the real subscription
+// rows keep the full history.
+//
+// Returns (nil, nil) when no public 'free' plan exists — the caller then keeps
+// the fail-closed SUBSCRIPTION_INACTIVE posture.
+func (r *SubscriptionsRepo) FreeFallback(ctx context.Context) (*domain.Subscription, error) {
+	s := &domain.Subscription{Status: "active"}
+	var limits, models []byte
+	err := r.Pool.QueryRow(ctx, `
+                SELECT pl.id, pl.code, pl.name, pl.limits, pl.models
+                FROM plans pl
+                WHERE pl.code = 'free' AND pl.is_public
+                ORDER BY pl.created_at
+                LIMIT 1`).
+		Scan(&s.PlanID, &s.Plan.Code, &s.Plan.Name, &limits, &models)
+	if store.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	s.Plan.ID = s.PlanID
+	if len(limits) > 2 {
+		_ = jsonUnmarshal(limits, &s.Plan.Limits)
+	}
+	if len(models) > 2 {
+		_ = jsonUnmarshal(models, &s.Plan.Models)
+	}
+	return s, nil
 }
 
 // EntitlementsRepo reads tenant entitlement overrides.

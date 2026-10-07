@@ -17,8 +17,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/nexau-cloud/nexau-api/internal/observability"
-	"github.com/nexau-cloud/nexau-api/internal/store"
+	"github.com/mash-cloud/mash-api/internal/observability"
+	"github.com/mash-cloud/mash-api/internal/store"
 )
 
 // Verdict is the outcome of a limit check.
@@ -332,6 +332,115 @@ func (l *Limiter) Release(ctx context.Context, key string, ttl time.Duration) {
 // Called by the background sweeper to erase leaked slots.
 func (l *Limiter) Reconcile(ctx context.Context, key string, value int64, ttl time.Duration) {
 	_, _ = l.rdb.Set(ctx, key, strconv.FormatInt(value, 10), ttl).Result()
+}
+
+// --- token-window reservation ------------------------------------------------
+//
+// The rolling plan windows (5h / weekly) are metered from llm_calls rows,
+// which exist only AFTER a call completes. Two admits that pass the window
+// check concurrently therefore both see the same pre-call position and can
+// collectively overshoot the window (audit: N in-flight calls are invisible
+// for their entire duration — up to StreamMaxDuration). The reservation
+// closes that gap: every admitted call atomically reserves an estimate of
+// its token cost against the REMAINING window budget, and settles the
+// reservation when its usage row is about to land. Fail-open on Redis loss
+// (same availability posture as every other limiter dimension).
+
+// reserveLua atomically adds amount to the reservation counter iff the result
+// stays within the remaining budget (ceiling). Returns {ok, total}: on success
+// total is the new reserved sum; on denial it is the UNCHANGED current sum,
+// which is what the caller adds to the DB usage to report the effective
+// position.
+// KEYS[1]=counter  ARGV: amount, ceiling, ttl_ms
+var reserveLua = redis.NewScript(`
+local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
+if cur + tonumber(ARGV[1]) > tonumber(ARGV[2]) then
+        return {0, cur}
+end
+local v = redis.call('INCRBY', KEYS[1], tonumber(ARGV[1]))
+redis.call('PEXPIRE', KEYS[1], tonumber(ARGV[3]))
+return {1, v}
+`)
+
+// releaseReservationLua returns amount to the pool, floored at zero. The
+// counter is deleted at zero (no key churn for idle tenants).
+// KEYS[1]=counter  ARGV: amount, ttl_ms
+var releaseReservationLua = redis.NewScript(`
+local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
+local v = cur - tonumber(ARGV[1])
+if v <= 0 then
+        redis.call('DEL', KEYS[1])
+        return 0
+end
+redis.call('SET', KEYS[1], v)
+redis.call('PEXPIRE', KEYS[1], tonumber(ARGV[2]))
+return v
+`)
+
+// ReserveOutcome is the result of a reservation attempt.
+type ReserveOutcome struct {
+	Allowed bool
+	Total   int64 // reserved AFTER the attempt (denied: the unchanged current)
+	Wanted  int64 // the amount this call tried to reserve
+}
+
+// Reserve atomically reserves amount tokens under ceiling (the remaining
+// window budget: quota − used). The check-and-increment is one Lua script:
+// concurrent admits cannot both spend the same remaining budget. Fail-open on
+// Redis loss (allowed, unreserved — counted in the fail-open metric).
+func (l *Limiter) Reserve(ctx context.Context, key string, amount, ceiling int64, ttl time.Duration) ReserveOutcome {
+	if amount < 0 {
+		amount = 0
+	}
+	if ceiling < 0 {
+		ceiling = 0
+	}
+	if amount == 0 {
+		return ReserveOutcome{Allowed: true, Total: l.reserved(ctx, key)}
+	}
+	res, err := reserveLua.Run(ctx, l.rdb, []string{key},
+		amount, ceiling, ttl.Milliseconds()).Slice()
+	if err != nil {
+		if l.metrics != nil {
+			l.metrics.RateLimitFailOpen.Add(ctx, 1)
+		}
+		if l.failOpen {
+			return ReserveOutcome{Allowed: true, Wanted: amount}
+		}
+		return ReserveOutcome{Allowed: false, Wanted: amount}
+	}
+	if len(res) < 2 {
+		return ReserveOutcome{Allowed: true, Wanted: amount}
+	}
+	ok, _ := res[0].(int64)
+	total, _ := res[1].(int64)
+	return ReserveOutcome{Allowed: ok == 1, Total: total, Wanted: amount}
+}
+
+// ReleaseReservation returns amount tokens to the pool (call settled).
+// Best-effort: a lost release self-heals via the TTL backstop, which keeps the
+// reservation counted until it expires — the conservative direction (the
+// window can under-admit briefly, never over-admit).
+func (l *Limiter) ReleaseReservation(ctx context.Context, key string, amount int64, ttl time.Duration) {
+	if l.rdb == nil || amount <= 0 {
+		return
+	}
+	_, _ = releaseReservationLua.Run(ctx, l.rdb, []string{key},
+		amount, ttl.Milliseconds()).Int()
+}
+
+// Reserved reports the currently-reserved amount for a key (0 on miss/error —
+// display-side only, never an enforcement input by itself).
+func (l *Limiter) Reserved(ctx context.Context, key string) int64 {
+	return l.reserved(ctx, key)
+}
+
+func (l *Limiter) reserved(ctx context.Context, key string) int64 {
+	v, err := l.rdb.Get(ctx, key).Int64()
+	if err != nil {
+		return 0
+	}
+	return v
 }
 
 // --- client IP extraction ---------------------------------------------------

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/observability"
+	"github.com/mash-cloud/mash-api/internal/observability"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -23,7 +23,7 @@ import (
 // The caller (api layer) answers 200 on nil error only — i.e. after the
 // state change has COMMITTED. Anything else (5xx) makes the provider
 // retry, which is the desired behavior for transient storage failures.
-func (s *Service) HandleWebhook(ctx context.Context, raw []byte, signature, clientIP string, headerEventID ...string) error {
+func (s *Service) HandleWebhook(ctx context.Context, raw []byte, signature, clientIP string) error {
 	if !s.Enabled() {
 		return ErrDisabled
 	}
@@ -31,7 +31,7 @@ func (s *Service) HandleWebhook(ctx context.Context, raw []byte, signature, clie
 	// Budget first (cheap): a webhook flood must not reach HMAC+DB.
 	if s.lim != nil && s.cfg.WebhookPerIP > 0 {
 		if !s.lim.Admit(ctx, webhookBudgetKey(clientIP), time.Minute, s.cfg.WebhookPerIP,
-			fmt.Sprintf("wh-%d-%d", time.Now().UnixNano(), time.Now().UnixMicro())) {
+			fmt.Sprintf("wh-%d", time.Now().UnixNano())) {
 			return errWebhookBudget
 		}
 	}
@@ -46,14 +46,7 @@ func (s *Service) HandleWebhook(ctx context.Context, raw []byte, signature, clie
 	}
 
 	ev, err := s.provider.ParseWebhook(raw)
-	if err != nil || ev == nil {
-		s.webhookMetric("unparsed")
-		return nil
-	}
-	if len(headerEventID) > 0 && headerEventID[0] != "" {
-		ev.EventID = headerEventID[0]
-	}
-	if ev.EventID == "" {
+	if err != nil || ev == nil || ev.EventID == "" {
 		// Correctly signed garbage: a provider bug or a versioned envelope
 		// we do not understand. Acknowledge (stop retries) and count it —
 		// silent drops would hide provider-side drift.
@@ -81,18 +74,8 @@ func (s *Service) HandleWebhook(ctx context.Context, raw []byte, signature, clie
 		return err // 5xx → provider retries → correct (not yet recorded)
 	}
 	if duplicate {
-		// If the event was previously recorded, verify whether the referenced
-		// order actually reached terminal state. If a previous attempt failed
-		// transiently mid-flight, this retry must still apply the state change.
-		if o != nil && (o.Status == StatusPaid || o.Status == StatusFailed) {
-			s.webhookMetric("duplicate", observability.Attr("event", ev.Type))
-			return nil
-		}
-		if o == nil {
-			s.webhookMetric("duplicate", observability.Attr("event", ev.Type))
-			return nil
-		}
-		// Order is still non-terminal: fall through to state apply (applyPaid is idempotent)
+		s.webhookMetric("duplicate", observability.Attr("event", ev.Type))
+		return nil
 	}
 
 	if !ev.Handled() {

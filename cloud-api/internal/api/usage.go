@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/auth"
-	"github.com/nexau-cloud/nexau-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/auth"
+	"github.com/mash-cloud/mash-api/internal/domain"
 )
 
 // handleUsage: GET /v1/usage?from=RFC3339&to=RFC3339&by_model=true

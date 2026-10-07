@@ -35,9 +35,9 @@ package bifrost
 // per-process (per replica): each replica opens and recovers independently,
 // which is the standard deployment shape for in-process breakers.
 //
-// Observability: nexau_bifrost_breaker_state gauge (0 closed, 1 half-open,
-// 2 open), nexau_bifrost_breaker_trips_total{reason} and
-// nexau_bifrost_breaker_rejected_total{state} counters. The state is also
+// Observability: mash_bifrost_breaker_state gauge (0 closed, 1 half-open,
+// 2 open), mash_bifrost_breaker_trips_total{reason} and
+// mash_bifrost_breaker_rejected_total{state} counters. The state is also
 // surfaced through GET /health/ready (informational, never readiness-gating).
 
 import (
@@ -45,7 +45,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/observability"
+	"github.com/mash-cloud/mash-api/internal/observability"
 )
 
 type cbState int32

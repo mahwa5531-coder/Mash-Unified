@@ -117,10 +117,8 @@ type Metrics struct {
 	HTTPDurationMS         *Histogram // http.duration_ms{route}
 	ActiveRequests         *Gauge     // http.active_requests
 	ActiveStreams          *Gauge     // stream.active
-	ActiveWSConnections    *Gauge     // ws.connections
 	EventsForwarded        *Counter   // stream.events_forwarded{type}
-	RunsStarted            *Counter   // runs.started
-	RunsCompleted          *Counter   // runs.completed{status}
+	CallsCompleted         *Counter   // llm.calls_completed{status}
 	BifrostRequests        *Counter   // bifrost.requests{status}
 	BifrostDurationMS      *Histogram // bifrost.duration_ms
 	BifrostStreamEvents    *Counter   // bifrost.stream_chunks
@@ -133,13 +131,10 @@ type Metrics struct {
 	RateLimited            *Counter   // ratelimit.rejected{scope}
 	RateLimitFailOpen      *Counter   // ratelimit.fail_open
 	QuotaGateFails         *Counter   // quota.gate_fails (usage-store failure, failed open)
-	QuotaRejected          *Counter   // quota.rejected (PLAN_QUOTA_EXCEEDED)
+	QuotaRejected          *Counter   // quota.rejected (WINDOW_QUOTA_EXCEEDED)
 	IdempotencyHits        *Counter   // idempotency.hits{outcome}
 	MeterQueueDepth        *Gauge     // meter.queue_depth
 	MeterBatchLatencyMS    *Histogram // meter.batch_latency_ms
-	RunCancellations       *Counter   // runs.cancelled{reason}
-	WSSlowConsumers        *Counter   // ws.slow_consumers_evicted
-	WSGraceDrops           *Counter   // ws.grace_drops (frames dropped inside the grace window)
 	RedisOps               *Counter   // redis.commands{op,status}
 	PoolSaturation         *Gauge     // pg.pool_saturation_pct
 	PaymentOrders          *Counter   // payment.orders{provider,event,status}
@@ -151,37 +146,32 @@ type Metrics struct {
 func NewMetrics() *Metrics {
 	latencyBuckets := []float64{1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 30000}
 	return &Metrics{
-		HTTPRequests:           NewCounter("nexau_http_requests_total", "HTTP requests by route/status/method"),
-		HTTPDurationMS:         NewHistogram("nexau_http_duration_ms", "HTTP request duration in ms", latencyBuckets...),
-		ActiveRequests:         NewGauge("nexau_http_active_requests", "In-flight HTTP requests"),
-		ActiveStreams:          NewGauge("nexau_stream_active", "Active LLM event streams"),
-		ActiveWSConnections:    NewGauge("nexau_ws_connections", "Open WebSocket connections"),
-		EventsForwarded:        NewCounter("nexau_stream_events_forwarded_total", "Events delivered to clients by type"),
-		RunsStarted:            NewCounter("nexau_runs_started_total", "Agent runs started"),
-		RunsCompleted:          NewCounter("nexau_runs_completed_total", "Agent runs completed by status"),
-		BifrostRequests:        NewCounter("nexau_bifrost_requests_total", "Bifrost upstream requests by status"),
-		BifrostDurationMS:      NewHistogram("nexau_bifrost_duration_ms", "Bifrost upstream call duration in ms", latencyBuckets...),
-		BifrostStreamEvents:    NewCounter("nexau_bifrost_stream_chunks_total", "Bifrost SSE chunks consumed"),
-		BifrostBreakerState:    NewGauge("nexau_bifrost_breaker_state", "Bifrost circuit breaker state (0 closed, 1 half-open, 2 open)"),
-		BifrostBreakerTrips:    NewCounter("nexau_bifrost_breaker_trips_total", "Bifrost circuit breaker trips by reason"),
-		BifrostBreakerRejected: NewCounter("nexau_bifrost_breaker_rejected_total", "Bifrost calls fast-failed by the open circuit breaker"),
-		UsageTokensIn:          NewCounter("nexau_usage_input_tokens_total", "Authoritative input tokens metered"),
-		UsageTokensOut:         NewCounter("nexau_usage_output_tokens_total", "Authoritative output tokens metered"),
-		UsageDropped:           NewCounter("nexau_usage_dropped_total", "Usage records dropped by reason"),
-		RateLimited:            NewCounter("nexau_ratelimit_rejected_total", "Requests rejected by rate limiter"),
-		RateLimitFailOpen:      NewCounter("nexau_ratelimit_failopen_total", "Rate limiter fail-open events (Redis unavailable)"),
-		QuotaGateFails:         NewCounter("nexau_quota_gate_fails_total", "Monthly-quota gate usage-store failures (failed open)"),
-		QuotaRejected:          NewCounter("nexau_quota_rejected_total", "Runs rejected: monthly token quota exceeded"),
-		IdempotencyHits:        NewCounter("nexau_idempotency_hits_total", "Idempotency duplicate interceptions"),
-		MeterQueueDepth:        NewGauge("nexau_meter_queue_depth", "Usage recorder queue depth"),
-		MeterBatchLatencyMS:    NewHistogram("nexau_meter_batch_latency_ms", "Usage batch flush duration ms", latencyBuckets...),
-		RunCancellations:       NewCounter("nexau_runs_cancelled_total", "Run cancellations by reason"),
-		WSSlowConsumers:        NewCounter("nexau_ws_slow_consumers_evicted_total", "WS connections evicted for slow consumption"),
-		WSGraceDrops:           NewCounter("nexau_ws_grace_drop_total", "WS frames dropped inside the slow-consumer grace window"),
-		RedisOps:               NewCounter("nexau_redis_commands_total", "Redis commands by op/status"),
-		PoolSaturation:         NewGauge("nexau_pg_pool_saturation_pct", "PostgreSQL pool saturation percentage"),
-		PaymentOrders:          NewCounter("nexau_payment_orders_total", "Payment orders by provider/event/status"),
-		PaymentCredits:         NewCounter("nexau_payment_credits_applied_total", "Credits minted by provider"),
-		PaymentWebhooks:        NewCounter("nexau_payment_webhooks_total", "Webhook outcomes by event type"),
+		HTTPRequests:           NewCounter("mash_http_requests_total", "HTTP requests by route/status/method"),
+		HTTPDurationMS:         NewHistogram("mash_http_duration_ms", "HTTP request duration in ms", latencyBuckets...),
+		ActiveRequests:         NewGauge("mash_http_active_requests", "In-flight HTTP requests"),
+		ActiveStreams:          NewGauge("mash_stream_active", "Active LLM event streams"),
+		EventsForwarded:        NewCounter("mash_stream_events_forwarded_total", "Events delivered to clients by type"),
+		CallsCompleted:         NewCounter("mash_llm_calls_total", "LLM calls completed by status"),
+		BifrostRequests:        NewCounter("mash_bifrost_requests_total", "Bifrost upstream requests by status"),
+		BifrostDurationMS:      NewHistogram("mash_bifrost_duration_ms", "Bifrost upstream call duration in ms", latencyBuckets...),
+		BifrostStreamEvents:    NewCounter("mash_bifrost_stream_chunks_total", "Bifrost SSE chunks consumed"),
+		BifrostBreakerState:    NewGauge("mash_bifrost_breaker_state", "Bifrost circuit breaker state (0 closed, 1 half-open, 2 open)"),
+		BifrostBreakerTrips:    NewCounter("mash_bifrost_breaker_trips_total", "Bifrost circuit breaker trips by reason"),
+		BifrostBreakerRejected: NewCounter("mash_bifrost_breaker_rejected_total", "Bifrost calls fast-failed by the open circuit breaker"),
+		UsageTokensIn:          NewCounter("mash_usage_input_tokens_total", "Authoritative input tokens metered"),
+		UsageTokensOut:         NewCounter("mash_usage_output_tokens_total", "Authoritative output tokens metered"),
+		UsageDropped:           NewCounter("mash_usage_dropped_total", "Usage records dropped by reason"),
+		RateLimited:            NewCounter("mash_ratelimit_rejected_total", "Requests rejected by rate limiter"),
+		RateLimitFailOpen:      NewCounter("mash_ratelimit_failopen_total", "Rate limiter fail-open events (Redis unavailable)"),
+		QuotaGateFails:         NewCounter("mash_quota_gate_fails_total", "Window-quota gate usage-store failures (failed open)"),
+		QuotaRejected:          NewCounter("mash_quota_rejected_total", "LLM calls rejected: rolling token window quota exceeded"),
+		MeterQueueDepth:        NewGauge("mash_meter_queue_depth", "Usage recorder queue depth"),
+		MeterBatchLatencyMS:    NewHistogram("mash_meter_batch_latency_ms", "Usage batch flush duration ms", latencyBuckets...),
+
+		RedisOps:        NewCounter("mash_redis_commands_total", "Redis commands by op/status"),
+		PoolSaturation:  NewGauge("mash_pg_pool_saturation_pct", "PostgreSQL pool saturation percentage"),
+		PaymentOrders:   NewCounter("mash_payment_orders_total", "Payment orders by provider/event/status"),
+		PaymentCredits:  NewCounter("mash_payment_credits_applied_total", "Credits minted by provider"),
+		PaymentWebhooks: NewCounter("mash_payment_webhooks_total", "Webhook outcomes by event type"),
 	}
 }

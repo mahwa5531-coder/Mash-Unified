@@ -3,7 +3,7 @@ package payment
 import (
 	"context"
 
-	"github.com/nexau-cloud/nexau-api/internal/observability"
+	"github.com/mash-cloud/mash-api/internal/observability"
 )
 
 // apply.go — the exactly-once core. EVERY money-moving path (client

@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/nexau-cloud/nexau-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
 // fakeRazorpay is a byte-compatible stand-in for api.razorpay.com:

@@ -74,11 +74,7 @@ func New(prefix string) string {
 
 // Convenience constructors for the platform's id vocabulary.
 func RequestID() string      { return New("req") }
-func RunID() string          { return New("run") }
-func SessionID() string      { return New("sess") }
-func EventID() string        { return New("evt") }
-func MessageID() string      { return New("msg") }
-func ThinkingMsgID() string  { return New("thk") }
+func CallID() string         { return New("llm") }
 func TenantID() string       { return New("ten") }
 func UserID() string         { return New("usr") }
 func DeviceID() string       { return New("dev") }

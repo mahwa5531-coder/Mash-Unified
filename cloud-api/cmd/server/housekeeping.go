@@ -7,28 +7,24 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/agent"
-	"github.com/nexau-cloud/nexau-api/internal/observability"
-	"github.com/nexau-cloud/nexau-api/internal/store"
-	"github.com/nexau-cloud/nexau-api/internal/store/repos"
+	"github.com/mash-cloud/mash-api/internal/llm"
+	"github.com/mash-cloud/mash-api/internal/observability"
+	"github.com/mash-cloud/mash-api/internal/store"
+	"github.com/mash-cloud/mash-api/internal/store/repos"
 )
 
 // housekeepingDeps bundles the sweeper's collaborators.
 type housekeepingDeps struct {
-	sessions       *repos.SessionsRepo
-	runs           *repos.RunsRepo
-	refresh        *repos.RefreshTokensRepo
-	pg             *store.Postgres
-	metrics        *observability.Metrics
-	mgr            *agent.Manager
-	stuckAfter     time.Duration
-	sessionIdleTTL time.Duration
+	refresh *repos.RefreshTokensRepo
+	pg      *store.Postgres
+	metrics *observability.Metrics
+	proxy   *llm.Proxy
 }
 
-// startHousekeeping launches the periodic maintenance loop: idle-session
-// expiry, orphaned-run recovery, refresh-token retention, and the metrics
-// sampler (pool saturation, gauge export). One goroutine, one lifecycle,
-// stopped via context; work is short-bounded per tick.
+// startHousekeeping launches the periodic maintenance loop: refresh-token
+// retention and the metrics sampler (pool saturation, gauge export). One
+// goroutine, one lifecycle, stopped via context; work is short-bounded per
+// tick.
 func startHousekeeping(ctx context.Context, d housekeepingDeps, logger *slog.Logger) *housekeeper {
 	h := &housekeeper{deps: d, logger: logger}
 	h.wg.Add(1)
@@ -62,11 +58,10 @@ func (h *housekeeper) loop(ctx context.Context) {
 	}
 }
 
-// guard runs one housekeeping unit behind a panic barrier (2026-09-18
-// post-mortem audit): this loop is detached and periodic — an unrecovered
-// panic would crash the process, and even a silent death would stop idle-run
-// reaping and slot reconciliation for the pod's remaining lifetime. A failed
-// unit is logged; the next tick runs as normal.
+// guard runs one housekeeping unit behind a panic barrier: this loop is
+// detached and periodic — an unrecovered panic would crash the process, and
+// even a silent death would stop maintenance for the pod's remaining
+// lifetime. A failed unit is logged; the next tick runs as normal.
 func (h *housekeeper) guard(unit string, fn func()) {
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -78,54 +73,14 @@ func (h *housekeeper) guard(unit string, fn func()) {
 }
 
 func (h *housekeeper) sweep(ctx context.Context) {
-	d := h.deps
-
-	// Idle sessions → closed. Two equivalent guards: the sliding idle
-	// deadline (extended on every touch) and the last_seen horizon.
-	sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	idleBefore := time.Now().Add(-d.sessionIdleTTL)
-	if n, err := d.sessions.ExpireIdle(sctx, idleBefore); err != nil {
-		observability.LogWarn("housekeeping: session expiry failed", "error", err)
-	} else if n > 0 {
-		observability.LogInfo("housekeeping: sessions expired", "count", n)
-	}
-	cancel()
-
-	// Orphaned runs (instance crash): older than the maximum possible stream
-	// lifetime + grace → failed with ORPHANED_RUN. The same pass returns the
-	// (tenant, user) owners whose Redis concurrency counters must be reset to
-	// PostgreSQL truth — both owners of still-running runs (drift correction)
-	// and owners of the reaped rows (leaked slots fall to the new truth
-	// instead of persisting until the slot TTL; audit finding 4).
-	rctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	owners, reaped, err := d.runs.ReapAndListSlotOwners(rctx, time.Now().Add(-d.stuckAfter))
-	if err != nil {
-		observability.LogWarn("housekeeping: run recovery failed", "error", err)
-	} else {
-		if reaped > 0 {
-			observability.LogInfo("housekeeping: orphaned runs recovered", "count", reaped)
-		}
-		if d.mgr != nil {
-			for _, o := range owners {
-				d.mgr.ReconcileSlots(rctx, o.TenantID, o.UserID, o.TenantRunning, o.UserRunning)
-			}
-			if len(owners) > 0 {
-				observability.LogDebug("housekeeping: concurrency slots reconciled",
-					"owners", len(owners))
-			}
-		}
-	}
-	cancel()
-
 	// Refresh-token retention (90 days past expiry/revocation).
 	tctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	if n, err := d.refresh.SweepExpired(tctx, 90*24*time.Hour); err != nil {
+	if n, err := h.deps.refresh.SweepExpired(tctx, 90*24*time.Hour); err != nil {
 		observability.LogWarn("housekeeping: refresh sweep failed", "error", err)
 	} else if n > 100 {
 		observability.LogInfo("housekeeping: refresh tokens purged", "count", n)
 	}
 	cancel()
-
 }
 
 func (h *housekeeper) sampleMetrics(ctx context.Context) {
@@ -137,12 +92,11 @@ func (h *housekeeper) sampleMetrics(ctx context.Context) {
 		h.deps.metrics.PoolSaturation.Set(int64(float64(stat.AcquiredConns()) / float64(stat.MaxConns()) * 100))
 	}
 	h.deps.metrics.PoolSaturation.Observe(ctx)
-	if h.deps.mgr != nil {
-		h.deps.metrics.ActiveStreams.Set(int64(h.deps.mgr.ActiveCount()))
+	if h.deps.proxy != nil {
+		h.deps.metrics.ActiveStreams.Set(h.deps.proxy.ActiveCount())
 	}
 	h.deps.metrics.ActiveStreams.Observe(ctx)
 	h.deps.metrics.ActiveRequests.Observe(ctx)
-	h.deps.metrics.ActiveWSConnections.Observe(ctx)
 	h.deps.metrics.MeterQueueDepth.Observe(ctx)
 }
 

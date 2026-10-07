@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/ids"
-	"github.com/nexau-cloud/nexau-api/internal/observability"
+	"github.com/mash-cloud/mash-api/internal/ids"
+	"github.com/mash-cloud/mash-api/internal/observability"
 )
 
 // Checkout starts a purchase: resolves the pack, creates the provider

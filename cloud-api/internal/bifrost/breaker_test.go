@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/domain"
 )
 
 // newTestBreaker builds a breaker with a controllable clock.

@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
-	"github.com/nexau-cloud/nexau-api/internal/observability"
-	"github.com/nexau-cloud/nexau-api/internal/reqctx"
+	"github.com/mash-cloud/mash-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/observability"
+	"github.com/mash-cloud/mash-api/internal/reqctx"
 )
 
 // Client is safe for concurrent use by multiple goroutines.
@@ -188,13 +188,6 @@ func (c *Client) Health(ctx context.Context) error {
 	return fmt.Errorf("bifrost health: status %d", resp.StatusCode)
 }
 
-// CloseIdleConnections closes any idle keep-alive connections held by the transport.
-func (c *Client) CloseIdleConnections() {
-	if tr, ok := c.http.Transport.(*http.Transport); ok {
-		tr.CloseIdleConnections()
-	}
-}
-
 // CircuitState reports the upstream circuit-breaker state for ops surfaces
 // ("disabled", "closed", "open", "half_open").
 func (c *Client) CircuitState() string { return c.cb.stateName() }
@@ -239,8 +232,8 @@ func (c *Client) post(ctx context.Context, body []byte, stream bool) (*http.Resp
 	if rid := reqctx.RequestID(ctx); rid != "" {
 		req.Header.Set("x-request-id", rid)
 	}
-	if rid := reqctx.RunID(ctx); rid != "" {
-		req.Header.Set("x-nexau-run-id", rid)
+	if cid := reqctx.CallID(ctx); cid != "" {
+		req.Header.Set("x-mash-call-id", cid)
 	}
 	traceparentFromContext(ctx, req)
 

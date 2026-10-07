@@ -9,7 +9,7 @@ type ctxKey int
 
 const (
 	keyRequestID ctxKey = iota
-	keyRunID
+	keyCallID
 )
 
 // WithRequestID attaches the HTTP correlation id (x-request-id upstream).
@@ -25,14 +25,14 @@ func RequestID(ctx context.Context) string {
 	return ""
 }
 
-// WithRunID attaches the run id for upstream correlation headers.
-func WithRunID(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, keyRunID, id)
+// WithCallID attaches the LLM call id for upstream correlation headers.
+func WithCallID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, keyCallID, id)
 }
 
-// RunID returns the run id ("" when absent).
-func RunID(ctx context.Context) string {
-	if v, ok := ctx.Value(keyRunID).(string); ok {
+// CallID returns the LLM call id ("" when absent).
+func CallID(ctx context.Context) string {
+	if v, ok := ctx.Value(keyCallID).(string); ok {
 		return v
 	}
 	return ""

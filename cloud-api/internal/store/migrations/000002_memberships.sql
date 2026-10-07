@@ -1,4 +1,6 @@
 -- 0002 memberships (tenant isolation backbone)
+-- Every user is provisioned with a personal tenant (single-player model, v1).
+-- The tenant remains the anchor for subscriptions, quotas and billing.
 
 CREATE TABLE IF NOT EXISTS tenant_members (
     tenant_id   TEXT NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,

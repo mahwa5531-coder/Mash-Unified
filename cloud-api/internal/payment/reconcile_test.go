@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
 func TestGetOrder_ReconcilesMissedWebhook(t *testing.T) {

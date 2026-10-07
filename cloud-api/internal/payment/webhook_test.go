@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
 func TestWebhook_Captured_AppliesCredits(t *testing.T) {

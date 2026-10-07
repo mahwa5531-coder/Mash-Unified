@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/reqctx"
+	"github.com/mash-cloud/mash-api/internal/reqctx"
 )
 
 func TestRequestIDGenerated(t *testing.T) {
@@ -159,23 +159,23 @@ func TestInFlightSaturation(t *testing.T) {
 }
 
 func TestCORSAllowed(t *testing.T) {
-	h := CORS([]string{"https://desktop.nexau.cloud"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := CORS([]string{"https://desktop.mash.cloud"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	}))
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/", nil)
-	req.Header.Set("Origin", "https://desktop.nexau.cloud")
+	req.Header.Set("Origin", "https://desktop.mash.cloud")
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("preflight: %d", rec.Code)
 	}
-	if rec.Header().Get("Access-Control-Allow-Origin") != "https://desktop.nexau.cloud" {
+	if rec.Header().Get("Access-Control-Allow-Origin") != "https://desktop.mash.cloud" {
 		t.Fatal("origin must be echoed")
 	}
 }
 
 func TestCORSDisallowed(t *testing.T) {
-	h := CORS([]string{"https://desktop.nexau.cloud"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := CORS([]string{"https://desktop.mash.cloud"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	}))
 	rec := httptest.NewRecorder()

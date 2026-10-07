@@ -22,10 +22,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/ids"
-	"github.com/nexau-cloud/nexau-api/internal/payment"
-	"github.com/nexau-cloud/nexau-api/internal/store"
-	"github.com/nexau-cloud/nexau-api/internal/store/repos"
+	"github.com/mash-cloud/mash-api/internal/ids"
+	"github.com/mash-cloud/mash-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/store"
+	"github.com/mash-cloud/mash-api/internal/store/repos"
 )
 
 func testDB(t *testing.T) (*repos.PaymentsRepo, *store.Postgres) {
@@ -48,7 +48,10 @@ func testDB(t *testing.T) (*repos.PaymentsRepo, *store.Postgres) {
                 DROP TABLE IF EXISTS credit_ledger, credit_balances, payment_webhook_events, payment_orders CASCADE`); err != nil {
 		t.Fatalf("drop: %v", err)
 	}
-	if _, err := pg.Pool.Exec(ctx, `DELETE FROM schema_migrations WHERE version = 10`); err != nil {
+	// Payments live in migration 000006 (post-cleanup chain). The dropped
+	// tables above are exactly its products, so its bookkeeping row must go
+	// too — otherwise Migrate skips it and the tables never come back.
+	if _, err := pg.Pool.Exec(ctx, `DELETE FROM schema_migrations WHERE version = 6`); err != nil {
 		// fresh DB has no bookkeeping table yet — only a real failure matters
 		if !strings.Contains(err.Error(), "does not exist") {
 			t.Fatalf("reset migration bookkeeping: %v", err)

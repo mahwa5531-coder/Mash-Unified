@@ -7,16 +7,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/domain"
 )
 
 type fakeWriter struct {
 	mu      sync.Mutex
-	batches [][]domain.UsageRecord
+	batches [][]domain.LLMCall
 	fail    int // fail the first N inserts
 }
 
-func (f *fakeWriter) InsertUsageRecords(ctx context.Context, recs []domain.UsageRecord) error {
+func (f *fakeWriter) InsertCalls(ctx context.Context, recs []domain.LLMCall) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.fail > 0 {
@@ -37,8 +37,8 @@ func (f *fakeWriter) total() int {
 	return n
 }
 
-func rec(run string) domain.UsageRecord {
-	return domain.UsageRecord{RunID: run, CallSeq: 1, Model: "openai/gpt-4o"}
+func rec(run string) domain.LLMCall {
+	return domain.LLMCall{CallID: run, ResolvedModel: "openai/gpt-4o", StartedAt: time.Now().UTC()}
 }
 
 func TestRecorderBatchesAndFlushes(t *testing.T) {

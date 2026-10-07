@@ -231,3 +231,91 @@ func member(i int) string {
 	}
 	return "m" + time.Now().Format("150405") + string(rune('a'+i))
 }
+
+// --- token-window reservation -------------------------------------------------
+
+func TestReserveWithinCeiling(t *testing.T) {
+	l, _ := newTestLimiter(t, true)
+	ctx := context.Background()
+	// Remaining budget 100: two reserves of 60 must not BOTH fit (the
+	// exact race the reservation exists to close).
+	if o := l.Reserve(ctx, "q", 60, 100, time.Minute); !o.Allowed {
+		t.Fatalf("first reserve must fit: %+v", o)
+	}
+	if o := l.Reserve(ctx, "q", 60, 100, time.Minute); o.Allowed {
+		t.Fatal("second reserve of 60 over a 100 ceiling with 60 held must be denied")
+	}
+	if o := l.Reserve(ctx, "q", 40, 100, time.Minute); !o.Allowed {
+		t.Fatalf("exact remainder must fit: %+v", o)
+	}
+	if got := l.Reserved(ctx, "q"); got != 100 {
+		t.Fatalf("reserved = %d, want 100", got)
+	}
+}
+
+func TestReserveDenialReportsCurrentSum(t *testing.T) {
+	l, _ := newTestLimiter(t, true)
+	ctx := context.Background()
+	l.Reserve(ctx, "q2", 30, 100, time.Minute)
+	o := l.Reserve(ctx, "q2", 80, 100, time.Minute) // would total 110 > 100
+	if o.Allowed {
+		t.Fatal("must deny")
+	}
+	if o.Total != 30 {
+		t.Fatalf("denied outcome must report the unchanged current sum 30, got %d", o.Total)
+	}
+}
+
+func TestReserveReleaseCycle(t *testing.T) {
+	l, _ := newTestLimiter(t, true)
+	ctx := context.Background()
+	l.Reserve(ctx, "q3", 50, 100, time.Minute)
+	l.ReleaseReservation(ctx, "q3", 50, time.Minute)
+	if got := l.Reserved(ctx, "q3"); got != 0 {
+		t.Fatalf("reserved after release = %d, want 0", got)
+	}
+	// Release below zero floors at zero and deletes the key.
+	l.ReleaseReservation(ctx, "q3", 999, time.Minute)
+	if got := l.Reserved(ctx, "q3"); got != 0 {
+		t.Fatalf("floored release = %d, want 0", got)
+	}
+	// Budget is spendable again after settle.
+	if o := l.Reserve(ctx, "q3", 100, 100, time.Minute); !o.Allowed {
+		t.Fatalf("full budget must be available after settle: %+v", o)
+	}
+}
+
+func TestReserveExpiryBackstop(t *testing.T) {
+	l, mr := newTestLimiter(t, true)
+	ctx := context.Background()
+	l.Reserve(ctx, "q4", 50, 100, 50*time.Millisecond)
+	mr.FastForward(100 * time.Millisecond)
+	if got := l.Reserved(ctx, "q4"); got != 0 {
+		t.Fatalf("reservation must self-expire (crash backstop), got %d", got)
+	}
+	if o := l.Reserve(ctx, "q4", 100, 100, time.Minute); !o.Allowed {
+		t.Fatalf("expired reservation must not hold budget: %+v", o)
+	}
+}
+
+func TestReserveFailOpenAndClosed(t *testing.T) {
+	ctx := context.Background()
+	l1, mr1 := newTestLimiter(t, true)
+	mr1.Close()
+	if o := l1.Reserve(ctx, "q5", 50, 100, time.Minute); !o.Allowed {
+		t.Fatal("fail-open limiter must allow (unreserved) when Redis is down")
+	}
+	l2, mr2 := newTestLimiter(t, false)
+	mr2.Close()
+	if o := l2.Reserve(ctx, "q5", 50, 100, time.Minute); o.Allowed {
+		t.Fatal("fail-closed limiter must deny when Redis is down")
+	}
+}
+
+func TestReserveZeroAmount(t *testing.T) {
+	l, _ := newTestLimiter(t, true)
+	ctx := context.Background()
+	if o := l.Reserve(ctx, "q6", 0, 0, time.Minute); !o.Allowed {
+		t.Fatal("zero amount is a no-op allow")
+	}
+}

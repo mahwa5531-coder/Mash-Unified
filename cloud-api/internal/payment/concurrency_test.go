@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/nexau-cloud/nexau-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
 // TestConcurrent_CheckoutSameIdempotencyKey: 32 goroutines fire checkout

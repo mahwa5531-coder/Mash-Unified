@@ -1,0 +1,161 @@
+erDiagram
+    TENANTS {
+        text id PK "ten_<ulid>"
+        text slug UK
+        text name
+        text status "active | suspended | deleted"
+        jsonb settings
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    USERS {
+        text id PK "usr_<ulid>"
+        text email "lower(email) UNIQUE - display metadata only"
+        text display_name "Google name claim"
+        text avatar_url "Google picture claim"
+        text status
+        boolean is_platform_admin
+        text auth_provider "always google"
+        text external_subject UK "Google sub - immutable identity anchor"
+        boolean email_verified
+        timestamptz last_login_at
+    }
+    TENANT_MEMBERS {
+        text tenant_id PK, FK
+        text user_id PK, FK
+        text role "owner | admin | member"
+        text status "active | suspended | removed"
+    }
+    PLANS {
+        text id PK "pln_free / pln_pro"
+        text code UK "free | pro"
+        text name
+        jsonb limits "HOT-CHANGEABLE: window_5h_tokens + window_weekly_tokens live HERE (with rpm / concurrency / max_request_bytes)"
+        jsonb models "allowlist: exact or provider-slash patterns"
+        boolean is_public
+    }
+    SUBSCRIPTIONS {
+        text id PK "sub_<ulid>"
+        text tenant_id FK "UNIQUE per tenant where effective"
+        text plan_id FK
+        text status "trialing | active | past_due (grace) | canceled | expired"
+        timestamptz current_period_start
+        timestamptz current_period_end "autopay / renewal boundary"
+        boolean cancel_at_period_end
+    }
+    ENTITLEMENTS {
+        text id PK
+        text tenant_id FK
+        text key "models.allow, features.tools, ..."
+        jsonb value
+        text source "manual | plan | promo"
+        timestamptz expires_at
+    }
+    DEVICES {
+        text id PK "dev_<ulid>"
+        text user_id FK
+        text name
+        text platform
+        timestamptz last_seen_at
+        timestamptz revoked_at
+    }
+    REFRESH_TOKENS {
+        text id PK "rt_<ulid> - public id"
+        text user_id FK
+        text tenant_id FK "active tenant context (nullable)"
+        text device_id FK "nullable"
+        text family_id "rotation family - reuse detection revokes family"
+        text token_hash UK "SHA-256 of secret, never the secret"
+        timestamptz expires_at "30d, rolling renewal on use"
+        timestamptz used_at
+        timestamptz revoked_at
+        text revoked_reason "rotation | reuse | logout | admin"
+        text replaced_by FK "rotation chain"
+    }
+    LLM_CALLS {
+        bigint id PK
+        text call_id UK "llm_<ulid> - UNIQUE = exactly-once metering"
+        text tenant_id FK
+        text user_id FK
+        text request_id "x-request-id correlation"
+        text requested_model
+        text resolved_model "model actually served"
+        text provider
+        boolean stream
+        text status "completed | failed | cancelled"
+        text error_code
+        bigint input_tokens "NORMALIZED (quota currency)"
+        bigint output_tokens "NORMALIZED"
+        bigint total_tokens "NORMALIZED: input + output - window SUMs read this"
+        bigint raw_prompt_tokens "provider-reported (audit)"
+        bigint raw_completion_tokens "provider-reported (audit)"
+        bigint reasoning_tokens
+        bigint cache_read_tokens
+        bigint cache_write_tokens
+        numeric total_cost "Bifrost-reported"
+        int latency_ms
+        timestamptz recorded_at "rolling-window math column (5h / 7d SUMs)"
+    }
+    TOKEN_NORMALIZATION {
+        text model PK "exact provider/model, provider-slash pattern, or * default"
+        numeric input_weight "HOT-CHANGEABLE: scale on prompt tokens"
+        numeric cached_read_weight "HOT-CHANGEABLE: cache-hit discount"
+        numeric cached_write_weight "HOT-CHANGEABLE: cache-write discount"
+        numeric output_weight "HOT-CHANGEABLE: scale on completion"
+        boolean is_active "soft-disable without delete"
+        timestamptz updated_at "audit of last change"
+    }
+    PAYMENT_ORDERS {
+        text id PK "pay_<ulid>"
+        text tenant_id FK
+        text user_id "acting user (audit) - deliberately NO FK"
+        text provider "razorpay | mock"
+        text provider_order_id "UNIQUE (provider, provider_order_id)"
+        text pack_id
+        text currency "INR only"
+        bigint amount_paise "integer paise - never floats"
+        bigint credits "snapshot at creation"
+        text status "pending | attempted | paid | failed | expired"
+        text provider_payment_id
+        text idempotency_key "UNIQUE (tenant_id, key) - double-click safe"
+        timestamptz paid_at
+        timestamptz expires_at
+    }
+    PAYMENT_WEBHOOK_EVENTS {
+        text event_id PK "provider-issued - at-least-once dedupe key"
+        text provider
+        text event_type "payment.captured, ..."
+        text order_id FK "SET NULL on order delete"
+        jsonb payload
+    }
+    CREDIT_LEDGER {
+        text id PK "led_<ulid>"
+        text tenant_id FK
+        text order_id FK "UNIQUE (order_id, kind) = exactly-once backstop"
+        text kind "topup | adjustment | refund"
+        bigint credits
+        bigint balance_after "running snapshot"
+    }
+    CREDIT_BALANCES {
+        text tenant_id PK, FK
+        bigint balance "CHECK >= 0"
+        timestamptz updated_at
+    }
+
+    TENANTS ||--o{ TENANT_MEMBERS : "has members"
+    USERS ||--o{ TENANT_MEMBERS : "joins via"
+    TENANTS ||--o| SUBSCRIPTIONS : "at most one effective"
+    PLANS ||--o{ SUBSCRIPTIONS : "subscribed by"
+    TENANTS ||--o{ ENTITLEMENTS : "overridden by"
+    USERS ||--o{ DEVICES : "registers"
+    USERS ||--o{ REFRESH_TOKENS : "holds"
+    TENANTS |o--o{ REFRESH_TOKENS : "scoped to"
+    DEVICES |o--o{ REFRESH_TOKENS : "bound to"
+    REFRESH_TOKENS |o--o{ REFRESH_TOKENS : "replaced by"
+    TENANTS ||--o{ LLM_CALLS : "metered on"
+    USERS ||--o{ LLM_CALLS : "metered on"
+    TENANTS ||--o{ PAYMENT_ORDERS : "checks out"
+    PAYMENT_ORDERS |o--o{ PAYMENT_WEBHOOK_EVENTS : "settled by"
+    TENANTS ||--o{ CREDIT_LEDGER : "credited on"
+    PAYMENT_ORDERS ||--o{ CREDIT_LEDGER : "mints"
+    TENANTS ||--o| CREDIT_BALANCES : "carries"

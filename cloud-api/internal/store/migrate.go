@@ -34,18 +34,11 @@ func Migrate(ctx context.Context, pool *Postgres) error {
 	}
 	sort.Strings(names) // 000001_users.sql, 000002_..., …
 
-	// Cluster-wide lock: acquire a dedicated connection so the session-level advisory lock
-	// and unlock are guaranteed to run on the exact same PostgreSQL backend session.
-	conn, err := pool.Pool.Acquire(ctx)
-	if err != nil {
-		return fmt.Errorf("migrate: acquire connection: %w", err)
-	}
-	defer conn.Release()
-
-	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock(5234091001)`); err != nil {
+	// Cluster-wide lock: any instance may migrate; exactly one does at a time.
+	if _, err := pool.Pool.Exec(ctx, `SELECT pg_advisory_lock(5234091001)`); err != nil {
 		return fmt.Errorf("migrate: advisory lock: %w", err)
 	}
-	defer conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(5234091001)`)
+	defer pool.Pool.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(5234091001)`)
 
 	for _, name := range names {
 		version, err := strconv.ParseInt(strings.SplitN(strings.TrimPrefix(name, "migrations/"), "_", 2)[0], 10, 64)

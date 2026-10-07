@@ -1,11 +1,14 @@
 -- 0003 plans, subscriptions, entitlements
+-- v1 catalog: Free and Pro (seeded in 000007).
 
 CREATE TABLE IF NOT EXISTS plans (
     id          TEXT PRIMARY KEY,                       -- pln_<code>
     code        TEXT NOT NULL UNIQUE,
     name        TEXT NOT NULL,
-    -- Enforced limits: requests_per_minute, concurrent_runs_per_user,
-    -- concurrent_runs_per_tenant, max_request_bytes, monthly_token_quota
+    -- Enforced limits: requests_per_minute_user, requests_per_minute_tenant,
+    -- concurrent_requests_per_user, concurrent_requests_per_tenant,
+    -- max_request_bytes, window_5h_tokens, window_weekly_tokens
+    -- (hot-changeable via SQL; see docs/TABLES.md)
     limits      JSONB NOT NULL DEFAULT '{}'::jsonb,
     -- Model allowlist entries: exact ("openai/gpt-4o") or pattern ("anthropic/*")
     models      JSONB NOT NULL DEFAULT '[]'::jsonb,

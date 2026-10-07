@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
-	"github.com/nexau-cloud/nexau-api/internal/reqctx"
+	"github.com/mash-cloud/mash-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/reqctx"
 )
 
 // domainError keeps the test file readable.
@@ -373,17 +373,14 @@ func TestClientStreamChunksIncrementally(t *testing.T) {
 	}
 }
 
-// TestClientPropagatesCorrelationHeaders pins the reader half of upstream
-// correlation: x-request-id and x-nexau-run-id must arrive on every Bifrost
-// request when the context carries them. (The run-id writer half lived
-// un-wired in agent.Service until the 2026-09-23 cleanup — the header was
-// always empty in production; see agent.TestCreateRunAttachesRunIDToProducerContext
-// for the wiring half.)
+// TestClientPropagatesCorrelationHeaders pins upstream correlation:
+// x-request-id and x-mash-call-id must arrive on every Bifrost request
+// when the context carries them.
 func TestClientPropagatesCorrelationHeaders(t *testing.T) {
-	var gotReqID, gotRunID string
+	var gotReqID, gotCallID string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotReqID = r.Header.Get("x-request-id")
-		gotRunID = r.Header.Get("x-nexau-run-id")
+		gotCallID = r.Header.Get("x-mash-call-id")
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":"1","object":"chat.completion","created":1,"model":"openai/gpt-4o","choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"hi"}}]}`))
 	}))
@@ -391,14 +388,14 @@ func TestClientPropagatesCorrelationHeaders(t *testing.T) {
 
 	c := NewClient(TransportConfig{BaseURL: srv.URL}, nil)
 	ctx := reqctx.WithRequestID(context.Background(), "req_corr_1")
-	ctx = reqctx.WithRunID(ctx, "run_corr_1")
+	ctx = reqctx.WithCallID(ctx, "call_corr_1")
 	if _, err := c.Completion(ctx, &ChatRequest{Model: "openai/gpt-4o"}); err != nil {
 		t.Fatalf("Completion: %v", err)
 	}
 	if gotReqID != "req_corr_1" {
 		t.Fatalf("x-request-id = %q, want req_corr_1", gotReqID)
 	}
-	if gotRunID != "run_corr_1" {
-		t.Fatalf("x-nexau-run-id = %q, want run_corr_1", gotRunID)
+	if gotCallID != "call_corr_1" {
+		t.Fatalf("x-mash-call-id = %q, want call_corr_1", gotCallID)
 	}
 }

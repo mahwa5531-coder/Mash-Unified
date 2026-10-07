@@ -41,19 +41,16 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
-	"github.com/nexau-cloud/nexau-api/internal/ids"
-	"github.com/nexau-cloud/nexau-api/internal/store"
-	"github.com/nexau-cloud/nexau-api/internal/store/repos"
+	"github.com/mash-cloud/mash-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/ids"
+	"github.com/mash-cloud/mash-api/internal/store/repos"
 )
 
 // OAuthStore provisions OAuth identities (implemented by repos.OAuthUsersRepo).
 type OAuthStore interface {
-	// FindOrCreateGoogleUser resolves the identity per the three cases
-	// (login / link / provision) and reports which one happened. A link onto
-	// an UNVERIFIED local account is refused with repos.ErrOAuthAccountUnverified
-	// (anti pre-hijacking, 2026-09-19 audit finding 3).
-	FindOrCreateGoogleUser(ctx context.Context, sub, email, displayName string) (*domain.User, repos.OAuthOutcome, error)
+	// FindOrCreateGoogleUser resolves the identity per the documented cases
+	// (login / provision) with race arbitration.
+	FindOrCreateGoogleUser(ctx context.Context, sub, email, displayName, avatarURL string) (*domain.User, error)
 }
 
 // DevicesStore registers desktop devices (implemented by repos.DevicesRepo).
@@ -79,19 +76,37 @@ type GoogleProvider struct {
 	authURL      string
 	tokenURL     string
 	jwksURL      string
+	issuers      map[string]bool // accepted ID-token `iss` values (config-driven)
 	hc           httpClient
 	keys         *googleKeys
 }
 
+// defaultGoogleIssuers are Google's two documented forms (no scheme / with
+// scheme). A deployment pointing the endpoints at a test or proxy OAuth
+// server overrides this list via NEXAU_AUTH_GOOGLE_ISSUERS — the issuer check
+// is a security boundary, so it is explicit configuration, never inferred
+// from the endpoint URLs.
+var defaultGoogleIssuers = []string{"accounts.google.com", "https://accounts.google.com"}
+
 // NewGoogleProvider builds the provider (hc nil → http.DefaultClient).
-func NewGoogleProvider(clientID, clientSecret, redirectURI, authURL, tokenURL, jwksURL string, hc httpClient) *GoogleProvider {
+// issuers nil/empty → Google's documented forms.
+func NewGoogleProvider(clientID, clientSecret, redirectURI, authURL, tokenURL, jwksURL string, issuers []string, hc httpClient) *GoogleProvider {
 	if hc == nil {
 		hc = http.DefaultClient
+	}
+	if len(issuers) == 0 {
+		issuers = defaultGoogleIssuers
+	}
+	m := make(map[string]bool, len(issuers))
+	for _, s := range issuers {
+		if s = strings.TrimSpace(s); s != "" {
+			m[s] = true
+		}
 	}
 	return &GoogleProvider{
 		clientID: clientID, clientSecret: clientSecret, redirectURI: redirectURI,
 		authURL: authURL, tokenURL: tokenURL, jwksURL: jwksURL,
-		hc: hc, keys: &googleKeys{url: jwksURL, hc: hc},
+		issuers: m, hc: hc, keys: &googleKeys{url: jwksURL, hc: hc},
 	}
 }
 
@@ -146,10 +161,11 @@ func (g *GoogleProvider) Exchange(ctx context.Context, code string) (*GoogleIden
 	return g.verifyIDToken(ctx, tok.IDToken)
 }
 
-// googleIssuers are both accepted forms (Google documents both).
-var googleIssuers = map[string]bool{
-	"accounts.google.com":         true,
-	"https://accounts.google.com": true,
+// googleIssuersAre reports whether the ID token's issuer is one this
+// deployment accepts (Google's documented forms by default; overridden via
+// NEXAU_AUTH_GOOGLE_ISSUERS when the endpoints point at a test/fake server).
+func (g *GoogleProvider) issuerAccepted(iss string) bool {
+	return g.issuers[iss]
 }
 
 // verifyIDToken checks RS256 signature against Google's JWKS and validates
@@ -180,7 +196,7 @@ func (g *GoogleProvider) verifyIDToken(ctx context.Context, raw string) (*Google
 	if !parsed.Valid {
 		return nil, domain.ErrOAuthProvider(errors.New("id token invalid"))
 	}
-	if !googleIssuers[body.Issuer] {
+	if !g.issuerAccepted(body.Issuer) {
 		return nil, domain.ErrOAuthProvider(fmt.Errorf("id token issuer %q", body.Issuer))
 	}
 	if len(body.Audience) == 0 || body.Audience[0] != g.clientID {
@@ -350,81 +366,43 @@ func (s *Service) FinishGoogleOAuth(ctx context.Context, code, state, txCookie s
 	return u, grant, nil
 }
 
-// resolveGoogleUser applies the three cases with the documented race retries.
-// On an actual LINK (case 2) the account owner is notified — a Google identity
-// appearing on a password account must never be a silent event.
+// resolveGoogleUser applies the documented cases with race retries
+// (login / provision).
 func (s *Service) resolveGoogleUser(ctx context.Context, ident *GoogleIdentity) (*domain.User, error) {
 	name := ident.Name
 	if len(name) > 128 {
 		name = name[:128]
 	}
+	avatar := ident.Picture
+	if len(avatar) > 2048 {
+		avatar = avatar[:2048]
+	}
 	for attempt := 0; attempt < 3; attempt++ {
-		u, outcome, err := s.OAuth.FindOrCreateGoogleUser(ctx, ident.Sub, ident.Email, name)
+		u, err := s.OAuth.FindOrCreateGoogleUser(ctx, ident.Sub, ident.Email, name, avatar)
 		if err == nil {
-			if outcome == repos.OAuthLinked {
-				s.notifyLinked(ctx, u)
-			}
 			return u, nil
 		}
 		if errors.Is(err, repos.ErrOAuthSubjectRace) || repos.IsEmailTaken(err) {
-			continue // the winner committed; re-run resolves to case 1/2
+			continue // the winner committed; re-run resolves to the login case
 		}
 		if errors.Is(err, repos.ErrIdentityConflict) {
 			return nil, domain.ErrIdentityConflict()
-		}
-		if errors.Is(err, repos.ErrOAuthAccountUnverified) {
-			// Pre-hijacking defense: the email match never proved mailbox control.
-			return nil, domain.ErrOAuthAccountUnverified()
 		}
 		return nil, repos.AsDomain(err)
 	}
 	return nil, domain.ErrInternal(errors.New("oauth resolution did not converge"))
 }
 
-// notifyLinked best-effort informs the account owner that a Google identity was linked.
-func (s *Service) notifyLinked(ctx context.Context, u *domain.User) {}
-
 // resolveTenant picks the first active membership (login parity).
 func (s *Service) resolveTenant(ctx context.Context, userID string) (string, string, error) {
 	ms, err := s.Tenants.Memberships(ctx, userID)
 	if err != nil {
-		return "", "", store.MapDBError(err)
+		return "", "", storeMapError(err)
 	}
 	if len(ms) == 0 {
 		return "", "", domain.ErrForbidden("user has no active tenant membership")
 	}
 	return ms[0].TenantID, ms[0].Role, nil
-}
-
-// validEmail performs basic format validation.
-func validEmail(s string) bool {
-	if len(s) < 3 || len(s) > 254 {
-		return false
-	}
-	i := strings.IndexByte(s, '@')
-	return i > 0 && i < len(s)-1 && !strings.Contains(s, " ")
-}
-
-// LookupEmail powers POST /v1/auth/lookup (the login screen's email step).
-// This is a purposeful, rate-limited account-resolution surface: the caller
-// learns only whether the email exists and which door it belongs to.
-func (s *Service) LookupEmail(ctx context.Context, email string) (exists bool, provider string, err error) {
-	email = strings.ToLower(strings.TrimSpace(email))
-	if email == "" || !validEmail(email) {
-		return false, "", domain.ErrValidation("a valid email address is required")
-	}
-	u, err := s.Users.ByEmail(ctx, email)
-	if err != nil {
-		return false, "", store.MapDBError(err)
-	}
-	if u == nil || u.Status != "active" {
-		return false, "", nil
-	}
-	p := u.AuthProvider
-	if p == "" {
-		p = "google"
-	}
-	return true, p, nil
 }
 
 // ExchangeWebGrant consumes the single-use grant and mints the short web
@@ -443,7 +421,7 @@ func (s *Service) ExchangeWebGrant(ctx context.Context, grant string) (*WebSessi
 	}
 	u, err := s.Users.ByID(ctx, g.UserID)
 	if err != nil {
-		return nil, store.MapDBError(err)
+		return nil, storeMapError(err)
 	}
 	if u == nil || u.Status != "active" {
 		return nil, domain.ErrUnauthorized(errors.New("account not active"))

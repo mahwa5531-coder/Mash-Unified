@@ -9,13 +9,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -57,7 +54,6 @@ type keyFuncVerifier struct {
 	issuer   string
 	audience string
 	leeway   time.Duration
-	method   string // "local" | "jwks" — recorded in Claims.Method
 }
 
 func (v *keyFuncVerifier) Verify(ctx context.Context, token string) (*Claims, error) {
@@ -66,7 +62,7 @@ func (v *keyFuncVerifier) Verify(ctx context.Context, token string) (*Claims, er
 	}
 	claims := &jwt.RegisteredClaims{}
 	parsed, err := jwt.ParseWithClaims(token, claims, v.keyfunc,
-		jwt.WithValidMethods(validAlgsFor(v.method)),
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 		jwt.WithIssuer(v.issuer),
 		jwt.WithAudience(v.audience),
 		jwt.WithExpirationRequired(),
@@ -100,7 +96,7 @@ func (v *keyFuncVerifier) Verify(ctx context.Context, token string) (*Claims, er
 		Audience:  v.audience,
 		IssuedAt:  body.IssuedAt.Time,
 		ExpiresAt: body.ExpiresAt.Time,
-		Method:    v.method,
+		Method:    "local",
 	}
 	if c.Subject == "" {
 		return nil, ErrTokenClass{Kind: "malformed", Desc: "missing sub claim"}
@@ -108,23 +104,13 @@ func (v *keyFuncVerifier) Verify(ctx context.Context, token string) (*Claims, er
 	return c, nil
 }
 
-func validAlgsFor(method string) []string {
-	if method == "local" {
-		return []string{jwt.SigningMethodHS256.Alg()}
-	}
-	return []string{
-		jwt.SigningMethodRS256.Alg(), jwt.SigningMethodRS384.Alg(), jwt.SigningMethodRS512.Alg(),
-		jwt.SigningMethodES256.Alg(), jwt.SigningMethodES384.Alg(), jwt.SigningMethodES512.Alg(),
-		jwt.SigningMethodPS256.Alg(), jwt.SigningMethodPS384.Alg(), jwt.SigningMethodPS512.Alg(),
-		jwt.SigningMethodEdDSA.Alg(),
-	}
-}
-
 // ---------------------------------------------------------------------------
-// Local HS256 signer/verifier
+// Local HS256 signer/verifier — the only token authority in this deployment.
+// Google is the identity provider (verified via its own JWKS in oauth.go);
+// session tokens are minted and verified here.
 // ---------------------------------------------------------------------------
 
-// LocalSigner mints and verifies HS256 tokens (local / hybrid modes).
+// LocalSigner mints and verifies HS256 tokens.
 type LocalSigner struct {
 	secret   []byte
 	issuer   string
@@ -137,7 +123,7 @@ type LocalSigner struct {
 func NewLocalSigner(secret, issuer, audience string, leeway, ttl time.Duration) *LocalSigner {
 	return &LocalSigner{
 		secret: []byte(secret), issuer: issuer, audience: audience,
-		leeway: leeway, ttl: ttl, kid: "nexau-local-1",
+		leeway: leeway, ttl: ttl, kid: "mash-local-1",
 	}
 }
 
@@ -170,8 +156,6 @@ func (s *LocalSigner) SignWithTTL(subject, tenantID, role, deviceID, jti string,
 
 // Verify implements Verifier.
 func (s *LocalSigner) Verify(ctx context.Context, token string) (*Claims, error) {
-	// Reject tokens minted by us but signed with another kid? HS256 does not
-	// use kid for key selection here; parse and validate signature.
 	v := &keyFuncVerifier{
 		keyfunc: func(t *jwt.Token) (any, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -182,7 +166,6 @@ func (s *LocalSigner) Verify(ctx context.Context, token string) (*Claims, error)
 		issuer:   s.issuer,
 		audience: s.audience,
 		leeway:   s.leeway,
-		method:   "local",
 	}
 	return v.Verify(ctx, token)
 }
@@ -197,148 +180,8 @@ func HashToken(secret string) string {
 }
 
 // ---------------------------------------------------------------------------
-// JWKS verifier (external IdP)
+// JWKS key parsing (shared with the Google provider's key cache in oauth.go)
 // ---------------------------------------------------------------------------
-
-// JWKSVerifier fetches and caches a JSON Web Key Set, resolving `kid`s to
-// crypto.PublicKey. Cache refresh happens on an interval and eagerly when an
-// unknown kid appears (bounded by a min-refresh interval to prevent DoS via
-// junk kids).
-type JWKSVerifier struct {
-	url      string
-	issuer   string
-	audience string
-	leeway   time.Duration
-	client   httpClient
-	refresh  time.Duration
-	minRef   time.Duration
-
-	mu       sync.RWMutex
-	keys     map[string]cryptoKey
-	lastLoad time.Time
-	lastTry  time.Time
-}
-
-type httpClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
-type cryptoKey struct {
-	alg string
-	key any
-}
-
-// NewJWKSVerifier builds the verifier; the first fetch is lazy.
-func NewJWKSVerifier(jwksURL, issuer, audience string, refresh, minRefresh, leeway time.Duration, hc httpClient) *JWKSVerifier {
-	return &JWKSVerifier{
-		url: jwksURL, issuer: issuer, audience: audience, leeway: leeway,
-		client: hc, refresh: refresh, minRef: minRefresh,
-		keys: map[string]cryptoKey{},
-	}
-}
-
-func (v *JWKSVerifier) Verify(ctx context.Context, token string) (*Claims, error) {
-	// Peek at the alg/kid first (for diagnostics only; real validation below).
-	peek, _, err := jwt.NewParser().ParseUnverified(token, &jwt.RegisteredClaims{})
-	if err != nil {
-		return nil, ErrTokenClass{Kind: "malformed", Desc: "unparseable header"}
-	}
-	_ = peek
-
-	kv := &keyFuncVerifier{
-		keyfunc: func(t *jwt.Token) (any, error) {
-			alg, _ := t.Header["alg"].(string)
-			kid, _ := t.Header["kid"].(string)
-			key, err := v.key(ctx, kid, alg)
-			if err != nil {
-				return nil, err
-			}
-			return key, nil
-		},
-		issuer:   v.issuer,
-		audience: v.audience,
-		leeway:   v.leeway,
-		method:   "jwks",
-	}
-	return kv.Verify(ctx, token)
-}
-
-// key resolves a key by kid, refreshing the set when missing or stale.
-func (v *JWKSVerifier) key(ctx context.Context, kid, alg string) (any, error) {
-	v.mu.RLock()
-	ck, ok := v.keys[kid]
-	stale := time.Since(v.lastLoad) > v.refresh
-	v.mu.RUnlock()
-	if ok && !stale {
-		return ck.key, nil
-	}
-
-	// Unknown kid or stale cache: refresh (rate-limited).
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	if k, ok := v.keys[kid]; ok && time.Since(v.lastLoad) <= v.refresh {
-		return k.key, nil
-	}
-	if time.Since(v.lastTry) < v.minRef {
-		if k, ok := v.keys[kid]; ok {
-			return k.key, nil
-		}
-		return nil, fmt.Errorf("unknown kid %q (refresh throttled)", kid)
-	}
-	v.lastTry = time.Now()
-
-	if err := v.load(ctx); err != nil {
-		if k, ok := v.keys[kid]; ok {
-			return k.key, nil // serve stale on refresh failure
-		}
-		return nil, fmt.Errorf("jwks refresh: %w", err)
-	}
-	if k, ok := v.keys[kid]; ok {
-		return k.key, nil
-	}
-	return nil, fmt.Errorf("unknown kid %q", kid)
-}
-
-// load fetches and parses the key set.
-func (v *JWKSVerifier) load(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.url, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := v.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10)); _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("jwks fetch: status %d", resp.StatusCode)
-	}
-
-	var set struct {
-		Keys []jwk `json:"keys"`
-	}
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&set); err != nil {
-		return fmt.Errorf("jwks decode: %w", err)
-	}
-	next := make(map[string]cryptoKey, len(set.Keys))
-	for _, k := range set.Keys {
-		pub, err := k.publicKey()
-		if err != nil {
-			continue // skip unusable keys (e.g. private oct keys)
-		}
-		alg := k.Alg
-		if alg == "" {
-			alg = inferAlg(k.Kty)
-		}
-		if kid := k.Kid; kid != "" {
-			next[kid] = cryptoKey{alg: alg, key: pub}
-		}
-	}
-	v.keys = next
-	v.lastLoad = time.Now()
-	return nil
-}
 
 type jwk struct {
 	Kty string `json:"kty"`
@@ -402,22 +245,15 @@ func (k jwk) publicKey() (any, error) {
 	}
 }
 
-func inferAlg(kty string) string {
-	switch kty {
-	case "RSA":
-		return "RS256"
-	case "EC":
-		return "ES256"
-	case "OKP":
-		return "EdDSA"
-	}
-	return ""
-}
-
 func decodeB64BigInt(s string) (*big.Int, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
 		return nil, err
 	}
 	return new(big.Int).SetBytes(raw), nil
+}
+
+// httpClient is the transport seam shared by the Google provider.
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
 }

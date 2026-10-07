@@ -243,19 +243,11 @@ func ParseWebhookEnvelope(body []byte) (*WebhookEvent, error) {
 	if err := json.Unmarshal(body, &env); err != nil {
 		return nil, err
 	}
-	if env.Event == "" {
-		return nil, fmt.Errorf("payment: webhook envelope missing event")
-	}
-	eventID := env.ID
-	if eventID == "" {
-		if p := env.Payload.Payment; p != nil && p.Entity.ID != "" {
-			eventID = fmt.Sprintf("evt_%s_%s", env.Event, p.Entity.ID)
-		} else if o := env.Payload.Order; o != nil && o.Entity.ID != "" {
-			eventID = fmt.Sprintf("evt_%s_%s", env.Event, o.Entity.ID)
-		}
+	if env.ID == "" || env.Event == "" {
+		return nil, fmt.Errorf("payment: webhook envelope missing id/event")
 	}
 	ev := &WebhookEvent{
-		EventID:  eventID,
+		EventID:  env.ID,
 		Provider: "",
 		Type:     env.Event,
 		Raw:      body,

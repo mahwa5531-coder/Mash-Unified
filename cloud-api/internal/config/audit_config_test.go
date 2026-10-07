@@ -1,9 +1,8 @@
-// 2026-09-19 security audit — configuration-boundary regressions.
+// Configuration-boundary regressions (2026-09-19 security audit, trimmed to
+// the Google-only surface on 2026-10-05):
 //
 //	finding 1 (HIGH, runtime half): the HS256 secret must arrive via env or
 //	  secret FILE at runtime — never a committed default, never an image.
-//	needs-validation: emailed links must target an https origin (loopback
-//	  dev exempt), and smtp mode must not run without a link destination.
 package config
 
 import (
@@ -11,33 +10,31 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // setBaseEnv installs the minimal valid deployment environment.
 func setBaseEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv("NEXAU_DATABASE_URL", "postgres://u:p@localhost:5432/nexau?sslmode=require")
+	t.Setenv("NEXAU_DATABASE_URL", "postgres://u:p@localhost:5432/mash?sslmode=require")
 	t.Setenv("NEXAU_REDIS_URL", "redis://localhost:6379/0")
 	t.Setenv("NEXAU_BIFROST_URL", "http://localhost:8081")
-	t.Setenv("NEXAU_AUTH_MODE", "local")
 	t.Setenv("NEXAU_AUTH_HS256_SECRET", strings.Repeat("s", 48))
 }
 
-// TestAudit_SecretRequiredInLocalMode: no env secret, no file → hard failure.
-// This is the runtime twin of the compose.yaml fail-fast (the committed
-// default secret is gone; forgetting to inject is a deployment blocker).
-func TestAudit_SecretRequiredInLocalMode(t *testing.T) {
+// TestAudit_SecretRequired: no env secret, no file → hard failure.
+func TestAudit_SecretRequired(t *testing.T) {
 	setBaseEnv(t)
 	t.Setenv("NEXAU_AUTH_HS256_SECRET", "")
 	if _, err := Load(); err == nil {
-		t.Fatal("local mode without any HS256 secret must be rejected")
+		t.Fatal("without any HS256 secret the deployment must be rejected")
 	} else if !strings.Contains(err.Error(), "HS256_SECRET") {
 		t.Fatalf("error must name the missing secret: %v", err)
 	}
 }
 
-// TestAudit_SecretFileOverridesEnv: NEXAU_AUTH_HS256_SECRET_FILE wins over
-// the env var (secret-manager mounts are the production channel).
+// TestAudit_SecretFileOverridesEnv: NEXAU_AUTH_HS256_SECRET_FILE wins over the
+// env var (secret-manager mounts are the production channel).
 func TestAudit_SecretFileOverridesEnv(t *testing.T) {
 	setBaseEnv(t)
 	fileSecret := strings.Repeat("f", 64)
@@ -73,87 +70,127 @@ func TestAudit_SecretFileTooShortRejected(t *testing.T) {
 	}
 }
 
-// TestAudit_AppBaseURLSchemeMatrix: emailed-link destination security.
-func TestAudit_AppBaseURLSchemeMatrix(t *testing.T) {
-	cases := []struct {
-		name string
-		url  string
-		ok   bool
-	}{
-		{"https production", "https://app.nexau.cloud", true},
-		{"https with path", "https://app.nexau.cloud/", true},
-		{"http loopback dev", "http://localhost:3000", true},
-		{"http 127.0.0.1 dev", "http://127.0.0.1:5173", true},
-		{"http routable blocked", "http://app.nexau.cloud", false},
-		{"http private-ip blocked", "http://10.0.0.5", false},
-		{"ftp scheme blocked", "ftp://app.nexau.cloud", false},
-		{"javascript blocked", "javascript:alert(1)", false},
-		{"empty host blocked", "https://", false},
+// TestAudit_GoogleOAuthRequiresWebSuccessURL: a fully-configured Google
+// provider without a browser success destination is a misconfiguration.
+func TestAudit_GoogleOAuthRequiresWebSuccessURL(t *testing.T) {
+	setBaseEnv(t)
+	t.Setenv("NEXAU_AUTH_GOOGLE_CLIENT_ID", "test.apps.googleusercontent.com")
+	t.Setenv("NEXAU_AUTH_GOOGLE_CLIENT_SECRET", "test-secret")
+	t.Setenv("NEXAU_AUTH_GOOGLE_REDIRECT_URL", "https://api.mash.cloud/v1/auth/oauth/google/callback")
+	t.Setenv("NEXAU_AUTH_WEB_SUCCESS_URL", "")
+
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "WEB_SUCCESS_URL") {
+		t.Fatalf("google oauth without WebSuccessURL must be rejected: %v", err)
 	}
-	for _, c := range cases {
-		if err := validateSecureBaseURL(c.url); (err == nil) != c.ok {
-			t.Fatalf("%s: url=%q err=%v wantOk=%v", c.name, c.url, err, c.ok)
+}
+
+// TestAudit_BaseEnvLoads: the minimal Google-only deployment shape boots.
+func TestAudit_BaseEnvLoads(t *testing.T) {
+	setBaseEnv(t)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("base env must load: %v", err)
+	}
+	if cfg.Auth.GoogleClientID != "" {
+		t.Fatal("google oauth must be unconfigured in the base env")
+	}
+	if cfg.Auth.RevocationCheck != true {
+		t.Fatal("revocation checking must default on")
+	}
+}
+
+// --- URL externalization (2026-10-06): every connection URL is env-driven and
+// --- boot-validated, so test/staging repointing is a pure env change.
+
+// TestConfig_URLShapeValidation: a scheme-less or host-less URL fails at boot
+// naming the exact key — not at first request as a transport mystery.
+func TestConfig_URLShapeValidation(t *testing.T) {
+	cases := []struct{ key, val string }{
+		{"NEXAU_AUTH_GOOGLE_TOKEN_URL", "oauth2.googleapis.com/token"},
+		{"NEXAU_BIFROST_URL", "bifrost:8080"},
+		{"NEXAU_RAZORPAY_API_BASE", "api.razorpay.com/v1"},
+		{"NEXAU_AUTH_WEB_SUCCESS_URL", "not a url"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.key, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv(tc.key, tc.val)
+			_, err := Load()
+			if err == nil || !strings.Contains(err.Error(), tc.key) {
+				t.Fatalf("%s=%q must be rejected naming the key: %v", tc.key, tc.val, err)
+			}
+		})
+	}
+}
+
+// TestConfig_GoogleIssuerOverride: pointing the OAuth endpoints at a test
+// server ALSO overrides the accepted issuers — the issuer allowlist is
+// deployment config, never code.
+func TestConfig_GoogleIssuerOverride(t *testing.T) {
+	setBaseEnv(t)
+	t.Setenv("NEXAU_AUTH_GOOGLE_ISSUERS", " https://oauth.test.mash.local , https://accounts.google.com ,")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("issuer override must load: %v", err)
+	}
+	want := []string{"https://oauth.test.mash.local", "https://accounts.google.com"}
+	if len(cfg.Auth.GoogleIssuers) != len(want) {
+		t.Fatalf("issuers = %v, want %v (trimmed, no empties)", cfg.Auth.GoogleIssuers, want)
+	}
+	for i := range want {
+		if cfg.Auth.GoogleIssuers[i] != want[i] {
+			t.Fatalf("issuers = %v, want %v", cfg.Auth.GoogleIssuers, want)
 		}
 	}
 }
 
-// TestAudit_SMTPModeRequiresAppBaseURL: with signup enabled, smtp mail
-// without a website destination is a misconfiguration (reset links would
-// carry token:// pseudo-URIs).
-func TestAudit_SMTPModeRequiresAppBaseURL(t *testing.T) {
+// TestConfig_GoogleIssuerDefaults: unset → Google's two documented forms.
+func TestConfig_GoogleIssuerDefaults(t *testing.T) {
 	setBaseEnv(t)
-	t.Setenv("NEXAU_MAIL_MODE", "smtp")
-	t.Setenv("NEXAU_SMTP_HOST", "smtp.example.test")
-	t.Setenv("NEXAU_MAIL_FROM", "no-reply@example.test")
-	t.Setenv("NEXAU_APP_BASE_URL", "")
-
-	_, err := Load()
-	if err == nil || !strings.Contains(err.Error(), "NEXAU_APP_BASE_URL") {
-		t.Fatalf("smtp mode without AppBaseURL must be rejected: %v", err)
-	}
-}
-
-// TestAudit_SMTPModeWithHTTPSBaseURLValid: the full valid production shape.
-func TestAudit_SMTPModeWithHTTPSBaseURLValid(t *testing.T) {
-	setBaseEnv(t)
-	t.Setenv("NEXAU_MAIL_MODE", "smtp")
-	t.Setenv("NEXAU_SMTP_HOST", "smtp.example.test")
-	t.Setenv("NEXAU_MAIL_FROM", "no-reply@example.test")
-	t.Setenv("NEXAU_APP_BASE_URL", "https://app.nexau.cloud")
-
-	if _, err := Load(); err != nil {
-		t.Fatalf("valid smtp configuration must load: %v", err)
-	}
-}
-
-// TestAudit_HTTPAppBaseURLRejectedAtLoad: the scheme check fires through
-// Load() (not just the helper) — plaintext link bases never reach runtime.
-func TestAudit_HTTPAppBaseURLRejectedAtLoad(t *testing.T) {
-	setBaseEnv(t)
-	t.Setenv("NEXAU_APP_BASE_URL", "http://app.nexau.cloud")
-
-	_, err := Load()
-	if err == nil || !strings.Contains(err.Error(), "https") {
-		t.Fatalf("http AppBaseURL must be rejected at load: %v", err)
-	}
-}
-
-// TestAudit_UnverifiedRetentionBounds: purge retention must be ≥1h (or the
-// default applies).
-func TestAudit_UnverifiedRetentionBounds(t *testing.T) {
-	setBaseEnv(t)
-	t.Setenv("NEXAU_AUTH_UNVERIFIED_RETENTION", "10s")
-	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "UNVERIFIED_RETENTION") {
-		t.Fatalf("sub-hour retention must be rejected: %v", err)
-	}
-
-	setBaseEnv(t)
-	t.Setenv("NEXAU_AUTH_UNVERIFIED_RETENTION", "24h")
 	cfg, err := Load()
 	if err != nil {
-		t.Fatalf("valid retention must load: %v", err)
+		t.Fatal(err)
 	}
-	if cfg.Auth.UnverifiedRetention != 24*60*60*1e9 { // ns
-		t.Fatalf("retention not applied: %v", cfg.Auth.UnverifiedRetention)
+	if len(cfg.Auth.GoogleIssuers) != 2 ||
+		cfg.Auth.GoogleIssuers[0] != "accounts.google.com" ||
+		cfg.Auth.GoogleIssuers[1] != "https://accounts.google.com" {
+		t.Fatalf("default issuers wrong: %v", cfg.Auth.GoogleIssuers)
+	}
+}
+
+// TestConfig_QuotaReserveDefaultsAndValidation.
+func TestConfig_QuotaReserveDefaultsAndValidation(t *testing.T) {
+	setBaseEnv(t)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Quota.ReserveEnabled || cfg.Quota.ReserveMinTokens != 1024 ||
+		cfg.Quota.ReserveMaxTokens != 32768 || cfg.Quota.ReserveTTL != 30*time.Minute {
+		t.Fatalf("reserve defaults wrong: %+v", cfg.Quota)
+	}
+
+	// Max < Min is a deployment blocker.
+	setBaseEnv(t)
+	t.Setenv("NEXAU_QUOTA_RESERVE_MIN_TOKENS", "5000")
+	t.Setenv("NEXAU_QUOTA_RESERVE_MAX_TOKENS", "1000")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "MAX_TOKENS") {
+		t.Fatalf("max < min must be rejected: %v", err)
+	}
+
+	// TTL must exceed the stream max duration (crash backstop invariant).
+	setBaseEnv(t)
+	t.Setenv("NEXAU_QUOTA_RESERVE_TTL", "1m")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "RESERVE_TTL") {
+		t.Fatalf("short TTL must be rejected: %v", err)
+	}
+
+	// Disabled skips the invariant checks.
+	setBaseEnv(t)
+	t.Setenv("NEXAU_QUOTA_RESERVE_ENABLED", "false")
+	t.Setenv("NEXAU_QUOTA_RESERVE_MIN_TOKENS", "5000")
+	t.Setenv("NEXAU_QUOTA_RESERVE_MAX_TOKENS", "1000")
+	if _, err := Load(); err != nil {
+		t.Fatalf("disabled reservation must not validate bounds: %v", err)
 	}
 }

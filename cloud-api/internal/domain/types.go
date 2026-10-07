@@ -1,4 +1,4 @@
-// Package domain defines the core business types of the NexaU Cloud API and
+// Package domain defines the core business types of the MASh Cloud API and
 // its stable, client-facing error model. Nothing in this package depends on
 // transport, storage or protocol details.
 package domain
@@ -13,20 +13,22 @@ import (
 
 // ---- Identity ----
 
-// User is a NexaU identity.
+// User is a MASh identity (Google OAuth only).
 type User struct {
 	ID              string
 	Email           string
-	DisplayName     string
+	DisplayName     string // Google `name` claim
+	AvatarURL       string // Google `picture` claim
 	Status          string // active | suspended | deleted
 	IsPlatformAdmin bool
-	AuthProvider    string
-	EmailVerified   bool // local mode: email verification state (signup starts false)
+	AuthProvider    string // "google"
+	ExternalSubject string // Google `sub` claim — the immutable identity anchor
+	EmailVerified   bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
 
-// Tenant is an isolated customer organization.
+// Tenant is an isolated customer organization (one per user in v1).
 type Tenant struct {
 	ID     string
 	Slug   string
@@ -49,14 +51,20 @@ const (
 	RoleMember = "member"
 )
 
-// PlanLimits are enforced limits coming from the subscription plan.
+// PlanLimits are enforced limits coming from the subscription plan. All of
+// them live in plans.limits (JSONB) and are hot-changeable via SQL — the API
+// process picks up edits within its short identity-cache TTL.
 type PlanLimits struct {
-	RequestsPerMinuteUser   int64 `json:"requests_per_minute_user,omitempty"`
-	RequestsPerMinuteTenant int64 `json:"requests_per_minute_tenant,omitempty"`
-	ConcurrentRunsUser      int64 `json:"concurrent_runs_per_user,omitempty"`
-	ConcurrentRunsTenant    int64 `json:"concurrent_runs_per_tenant,omitempty"`
-	MaxRequestBytes         int64 `json:"max_request_bytes,omitempty"`
-	MonthlyTokenQuota       int64 `json:"monthly_token_quota,omitempty"`
+	RequestsPerMinuteUser    int64 `json:"requests_per_minute_user,omitempty"`
+	RequestsPerMinuteTenant  int64 `json:"requests_per_minute_tenant,omitempty"`
+	ConcurrentRequestsUser   int64 `json:"concurrent_requests_per_user,omitempty"`
+	ConcurrentRequestsTenant int64 `json:"concurrent_requests_per_tenant,omitempty"`
+	MaxRequestBytes          int64 `json:"max_request_bytes,omitempty"`
+	// Rolling normalized-token budgets (the quota currency — see
+	// token_normalization): a 5-hour burst window and a 7-day weekly
+	// window. Either can bind; 0 disables that window.
+	Window5hTokens     int64 `json:"window_5h_tokens,omitempty"`
+	WindowWeeklyTokens int64 `json:"window_weekly_tokens,omitempty"`
 }
 
 // Plan is a subscribable tier.
@@ -105,113 +113,101 @@ type Device struct {
 	RevokedAt  *time.Time
 }
 
-// ---- Sessions & runs ----
+// ---- LLM call metering ----
 
-// Session statuses.
+// LLM call statuses (terminal only — a call is recorded once, at completion).
 const (
-	SessionActive = "active"
-	SessionClosed = "closed"
+	CallCompleted = "completed"
+	CallFailed    = "failed"
+	CallCancelled = "cancelled"
 )
 
-// Session is cloud-side metadata for a desktop agent session.
-type Session struct {
-	ID         string
-	TenantID   string
-	UserID     string
-	Status     string
-	Metadata   map[string]any // client labels (never message content)
-	CreatedAt  time.Time
-	LastSeenAt time.Time
-	ExpiresAt  *time.Time // sliding idle deadline: extended on activity
+// TokenUsage is the canonical usage shape with Bifrost cost fields for
+// billing. Input/Output/Total are the NORMALIZED values (the quota currency,
+// derived via the model's token_normalization rule); Raw* preserve the
+// provider-reported numbers so per-row accounting stays reconstructible for
+// any past or future weights.
+type TokenUsage struct {
+	InputTokens         int64   `json:"input_tokens"`
+	OutputTokens        int64   `json:"output_tokens"`
+	TotalTokens         int64   `json:"total_tokens"` // = InputTokens + OutputTokens
+	RawPromptTokens     int64   `json:"raw_prompt_tokens,omitempty"`
+	RawCompletionTokens int64   `json:"raw_completion_tokens,omitempty"`
+	ReasoningTokens     int64   `json:"reasoning_tokens"`
+	CacheReadTokens     int64   `json:"cache_read_tokens"`
+	CacheWriteTokens    int64   `json:"cache_write_tokens"`
+	InputCost           float64 `json:"input_cost,omitempty"`
+	OutputCost          float64 `json:"output_cost,omitempty"`
+	TotalCost           float64 `json:"total_cost,omitempty"`
 }
 
-// Run statuses.
-const (
-	RunRunning      = "running"
-	RunCompleted    = "completed"
-	RunFailed       = "failed"
-	RunCancelled    = "cancelled"
-	RunDisconnected = "disconnected"
-)
+// Add returns the element-wise sum.
+func (u TokenUsage) Add(o TokenUsage) TokenUsage {
+	return TokenUsage{
+		InputTokens:         u.InputTokens + o.InputTokens,
+		OutputTokens:        u.OutputTokens + o.OutputTokens,
+		TotalTokens:         u.TotalTokens + o.TotalTokens,
+		RawPromptTokens:     u.RawPromptTokens + o.RawPromptTokens,
+		RawCompletionTokens: u.RawCompletionTokens + o.RawCompletionTokens,
+		ReasoningTokens:     u.ReasoningTokens + o.ReasoningTokens,
+		CacheReadTokens:     u.CacheReadTokens + o.CacheReadTokens,
+		CacheWriteTokens:    u.CacheWriteTokens + o.CacheWriteTokens,
+		InputCost:           u.InputCost + o.InputCost,
+		OutputCost:          u.OutputCost + o.OutputCost,
+		TotalCost:           u.TotalCost + o.TotalCost,
+	}
+}
 
-// Run is one logical LLM request within a session.
-type Run struct {
-	ID             string
-	SessionID      string
+// LLMCall is the persisted metering fact for one proxied LLM request.
+// Payloads are never stored — metering facts only.
+type LLMCall struct {
+	CallID         string
 	TenantID       string
 	UserID         string
 	RequestID      string
-	TurnID         string
-	IdempotencyKey string
 	RequestedModel string
 	ResolvedModel  string
 	Provider       string
 	Stream         bool
-	Status         string
+	Status         string // completed | failed | cancelled
 	ErrorCode      string
 	ErrorMessage   string
-	CancelReason   string
-	CancelBy       string
-	StartedAt      time.Time
-	CompletedAt    *time.Time
-}
-
-// Terminal reports whether the run has reached a final state.
-func (r *Run) Terminal() bool {
-	switch r.Status {
-	case RunCompleted, RunFailed, RunCancelled, RunDisconnected:
-		return true
-	default:
-		return false
-	}
-}
-
-// ---- Usage ----
-
-// TokenUsage is the NexAU-canonical usage shape (nexau/core/usage.py parity)
-// with Bifrost cost fields added for billing.
-type TokenUsage struct {
-	InputTokens      int64   `json:"input_tokens"`
-	OutputTokens     int64   `json:"output_tokens"`
-	TotalTokens      int64   `json:"total_tokens"`
-	ReasoningTokens  int64   `json:"reasoning_tokens"`
-	CacheReadTokens  int64   `json:"cache_read_tokens"`
-	CacheWriteTokens int64   `json:"cache_write_tokens"`
-	InputCost        float64 `json:"input_cost,omitempty"`
-	OutputCost       float64 `json:"output_cost,omitempty"`
-	TotalCost        float64 `json:"total_cost,omitempty"`
-}
-
-// Add returns the element-wise sum (NexAU TokenUsage.__add__ parity).
-func (u TokenUsage) Add(o TokenUsage) TokenUsage {
-	return TokenUsage{
-		InputTokens:      u.InputTokens + o.InputTokens,
-		OutputTokens:     u.OutputTokens + o.OutputTokens,
-		TotalTokens:      u.TotalTokens + o.TotalTokens,
-		ReasoningTokens:  u.ReasoningTokens + o.ReasoningTokens,
-		CacheReadTokens:  u.CacheReadTokens + o.CacheReadTokens,
-		CacheWriteTokens: u.CacheWriteTokens + o.CacheWriteTokens,
-		InputCost:        u.InputCost + o.InputCost,
-		OutputCost:       u.OutputCost + o.OutputCost,
-		TotalCost:        u.TotalCost + o.TotalCost,
-	}
-}
-
-// UsageRecord is the persisted, authoritative billing fact.
-type UsageRecord struct {
-	RunID          string
-	CallSeq        int
-	TenantID       string
-	UserID         string
-	SessionID      string
-	Provider       string
-	Model          string
-	RequestedModel string
-	Status         string
 	Usage          TokenUsage
 	LatencyMS      int
 	StartedAt      time.Time
 	CompletedAt    *time.Time
+}
+
+// NormRule is one row of token-accounting weights — how raw provider usage is
+// converted into the quota currency (normalized tokens). Rows live in the
+// token_normalization table and are hot-changeable via SQL; Model is an exact
+// "provider/model" key, a "provider/*" pattern, or "*" (the default rule).
+//
+//	normalized_input  = max(0, round(prompt·InputWeight)
+//	                        − round(cache_read·CachedReadWeight)
+//	                        − round(cache_write·CachedWriteWeight))
+//	normalized_output = round(completion·OutputWeight)
+//	normalized_total  = normalized_input + normalized_output
+type NormRule struct {
+	Model             string
+	InputWeight       float64
+	CachedReadWeight  float64
+	CachedWriteWeight float64
+	OutputWeight      float64
+}
+
+// DefaultNormRule is the identity accounting used when no table row matches:
+// cached tokens are free (subtracted 1:1 from input), everything else counts
+// 1:1. Identical to the seeded '*' row.
+var DefaultNormRule = NormRule{
+	Model: "*", InputWeight: 1, CachedReadWeight: 1, CachedWriteWeight: 1, OutputWeight: 1,
+}
+
+// WindowUsage is the rolling-window normalized-token position the quota gate
+// admits against — the exact sums /v1/me renders.
+type WindowUsage struct {
+	Used5h     int64 // rolling 5 hours
+	UsedWeekly int64 // rolling 7 days
 }
 
 // UsageSummary aggregates usage over a window for GET /v1/usage.
@@ -231,7 +227,7 @@ type UsageSummary struct {
 
 // ---- Error model (stable, client-facing) ----
 
-// Error is the canonical NexaU error. It maps to the wire format:
+// Error is the canonical MASh error. It maps to the wire format:
 //
 //	{"error":{"code":"MODEL_TIMEOUT","message":"...","request_id":"req_...","details":{}}}
 //
@@ -328,11 +324,6 @@ var (
 	ErrNotFound = func(what string) *Error {
 		return &Error{Code: "NOT_FOUND", Message: "The requested " + what + " was not found.", HTTP: http.StatusNotFound}
 	}
-	ErrSessionNotFound = func() *Error { return ErrNotFound("session") }
-	ErrRunNotFound     = func() *Error { return ErrNotFound("run") }
-	ErrSessionClosed   = func() *Error {
-		return &Error{Code: "SESSION_CLOSED", Message: "The session is closed.", HTTP: http.StatusConflict}
-	}
 	ErrValidation = func(msg string) *Error {
 		return &Error{Code: "INVALID_REQUEST", Message: msg, HTTP: http.StatusBadRequest}
 	}
@@ -341,8 +332,7 @@ var (
 	}
 	ErrRateLimited = func(retryAfterMS int64, scope string) *Error {
 		// retryAfterMS is carried in Details AND surfaced as the
-		// Retry-After header by middleware.WriteDomainError — it was
-		// previously accepted and silently dropped (E2E 2026-09-23).
+		// Retry-After header by middleware.WriteDomainError.
 		d := map[string]any{"scope": scope}
 		if retryAfterMS > 0 {
 			d["retry_after_ms"] = retryAfterMS
@@ -350,38 +340,7 @@ var (
 		return &Error{Code: "RATE_LIMITED", Message: "Too many requests.", HTTP: http.StatusTooManyRequests, Details: d}
 	}
 	ErrConcurrencyLimited = func(scope string) *Error {
-		return &Error{Code: "CONCURRENCY_LIMIT", Message: "Too many concurrent runs.", HTTP: http.StatusTooManyRequests, Details: map[string]any{"scope": scope}}
-	}
-	ErrWSConnLimit = func() *Error {
-		return &Error{Code: "WS_CONNECTION_LIMIT", Message: "Too many open WebSocket connections.", HTTP: http.StatusTooManyRequests}
-	}
-	ErrDuplicate = func() *Error {
-		return &Error{Code: "DUPLICATE_IN_PROGRESS", Message: "An identical request is already being processed.", HTTP: http.StatusConflict}
-	}
-	ErrIdempotencyMismatch = func() *Error {
-		return &Error{Code: "IDEMPOTENCY_KEY_REUSE", Message: "The Idempotency-Key was reused with a different request body.", HTTP: http.StatusUnprocessableEntity}
-	}
-	ErrIdemOrphaned = func() *Error {
-		return &Error{Code: "IDEMPOTENCY_ORPHANED", Message: "The Idempotency-Key referenced a run that no longer exists; the key has been reset. Retry the same request.", HTTP: http.StatusConflict}
-	}
-	// Signup & account recovery (OWASP-aligned: generic messages, no
-	// account existence leaks on recovery surfaces).
-	ErrEmailTaken = func() *Error {
-		return &Error{Code: "EMAIL_TAKEN", Message: "An account with this email already exists. Sign in instead.", HTTP: http.StatusConflict}
-	}
-	ErrEmailNotVerified = func() *Error {
-		return &Error{Code: "EMAIL_NOT_VERIFIED", Message: "Verify your email address before signing in.", HTTP: http.StatusForbidden, Details: map[string]any{"resend_endpoint": "/v1/auth/email/resend"}}
-	}
-	ErrInvalidRecoveryToken = func() *Error {
-		// Deliberately generic: expired, already-used and unknown
-		// tokens are indistinguishable (OWASP Forgot Password CS).
-		return &Error{Code: "INVALID_TOKEN", Message: "This link is invalid or has expired. Request a new one.", HTTP: http.StatusBadRequest}
-	}
-	ErrPasswordWeak = func(reason string) *Error {
-		return &Error{Code: "PASSWORD_WEAK", Message: "The password does not meet the policy.", HTTP: http.StatusBadRequest, Details: map[string]any{"reason": reason}}
-	}
-	ErrResendCooldown = func(retryAfterSec int64) *Error {
-		return &Error{Code: "RESEND_COOLDOWN", Message: "Please wait before requesting another email.", HTTP: http.StatusTooManyRequests, Details: map[string]any{"retry_after_sec": retryAfterSec}}
+		return &Error{Code: "CONCURRENCY_LIMIT", Message: "Too many concurrent requests.", HTTP: http.StatusTooManyRequests, Details: map[string]any{"scope": scope}}
 	}
 	// OAuth & web-to-desktop handshake. OAUTH_STATE_INVALID and
 	// INVALID_OR_EXPIRED_CODE are deliberately generic (expired, replayed
@@ -401,15 +360,15 @@ var (
 	ErrIdentityConflict = func() *Error {
 		return &Error{Code: "IDENTITY_CONFLICT", Message: "This email is already linked to a different identity. Sign in with the original method.", HTTP: http.StatusConflict}
 	}
-	ErrOAuthAccountUnverified = func() *Error {
-		// Anti pre-hijacking: a Google-verified identity never auto-links
-		// onto an UNVERIFIED local account with that email (an attacker
-		// could have seeded it with their own password). The email owner
-		// must first prove mailbox control (password reset flips the flag).
-		return &Error{Code: "OAUTH_ACCOUNT_UNVERIFIED", Message: "An account with this email exists but its address was never verified. Sign in with your password (or reset it) first, then link Google.", HTTP: http.StatusConflict}
-	}
-	ErrPlanQuotaExceeded = func(quota, used int64) *Error {
-		return &Error{Code: "PLAN_QUOTA_EXCEEDED", Message: "The monthly token quota for this plan has been reached.", HTTP: http.StatusTooManyRequests, Details: map[string]any{"quota_tokens": quota, "used_tokens": used}}
+	// ErrWindowQuotaExceeded: a rolling plan window ("5h" | "weekly") is
+	// exhausted. resets_at (optional) is the exact earliest instant usage
+	// drops back below quota — clients use it to schedule the retry.
+	ErrWindowQuotaExceeded = func(window string, quota, used int64, resetsAt *time.Time) *Error {
+		d := map[string]any{"window": window, "quota_tokens": quota, "used_tokens": used}
+		if resetsAt != nil {
+			d["resets_at"] = resetsAt.UTC().Format(time.RFC3339)
+		}
+		return &Error{Code: "WINDOW_QUOTA_EXCEEDED", Message: "The token quota for this plan window has been reached.", HTTP: http.StatusTooManyRequests, Details: d}
 	}
 	ErrDesktopCode = func() *Error {
 		return &Error{Code: "INVALID_OR_EXPIRED_CODE", Message: "This sign-in code is invalid or has expired. Restart sign-in from the app.", HTTP: http.StatusBadRequest}

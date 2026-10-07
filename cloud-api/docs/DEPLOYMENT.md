@@ -21,7 +21,7 @@ defaults (all ~100 keys are documented inline in `.env.example`):
 ### Required (service will not boot without them)
 
 ```bash
-NEXAU_DATABASE_URL=postgres://nexau:PASSWORD@postgres:5432/nexau?sslmode=require
+NEXAU_DATABASE_URL=postgres://mash:PASSWORD@postgres:5432/mash?sslmode=require
 NEXAU_REDIS_URL=redis://redis:6379/0
 NEXAU_BIFROST_URL=http://bifrost:8081
 NEXAU_BIFROST_API_KEY=<key from your Bifrost deployment>
@@ -29,7 +29,7 @@ NEXAU_BIFROST_API_KEY=<key from your Bifrost deployment>
 # local auth mode (this API mints its own JWTs):
 NEXAU_AUTH_HS256_SECRET=$(openssl rand -hex 32)   # >= 32 bytes, secret-file variant available
 
-# public origin used for web application:
+# (mail/signup env vars removed — Google OAuth is the only identity path)
 NEXAU_APP_BASE_URL=https://app.your-domain.example
 ```
 
@@ -61,11 +61,26 @@ what), §11 (every payment key).
 
 ### Commonly tuned (all optional)
 
+Every connection URL is env-driven and validated at boot (absolute `http(s)`
+shape, exact key named on failure) — repointing OAuth, payments, Bifrost,
+OTel or the web redirect targets between prod/staging/test is a pure env
+change, never a code change.
+
 | Key | Default | What it does |
 |---|---|---|
 | `NEXAU_HTTP_ADDR` | `:8080` | listen address |
 | `NEXAU_ALLOWED_ORIGINS` | — | CORS allow-list (browsers need it; native desktop doesn't) |
 | `NEXAU_AUTH_MODE` | `local` | `local` (this API mints JWTs) or `jwks` (external IdP) |
+| `NEXAU_AUTH_GOOGLE_CLIENT_ID/SECRET/REDIRECT_URL` | — | Google OAuth (required in production) |
+| `NEXAU_AUTH_GOOGLE_AUTH_URL/TOKEN_URL/JWKS_URL` | Google production endpoints | endpoint overrides — point at a test/fake OAuth server without code changes |
+| `NEXAU_AUTH_GOOGLE_ISSUERS` | `accounts.google.com,https://accounts.google.com` | accepted ID-token issuers. MUST be set (to the test server's issuer) whenever the endpoint overrides point at a non-Google server — the issuer check is a security boundary, so it is explicit config, never inferred |
+| `NEXAU_RAZORPAY_API_BASE` | `https://api.razorpay.com/v1` | payment-gateway API base — repoint at a sandbox/mock gateway via env |
+| `NEXAU_QUOTA_RESERVE_ENABLED` | `true` | in-flight token reservation (race-free rolling windows) |
+| `NEXAU_QUOTA_RESERVE_MIN_TOKENS` | `1024` | per-call reservation floor |
+| `NEXAU_QUOTA_RESERVE_MAX_TOKENS` | `32768` | per-call reservation ceiling (one huge request must not starve the tenant window) |
+| `NEXAU_QUOTA_RESERVE_DEFAULT_OUT_TOKENS` | `4096` | output budget assumed when the request declares none |
+| `NEXAU_QUOTA_RESERVE_TTL` | `30m` | crash backstop — must exceed `NEXAU_STREAM_MAX_DURATION` |
+| `NEXAU_QUOTA_RESERVE_SETTLE_DELAY` | `2s` | release delay covering the async metering flush (≈4× `NEXAU_METER_FLUSH_INTERVAL`) |
 | `NEXAU_RATE_REQ_PER_MIN_USER/TENANT` | see `.env.example` | rate-limit budgets |
 
 ## 3. Bring-up
@@ -84,9 +99,9 @@ the API waits for both datastores to answer health checks).
 ### Bare metal
 
 ```bash
-make build              # → bin/nexau-api (or: go build -o bin/nexau-api ./cmd/server)
+make build              # → bin/mash-api (or: go build -o bin/mash-api ./cmd/server)
 set -a; . ./.env; set +a
-./bin/nexau-api         # migrations embedded; runs against $NEXAU_DATABASE_URL
+./bin/mash-api          # migrations embedded; runs against $NEXAU_DATABASE_URL
 ```
 
 ## 4. Verify the deployment (smoke tests)
@@ -95,8 +110,13 @@ set -a; . ./.env; set +a
 # liveness (no auth required)
 curl -fsS localhost:8080/health
 
+# auth round-trip (local mode; adjust for your provisioned user)
+TOKEN=$(curl -s localhost:8080/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  # (dev token: mint via the Google OAuth flow, or the mock provider in tests)
+
 # authed call through the full stack (api → bifrost)
-curl -fsS localhost:8080/v1/agent/chat/completions \
+curl -fsS localhost:8080/v1/chat/completions \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"ping"}]}' | head -c 400
 
@@ -134,4 +154,5 @@ expiry) — no real money ever moves. See `PAYMENT-GATEWAY.md` §11.
 |---|---|---|
 | Unit + scenario | `go test ./internal/... -race` | every package, including the payment race storms |
 | HTTP e2e | `go test ./tests/... -race` | full request lifecycle over real HTTP |
+| Validation matrix | `go test ./validation/... -race` | 45 fault/security/load sections, 219 tests |
 | PG integration | `NEXAU_TEST_DATABASE_URL=… go test ./internal/store/repos/...` | real-SQL truth (uniqueness, row locks, exactly-once) |

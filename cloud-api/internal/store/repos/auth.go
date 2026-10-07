@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/nexau-cloud/nexau-api/internal/store"
+	"github.com/mash-cloud/mash-api/internal/store"
 )
 
 // RefreshTokensRepo implements opaque refresh tokens with rotation and
@@ -151,7 +151,7 @@ func (r *RefreshTokensRepo) Issue(ctx context.Context, t *RefreshToken) error {
                 INSERT INTO refresh_tokens (id, user_id, tenant_id, device_id, family_id,
                         token_hash, expires_at, user_agent)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-		t.ID, t.UserID, nullIfEmpty(t.TenantID), nullIfEmpty(t.DeviceID), t.FamilyID,
+		t.ID, t.UserID, nullString(t.TenantID), nullString(t.DeviceID), t.FamilyID,
 		t.TokenHash, t.ExpiresAt, t.UserAgent)
 	return err
 }

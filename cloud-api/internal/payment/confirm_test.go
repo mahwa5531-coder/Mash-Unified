@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nexau-cloud/nexau-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
 func TestConfirm_HappyPath_CreditsApplied(t *testing.T) {

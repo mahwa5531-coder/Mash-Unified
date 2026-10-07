@@ -13,11 +13,12 @@ produced these items live in git history (see "Audit history" below).
    committed default — schedule a maintenance window; all access tokens
    invalidate and clients re-authenticate.
 3. Set `NEXAU_APP_BASE_URL` to the https website origin (loopback exempt in
-   dev).
-4. Optionally tune `NEXAU_AUTH_REFRESH_PER_IP`, `NEXAU_AUTH_OAUTH_PER_IP`
-   (defaults: 60, 60).
-5. Confirm the load balancer: read-timeout > 15m (long streams),
-   `X-Accel-Buffering: no` for SSE.
+   dev); verify the SMTP relay offers STARTTLS — the mailer refuses cleartext.
+4. Optionally tune `NEXAU_AUTH_REFRESH_PER_IP`, `NEXAU_AUTH_OAUTH_PER_IP`,
+   `NEXAU_AUTH_UNVERIFIED_RETENTION` (defaults: 60, 60, 72h).
+5. Never set `NEXAU_MAIL_LOG_LINKS=true` outside a local dev machine.
+6. Confirm the load balancer: read-timeout > 15m (long SSE streams),
+   upgrade-header passthrough, `X-Accel-Buffering: no` for SSE.
 
 ## Ops-runbook items (deployment layer, not code)
 
@@ -53,7 +54,8 @@ produced these items live in git history (see "Audit history" below).
 | 2026-09-18 | Post-mortem-pattern audit (danluu catalog, ~180 incidents) | 2 serious defects fixed (poison-pill containment, Timeout×Recovery gap); 14 patterns verified addressed |
 | 2026-09-18 | Upstream circuit breaker gap (awesome-scalability rubric) | Shipped: `internal/bifrost/breaker.go` + §44 E2E |
 | 2026-09-19 | Security audit remediation | All 20 confirmed findings closed; §45 E2E; one mandatory operator action (secret rotation, above) |
-| 2026-09-23 | Cleanup pass (staticcheck + deadcode + manual) | ID entropy-collapse bug fixed (duplicate ids after 436 same-ms generations pre-fix); un-wired `x-nexau-run-id` correlation header wired; 16 dead declarations, 50 MB of run artifacts and a duplicate `migrations/` tree removed; lint + deadcode now zero |
+| 2026-10-05 | **MASh simplification** | Agent runtime, WS transport, event bus, run idempotency and ALL non-Google auth (password/signup/recovery/mailer/JWKS) deleted; new `internal/llm` proxy + `POST /v1/chat/completions` as the single LLM endpoint; fresh migration chain (7 files); 18.1k → ~8.6k production lines; see docs/CLEANUP-2026-10-05.md |
+| 2026-09-23 | Cleanup pass (staticcheck + deadcode + manual) | ID entropy-collapse bug fixed (duplicate ids after 436 same-ms generations pre-fix); un-wired correlation header wired; 16 dead declarations, 50 MB of run artifacts and a duplicate `migrations/` tree removed; lint + deadcode now zero |
 
 To read a full audit report: `git log --diff-filter=D --name-only -- docs/`
 locates the deleted file, then `git show <rev>:nexau-api/docs/<file>.md`.

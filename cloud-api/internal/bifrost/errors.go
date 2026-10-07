@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/domain"
 	"go.opentelemetry.io/otel/trace"
 )
 

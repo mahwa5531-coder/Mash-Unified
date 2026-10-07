@@ -8,8 +8,8 @@ import (
 
 const (
 	testSecret = "0123456789abcdef0123456789abcdef0123456789abcdef"
-	testIssuer = "https://auth.nexau.test"
-	testAud    = "nexau-cloud-api-test"
+	testIssuer = "https://auth.mash.test"
+	testAud    = "mash-cloud-api-test"
 )
 
 func newTestSigner(ttl time.Duration) *LocalSigner {

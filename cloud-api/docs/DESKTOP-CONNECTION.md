@@ -1,6 +1,6 @@
 # Desktop ↔ Cloud API ↔ Bifrost — The Single Connection Document
 
-> **Scope.** This is the one document that answers: *how does the NexAU desktop
+> **Scope.** This is the one document that answers: *how does the MASh desktop
 > application connect to the cloud, and how does that relate to Bifrost?*
 > Everything here is stated from **verified code in this repository** (file
 > paths cited) or from **the desktop team's own written spec** (labelled as
@@ -24,7 +24,7 @@ machine — that is what "fully managed, not BYOK" means in the wire topology:
 ```
 ┌──────────────────────┐   HTTPS + user JWT   ┌──────────────────────┐  internal HTTP + 1 key  ┌──────────┐
 │  NexaU Desktop app   │ ───────────────────> │  NexaU Cloud API     │ ─────────────────────> │ Bifrost  │──> 23+ LLMs
-│  (local, user PC)   │       SSE / HTTP     │  (stateless, N pods) │  POST /v1/chat/         │ (gateway)│
+│  (local, user PC)   │        SSE / POST     │  (stateless, N pods) │  POST /v1/chat/         │ (gateway)│
 └──────────────────────┘                      └──────────────────────┘  completions             └──────────┘
   holds: access + refresh        ▲                     ▲                                       ▲
   tokens only (DPAPI vault)      │                     │                                       │
@@ -34,10 +34,10 @@ machine — that is what "fully managed, not BYOK" means in the wire topology:
 
 | Question | Answer | Where it is enforced |
 |---|---|---|
-| Does the desktop call Bifrost? | **No.** No Bifrost address exists in any client-facing response. | `internal/bifrost/` is server-side only; `/v1/config` returns transports/limits only |
+| Does the desktop call Bifrost? | **No.** No Bifrost address exists in any client-facing response. | `internal/bifrost/` is server-side only; `/v1/config` (`internal/api/me.go:51`) returns transports/limits only |
 | What does the desktop call? | The Cloud API base URL, e.g. `https://api.mash.ai` | `README.md` endpoint table |
-| What credential does the desktop hold? | Its own JWT access token (1 h) + rotating refresh token (30 d) in the OS vault | `internal/auth/service.go` (`TokenPair`) |
-| What credential does the API use for Bifrost? | One global Bearer key, env-injected, server-side only | `.env.example` |
+| What credential does the desktop hold? | Its own JWT access token (1 h) + rotating refresh token (30 d) in the OS vault | `internal/auth/service.go:80` (`TokenPair`) |
+| What credential does the API use for Bifrost? | One global Bearer key, env-injected, server-side only | `.env.example` lines 7–12 |
 | If Bifrost scales to 100 replicas? | Invisible to both API and desktop (K8s Service VIP / LB in front of Bifrost; the API has one URL) | `docs/ARCHITECTURE.md` |
 
 ---
@@ -49,21 +49,30 @@ machine — that is what "fully managed, not BYOK" means in the wire topology:
 - **Transport**: HTTPS (TLS 1.2+). Plain HTTP is a dev-only convenience.
 - **Auth header** on every authenticated call:
   `Authorization: Bearer <access_token>` — enforced by
-  `internal/auth/middleware.go`.
+  `internal/auth/middleware.go` (`authMW.Require(...)` wiring in
+  `internal/api/router.go:102-149`).
 - **Base URL**: one per deployment (e.g. `https://api.mash.ai`). The desktop
   stores nothing else network-related. `GET /v1/config` (authed) returns every
   limit/timing value the desktop should obey at runtime — request sizes, model
-  entitlements, idle/stream timeouts.
+  entitlements, idle/stream timeouts, heartbeat interval
+  (`internal/api/me.go:51-86`) — so hard-coding tunables in the client is
+  unnecessary.
 - **CORS/origins**: CORS is a browser concept; a native desktop HTTP client
   needs **no** origin allow-list. `NEXAU_ALLOWED_ORIGINS` exists only for the
-  web UI.
-- **Primary LLM completions surface**:
-  `POST /v1/agent/chat/completions` is the primary transport used by the desktop.
-  It is an OpenAI-compatible pass-through (raw provider SSE bytes when `stream:true`
-  or JSON response when `stream:false`) — any existing OpenAI-style client
-  (or NexAU's internal LLM caller) works by changing only the base URL and using
-  the NexaU access token instead of an OpenAI key. Rate limits, entitlement
-  checks, and authoritative token metering are enforced server-side.
+  web dev UI.
+- **Streaming**: ONE transport — SSE:
+  - `POST /v1/chat/completions` with `stream:true` → OpenAI chat-completions
+    chunks forwarded **verbatim** (`internal/api/llm.go`, `internal/llm/sse.go`).
+  - The terminal event is `data: [DONE]`; comment heartbeats (`: ping`) keep
+    intermediaries alive; mid-stream upstream failures surface as one
+    in-band `{"error":{…}}` event before `[DONE]`.
+  - Canceling a stream = closing the connection: the cloud cancels the
+    upstream request through context propagation (no cancel endpoint, no
+    resume protocol — the desktop owns replay from its local transcript).
+- **OpenAI-compatible surface**: `POST /v1/chat/completions` is the ONLY LLM
+  endpoint. Any existing OpenAI-style client works by changing the base URL,
+  using `"provider/model"` model ids and the MASh access token instead of an
+  OpenAI key.
 
 ### 2.1 What the desktop sends vs. what it must never invent
 
@@ -207,12 +216,16 @@ channel), `ACCOUNT_INACTIVE`, `VALIDATION_ERROR`.
 
 ### 5.6 Runtime (authed) — the calls after login
 ```jsonc
-GET  /v1/me                                   // server-authoritative identity, limits, models
-GET  /v1/config                               // limits, endpoints, timing for the client
-POST /v1/agent/chat/completions               // OpenAI-compatible chat completions (raw SSE stream or JSON)
-POST /v1/agent/chat/completions/cancel        // cancel in-flight chat completion
-GET  /v1/usage?from&to&by_model               // tenant usage aggregates
+GET   /v1/me                                  // server-authoritative identity, limits, quota, models
+GET   /v1/config                              // limits, endpoint contract, stream timing
+POST  /v1/chat/completions                    // THE LLM call (stream:true → SSE; OpenAI-compatible)
+GET   /v1/usage?from&to&by_model              // tenant usage aggregates
 ```
+Wire format: plain OpenAI chat-completions chunks, forwarded verbatim
+(`choices[].delta`, usage in the final chunk, `data: [DONE]` terminator).
+Sessions, runs and their transcripts are DESKTOP-LOCAL — there is no
+`/v1/agent/*` surface anymore, and no resume protocol (replay from the local
+transcript; the cloud buffers nothing).
 
 ---
 
@@ -234,7 +247,7 @@ profile`. ID tokens are verified against Google's JWKS (RS256; `iss`/`aud`/
 `exp` checked) — unverified provider emails never create accounts.
 
 First Google sign-in provisions **user + personal tenant + owner membership +
-free-plan trial atomically**; a later password signup with the same email is
+free-plan trial atomically**; the identity anchor is the Google `sub`
 **linked, not duplicated** (`internal/store/repos/oauth.go`,
 `FindOrCreateGoogleUser`).
 
@@ -272,7 +285,9 @@ each row maps to a **finished, tested** cloud endpoint above.
 - [ ] **Vault write**: store the `TokenPair` in the DPAPI vault; keep your
       existing `ensure_valid_token()` sliding refresh pointed at
       `POST /v1/auth/refresh` (persist the **new** pair atomically per call).
-- [ ] **Chat completions client**: standard OpenAI-format client calling `POST /v1/agent/chat/completions` with `stream: true` (reading `data: {...}` chunks) or `stream: false`.
+- [ ] **Run/stream clients**: SSE consumer for
+      `POST /v1/chat/completions` (`stream:true`) and
+      `resume{run_id, last_sequence}` reconnect logic.
 - [ ] **Startup entitlement fetch**: `GET /v1/config` once at boot; obey the
       returned limits/timeouts instead of hard-coding.
 
@@ -286,7 +301,8 @@ each row maps to a **finished, tested** cloud endpoint above.
 | User lingered > 60 s | same code | web page mints a fresh mcode; retry with the new one |
 | Access token expired | 401 `UNAUTHORIZED` | refresh; retry once; if refresh fails → vault clear → login again |
 | Refresh token reused (rotation race) | family revoked; 401s | full re-login (this is the theft-detection working) |
-| Stream dropped mid-flight | SSE disconnect / network error | retry request if appropriate; incomplete runs are safely metered up to disconnection |
+| **Token revoked mid-stream (logout elsewhere)** | stream ends; the next HTTP call is 401 `TOKEN_REVOKED` | treat as forced logout: clear the vault, require re-login |
+| **Stream dropped (network blip)** | SSE read returns EOF / error | the call is over: the cloud canceled the upstream and metered it `cancelled`; replay from the local transcript and retry as a NEW request |
 | Rate limited | 429 + `Retry-After` | honor the header; never hammer |
 | Redis/PG degraded (rare) | 503 `DEPENDENCY_UNAVAILABLE` | back off with jitter |
 | Bifrost gateway failing (cloud protects itself) | 503 `UPSTREAM_CIRCUIT_OPEN`, `details.retry_after_ms` present | back off for `retry_after_ms` (typically seconds); the cloud auto-recovers — probe after the hint, no user action needed |

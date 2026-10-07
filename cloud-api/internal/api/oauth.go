@@ -4,7 +4,6 @@ package api
 //
 //      GET  /v1/auth/oauth/google           begin "Continue with Google" (302)
 //      GET  /v1/auth/oauth/google/callback  finish OAuth → 302 web success page
-//      POST /v1/auth/lookup                email → {exists, auth_provider}
 //      POST /v1/auth/web/session            grant → short web access token
 //      POST /v1/auth/desktop/code           (authed) mint single-use mcode
 //      POST /v1/auth/desktop/exchange       mcode → full TokenPair
@@ -28,17 +27,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/auth"
-	"github.com/nexau-cloud/nexau-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/auth"
+	"github.com/mash-cloud/mash-api/internal/domain"
 )
 
 // oauthTxCookie binds the OAuth begin hop to the callback hop (login-CSRF
 // defense; SameSite=Lax rides both top-level GET navigations).
-const oauthTxCookie = "nexau_oauth_tx"
+const oauthTxCookie = "mash_oauth_tx"
 
 // --- per-IP throttles (counted every request; these are public surfaces) -----
 
-func lookupThrottleKey(ip string) string      { return "rl:lookup:ip:" + ip }
 func webSessionThrottleKey(ip string) string  { return "rl:webssn:ip:" + ip }
 func desktopXchgThrottleKey(ip string) string { return "rl:dxchg:ip:" + ip }
 func refreshThrottleKey(ip string) string     { return "rl:refresh:ip:" + ip }
@@ -96,39 +94,6 @@ func (a *API) handleGoogleOAuthBegin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
-// handleGoogleOAuthStart: POST /v1/auth/google/start
-func (a *API) handleGoogleOAuthStart(w http.ResponseWriter, r *http.Request) {
-	if a.authSvc.Google == nil {
-		writeError(w, r, domain.ErrOAuthDisabled())
-		return
-	}
-	ip := clientIP(r, a.cfg.TrustProxyHeaders)
-	if !a.ipAdmit(r, ip, oauthThrottleKey, a.cfg.Auth.MaxOAuthPerIP) {
-		w.Header().Set("Retry-After", "60")
-		writeError(w, r, domain.ErrRateLimited(60_000, "oauth_ip"))
-		return
-	}
-
-	redirect, state, tx, err := a.authSvc.BeginGoogleOAuth(r.Context())
-	if err != nil {
-		writeError(w, r, domain.AsError(err))
-		return
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name:     oauthTxCookie,
-		Value:    tx,
-		Path:     "/v1/auth",
-		MaxAge:   int(a.cfg.Auth.OAuthStateTTL.Seconds()),
-		HttpOnly: true,
-		Secure:   a.cfg.Auth.OAuthCookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
-	writeOK(w, map[string]any{
-		"auth_url": redirect,
-		"state":    state,
-	})
-}
-
 // handleGoogleOAuthCallback: GET /v1/auth/oauth/google/callback?code&state
 //
 // Errors redirect to the web login page (?error=code) when configured — the
@@ -172,43 +137,6 @@ func (a *API) handleGoogleOAuthCallback(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	http.Redirect(w, r, a.cfg.Auth.WebSuccessURL+"?grant="+grant, http.StatusFound)
-}
-
-// handleAuthLookup: POST /v1/auth/lookup {email}
-//
-// Purposeful account-resolution surface for the login screen (Slack/Notion
-// pattern). Response: {exists, auth_provider} — the provider is returned only
-// when the account exists and is active.
-func (a *API) handleAuthLookup(w http.ResponseWriter, r *http.Request) {
-	ip := clientIP(r, a.cfg.TrustProxyHeaders)
-	if !a.ipAdmit(r, ip, lookupThrottleKey, a.cfg.Auth.MaxLookupPerIP) {
-		w.Header().Set("Retry-After", "60")
-		writeError(w, r, domain.ErrRateLimited(60_000, "lookup_ip"))
-		return
-	}
-
-	var body struct {
-		Email string `json:"email"`
-	}
-	if err := decodeJSON(r, &body); err != nil || body.Email == "" {
-		writeError(w, r, domain.ErrValidation("a valid email address is required"))
-		return
-	}
-	if len(body.Email) > 320 {
-		writeError(w, r, domain.ErrValidation("email exceeds the allowed length"))
-		return
-	}
-
-	exists, provider, err := a.authSvc.LookupEmail(r.Context(), body.Email)
-	if err != nil {
-		writeError(w, r, domain.AsError(err))
-		return
-	}
-	if exists {
-		writeOK(w, map[string]any{"exists": true, "auth_provider": provider})
-		return
-	}
-	writeOK(w, map[string]any{"exists": false})
 }
 
 // handleWebSession: POST /v1/auth/web/session {grant}

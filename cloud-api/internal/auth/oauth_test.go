@@ -1,10 +1,9 @@
 package auth
 
-// Google OAuth + web session + lookup: unit coverage over the REAL provider
-// (fake Google endpoints), REAL Redis semantics (miniredis, including the
-// Lua GETDEL consume) and the service race/retry logic (fake OAuth store with
-// the same atomicity arbitration as the SQL). Wire-level coverage lives in
-// validation (§42).
+// Google OAuth + web session: unit coverage over the REAL provider (fake
+// Google endpoints), REAL Redis semantics (miniredis, including the Lua
+// GETDEL consume) and the service race/retry logic (fake OAuth store with the
+// same atomicity arbitration as the SQL).
 
 import (
 	"context"
@@ -27,8 +26,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
-	"github.com/nexau-cloud/nexau-api/internal/store/repos"
+	"github.com/mash-cloud/mash-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/store/repos"
 )
 
 // ---- fake Google ---------------------------------------------------------------
@@ -172,39 +171,29 @@ func (f *fakeOAuthStore) publish(u *domain.User) {
 	f.users.byEm[u.Email] = f.users.byID[u.ID]
 }
 
-func (f *fakeOAuthStore) FindOrCreateGoogleUser(_ context.Context, sub, email, name string) (*domain.User, repos.OAuthOutcome, error) {
+func (f *fakeOAuthStore) FindOrCreateGoogleUser(_ context.Context, sub, email, name, avatar string) (*domain.User, error) {
 	f.subCalls.Add(1)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.failFirst[sub] > 0 {
 		f.failFirst[sub]--
-		return nil, 0, repos.ErrOAuthSubjectRace
+		return nil, repos.ErrOAuthSubjectRace
 	}
 	if u, ok := f.bySub[sub]; ok {
-		return u, repos.OAuthLoggedIn, nil // case 1: login
+		u.AvatarURL = avatar // login: profile refresh from the current token
+		return u, nil        // case 1: login
 	}
 	if u, ok := f.byEmail[strings.ToLower(email)]; ok {
 		if linked, has := f.subByUser[u.ID]; has && linked != sub {
-			return nil, 0, repos.ErrIdentityConflict
+			return nil, repos.ErrIdentityConflict
 		}
-		if !u.EmailVerified {
-			// Mirrors the repo's anti-pre-hijacking gate: no OAuth
-			// identity links onto an unverified local account.
-			return nil, 0, repos.ErrOAuthAccountUnverified
-		}
-		u.AuthProvider = "google"
-		f.subByUser[u.ID] = sub
-		f.bySub[sub] = u
-		u.EmailVerified = true
-		if u.DisplayName == "" {
-			u.DisplayName = name
-		}
-		f.publish(u)
-		return u, repos.OAuthLinked, nil // case 2: link
+		// Google-only: an email match without a matching subject is a conflict;
+		// there are no local accounts to link onto.
+		return nil, repos.ErrIdentityConflict
 	}
 	u := &domain.User{
 		ID: "usr_" + randomHex(8), Email: strings.ToLower(email), DisplayName: name,
-		Status: "active", AuthProvider: "google", EmailVerified: true,
+		AvatarURL: avatar, Status: "active", AuthProvider: "google", EmailVerified: true,
 	}
 	f.bySub[sub] = u
 	f.byEmail[strings.ToLower(email)] = u
@@ -214,7 +203,7 @@ func (f *fakeOAuthStore) FindOrCreateGoogleUser(_ context.Context, sub, email, n
 		f.tenants.byUser[u.ID] = []memTenant{{tenantID: tenID, role: "owner"}}
 	}
 	f.publish(u)
-	return u, repos.OAuthProvisioned, nil // case 3: provision
+	return u, nil // case 2: provision
 }
 
 type fakeDevices struct {
@@ -264,25 +253,11 @@ func newOAuthTestEnv(t *testing.T) *oauthTestEnv {
 
 		Google: NewGoogleProvider("test-client-id", "test-client-secret",
 			"https://api.example.test/v1/auth/oauth/google/callback",
-			"https://accounts.google.example/auth", fg.tokURL, fg.jwksURL, fg.srv.Client()),
+			"https://accounts.google.example/auth", fg.tokURL, fg.jwksURL, nil, fg.srv.Client()),
 		OAuth:   env.oauth,
 		Devices: env.devices,
 	}
 	return env
-}
-
-// registerMemUser seeds the local user store with a password user.
-func (env *oauthTestEnv) registerMemUser(t *testing.T, email, password string) *domain.User {
-	t.Helper()
-	u := &domain.User{ID: "usr_" + randomHex(8), Email: strings.ToLower(email), DisplayName: email, Status: "active", AuthProvider: "local"}
-	env.users.mu.Lock()
-	env.users.byID[u.ID] = &memUser{u: *u, pwHash: "bcrypt-hash:" + password}
-	env.users.byEm[u.Email] = env.users.byID[u.ID]
-	env.users.mu.Unlock()
-	env.tenants.mu.Lock()
-	env.tenants.byUser[u.ID] = []memTenant{{tenantID: "ten_" + randomHex(6), role: "owner"}}
-	env.tenants.mu.Unlock()
-	return u
 }
 
 // runOAuth drives begin→(fake google)→finish with a faithful tx cookie.
@@ -327,7 +302,7 @@ func extractQueryParam(t *testing.T, rawURL, key string) string {
 // ---- tests ------------------------------------------------------------------------
 
 func TestGoogleAuthCodeURL(t *testing.T) {
-	g := NewGoogleProvider("cid", "csecret", "https://api.x.test/cb", "https://auth.example/auth", "https://tok.example/token", "https://jwks.example/certs", nil)
+	g := NewGoogleProvider("cid", "csecret", "https://api.x.test/cb", "https://auth.example/auth", "https://tok.example/token", "https://jwks.example/certs", nil, nil)
 	url := g.AuthCodeURL("thestate")
 	for _, want := range []string{
 		"client_id=cid", "redirect_uri=", "response_type=code",
@@ -551,34 +526,50 @@ func TestExchangeWebGrant(t *testing.T) {
 	}
 }
 
-func TestLookupEmail(t *testing.T) {
-	env := newOAuthTestEnv(t)
-	ctx := context.Background()
-
-	if _, _, err := env.svc.LookupEmail(ctx, "not-an-email"); err == nil {
-		t.Fatal("invalid email accepted")
-	}
-	exists, prov, err := env.svc.LookupEmail(ctx, "Nobody@Example.Test")
-	if err != nil || exists || prov != "" {
-		t.Fatalf("unknown: %v %s %v", exists, prov, err)
-	}
-
-	env.registerMemUser(t, "local@example.test", "pw-secret-1")
-	exists, prov, err = env.svc.LookupEmail(ctx, "LOCAL@example.test")
-	if err != nil || !exists || prov != "local" {
-		t.Fatalf("local: %v %s %v", exists, prov, err)
-	}
-
-	_, _, _ = env.runOAuth(t, "sub-g", "g@example.test")
-	exists, prov, err = env.svc.LookupEmail(ctx, "g@example.test")
-	if err != nil || !exists || prov != "google" {
-		t.Fatalf("google: %v %s %v", exists, prov, err)
-	}
-}
-
 // memRefresh/memUsers/memTenants fakes are shared with signup_test.go (same
 // package) — no redefinition here.
 
 // silence unused warnings for fmt/err helpers used conditionally by cases.
 var _ = fmt.Sprintf
 var _ = errors.New
+
+// TestGoogleCustomIssuerConfigured proves the issuer allowlist is deployment
+// config, not code: a fake OAuth server issuing tokens under its OWN issuer
+// (the exact situation of pointing NEXAU_AUTH_GOOGLE_*_URL at a test server)
+// is accepted when the issuer is configured and rejected when it is not.
+func TestGoogleCustomIssuerConfigured(t *testing.T) {
+	env := newOAuthTestEnv(t)
+	const customIss = "https://oauth.test.mash.local"
+
+	// The provider the deployment would build from env: endpoints at the
+	// fake, issuer list containing the fake's issuer.
+	custom := NewGoogleProvider("test-client-id", "test-client-secret",
+		"https://api.example.test/v1/auth/oauth/google/callback",
+		"https://accounts.google.example/auth", env.fg.tokURL, env.fg.jwksURL,
+		[]string{customIss}, env.fg.srv.Client())
+
+	forge := func(iss string) string {
+		claims := env.fg.idClaimsFn()
+		claims["iss"] = iss
+		tk := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+		tk.Header["kid"] = env.fg.kid
+		signed, err := tk.SignedString(env.fg.key)
+		if err != nil {
+			t.Fatalf("sign: %v", err)
+		}
+		return signed
+	}
+
+	// Accepted when configured.
+	if _, err := custom.verifyIDToken(context.Background(), forge(customIss)); err != nil {
+		t.Fatalf("custom issuer must be accepted when configured: %v", err)
+	}
+	// Rejected with default issuers (the old hardcoded-map behavior).
+	if _, err := env.svc.Google.verifyIDToken(context.Background(), forge(customIss)); err == nil {
+		t.Fatal("custom issuer must be rejected by the default (Google-only) allowlist")
+	}
+	// Google's issuer still rejected by the custom-only deployment.
+	if _, err := custom.verifyIDToken(context.Background(), forge("https://accounts.google.com")); err == nil {
+		t.Fatal("unconfigured Google issuer must be rejected by the custom allowlist")
+	}
+}

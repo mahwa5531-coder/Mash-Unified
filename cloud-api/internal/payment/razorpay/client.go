@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
 // Client is the Razorpay REST transport. Safe for concurrent use (one

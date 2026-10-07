@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/payment"
-	"github.com/nexau-cloud/nexau-api/internal/payment/razorpay"
+	"github.com/mash-cloud/mash-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/payment/razorpay"
 )
 
 func TestService_WithRazorpayClientAgainstFakeServer(t *testing.T) {

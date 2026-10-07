@@ -1,11 +1,12 @@
-// Package metering records authoritative usage asynchronously. The streaming
-// hot path must never block on PostgreSQL: records flow through a bounded
-// queue to a single batcher goroutine that flushes in batches with retries.
+// Package metering records authoritative llm_calls asynchronously. The
+// streaming hot path must never block on PostgreSQL: records flow through a
+// bounded queue to a single batcher goroutine that flushes in batches with
+// retries.
 //
-// Exactly-once is guaranteed by the usage_records UNIQUE(run_id, call_seq)
-// constraint with ON CONFLICT DO NOTHING — a retried batch can never
-// double-charge. Bounded-queue overflow drops records loudly (metric + error
-// log): billing gaps are visible, never silent, and never OOM the process.
+// Exactly-once is guaranteed by the llm_calls UNIQUE(call_id) constraint with
+// ON CONFLICT DO NOTHING — a retried batch can never double-charge.
+// Bounded-queue overflow drops records loudly (metric + error log): billing
+// gaps are visible, never silent, and never OOM the process.
 package metering
 
 import (
@@ -15,14 +16,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/domain"
-	"github.com/nexau-cloud/nexau-api/internal/observability"
+	"github.com/mash-cloud/mash-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/observability"
 )
 
-// UsageWriter persists a batch of usage records (implemented by
-// repos.UsageRepo.InsertUsageRecords).
-type UsageWriter interface {
-	InsertUsageRecords(ctx context.Context, recs []domain.UsageRecord) error
+// CallWriter persists a batch of completed calls (implemented by
+// repos.LLMCallsRepo.InsertCalls).
+type CallWriter interface {
+	InsertCalls(ctx context.Context, calls []domain.LLMCall) error
 }
 
 // Config bounds the recorder.
@@ -35,11 +36,11 @@ type Config struct {
 
 // Recorder is safe for concurrent use. Close must be called exactly once.
 type Recorder struct {
-	w   UsageWriter
+	w   CallWriter
 	cfg Config
 	m   *observability.Metrics
 
-	ch     chan domain.UsageRecord
+	ch     chan domain.LLMCall
 	wg     sync.WaitGroup
 	cancel context.CancelFunc
 
@@ -50,7 +51,7 @@ type Recorder struct {
 }
 
 // New starts the recorder and its batcher goroutine.
-func New(w UsageWriter, cfg Config, m *observability.Metrics) *Recorder {
+func New(w CallWriter, cfg Config, m *observability.Metrics) *Recorder {
 	if cfg.QueueSize < 64 {
 		cfg.QueueSize = 64
 	}
@@ -68,7 +69,7 @@ func New(w UsageWriter, cfg Config, m *observability.Metrics) *Recorder {
 		w:      w,
 		cfg:    cfg,
 		m:      m,
-		ch:     make(chan domain.UsageRecord, cfg.QueueSize),
+		ch:     make(chan domain.LLMCall, cfg.QueueSize),
 		cancel: cancel,
 	}
 	r.wg.Add(1)
@@ -76,9 +77,9 @@ func New(w UsageWriter, cfg Config, m *observability.Metrics) *Recorder {
 	return r
 }
 
-// Record enqueues one authoritative usage fact. It never blocks the streaming
+// Record enqueues one authoritative call fact. It never blocks the streaming
 // path: a full queue drops the record loudly.
-func (r *Recorder) Record(rec domain.UsageRecord) {
+func (r *Recorder) Record(rec domain.LLMCall) {
 	select {
 	case r.ch <- rec:
 		if r.m != nil {
@@ -102,7 +103,7 @@ func (r *Recorder) drop() {
 		n := r.dropped
 		r.dropped = 0
 		r.dropMu.Unlock()
-		observability.LogWarn("metering: usage records dropped (queue full)",
+		observability.LogWarn("metering: call records dropped (queue full)",
 			"dropped_recent", n, "queue_size", r.cfg.QueueSize)
 		return
 	}
@@ -113,7 +114,7 @@ func (r *Recorder) drop() {
 func (r *Recorder) batcher(ctx context.Context) {
 	defer r.wg.Done()
 
-	batch := make([]domain.UsageRecord, 0, r.cfg.BatchSize)
+	batch := make([]domain.LLMCall, 0, r.cfg.BatchSize)
 	ticker := time.NewTicker(r.cfg.FlushInterval)
 	defer ticker.Stop()
 
@@ -168,7 +169,7 @@ func (r *Recorder) batcher(ctx context.Context) {
 // would stop for the pod's remaining lifetime (invisible billing gap). A
 // contained panic is surfaced as a normal batch failure: dropped, counted,
 // logged — and the loop keeps serving later records.
-func safePersist(ctx context.Context, persist func(context.Context, []domain.UsageRecord) error, batch []domain.UsageRecord) (err error) {
+func safePersist(ctx context.Context, persist func(context.Context, []domain.LLMCall) error, batch []domain.LLMCall) (err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			err = fmt.Errorf("usage writer panic contained: %v", rec)
@@ -180,13 +181,13 @@ func safePersist(ctx context.Context, persist func(context.Context, []domain.Usa
 // persistWithRetry retries only transient failures. Batch insert is
 // idempotent (ON CONFLICT DO NOTHING), so a retry after a timeout can neither
 // double-charge nor corrupt.
-func (r *Recorder) persistWithRetry(ctx context.Context, batch []domain.UsageRecord) error {
+func (r *Recorder) persistWithRetry(ctx context.Context, batch []domain.LLMCall) error {
 	backoff := 100 * time.Millisecond
 	var lastErr error
 	for attempt := 0; attempt <= r.cfg.RetryMax; attempt++ {
 		// Per-attempt budget: the batcher must not wedge on a stuck query.
 		cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-		err := r.w.InsertUsageRecords(cctx, batch)
+		err := r.w.InsertCalls(cctx, batch)
 		cancel()
 		if err == nil {
 			return nil

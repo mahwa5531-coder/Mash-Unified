@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nexau-cloud/nexau-api/internal/auth"
-	"github.com/nexau-cloud/nexau-api/internal/domain"
+	"github.com/mash-cloud/mash-api/internal/auth"
+	"github.com/mash-cloud/mash-api/internal/domain"
 )
 
 // handleRefresh: POST /v1/auth/refresh {refresh_token}
@@ -63,39 +63,35 @@ func (a *API) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}{true})
 }
 
-// handleLogoutAll: POST /v1/auth/logout-all
+// handleLogoutAll: POST /v1/auth/logout-all — revoke every refresh-token
+// family for the authenticated user (sign out everywhere: lost/stolen
+// device response). The response counts the revoked sessions; the presented
+// access token is blacklisted for its remaining lifetime when revocation
+// checking is on.
 func (a *API) handleLogoutAll(w http.ResponseWriter, r *http.Request) {
-	claims := auth.FromClaims(r.Context())
-	if claims == nil || claims.Subject == "" {
+	idn := auth.FromIdentity(r.Context())
+	if idn == nil {
 		writeError(w, r, domain.ErrUnauthorized(nil))
 		return
 	}
-	jti := claims.TokenID
-	ttl := time.Until(claims.ExpiresAt)
-	if err := a.authSvc.LogoutAll(r.Context(), claims.Subject, jti, ttl); err != nil {
+	claims := auth.FromClaims(r.Context())
+	var jti string
+	var ttl time.Duration
+	if claims != nil {
+		jti = claims.TokenID
+		ttl = time.Until(claims.ExpiresAt)
+	}
+	n, err := a.authSvc.LogoutAll(r.Context(), idn.User.ID, jti, ttl)
+	if err != nil {
 		writeError(w, r, domain.AsError(err))
 		return
 	}
+	// The cached identity is fine (plan/status unchanged); only token state
+	// is invalidated, and that lives in refresh_tokens + the jti blacklist.
 	writeOK(w, struct {
-		LoggedOutAll bool `json:"logged_out_all"`
-	}{true})
-}
-
-// handleAuthSession: GET /v1/auth/session
-func (a *API) handleAuthSession(w http.ResponseWriter, r *http.Request) {
-	claims := auth.FromClaims(r.Context())
-	if claims == nil {
-		writeError(w, r, domain.ErrUnauthorized(nil))
-		return
-	}
-	writeOK(w, map[string]any{
-		"authenticated": true,
-		"user_id":       claims.Subject,
-		"tenant_id":     claims.TenantID,
-		"device_id":     claims.DeviceID,
-		"role":          claims.Role,
-		"expires_at":    claims.ExpiresAt,
-	})
+		LoggedOut      bool  `json:"logged_out"`
+		SessionsKilled int64 `json:"sessions_killed"`
+	}{true, n})
 }
 
 // clientIP extracts the source address. X-Forwarded-For is honored only when
