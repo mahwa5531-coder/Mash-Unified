@@ -117,7 +117,16 @@ async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | 
         if "limits" in data:
             meta["limits"] = data["limits"]
         if "quota" in data:
-            meta["quota"] = data["quota"]
+            quota_data = data["quota"]
+            if isinstance(quota_data, dict) and "windows" in quota_data and isinstance(quota_data["windows"], list):
+                for win in quota_data["windows"]:
+                    if isinstance(win, dict):
+                        # ponytail: normalize quota percent between cloud API (used_percent) and UI (percent)
+                        if "percent" not in win and "used_percent" in win:
+                            win["percent"] = win["used_percent"]
+                        elif "used_percent" not in win and "percent" in win:
+                            win["used_percent"] = win["percent"]
+            meta["quota"] = quota_data
 
         # Also fetch live usage from /v1/me/usage if available
         try:

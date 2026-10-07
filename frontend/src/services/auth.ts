@@ -6,7 +6,8 @@ export interface QuotaWindow {
   window: "5h" | "weekly" | string;
   quota_tokens?: number;
   used_tokens?: number;
-  percent: number;
+  percent?: number;
+  used_percent?: number;
   resets_at?: string;
 }
 

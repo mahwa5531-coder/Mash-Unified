@@ -260,28 +260,30 @@ export default function SettingsModal({
 
               {authInfo?.quota?.windows && authInfo.quota.windows.length > 0 ? (
                 <div className="space-y-2.5">
-                  {authInfo.quota.windows.map((win) => (
-                    <div
-                      key={win.window}
-                      className="bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/80 dark:border-white/[0.06] rounded-xl p-3.5 text-xs"
-                    >
-                      <div className="flex justify-between items-center mb-1.5 text-[11px]">
-                        <span className="font-medium text-zinc-800 dark:text-zinc-200">
-                          {win.window === '5h' ? '5-Hour Burst Limit' : 'Weekly Allocation'}
-                        </span>
-                        {/* Percentage ONLY - clean, no raw token counts */}
-                        <span className="font-mono text-zinc-700 dark:text-zinc-300 font-semibold">
-                          {win.percent}%
-                        </span>
-                      </div>
+                  {authInfo.quota.windows.map((win) => {
+                    const pct = win.percent ?? win.used_percent ?? 0;
+                    return (
+                      <div
+                        key={win.window}
+                        className="bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/80 dark:border-white/[0.06] rounded-xl p-3.5 text-xs"
+                      >
+                        <div className="flex justify-between items-center mb-1.5 text-[11px]">
+                          <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                            {win.window === '5h' ? '5-Hour Burst Limit' : 'Weekly Allocation'}
+                          </span>
+                          {/* Percentage ONLY - clean, no raw token counts */}
+                          <span className="font-mono text-zinc-700 dark:text-zinc-300 font-semibold">
+                            {pct}%
+                          </span>
+                        </div>
 
-                      {/* Clean unified color grade progress bar (monochrome / subtle dark accent, NO neon circus) */}
-                      <div className="w-full bg-zinc-200 dark:bg-white/[0.08] h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-zinc-800 dark:bg-zinc-200 transition-all duration-300"
-                          style={{ width: `${Math.min(win.percent, 100)}%` }}
-                        />
-                      </div>
+                        {/* Clean unified color grade progress bar (monochrome / subtle dark accent, NO neon circus) */}
+                        <div className="w-full bg-zinc-200 dark:bg-white/[0.08] h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-zinc-800 dark:bg-zinc-200 transition-all duration-300"
+                            style={{ width: `${Math.min(pct, 100)}%` }}
+                          />
+                        </div>
 
                       <div className="flex items-center justify-between mt-1.5 text-[10.5px] text-zinc-500 dark:text-zinc-400">
                         <span>
@@ -296,7 +298,8 @@ export default function SettingsModal({
                         )}
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
                 </div>
               ) : (
                 <div className="bg-zinc-50 dark:bg-[#18181b] border border-zinc-200/80 dark:border-white/[0.06] rounded-xl p-4 text-center text-zinc-500 dark:text-zinc-400 text-xs">

@@ -32,9 +32,9 @@ export function SidebarFooter({ onOpenSettings, authUser }: SidebarFooterProps) 
             </div>
             <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono flex items-center gap-1">
               <span>{planName}</span>
-              {authUser?.quota?.windows?.[0]?.percent !== undefined && (
+              {((authUser?.quota?.windows?.[0]?.percent ?? authUser?.quota?.windows?.[0]?.used_percent) !== undefined) && (
                 <span className="text-[9.5px] text-zinc-400 dark:text-zinc-500">
-                  · {authUser.quota.windows[0].percent}%
+                  · {authUser?.quota?.windows?.[0]?.percent ?? authUser?.quota?.windows?.[0]?.used_percent}%
                 </span>
               )}
             </div>
