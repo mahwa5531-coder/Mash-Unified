@@ -159,6 +159,8 @@ def _build_agent_config() -> AgentConfig:
         agent_config.max_context_tokens = 200000   # 200k tokens
     elif "gpt-4" in active_model.lower():
         agent_config.max_context_tokens = 128000   # 128k tokens
+    elif any(k in active_model.lower() for k in ("deepseek", "llama", "ling", "qwen", "mistral")):
+        agent_config.max_context_tokens = 131072   # 128k tokens
 
     if os.getenv("AGENT_MAX_ITERATIONS"):
         agent_config.max_iterations = int(os.getenv("AGENT_MAX_ITERATIONS"))

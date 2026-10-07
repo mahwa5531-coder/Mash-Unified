@@ -62,6 +62,7 @@ __all__ = [
     "view_file",
     "run_shell_command",
     "duckduckgo_web_search",
+    "duckduckgo_search",
     "google_web_search",
     "web_search",
     "web_fetch",
@@ -147,7 +148,7 @@ def __getattr__(name: str) -> object:
         from .shell_tools.run_shell_command import run_shell_command
 
         return _cache_export(name, run_shell_command)
-    if name in ("google_web_search", "web_search", "duckduckgo_web_search"):
+    if name in ("google_web_search", "web_search", "duckduckgo_web_search", "duckduckgo_search"):
         from .web_tools.duckduckgo_search import (
             duckduckgo_web_search,
             google_web_search,
@@ -158,6 +159,7 @@ def __getattr__(name: str) -> object:
             "google_web_search": google_web_search,
             "web_search": web_search,
             "duckduckgo_web_search": duckduckgo_web_search,
+            "duckduckgo_search": duckduckgo_web_search,
         }[name]
         return _cache_export(name, target)
     if name == "web_fetch":

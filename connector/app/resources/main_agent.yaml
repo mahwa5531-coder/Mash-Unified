@@ -15,44 +15,44 @@ llm_config:
 
 tools:
   - name: view_file
-    yaml_path: ../tools/schemas/view_file.tool.yaml
-    binding: app.tools:view_file
+    yaml_path: nexau:archs/tool/builtin/schemas/view_file.tool.yaml
+    binding: nexau.archs.tool.builtin:view_file
 
   - name: write_file
-    yaml_path: ../tools/schemas/write_file.tool.yaml
+    yaml_path: nexau:archs/tool/builtin/schemas/write_file.tool.yaml
     binding: nexau.archs.tool.builtin:write_file
 
   - name: replace_file_content
-    yaml_path: ../tools/schemas/replace_file_content.tool.yaml
-    binding: app.tools:replace_file_content
+    yaml_path: nexau:archs/tool/builtin/schemas/replace_file_content.tool.yaml
+    binding: nexau.archs.tool.builtin:replace_file_content
 
   - name: search_file_content
-    yaml_path: ../tools/schemas/search_file_content.tool.yaml
-    binding: app.tools:search_file_content
+    yaml_path: nexau:archs/tool/builtin/schemas/search_file_content.tool.yaml
+    binding: nexau.archs.tool.builtin:search_file_content
 
   - name: glob
-    yaml_path: ../tools/schemas/glob.tool.yaml
+    yaml_path: nexau:archs/tool/builtin/schemas/glob.tool.yaml
     binding: nexau.archs.tool.builtin:glob
 
   - name: run_shell_command
-    yaml_path: ../tools/schemas/run_shell_command.tool.yaml
+    yaml_path: nexau:archs/tool/builtin/schemas/run_shell_command.tool.yaml
     binding: nexau.archs.tool.builtin:run_shell_command
 
   - name: web_search
-    yaml_path: ../tools/schemas/web_search.tool.yaml
-    binding: app.tools:duckduckgo_search
+    yaml_path: nexau:archs/tool/builtin/schemas/web_search.tool.yaml
+    binding: nexau.archs.tool.builtin:duckduckgo_web_search
 
   - name: web_fetch
-    yaml_path: ../tools/schemas/web_fetch.tool.yaml
+    yaml_path: nexau:archs/tool/builtin/schemas/web_fetch.tool.yaml
     binding: nexau.archs.tool.builtin:web_fetch
 
   - name: background_task_manage_tool
-    yaml_path: ../tools/schemas/background_task_manage_tool.tool.yaml
+    yaml_path: nexau:archs/tool/builtin/schemas/background_task_manage_tool.tool.yaml
     binding: nexau.archs.tool.builtin:background_task_manage_tool
 
   - name: audit_skill_tool
-    yaml_path: ../tools/schemas/audit_skill_tool.tool.yaml
-    binding: app.tools:audit_skill_tool
+    yaml_path: nexau:archs/tool/builtin/schemas/audit_skill_tool.tool.yaml
+    binding: nexau.archs.tool.builtin:audit_skill_tool
 
 middlewares:
   - import: nexau.archs.main_sub.execution.middleware.context_compaction:ContextCompactionMiddleware
