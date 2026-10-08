@@ -30,7 +30,10 @@ from nexau.archs.platform.path_helpers import get_nexau_home
 logger = logging.getLogger(__name__)
 
 VAULT_FILE = get_nexau_home() / "auth.vault"
-JSON_META_FILE = get_nexau_home() / "auth_meta.json"
+
+# ponytail: In-memory session state for user profile, quotas, and tier.
+# Held strictly in RAM — never written as unencrypted JSON to user's hard drive.
+_IN_MEMORY_AUTH_META: dict[str, Any] = {}
 
 
 class DATA_BLOB(ctypes.Structure):
@@ -74,9 +77,18 @@ def save_secure_vault(secrets_dict: dict[str, Any], meta_dict: dict[str, Any] | 
         except Exception:
             pass
 
+    # Update in-memory state in RAM only — zero unencrypted JSON files on disk
     if meta_dict is not None:
-        JSON_META_FILE.parent.mkdir(parents=True, exist_ok=True)
-        JSON_META_FILE.write_text(json.dumps(meta_dict, indent=2), encoding="utf-8")
+        _IN_MEMORY_AUTH_META.clear()
+        _IN_MEMORY_AUTH_META.update(meta_dict)
+
+    # Clean up legacy disk metadata if present
+    legacy_meta = get_nexau_home() / "auth_meta.json"
+    if legacy_meta.exists():
+        try:
+            legacy_meta.unlink()
+        except Exception:
+            pass
 
 
 def load_secure_vault() -> dict[str, Any] | None:
@@ -118,25 +130,46 @@ def load_secure_vault() -> dict[str, Any] | None:
 
 
 def get_auth_metadata() -> dict[str, Any]:
-    """Returns non-sensitive metadata (email, name, plan) for instant UI rendering."""
-    if not JSON_META_FILE.exists():
-        return {"authenticated": False}
-    try:
-        data = json.loads(JSON_META_FILE.read_text(encoding="utf-8"))
-        return {"authenticated": True, **data}
-    except Exception:
-        return {"authenticated": False}
+    """Returns non-sensitive metadata (email, name, plan) from in-memory session state."""
+    if _IN_MEMORY_AUTH_META.get("authenticated") or _IN_MEMORY_AUTH_META.get("email"):
+        return _IN_MEMORY_AUTH_META.copy()
+
+    # Cold boot fallback: check if DPAPI vault has an active account without touching disk JSON
+    vault = load_secure_vault()
+    if vault and vault.get("active_account"):
+        acc_email = vault.get("active_account")
+        acc_info = (vault.get("accounts") or {}).get(acc_email) or {}
+        return {
+            "authenticated": True,
+            "email": acc_email,
+            "name": acc_info.get("name") or "User",
+            "plan": acc_info.get("plan") or "pro",
+            "credits_remaining": acc_info.get("credits_remaining", 500),
+            "accounts": [
+                {
+                    "email": acc.get("email"),
+                    "name": acc.get("name"),
+                    "plan": acc.get("plan"),
+                    "credits_remaining": acc.get("credits_remaining"),
+                }
+                for acc in (vault.get("accounts") or {}).values()
+                if isinstance(acc, dict) and acc.get("email")
+            ] if isinstance(vault.get("accounts"), dict) else [],
+        }
+    return {"authenticated": False}
 
 
 def clear_vault() -> None:
-    """Wipes all local credentials and metadata on logout."""
+    """Wipes all local credentials and in-memory metadata on logout."""
+    _IN_MEMORY_AUTH_META.clear()
     if VAULT_FILE.exists():
         try:
             VAULT_FILE.unlink()
         except Exception:
             pass
-    if JSON_META_FILE.exists():
+    legacy_meta = get_nexau_home() / "auth_meta.json"
+    if legacy_meta.exists():
         try:
-            JSON_META_FILE.unlink()
+            legacy_meta.unlink()
         except Exception:
             pass

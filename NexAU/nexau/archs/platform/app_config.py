@@ -71,4 +71,6 @@ class AppConfig(BaseModel):
     def save(self) -> None:
         path = self.get_config_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(self.model_dump_json(indent=2), encoding="utf-8")
+        # ponytail: Exclude user account identity/quotas from disk persistence — user state is held in RAM only
+        data = self.model_dump(exclude={"user"})
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")

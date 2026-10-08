@@ -66,6 +66,7 @@ middlewares:
       tail_lines: 30
       bypass_tool_names:
         - run_shell_command
+        - audit_skill_tool
   - import: nexau.archs.main_sub.execution.middleware.round_and_token_reminder:RoundAndTokenReminderMiddleware
     params:
       desired_max_tokens: 16384

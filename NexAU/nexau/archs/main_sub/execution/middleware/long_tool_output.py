@@ -87,15 +87,11 @@ compatibility, while the default constructor behavior resolves a sandbox-
 specific output directory at runtime via ``BaseSandbox.get_tool_output_dir()``.
 """
 
-_DEFAULT_BYPASS_TOOL_NAMES: frozenset[str] = frozenset({"LoadSkill"})
+_DEFAULT_BYPASS_TOOL_NAMES: frozenset[str] = frozenset({"LoadSkill", "audit_skill_tool"})
 """Tools bypassed by default.
 
-``LoadSkill`` reads from the in-memory skill registry without starting a
-sandbox (see ``ToolExecutor._SANDBOX_OPTIONAL_TOOL_NAMES``).  The sandbox
-reference is therefore ``None`` when the after-tool hook runs, making it
-impossible to persist the full output via the Sandbox API.  Bypassing it
-avoids the error and is semantically correct - skill content loaded into
-context should not be truncated.
+``LoadSkill`` and ``audit_skill_tool`` provide structured statutory audit methodology
+and skill references that must never be truncated in LLM context.
 """
 
 
