@@ -62,6 +62,11 @@ const STATUS_VARIANT_MAP: Record<string, AuditCalloutVariant> = {
   'DISCLOSURE': 'neutral',
   'OBSERVATION': 'neutral',
   'CARO 2020': 'neutral',
+  'RED': 'danger',
+  'AMBER': 'warning',
+  'YELLOW': 'warning',
+  'GREEN': 'success',
+  'BLUE': 'info',
 };
 
 const VARIANT_CONFIG: Record<AuditCalloutVariant, {

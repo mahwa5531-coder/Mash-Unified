@@ -6,10 +6,12 @@ import { AuditCallout } from '@/primitives/AuditCallout';
 // ----------------------------------------------------------------------
 // Strip alert/color tags from children nodes
 // ----------------------------------------------------------------------
-function cleanCalloutChildren(node: any, tag: string, state = { stripped: false }): any {
+function cleanCalloutChildren(node: any, tag: string, title?: string, state = { stripped: false }): any {
   if (!node || state.stripped) return node;
   if (typeof node === 'string') {
-    const reg = new RegExp(`^\\s*\\[!${tag}\\]\\s*`, 'i');
+    const tagEscaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const titlePattern = title ? `(?:\\s*${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?` : '';
+    const reg = new RegExp(`^\\s*\\[!?${tagEscaped}\\]${titlePattern}\\s*`, 'i');
     if (reg.test(node)) {
       state.stripped = true;
       return node.replace(reg, '');
@@ -17,10 +19,10 @@ function cleanCalloutChildren(node: any, tag: string, state = { stripped: false 
     return node;
   }
   if (Array.isArray(node)) {
-    return node.map((child) => cleanCalloutChildren(child, tag, state));
+    return node.map((child) => cleanCalloutChildren(child, tag, title, state));
   }
   if (React.isValidElement(node) && (node.props as any)?.children) {
-    const newChildren = cleanCalloutChildren((node.props as any).children, tag, state);
+    const newChildren = cleanCalloutChildren((node.props as any).children, tag, title, state);
     return React.cloneElement(node as React.ReactElement<any>, {}, newChildren);
   }
   return node;
@@ -43,11 +45,12 @@ function extractText(nodes: any): string {
 export function CalloutBlockquote({ children }: { children: React.ReactNode }) {
   const rawText = extractText(children);
 
-  // 1. Check for statutory alert or color tags: [!EXCEPTION], [!WARNING], [!COMPLIANT], [!NOTE], etc.
-  const alertMatch = rawText.match(/^\s*\[!(EXCEPTION|MATERIAL WEAKNESS|FAIL|WARNING|CAUTION|CONTROL DEFICIENCY|SIGNIFICANT DEFICIENCY|COMPLIANT|PASS|NOTE|TIP|IMPORTANT|RED|GREEN|AMBER|BLUE|NEUTRAL)\]/i);
+  // 1. Check for statutory alert or color tags: [!EXCEPTION], [EXCEPTION], [!WARNING], [WARNING], etc.
+  const alertMatch = rawText.match(/^\s*\[!?(EXCEPTION|MATERIAL WEAKNESS|FAIL|WARNING|CAUTION|CONTROL DEFICIENCY|SIGNIFICANT DEFICIENCY|COMPLIANT|PASS|NOTE|TIP|IMPORTANT|RED|GREEN|AMBER|BLUE|NEUTRAL)\](?:\s*([^\n\r]+))?/i);
   if (alertMatch) {
     const tag = alertMatch[1].toUpperCase();
-    const cleaned = cleanCalloutChildren(children, alertMatch[1]);
+    const trailingTitle = alertMatch[2]?.trim();
+    const cleaned = cleanCalloutChildren(children, alertMatch[1], trailingTitle);
     return (
       <AuditCallout status={tag}>
         {cleaned}

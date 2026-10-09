@@ -45,20 +45,36 @@ const STATUS_VARIANT_MAP: Record<string, AuditSemanticVariant> = {
   NOTE: 'neutral',
 };
 
-// Non-Alarmist Palette: calm, desaturated light shades that smoothly work on dark/light backgrounds without color clash
-const VARIANT_STYLES: Record<AuditSemanticVariant, string> = {
-  danger: 'bg-rose-500/[0.08] dark:bg-rose-500/[0.12] text-rose-700 dark:text-rose-400 border-rose-500/20 dark:border-rose-500/30',
-  warning: 'bg-amber-500/[0.08] dark:bg-amber-500/[0.12] text-amber-800 dark:text-amber-400 border-amber-500/20 dark:border-amber-500/30',
-  success: 'bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12] text-emerald-800 dark:text-emerald-400 border-emerald-500/20 dark:border-emerald-500/30',
-  info: 'bg-zinc-100 dark:bg-white/[0.05] text-zinc-700 dark:text-zinc-300 border-zinc-200/80 dark:border-white/[0.08]',
-  neutral: 'bg-zinc-100 dark:bg-white/[0.05] text-zinc-700 dark:text-zinc-300 border-zinc-200/80 dark:border-white/[0.08]',
+// Non-Alarmist Palette: crisp terminal indicators without bulky pill bubbles
+const VARIANT_STYLES: Record<AuditSemanticVariant, { text: string; dot: string }> = {
+  danger: {
+    text: 'text-rose-600 dark:text-rose-400',
+    dot: 'bg-rose-500',
+  },
+  warning: {
+    text: 'text-amber-600 dark:text-amber-400',
+    dot: 'bg-amber-500',
+  },
+  success: {
+    text: 'text-emerald-600 dark:text-emerald-400',
+    dot: 'bg-emerald-500',
+  },
+  info: {
+    text: 'text-blue-600 dark:text-blue-400',
+    dot: 'bg-blue-500',
+  },
+  neutral: {
+    text: 'text-zinc-600 dark:text-zinc-400',
+    dot: 'bg-zinc-400',
+  },
 };
 
 /**
  * AuditBadge Primitive
  * 
- * Non-alarmist statutory audit status badges.
- * Uses calm, light shades that blend cleanly with the background without visual clash or neon glare.
+ * Non-alarmist statutory audit status indicator.
+ * Renders as a crisp terminal marker (dot + uppercase monospace text)
+ * without toy-like pill bubbles or bulky backgrounds.
  */
 export function AuditBadge({
   status,
@@ -69,17 +85,19 @@ export function AuditBadge({
 }: AuditBadgeProps) {
   const label = children || status;
   const resolvedVariant = variant || (status ? STATUS_VARIANT_MAP[status.toString().toUpperCase()] : 'neutral') || 'neutral';
+  const style = VARIANT_STYLES[resolvedVariant] || VARIANT_STYLES.neutral;
 
   return (
     <span
       className={cn(
-        "inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded-[4px] font-mono text-[10.5px] font-medium tracking-tight border select-none align-baseline leading-none shadow-2xs",
-        VARIANT_STYLES[resolvedVariant],
+        "inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold tracking-tight select-none align-baseline leading-none mx-0.5",
+        style.text,
         className
       )}
       {...props}
     >
-      {label}
+      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", style.dot)} />
+      <span>{label}</span>
     </span>
   );
 }
