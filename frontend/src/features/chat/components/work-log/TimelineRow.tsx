@@ -18,13 +18,13 @@ interface TimelineRowProps {
   liveThinkingSeconds: number;
   latchedThinkingSeconds: number | null;
   expandedThoughts: Record<string, boolean>;
-  expandedCmdIndex: string | null;
+  expandedCmds: Record<string, boolean>;
   expandedGroups: Record<string, boolean>;
   copiedId: string | null;
   toggleThought: (id: string) => void;
+  toggleCmd: (id: string) => void;
   toggleGroup: (id: string) => void;
   handleCopy: (text: string, id: string) => void;
-  setExpandedCmdIndex: React.Dispatch<React.SetStateAction<string | null>>;
   setCopiedId: React.Dispatch<React.SetStateAction<string | null>>;
   thoughtScrollRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -73,11 +73,11 @@ export function TimelineRow(props: TimelineRowProps) {
         entry={entry}
         isChild={isChild}
         isStreaming={props.isStreaming}
-        isCmdExpanded={props.expandedCmdIndex === toolId}
+        isCmdExpanded={!!props.expandedCmds[toolId]}
         copiedId={props.copiedId}
         onOpenFile={props.onOpenFile}
         handleCopy={props.handleCopy}
-        setExpandedCmdIndex={props.setExpandedCmdIndex}
+        toggleCmd={props.toggleCmd}
       />
     );
   }

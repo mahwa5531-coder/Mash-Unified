@@ -40,7 +40,7 @@ export default function TaskWorkLogAccordion({
   // Starts collapsed by default so finished turns display "Worked for {time} >" summary
   const [clusterOpen, setClusterOpen] = useState<boolean>(false);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
-  const [expandedCmdIndex, setExpandedCmdIndex] = useState<string | null>(null);
+  const [expandedCmds, setExpandedCmds] = useState<Record<string, boolean>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const thoughtScrollRef = useRef<HTMLDivElement>(null);
@@ -148,7 +148,7 @@ export default function TaskWorkLogAccordion({
           }
         }
       });
-      return fullTimeline;
+      return groupTimelineEntries(fullTimeline);
     }
 
     // Branch B: Streaming or legacy flat messages fallback
@@ -211,6 +211,10 @@ export default function TaskWorkLogAccordion({
     setExpandedGroups(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const toggleCmd = (id: string) => {
+    setExpandedCmds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -229,13 +233,13 @@ export default function TaskWorkLogAccordion({
       liveThinkingSeconds={liveThinkingSeconds}
       latchedThinkingSeconds={latchedThinkingSeconds}
       expandedThoughts={expandedThoughts}
-      expandedCmdIndex={expandedCmdIndex}
+      expandedCmds={expandedCmds}
       expandedGroups={expandedGroups}
       copiedId={copiedId}
       toggleThought={toggleThought}
+      toggleCmd={toggleCmd}
       toggleGroup={toggleGroup}
       handleCopy={handleCopy}
-      setExpandedCmdIndex={setExpandedCmdIndex}
       setCopiedId={setCopiedId}
       thoughtScrollRef={thoughtScrollRef}
     />

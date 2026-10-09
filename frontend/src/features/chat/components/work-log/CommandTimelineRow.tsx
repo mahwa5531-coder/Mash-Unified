@@ -15,7 +15,7 @@ interface CommandTimelineRowProps {
   copiedId: string | null;
   onOpenFile?: (path: string) => void;
   handleCopy: (text: string, id: string) => void;
-  setExpandedCmdIndex: React.Dispatch<React.SetStateAction<string | null>>;
+  toggleCmd: (id: string) => void;
 }
 
 export function CommandTimelineRow({
@@ -26,7 +26,7 @@ export function CommandTimelineRow({
   copiedId,
   onOpenFile,
   handleCopy,
-  setExpandedCmdIndex,
+  toggleCmd,
 }: CommandTimelineRowProps) {
   const isRunning = isToolRunning(entry.data?.tool, isStreaming);
   const isCancelled = entry.data?.tool?.status === 'cancelled';
@@ -56,17 +56,25 @@ export function CommandTimelineRow({
     <div key={entry.id} className={cn("flex flex-col text-xs select-none transition-colors", isChild ? "pl-2 py-0.5" : "my-0.5")}>
       <button
         type="button"
-        onClick={() => setExpandedCmdIndex(isCmdExpanded ? null : toolId)}
+        onClick={() => toggleCmd(toolId)}
         className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-normal py-0.5 cursor-pointer select-none transition-colors group text-left w-fit"
       >
         {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
         {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
-        <span className={cn("font-sans text-[12px]", isFailed && "text-rose-500 font-medium")}>
-          {isCancelled ? 'Cancelled' : isRunning ? 'Running' : isFailed ? 'Failed' : 'Ran'}
-        </span>
-        <span className="font-mono font-medium text-foreground text-[12px] truncate max-w-md">
-          {entry.data?.cmd}
-        </span>
+        {entry.data?.toolSummary ? (
+          <span className={cn("font-sans text-[12px] font-normal text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 transition-colors", isFailed && "text-rose-500 font-medium")}>
+            {entry.data.toolSummary}
+          </span>
+        ) : (
+          <>
+            <span className={cn("font-sans text-[12px]", isFailed && "text-rose-500 font-medium")}>
+              {isCancelled ? 'Cancelled' : isRunning ? 'Running' : isFailed ? 'Failed' : 'Ran'}
+            </span>
+            <span className="font-mono text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 text-[12px] truncate max-w-md">
+              {entry.data?.cmd}
+            </span>
+          </>
+        )}
         <ChevronRight
           size={11}
           className={cn(

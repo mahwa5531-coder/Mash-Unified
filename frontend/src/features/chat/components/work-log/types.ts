@@ -29,7 +29,7 @@ export interface ExecutionStep {
 
 export interface TimelineEntry {
   id: string;
-  type: 'thought' | 'text' | 'file_read' | 'folder_view' | 'search' | 'task' | 'timer' | 'subagent' | 'edit' | 'command' | 'other' | 'command_group' | 'exploration_group' | 'edit_group';
+  type: 'thought' | 'text' | 'file_read' | 'folder_view' | 'search' | 'web_search' | 'web_fetch' | 'code_search' | 'task' | 'subagent' | 'edit' | 'command' | 'other' | 'command_group' | 'exploration_group' | 'edit_group';
   data: any;
   items?: TimelineEntry[];
 }

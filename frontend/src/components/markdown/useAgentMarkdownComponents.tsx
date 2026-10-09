@@ -163,7 +163,7 @@ export function useAgentMarkdownComponents({
 
     h4({ children, node: _node, ...props }: any) {
       return (
-        <h4 className="mt-4 mb-1.5 text-[13px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 first:mt-0" {...props}>
+        <h4 className="mt-4 mb-1.5 text-[14px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h4>
       );

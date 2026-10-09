@@ -8,7 +8,7 @@ import { ReasoningDisclosure } from '@/primitives';
 import type { TimelineEntry } from '@/features/chat/components/work-log/types';
 
 export function Unit14AllToolMatrix() {
-  const [expandedCmdId, setExpandedCmdId] = useState<string | null>('cmd-decomposed-demo');
+  const [expandedCmds, setExpandedCmds] = useState<Record<string, boolean>>({ 'cmd-decomposed-demo': true });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isThoughtOpen, setIsThoughtOpen] = useState(false);
   const [isLiveThinkingOpen, setIsLiveThinkingOpen] = useState(false);
@@ -18,6 +18,10 @@ export function Unit14AllToolMatrix() {
     'demo-group-edit': false,
   });
   const [openedFileAlert, setOpenedFileAlert] = useState<string | null>(null);
+
+  const toggleCmd = (id: string) => {
+    setExpandedCmds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const handleOpenFile = (path: string) => {
     setOpenedFileAlert(`Opened in right sidebar: ${path}`);
@@ -153,10 +157,10 @@ export function Unit14AllToolMatrix() {
                   }
                 }}
                 isStreaming={true}
-                isCmdExpanded={false}
+                isCmdExpanded={!!expandedCmds['c-act']}
                 copiedId={copiedId}
                 handleCopy={handleCopy}
-                setExpandedCmdIndex={() => {}}
+                toggleCmd={toggleCmd}
               />
             </div>
             <div>
@@ -176,10 +180,10 @@ export function Unit14AllToolMatrix() {
                     }
                   }
                 }}
-                isCmdExpanded={expandedCmdId === 'cmd-decomposed-demo'}
+                isCmdExpanded={!!expandedCmds['cmd-decomposed-demo']}
                 copiedId={copiedId}
                 handleCopy={handleCopy}
-                setExpandedCmdIndex={setExpandedCmdId}
+                toggleCmd={toggleCmd}
               />
             </div>
           </div>
@@ -308,10 +312,10 @@ export function Unit14AllToolMatrix() {
                     key={child.id}
                     entry={child}
                     isChild={true}
-                    isCmdExpanded={expandedCmdId === child.id}
+                    isCmdExpanded={!!expandedCmds[child.id]}
                     copiedId={copiedId}
                     handleCopy={handleCopy}
-                    setExpandedCmdIndex={setExpandedCmdId}
+                    toggleCmd={toggleCmd}
                   />
                 )}
               />

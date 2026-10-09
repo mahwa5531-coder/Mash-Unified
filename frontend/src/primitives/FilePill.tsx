@@ -45,10 +45,10 @@ export function FilePill({
     }
   }
 
-  // A full file path must contain a directory separator (/ or \) and not contain wildcards (* or ?)
+  // A file pill displays an authentic logo whenever it has a valid filename/path (and not a pure wildcard query)
   const hasSlash = cleanPath.includes('/') || cleanPath.includes('\\');
   const hasWildcard = cleanPath.includes('*') || cleanPath.includes('?');
-  const isFullPath = hasSlash && !hasWildcard;
+  const showIcon = !hasWildcard && Boolean(filePathOnly.trim());
   const isClickable = Boolean(!hasWildcard && (onOpenFile || onClick));
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -75,10 +75,10 @@ export function FilePill({
       )}
       {...props}
     >
-      {/* File logo (only for full file paths) and/or close button in the left slot */}
-      {(isFullPath || onClose) && (
+      {/* File logo and/or close button in the left slot */}
+      {(showIcon || onClose) && (
         <span className="relative flex items-center justify-center shrink-0 w-3 h-3">
-          {isFullPath && (
+          {showIcon && (
             <span className={cn(
               "flex items-center justify-center shrink-0 transition-opacity duration-100",
               onClose ? "group-hover:opacity-0 group-hover:pointer-events-none" : ""

@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Globe, ExternalLink, Search, CheckCircle2, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FilePill } from '@/primitives/FilePill';
 import { isToolRunning } from './toolTimeline';
@@ -74,12 +74,13 @@ export function ToolTimelineRow({
     );
   }
 
-  // 3. Search -> Analysed "pattern"
-  if (entry.type === 'search') {
+  // 3. Web Search -> Globe icon + toolSummary or "Searched web" "query"
+  if (entry.type === 'web_search') {
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isFailed = entry.data?.tool?.status === 'failed';
-    const pattern = entry.data?.pattern || 'query';
+    const query = entry.data?.query || 'query';
+    const toolSummary = entry.data?.toolSummary;
 
     return (
       <div
@@ -91,39 +92,92 @@ export function ToolTimelineRow({
       >
         {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
         {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
+        <Globe size={11} className="text-sky-500/80 shrink-0" />
         <span className={cn("font-sans text-[12px] shrink-0", isFailed ? "text-rose-500 font-medium" : "text-zinc-500 dark:text-zinc-400")}>
-          {isFailed ? 'Failed' : isCancelled ? 'Cancelled' : isRunning ? 'Analysing' : 'Analysed'}
+          {toolSummary ? toolSummary : (isFailed ? 'Failed' : isCancelled ? 'Cancelled' : isRunning ? 'Searching web' : 'Searched web')}
         </span>
-        <span className="font-mono text-[11px] text-zinc-700 dark:text-zinc-300 truncate max-w-sm">
-          "{pattern}"
-        </span>
+        {!toolSummary && (
+          <span className="font-mono text-[11px] text-zinc-700 dark:text-zinc-300 truncate max-w-sm">
+            "{query}"
+          </span>
+        )}
         {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
       </div>
     );
   }
 
-  // 4. Timer Row
-  if (entry.type === 'timer') {
+  // 4. Web Fetch -> ExternalLink icon + toolSummary or "Fetched" url
+  if (entry.type === 'web_fetch') {
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
-    const durLabel = entry.data?.durationSeconds ? `${entry.data.durationSeconds}s` : 'timer';
+    const isCancelled = entry.data?.tool?.status === 'cancelled';
+    const isFailed = entry.data?.tool?.status === 'failed';
+    const url = entry.data?.url || 'url';
+    const toolSummary = entry.data?.toolSummary;
+
     return (
-      <div key={entry.id} className={cn("flex items-center gap-1.5 text-xs select-none my-0.5", isChild ? "pl-1 py-0.5" : "my-0.5")}>
+      <div
+        key={entry.id}
+        className={cn(
+          "flex items-center gap-1.5 text-xs select-none transition-colors my-0.5",
+          isChild ? "pl-1 py-0.5" : "my-0.5"
+        )}
+      >
         {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
-        <span className="font-sans text-[12px] text-zinc-500 dark:text-zinc-400">
-          {isRunning ? 'Timing' : 'Timed'}
+        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
+        <ExternalLink size={11} className="text-emerald-500/80 shrink-0" />
+        <span className={cn("font-sans text-[12px] shrink-0", isFailed ? "text-rose-500 font-medium" : "text-zinc-500 dark:text-zinc-400")}>
+          {toolSummary ? toolSummary : (isFailed ? 'Failed' : isCancelled ? 'Cancelled' : isRunning ? 'Fetching web' : 'Fetched')}
         </span>
-        <span className="font-sans font-medium text-foreground text-[12px]">{durLabel}</span>
+        {!toolSummary && (
+          <span className="font-mono text-[11px] text-zinc-700 dark:text-zinc-300 truncate max-w-sm">
+            {url}
+          </span>
+        )}
+        {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
       </div>
     );
   }
 
-  // 5. Task Row
+  // 5. Code Search / Grep / Glob -> Search icon + pattern
+  if (entry.type === 'code_search' || entry.type === 'search') {
+    const isRunning = isToolRunning(entry.data?.tool, isStreaming);
+    const isCancelled = entry.data?.tool?.status === 'cancelled';
+    const isFailed = entry.data?.tool?.status === 'failed';
+    const pattern = entry.data?.pattern || 'query';
+    const toolSummary = entry.data?.toolSummary;
+
+    return (
+      <div
+        key={entry.id}
+        className={cn(
+          "flex items-center gap-1.5 text-xs select-none transition-colors my-0.5",
+          isChild ? "pl-1 py-0.5" : "my-0.5"
+        )}
+      >
+        {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
+        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
+        <Search size={11} className="text-amber-500/80 shrink-0" />
+        <span className={cn("font-sans text-[12px] shrink-0", isFailed ? "text-rose-500 font-medium" : "text-zinc-500 dark:text-zinc-400")}>
+          {toolSummary ? toolSummary : (isFailed ? 'Failed' : isCancelled ? 'Cancelled' : isRunning ? 'Searching' : 'Searched')}
+        </span>
+        {!toolSummary && (
+          <span className="font-mono text-[11px] text-zinc-700 dark:text-zinc-300 truncate max-w-sm">
+            "{pattern}"
+          </span>
+        )}
+        {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
+      </div>
+    );
+  }
+
+  // 6. Task Row
   if (entry.type === 'task') {
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const taskName = entry.data?.taskName || 'Task';
     return (
       <div key={entry.id} className={cn("flex items-center gap-1.5 text-xs select-none my-0.5", isChild ? "pl-1 py-0.5" : "my-0.5")}>
         {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
+        <CheckCircle2 size={11} className="text-indigo-400 shrink-0" />
         <span className="font-sans text-[12px] text-zinc-500 dark:text-zinc-400">
           {isRunning ? 'Running' : 'Checked'}
         </span>
@@ -132,13 +186,14 @@ export function ToolTimelineRow({
     );
   }
 
-  // 6. Subagent Row
+  // 8. Subagent Row
   if (entry.type === 'subagent') {
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const role = entry.data?.roleLabel || 'Subagent';
     return (
       <div key={entry.id} className={cn("flex items-center gap-1.5 text-xs select-none my-0.5", isChild ? "pl-1 py-0.5" : "my-0.5")}>
         {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
+        <Bot size={11} className="text-purple-400 shrink-0" />
         <span className="font-sans text-[12px] text-zinc-500 dark:text-zinc-400">
           {isRunning ? 'Running subagent' : 'Subagent'}
         </span>

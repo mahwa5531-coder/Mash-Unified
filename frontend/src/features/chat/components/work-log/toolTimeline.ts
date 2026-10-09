@@ -47,10 +47,11 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
   ) {
     const rawCmd = args.CommandLine || args.command || args.cmd || args.code || args.source_code || (typeof args === 'string' ? args : 'command');
     const cleanCmd = String(rawCmd).replace(/^powershell\s+-Command\s+/i, '').trim();
+    const toolSummary = args.toolSummary || args.tool_summary || args.summary || args.description || (t as any).summary || null;
     return {
       id: `tool-${tIdx}`,
       type: 'command',
-      data: { tool: t, cmd: cleanCmd, fullCmd: String(rawCmd) }
+      data: { tool: t, cmd: cleanCmd, fullCmd: String(rawCmd), toolSummary }
     };
   } else if (name.includes('list_directory') || name.includes('list_dir') || name.includes('browse')) {
     const p = args.DirectoryPath || args.dir_path || args.path || 'directory';
@@ -129,15 +130,30 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
         lineRange: extractLineRange(args) 
       }
     };
+  } else if (name.includes('search_web') || (name.includes('web') && name.includes('search'))) {
+    const query = args.Query || args.query || args.search_term || args.pattern || '*';
+    const toolSummary = args.toolSummary || args.description || null;
+    return {
+      id: `tool-${tIdx}`,
+      type: 'web_search',
+      data: { tool: t, query: String(query), toolSummary }
+    };
+  } else if (name.includes('web_fetch') || name.includes('read_url_content') || name.includes('fetch_url') || (name.includes('web') && name.includes('fetch'))) {
+    const url = args.Url || args.url || args.target_url || args.link || 'url';
+    const toolSummary = args.toolSummary || args.description || null;
+    return {
+      id: `tool-${tIdx}`,
+      type: 'web_fetch',
+      data: { tool: t, url: String(url), toolSummary }
+    };
   } else if (
     name.includes('search') || 
     name.includes('glob') || 
     name.includes('grep') || 
-    name.includes('find') ||
-    name.includes('web_fetch') ||
-    name.includes('read_url_content')
+    name.includes('find')
   ) {
-    const pattern = args.Query || args.Pattern || args.pattern || args.query || args.search_term || args.url || args.Url || '*';
+    const pattern = args.Query || args.Pattern || args.pattern || args.query || args.search_term || '*';
+    const toolSummary = args.toolSummary || args.description || null;
     let countStr = '';
     if (t.output) {
       const lines = t.output.split('\n').filter((l) => l.trim().length > 0);
@@ -145,8 +161,8 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     }
     return {
       id: `tool-${tIdx}`,
-      type: 'search',
-      data: { tool: t, pattern: String(pattern), countStr }
+      type: 'code_search',
+      data: { tool: t, pattern: String(pattern), countStr, toolSummary }
     };
   } else if (name.includes('invoke_subagent') || name.includes('define_subagent') || (name.includes('subagent') && !name.includes('manage'))) {
     let subagentRoles: string[] = [];
@@ -160,14 +176,6 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
       id: `tool-${tIdx}`,
       type: 'subagent',
       data: { tool: t, roleLabel, args }
-    };
-  } else if (name.includes('schedule') || (name.includes('timer') && !name.includes('manage'))) {
-    const dur = args.DurationSeconds ?? args.duration_seconds ?? args.duration ?? args.seconds ?? 0;
-    const prompt = args.Prompt || args.prompt || args.description || args.toolSummary || '';
-    return {
-      id: `tool-${tIdx}`,
-      type: 'timer',
-      data: { tool: t, durationSeconds: Number(dur), prompt: String(prompt) }
     };
   } else if (
     name.includes('task') || 
@@ -270,12 +278,12 @@ export function groupTimelineEntries(entries: TimelineEntry[]): TimelineEntry[] 
     }
 
     // 3. Group consecutive file reads / searches / folder views (>= 2)
-    if (current.type === 'search' || current.type === 'file_read' || current.type === 'folder_view') {
+    if (current.type === 'search' || current.type === 'code_search' || current.type === 'file_read' || current.type === 'folder_view') {
       const group: TimelineEntry[] = [current];
       let j = i + 1;
       while (
         j < entries.length && 
-        (entries[j].type === 'search' || entries[j].type === 'file_read' || entries[j].type === 'folder_view')
+        (entries[j].type === 'search' || entries[j].type === 'code_search' || entries[j].type === 'file_read' || entries[j].type === 'folder_view')
       ) {
         group.push(entries[j]);
         j++;
