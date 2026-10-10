@@ -2,12 +2,13 @@
 
 import React, { useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { Download, AlertTriangle, Loader2 } from 'lucide-react';
-import { BASE_URL } from '@/services/client';
+import { Download, AlertTriangle, Loader2, ExternalLink } from 'lucide-react';
+import { BASE_URL, safeFetch } from '@/services/client';
 import { useIsDarkMode } from '@/hooks/useIsDarkMode';
 import { ImageViewer } from './renderers/ImageViewer';
 import { PdfViewer } from './renderers/PdfViewer';
 import { FileViewerNotice } from './renderers/FileViewerNotice';
+import { ExcelViewerCard } from './renderers/ExcelViewerCard';
 import { AgentMarkdown } from '@/components/markdown/AgentMarkdown';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -122,7 +123,18 @@ export default function SafeFileViewer({
     return <FileViewerNotice message="File not found" />;
   }
 
-  if (isBinaryExcel || isUnsupported) {
+  if (isBinaryExcel) {
+    return (
+      <ExcelViewerCard
+        filename={filename}
+        path={path}
+        sessionId={sessionId}
+        sessionQuery={sessionQuery}
+      />
+    );
+  }
+
+  if (isUnsupported) {
     return <FileViewerNotice message="File format not supported" />;
   }
 

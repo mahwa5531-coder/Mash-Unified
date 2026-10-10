@@ -76,6 +76,47 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 
+class UpdateStateRequest(BaseModel):
+    status: str
+    version: str | None = "1.2.0"
+    progress: int | None = 0
+
+
+_desktop_update_state = {
+    "status": "idle",
+    "version": "1.2.0",
+    "progress": 0,
+}
+
+
+@router.get("/system/updates")
+async def get_system_updates():
+    """Returns background auto-update status."""
+    return _desktop_update_state
+
+
+@router.post("/system/updates/set-state")
+async def set_system_update_state(req: UpdateStateRequest):
+    """Sync or mock updater status."""
+    _desktop_update_state["status"] = req.status
+    if req.version:
+        _desktop_update_state["version"] = req.version
+    if req.progress is not None:
+        _desktop_update_state["progress"] = req.progress
+    return {"status": "ok", "state": _desktop_update_state}
+
+
+@router.post("/system/updates/restart")
+async def restart_system_app():
+    """Trigger application shutdown and relaunch for applying pending updates."""
+    _desktop_update_state["status"] = "idle"
+    return {
+        "status": "restarting",
+        "action": "quit_and_install",
+        "message": "Application shutting down for binary swap and scheduled relaunch."
+    }
+
+
 class SelectFolderRequest(BaseModel):
     folder_path: str | None = None
 
@@ -407,6 +448,9 @@ async def open_system_file(request: OpenFileRequest):
             subprocess.run(["xdg-open", str(p)], check=False)
         return {"status": "success", "path": str(p)}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        err_str = str(e)
+        if "1155" in err_str or "No application is associated" in err_str or "no application" in err_str.lower():
+            err_str = "No spreadsheet application found on this computer. Please download the file or install Excel."
+        return {"status": "error", "message": err_str}
 
 

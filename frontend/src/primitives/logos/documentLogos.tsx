@@ -46,15 +46,14 @@ export function FluentWordLogo({ size = 16, className = "" }: { size?: number; c
   );
 }
 
-/** LOGO-MD-1: Official Markdown M↓ Octicon */
+/** LOGO-MD-1: Slate Markdown Note Sheet (Notion / Executive Document Style) */
 export function OfficialMarkdownLogo({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={`shrink-0 ${className}`}>
-      <rect x="2" y="4" width="20" height="16" rx="3" fill="#0284C7" fillOpacity="0.15" stroke="#0284C7" strokeWidth="1.5" />
-      <path
-        d="M5 15V9H7L9 11.5L11 9H13V15H11.5V11.2L9.8 13.3H8.2L6.5 11.2V15H5ZM16.5 15L14 12H15.5V9H17.5V12H19L16.5 15Z"
-        fill="#0284C7"
-      />
+      <rect x="3" y="2.5" width="18" height="19" rx="3" fill="#64748B" fillOpacity="0.14" stroke="#64748B" strokeWidth="1.5" />
+      <path d="M7 7.5H17" stroke="#64748B" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M7 11.5H15" stroke="#64748B" strokeWidth="1.4" strokeLinecap="round" opacity="0.85" />
+      <path d="M7 15.5H11.5" stroke="#64748B" strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />
     </svg>
   );
 }

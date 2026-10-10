@@ -3,7 +3,7 @@
 // Row-2 toolbar above the chat canvas: logo cluster (when sidebar closed),
 // back/forward, session breadcrumb, right-panel toggle.
 // Pure presentation — all behavior arrives via callbacks.
-import { PanelLeft, PanelRight, Sparkles } from 'lucide-react';
+import { PanelLeft, PanelRight, Sparkles, ArrowRight } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -12,6 +12,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
+import { useDesktopAutoUpdate } from '@/hooks/useDesktopAutoUpdate';
 
 interface ChatToolbarProps {
   isSidebarOpen: boolean;
@@ -34,13 +35,14 @@ export function ChatToolbar({
   sessionTitle,
   selectedSessionId,
 }: ChatToolbarProps) {
+  const { updateState, handleRestart } = useDesktopAutoUpdate();
   const isProjectSession = Boolean(sessionRepo && sessionRepo !== 'No Repo');
   const cleanTitle = selectedSessionId
     ? generateCleanSessionTitle(sessionTitle || '', selectedSessionId)
     : (sessionTitle || 'New Conversation');
 
   return (
-    <div className="h-9 bg-[#121214] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center justify-between px-3 select-none shrink-0 z-40 transition-all">
+    <div id="chat-top-toolbar" className="h-9 bg-[#121214] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center justify-between px-3 select-none shrink-0 z-40 transition-all">
                 <div className="flex items-center h-full min-w-0 flex-1">
                   {/* When Left Sidebar is CLOSED: show Logo and PanelLeft here */}
                   {!isSidebarOpen && (
@@ -100,9 +102,33 @@ export function ChatToolbar({
                   </div>
                 </div>
 
-                {/* Right Toggle Button: ONLY visible when right sidebar is closed! */}
-                {!isRightSidebarOpen && (
-                  <div className="flex items-center gap-1 shrink-0">
+                {/* Right Controls Container: Always visible in toolbar */}
+                <div className="flex items-center gap-2 shrink-0 ml-3">
+                  {/* State A: Downloading Update (raw ghost text, zero badge, zero pill background, zero color) */}
+                  {updateState.status === 'downloading' && (
+                    <span
+                      className="text-zinc-500 dark:text-zinc-400 font-mono text-[11px] leading-none select-none tracking-tight mr-1"
+                      title="Downloading update..."
+                    >
+                      downloading....
+                    </span>
+                  )}
+
+                  {/* State B: Ready to Restart (exact custom blue #2972BE capsule with right arrow) */}
+                  {updateState.status === 'ready' && (
+                    <button
+                      type="button"
+                      onClick={handleRestart}
+                      className="group inline-flex items-center gap-1.5 h-5 px-2.5 rounded-full bg-[#2972BE] hover:bg-[#3180D2] active:bg-[#1E5691] text-white font-medium text-[11px] leading-none tracking-tight select-none shadow-xs transition-all cursor-pointer border border-[#4B90D6]/40 active:scale-[0.97]"
+                      title="Click to restart and apply update"
+                    >
+                      <span>restart</span>
+                      <ArrowRight size={10} className="shrink-0 transition-transform group-hover:translate-x-0.5" />
+                    </button>
+                  )}
+
+                  {/* Right Toggle Button: ONLY visible when right sidebar is closed! */}
+                  {!isRightSidebarOpen && (
                     <button
                       type="button"
                       onClick={onOpenRightSidebar}
@@ -111,8 +137,8 @@ export function ChatToolbar({
                     >
                       <PanelRight size={15} />
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
   );
 }
