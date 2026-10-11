@@ -62,7 +62,7 @@ def _build_agent_config() -> AgentConfig:
     import nexau
     from nexau.archs.main_sub.config import AgentConfig
     from nexau.archs.platform.app_config import AppConfig
-    from nexau.archs.platform.crypto_vault import load_secure_vault
+    from nexau.archs.platform.crypto_vault import load_secure_vault, get_auth_metadata
 
     # Load canonical agent configuration (local Mash manifest preferred)
     local_manifest = Path(__file__).resolve().parent / "resources" / "main_agent.yaml"
@@ -73,6 +73,8 @@ def _build_agent_config() -> AgentConfig:
     # Runtime LLM credential resolution from settings/vault/env
     app_cfg = AppConfig.load()
     vault = load_secure_vault() or {}
+    meta = get_auth_metadata()
+    meta_models = meta.get("models") if isinstance(meta.get("models"), list) and meta.get("models") else []
 
     # The desktop connector communicates exclusively with the MASH Cloud API layer
     cloud_gateway = (
@@ -89,8 +91,8 @@ def _build_agent_config() -> AgentConfig:
         or vault.get("api_key")
         or "bearer-pending-auth"
     )
-    # Default model format strictly follows the cloud-api "provider/model" contract
-    active_model = os.getenv("MASH_MODEL") or app_cfg.model.default_model or "openai/gpt-6-luna"
+    # Default model dynamically inherits the primary allowed model from cloud identity
+    active_model = os.getenv("MASH_MODEL") or (meta_models[0] if meta_models else None) or app_cfg.model.default_model or "openai/gpt-6-luna"
 
     active_api_type = os.getenv("LLM_API_TYPE", "openai_chat_completion")
     is_mock = os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes") or active_key.lower() in ("mock", "none", "test")
