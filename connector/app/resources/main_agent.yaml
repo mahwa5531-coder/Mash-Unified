@@ -8,7 +8,7 @@ system_prompt: ../prompts/statutory_auditor.j2
 system_prompt_type: jinja
 
 llm_config:
-  model: ${env.MASH_MODEL:-openai/gpt-6-luna}
+  model: ${env.MASH_MODEL:-mash/auto}
   base_url: ${env.CLOUD_GATEWAY_URL:-http://127.0.0.1:8080/v1}
   api_key: ${env.MASH_API_KEY:-bearer-pending-auth}
   api_type: ${env.LLM_API_TYPE:-openai_chat_completion}
@@ -72,5 +72,4 @@ middlewares:
         - audit_skill_tool
   - import: nexau.archs.main_sub.execution.middleware.round_and_token_reminder:RoundAndTokenReminderMiddleware
     params:
-      desired_max_tokens: 16384
       enable_routine_reminders: false

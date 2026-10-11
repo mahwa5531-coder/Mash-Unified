@@ -320,6 +320,17 @@ func (p *Proxy) admit(ctx context.Context, idn *auth.Identity, req *Request) (fu
 		return nil, de
 	}
 
+	// Auto-resolve abstract model alias "mash/auto" to tenant's plan model:
+	// Desktop client sends "mash/auto" so the server routes dynamically per plan tier.
+	// This ensures MODEL_NOT_ENTITLED never fires for desktop users.
+	if req.Model == "mash/auto" || req.Model == "mash/default" {
+		if len(idn.Models) > 0 {
+			req.Model = idn.Models[0]
+		} else {
+			req.Model = "openai/gpt-6-luna"
+		}
+	}
+
 	// Model entitlement (allowlist with patterns). Every fallback must be
 	// inside the allowlist too — listing an off-allowlist model as a fallback
 	// must not bypass the primary check.

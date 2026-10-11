@@ -191,16 +191,8 @@ async def stream_query_bridge(
     effective_agent_config = server._default_agent_config
 
     if live_token and effective_agent_config and effective_agent_config.llm_config:
-        from nexau.archs.platform.crypto_vault import get_auth_metadata
-        meta = get_auth_metadata()
-        allowed_models = meta.get("models") if isinstance(meta.get("models"), list) and meta.get("models") else []
-        cur_model = effective_agent_config.llm_config.model
-        target_model = cur_model
-        # If cloud specifies an allowed models list and current model is not permitted, adopt cloud's primary model
-        if allowed_models and cur_model not in allowed_models:
-            target_model = allowed_models[0]
-
-        if effective_agent_config.llm_config.api_key != live_token or cur_model != target_model:
+        target_model = effective_agent_config.llm_config.model or "mash/auto"
+        if effective_agent_config.llm_config.api_key != live_token or effective_agent_config.llm_config.model != target_model:
             new_llm = copy.copy(effective_agent_config.llm_config)
             new_llm.api_key = live_token
             new_llm.model = target_model

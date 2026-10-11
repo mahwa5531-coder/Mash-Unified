@@ -158,6 +158,10 @@ var allowedRoles = map[string]bool{
 // Validate enforces every payload invariant. Errors are domain errors ready
 // for the client.
 func (r *Request) Validate(l Limits) *domain.Error {
+	// Auto-normalize abstract aliases to canonical "mash/auto"
+	if r.Model == "mash" || r.Model == "auto" || r.Model == "default" {
+		r.Model = "mash/auto"
+	}
 	// Model: "provider/model" shape (Bifrost routing), bounded length, safe charset.
 	if r.Model == "" {
 		return domain.ErrValidation("model is required")

@@ -73,8 +73,6 @@ def _build_agent_config() -> AgentConfig:
     # Runtime LLM credential resolution from settings/vault/env
     app_cfg = AppConfig.load()
     vault = load_secure_vault() or {}
-    meta = get_auth_metadata()
-    meta_models = meta.get("models") if isinstance(meta.get("models"), list) and meta.get("models") else []
 
     # The desktop connector communicates exclusively with the MASH Cloud API layer
     cloud_gateway = (
@@ -91,61 +89,35 @@ def _build_agent_config() -> AgentConfig:
         or vault.get("api_key")
         or "bearer-pending-auth"
     )
-    # Default model dynamically inherits the primary allowed model from cloud identity
-    active_model = os.getenv("MASH_MODEL") or (meta_models[0] if meta_models else None) or app_cfg.model.default_model or "openai/gpt-6-luna"
+    # The desktop uses the abstract model alias "mash/auto".
+    # The Cloud API gateway resolves this dynamically based on the user's plan.
+    active_model = os.getenv("MASH_MODEL") or "mash/auto"
 
-    active_api_type = os.getenv("LLM_API_TYPE", "openai_chat_completion")
     is_mock = os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes") or active_key.lower() in ("mock", "none", "test")
-
     if is_mock:
-        active_key = active_key or "mock"
         default_base_url = "http://mock"
     else:
         clean_gw = cloud_gateway.rstrip("/")
         if clean_gw.endswith("/v1/agent"):
             clean_gw = clean_gw[:-6]
-        # Direct tunnel to OpenAI-compatible Cloud API endpoint (/v1/chat/completions)
         default_base_url = clean_gw if clean_gw.endswith("/v1") else f"{clean_gw}/v1"
 
-    thinking_budget = int(os.getenv("LLM_THINKING_BUDGET", "16384"))
-    extra_llm_params: dict[str, Any] = {}
-    if thinking_budget > 0:
-        extra_llm_params["reasoning"] = {
-            "max_tokens": thinking_budget
-        }
-
     agent_config.llm_config = LLMConfig(
-        api_type=active_api_type,
+        api_type="openai_chat_completion",
         model=active_model,
         base_url=default_base_url,
         api_key=active_key,
-        max_tokens=(
-            int(os.getenv("LLM_MAX_TOKENS"))
-            if os.getenv("LLM_MAX_TOKENS")
-            else (vault.get("max_tokens") or (65536 if (":free" in active_model or "openrouter/free" in active_model or "gemini" in active_model) else (app_cfg.model.max_tokens or 4096)))
-        ),
-        timeout=float(os.getenv("LLM_TIMEOUT") or "120.0"),
-        stream_idle_timeout=float(os.getenv("LLM_STREAM_IDLE_TIMEOUT") or "45.0"),
-        max_retries=int(os.getenv("LLM_MAX_RETRIES") or "3"),
-        **extra_llm_params,
+        max_tokens=int(os.getenv("LLM_MAX_TOKENS", "16384")),
+        timeout=float(os.getenv("LLM_TIMEOUT", "120.0")),
+        stream_idle_timeout=float(os.getenv("LLM_STREAM_IDLE_TIMEOUT", "45.0")),
+        max_retries=int(os.getenv("LLM_MAX_RETRIES", "3")),
     )
 
-    # Dynamic context window: cloud/vault authoritative, else adapt to model capacity
-    cloud_context = (
-        int(os.getenv("LLM_MAX_CONTEXT_TOKENS"))
-        if os.getenv("LLM_MAX_CONTEXT_TOKENS")
-        else vault.get("max_context_tokens")
+    agent_config.max_context_tokens = int(
+        os.getenv("LLM_MAX_CONTEXT_TOKENS")
+        or vault.get("max_context_tokens")
+        or 1048576
     )
-    if cloud_context:
-        agent_config.max_context_tokens = int(cloud_context)
-    elif "gemini" in active_model.lower():
-        agent_config.max_context_tokens = 1048576  # 1M tokens
-    elif "claude" in active_model.lower():
-        agent_config.max_context_tokens = 200000   # 200k tokens
-    elif "gpt-4" in active_model.lower():
-        agent_config.max_context_tokens = 128000   # 128k tokens
-    elif any(k in active_model.lower() for k in ("deepseek", "llama", "ling", "qwen", "mistral")):
-        agent_config.max_context_tokens = 131072   # 128k tokens
 
     if os.getenv("AGENT_MAX_ITERATIONS"):
         agent_config.max_iterations = int(os.getenv("AGENT_MAX_ITERATIONS"))
