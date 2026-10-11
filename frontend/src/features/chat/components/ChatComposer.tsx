@@ -17,7 +17,7 @@ export interface ChatComposerProps {
   isStreaming: boolean;
   disabled?: boolean;
   sessionRepo?: string;
-  onInvalidMedia?: (show: boolean) => void;
+  onInvalidMedia?: (show: boolean, reason?: string) => void;
   initialAttachedFiles?: AttachedFile[];
 }
 

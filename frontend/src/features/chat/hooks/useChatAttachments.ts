@@ -14,15 +14,16 @@ export interface AttachedFile {
 }
 
 export const MAX_CHAT_ATTACHMENTS = 5;
+export const MAX_FILE_SIZE_BYTES = 30 * 1024 * 1024; // 30 MB
 
 export interface UseChatAttachmentsOptions {
-  onInvalidMedia?: (hasError: boolean) => void;
+  onInvalidMedia?: (hasError: boolean, reason?: string) => void;
   initialFiles?: AttachedFile[];
 }
 
 export function useChatAttachments(
   sessionId?: string | null,
-  options?: UseChatAttachmentsOptions | ((hasError: boolean) => void)
+  options?: UseChatAttachmentsOptions | ((hasError: boolean, reason?: string) => void)
 ) {
   const onInvalidMedia = typeof options === 'function' ? options : options?.onInvalidMedia;
   const initialFiles = typeof options === 'object' ? options.initialFiles : undefined;
@@ -47,10 +48,21 @@ export function useChatAttachments(
     const validFiles = Array.from(files);
     if (validFiles.length === 0) return;
 
+    // Check per-file size limit (30 MB)
+    const oversized = validFiles.find((f) => f.size > MAX_FILE_SIZE_BYTES);
+    if (oversized) {
+      const sizeMb = (oversized.size / (1024 * 1024)).toFixed(1);
+      const reason = `File "${oversized.name}" exceeds the 30 MB size limit (${sizeMb} MB).`;
+      setUploadError(reason);
+      setHasInvalidMedia(true);
+      onInvalidMedia?.(true, reason);
+      return;
+    }
+
     // ponytail: Single root guard protecting all 3 vectors (Drag & Drop, File Picker, Clipboard Paste)
     if (attachedFiles.length + validFiles.length > MAX_CHAT_ATTACHMENTS) {
       setHasInvalidMedia(true);
-      onInvalidMedia?.(true);
+      onInvalidMedia?.(true, "Maximum number of attachments reached");
     }
 
     const availableSlots = Math.max(0, MAX_CHAT_ATTACHMENTS - attachedFiles.length);

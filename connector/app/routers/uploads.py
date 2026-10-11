@@ -11,6 +11,10 @@ from app.paths import get_session_brain_dir
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 
 
+MAX_UPLOAD_SIZE_BYTES = 30 * 1024 * 1024  # 30 MB
+CHUNK_SIZE = 1024 * 1024  # 1 MB
+
+
 @router.post("/{session_id}")
 async def upload_file(session_id: str, file: UploadFile, engine: DatabaseEngineDep):
     session = await engine.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
@@ -27,12 +31,33 @@ async def upload_file(session_id: str, file: UploadFile, engine: DatabaseEngineD
     if not dest_path.is_relative_to(Path(save_dir).resolve()):
         raise HTTPException(status_code=400, detail="Invalid filename path")
     dest = str(dest_path)
+    total_bytes = 0
     try:
         with open(dest, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+            while True:
+                chunk = await file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UPLOAD_SIZE_BYTES:
+                    f.close()
+                    if os.path.exists(dest):
+                        os.remove(dest)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File exceeds maximum allowed size of 30 MB ({total_bytes / (1024 * 1024):.1f} MB)",
+                    )
+                f.write(chunk)
+    except HTTPException:
+        raise
     except Exception as e:
+        if os.path.exists(dest):
+            try:
+                os.remove(dest)
+            except Exception:
+                pass
         raise HTTPException(status_code=500, detail=f"Could not save file: {e}")
-    return {"status": "success", "path": dest}
+    return {"status": "success", "path": dest, "size": total_bytes}
 
 
 @router.get("/{session_id}")

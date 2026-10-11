@@ -73,6 +73,7 @@ export default function ChatCanvas({
   const [isQueueExpanded, setIsQueueExpanded] = useState<boolean>(true);
   const [showQuotaBanner, setShowQuotaBanner] = useState<boolean>(false);
   const [showInvalidMediaBanner, setShowInvalidMediaBanner] = useState<boolean>(false);
+  const [invalidMediaReason, setInvalidMediaReason] = useState<string>("Maximum number of attachments reached");
 
   // ponytail: Live DOM RAM window - strictly mount at most 100 turns in DOM to prevent tab freezes and RAM bloat
   const MAX_LIVE_TURNS = 100;
@@ -325,6 +326,7 @@ export default function ChatCanvas({
               <InvalidMediaBanner
                 open={showInvalidMediaBanner}
                 onOpenChange={setShowInvalidMediaBanner}
+                description={invalidMediaReason}
                 onDismiss={() => setShowInvalidMediaBanner(false)}
               />
             </div>
@@ -340,7 +342,11 @@ export default function ChatCanvas({
             isStreaming={isStreaming}
             disabled={Boolean(sessionId && !isHistoryLoaded)}
             sessionRepo={sessionRepo}
-            onInvalidMedia={setShowInvalidMediaBanner}
+            onInvalidMedia={(show, reason) => {
+              setShowInvalidMediaBanner(show);
+              if (reason) setInvalidMediaReason(reason);
+              else setInvalidMediaReason("Maximum number of attachments reached");
+            }}
           />
         </div>
       </div>
