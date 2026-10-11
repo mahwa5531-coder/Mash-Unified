@@ -77,7 +77,7 @@ func New(
 //	GET  /v1/config                     client integration config
 //	POST /v1/chat/completions           THE LLM endpoint (SSE tunnel to Bifrost)
 //	GET  /v1/usage                      usage aggregation window
-//	POST /v1/payments/*                 credit top-ups (Razorpay)
+//	POST /v1/payments/*                 plan purchases (PhonePe default)
 func (a *API) Router() http.Handler {
 	mux := http.NewServeMux()
 
@@ -117,16 +117,16 @@ func (a *API) Router() http.Handler {
 	// Usage.
 	mux.Handle("GET /v1/usage", a.authMW.Require(http.HandlerFunc(a.handleUsage)))
 
-	// Payments (credit top-ups). Routes mount regardless of provider
-	// mode: disabled deployments answer 503 PAYMENTS_DISABLED, keeping
-	// the client contract stable across deployments.
+	// Payments (plan purchases — plans only, no credit packs). Routes
+	// mount regardless of provider mode: disabled deployments answer
+	// 503 PAYMENTS_DISABLED, keeping the client contract stable.
 	mux.HandleFunc("POST /v1/payments/webhook", a.handlePaymentWebhook)
 	mux.Handle("GET /v1/payments/catalog", a.authMW.Require(http.HandlerFunc(a.handlePaymentCatalog)))
 	mux.Handle("POST /v1/payments/checkout", a.authMW.Require(http.HandlerFunc(a.handlePaymentCheckout)))
 	mux.Handle("POST /v1/payments/confirm", a.authMW.Require(http.HandlerFunc(a.handlePaymentConfirm)))
 	mux.Handle("GET /v1/payments/orders/{order_id}", a.authMW.Require(http.HandlerFunc(a.handlePaymentOrder)))
 	mux.Handle("GET /v1/payments/history", a.authMW.Require(http.HandlerFunc(a.handlePaymentHistory)))
-	mux.Handle("GET /v1/payments/balance", a.authMW.Require(http.HandlerFunc(a.handlePaymentBalance)))
+	mux.Handle("GET /v1/payments/subscription", a.authMW.Require(http.HandlerFunc(a.handlePaymentSubscription)))
 
 	return a.wrapMux(mux)
 }

@@ -117,6 +117,9 @@ func (r *SubscriptionsRepo) Effective(ctx context.Context, tenantID string) (*do
 	s := &domain.Subscription{}
 	var limits []byte
 	var models []byte
+	// The period-end check IS the expiry mechanism (read-side, no
+	// sweeper): an active-status row past its paid-through date is not
+	// effective — the resolver's free-plan fallback applies instead.
 	err := r.Pool.QueryRow(ctx, `
                 SELECT sub.id, sub.tenant_id, sub.plan_id, sub.status,
                        sub.current_period_start, sub.current_period_end,
@@ -125,6 +128,7 @@ func (r *SubscriptionsRepo) Effective(ctx context.Context, tenantID string) (*do
                 JOIN plans pl ON pl.id = sub.plan_id
                 WHERE sub.tenant_id = $1
                   AND sub.status IN ('trialing','active','past_due')
+                  AND (sub.current_period_end IS NULL OR sub.current_period_end > now())
                 ORDER BY sub.status = 'past_due' ASC, sub.created_at DESC
                 LIMIT 1`, tenantID).
 		Scan(&s.ID, &s.TenantID, &s.PlanID, &s.Status,
@@ -146,39 +150,30 @@ func (r *SubscriptionsRepo) Effective(ctx context.Context, tenantID string) (*do
 	return s, nil
 }
 
-// FreeFallback loads the public Free plan as a synthetic ACTIVE subscription
-// — the entitlement every tenant degrades to when no trial/paid subscription
-// is effective (canceled, expired, or none): a canceled Pro must fall back to
-// Free limits, never to a hard block. The synthetic row carries no ID or
-// periods — it is an entitlement, not a billing record; the real subscription
-// rows keep the full history.
-//
-// Returns (nil, nil) when no public 'free' plan exists — the caller then keeps
-// the fail-closed SUBSCRIPTION_INACTIVE posture.
-func (r *SubscriptionsRepo) FreeFallback(ctx context.Context) (*domain.Subscription, error) {
-	s := &domain.Subscription{Status: "active"}
-	var limits, models []byte
+// PlanByCode resolves a plan by its code — used by the identity
+// resolver's FREE-PLAN DEFAULT: a tenant without an effective paid
+// subscription falls back to the 'free' plan's limits + model allowlist
+// (a brand-new tenant is Free by default, never plan-less-and-unbounded).
+func (r *SubscriptionsRepo) PlanByCode(ctx context.Context, code string) (*domain.Plan, error) {
+	p := &domain.Plan{}
+	var limits []byte
+	var models []byte
 	err := r.Pool.QueryRow(ctx, `
-                SELECT pl.id, pl.code, pl.name, pl.limits, pl.models
-                FROM plans pl
-                WHERE pl.code = 'free' AND pl.is_public
-                ORDER BY pl.created_at
-                LIMIT 1`).
-		Scan(&s.PlanID, &s.Plan.Code, &s.Plan.Name, &limits, &models)
+                SELECT id, code, name, limits, models FROM plans WHERE code = $1`, code).
+		Scan(&p.ID, &p.Code, &p.Name, &limits, &models)
 	if store.IsNotFound(err) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	s.Plan.ID = s.PlanID
 	if len(limits) > 2 {
-		_ = jsonUnmarshal(limits, &s.Plan.Limits)
+		_ = jsonUnmarshal(limits, &p.Limits)
 	}
 	if len(models) > 2 {
-		_ = jsonUnmarshal(models, &s.Plan.Models)
+		_ = jsonUnmarshal(models, &p.Models)
 	}
-	return s, nil
+	return p, nil
 }
 
 // EntitlementsRepo reads tenant entitlement overrides.

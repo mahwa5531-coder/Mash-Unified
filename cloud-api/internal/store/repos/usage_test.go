@@ -33,11 +33,13 @@ func usageTestDB(t *testing.T) (*store.Postgres, *LLMCallsRepo, *NormalizationRe
 
 	if _, err := pg.Pool.Exec(ctx, `
                 DROP TABLE IF EXISTS token_normalization CASCADE;
-                ALTER TABLE llm_calls DROP COLUMN IF EXISTS raw_prompt_tokens, DROP COLUMN IF EXISTS raw_completion_tokens;
                 DROP TABLE IF EXISTS llm_calls CASCADE`); err != nil {
 		t.Fatalf("drop: %v", err)
 	}
-	for _, version := range []int64{5, 8} {
+	// 11 (model economics) seeds token_normalization rows + plan model
+	// lists — its products include the table dropped above, so its
+	// bookkeeping must go too (idempotent ON CONFLICT re-apply).
+	for _, version := range []int64{5, 8, 11} {
 		if _, err := pg.Pool.Exec(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version); err != nil {
 			if !strings.Contains(err.Error(), "does not exist") {
 				t.Fatalf("reset bookkeeping %d: %v", version, err)
@@ -195,11 +197,29 @@ func TestPG_NormalizationRepo_LoadsTable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("All: %v", err)
 	}
-	if len(rules) != 1 || rules[0].Model != "*" {
-		t.Fatalf("seeded rules: %+v", rules)
+	// Migration 000011 seeds the launch model lineup alongside the '*'
+	// default: the identity rule PLUS the six price-proportional rows.
+	if len(rules) != 7 {
+		t.Fatalf("seeded rules (want the '*' default + the 6 launch-lineup rows): %+v", rules)
 	}
-	if rules[0] != (domain.NormRule{Model: "*", InputWeight: 1, CachedReadWeight: 1, CachedWriteWeight: 1, OutputWeight: 1}) {
-		t.Fatalf("seeded '*' must be the identity rule: %+v", rules[0])
+	var star *domain.NormRule
+	for i := range rules {
+		if rules[i].Model == "*" {
+			star = &rules[i]
+		}
+	}
+	if star == nil || *star != (domain.NormRule{Model: "*", InputWeight: 1, CachedReadWeight: 1, CachedWriteWeight: 1, OutputWeight: 1}) {
+		t.Fatalf("seeded '*' must be the identity rule: %+v", star)
+	}
+	// The launch lineup's price-proportional anchor: Sonnet 5.5 at 20/100.
+	var sonnet *domain.NormRule
+	for i := range rules {
+		if rules[i].Model == "anthropic/claude-sonnet-5.5" {
+			sonnet = &rules[i]
+		}
+	}
+	if sonnet == nil || sonnet.InputWeight != 20 || sonnet.OutputWeight != 100 {
+		t.Fatalf("Sonnet 5.5 launch weights (20/100) missing: %+v", sonnet)
 	}
 
 	// Hot-change: a plain UPDATE is what the operator does — the next read
@@ -214,7 +234,7 @@ func TestPG_NormalizationRepo_LoadsTable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("All after insert: %v", err)
 	}
-	if len(rules) != 3 {
+	if len(rules) != 9 { // 7 seeded (000008 '*' + 000011 lineup) + 2 inserted
 		t.Fatalf("rules after insert: %+v", rules)
 	}
 	for _, r := range rules {
@@ -235,7 +255,7 @@ func TestPG_NormalizationRepo_LoadsTable(t *testing.T) {
 		t.Fatalf("deactivate: %v", err)
 	}
 	rules, err = norms.All(ctx)
-	if err != nil || len(rules) != 2 {
+	if err != nil || len(rules) != 8 { // 9 - the deactivated pattern row
 		t.Fatalf("active-only filter: %+v err=%v", rules, err)
 	}
 }
@@ -256,58 +276,5 @@ func TestPG_Migration8_PlanWindowKeys(t *testing.T) {
 	}
 	if hasMonthly != 0 || has5h != 2 || hasWeekly != 2 {
 		t.Fatalf("plan limits keys: monthly=%d 5h=%d weekly=%d (want 0/2/2)", hasMonthly, has5h, hasWeekly)
-	}
-}
-
-// TestPG_SubscriptionsFreeFallback: a canceled/expired subscription yields
-// Effective()=nil, and FreeFallback() returns the public Free plan with its
-// limits decoded — the read-time entitlement the identity resolver degrades
-// tenants to. With no public free plan configured, FreeFallback returns nil
-// (fail-closed SUBSCRIPTION_INACTIVE posture).
-func TestPG_SubscriptionsFreeFallback(t *testing.T) {
-	pg, _, _ := usageTestDB(t)
-	subs := NewSubscriptions(pg.Pool)
-	ctx := context.Background()
-
-	tenant := seedUsageTenant(t, pg)
-	if _, err := pg.Pool.Exec(ctx, `
-		INSERT INTO subscriptions (id, tenant_id, plan_id, status, current_period_start)
-		VALUES ('sub_ff', $1, 'pln_pro', 'active', now())`, tenant); err != nil {
-		t.Fatalf("seed pro sub: %v", err)
-	}
-
-	// Active Pro sub: Effective returns it; FreeFallback unused.
-	sub, err := subs.Effective(ctx, tenant)
-	if err != nil || sub == nil || sub.Plan.Code != "pro" {
-		t.Fatalf("effective pro: %+v err=%v", sub, err)
-	}
-
-	// Canceled: Effective drops to nil, FreeFallback carries the Free plan
-	// and its limits (the resolver degrades the tenant to Free).
-	if _, err := pg.Pool.Exec(ctx, `UPDATE subscriptions SET status='canceled' WHERE id='sub_ff'`); err != nil {
-		t.Fatalf("cancel: %v", err)
-	}
-	sub, err = subs.Effective(ctx, tenant)
-	if err != nil || sub != nil {
-		t.Fatalf("canceled effective should be nil: %+v err=%v", sub, err)
-	}
-	fb, err := subs.FreeFallback(ctx)
-	if err != nil || fb == nil {
-		t.Fatalf("free fallback: %+v err=%v", fb, err)
-	}
-	if fb.Plan.Code != "free" || fb.Status != "active" || fb.Plan.Limits.Window5hTokens == 0 || fb.Plan.Limits.WindowWeeklyTokens == 0 {
-		t.Fatalf("fallback shape: %+v", fb)
-	}
-
-	// No public free plan → nil (fail-closed), error-free.
-	if _, err := pg.Pool.Exec(ctx, `UPDATE plans SET is_public = FALSE WHERE code='free'`); err != nil {
-		t.Fatalf("hide free: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = pg.Pool.Exec(context.Background(), `UPDATE plans SET is_public = TRUE WHERE code='free'`)
-	})
-	fb, err = subs.FreeFallback(ctx)
-	if err != nil || fb != nil {
-		t.Fatalf("no public free → nil: %+v err=%v", fb, err)
 	}
 }

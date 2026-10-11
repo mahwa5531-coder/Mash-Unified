@@ -95,9 +95,16 @@ type CreateOrderRequest struct {
 // ProviderOrder is the provider-side view of an order.
 type ProviderOrder struct {
 	ID          string
-	Status      string // provider vocabulary: created | paid | attempted
+	Status      string // provider vocabulary: created | paid | attempted | …
 	AmountPaise int64
 	Currency    string
+
+	// ClientSecret (stripe): the PaymentIntent's browser handle — public by
+	// design, needed by Stripe.js. Empty for other providers.
+	ClientSecret string
+	// CheckoutURL (phonepe): the hosted PAY_PAGE url — public by design,
+	// the browser is redirected here wholesale. Empty for other providers.
+	CheckoutURL string
 }
 
 // ProviderPayment is a single payment attempt against an order.

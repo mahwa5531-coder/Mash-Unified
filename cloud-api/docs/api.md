@@ -1,7 +1,7 @@
 # MASh Cloud API — HTTP Reference
 
 The cloud layer does exactly four things: **identity** (Google OAuth only),
-**entitlements** (plans, quotas, rate limits), **billing** (Razorpay credit
+**entitlements** (plans, quotas, rate limits), **billing** (plan subscriptions — PhonePe default, Razorpay/Stripe selectable
 top-ups) and the **LLM tunnel** (`POST /v1/chat/completions` → private
 Bifrost gateway). Everything agent-related — sessions, transcripts, tools,
 files, execution — lives on the user's desktop and never crosses this API
@@ -92,31 +92,17 @@ routing format), e.g. `openai/gpt-4o`, `anthropic/claude-3-5-sonnet`.
 Pipeline (in order, all before any upstream traffic):
 
 1. **Identity** — Bearer token → server-authoritative identity (never client-supplied)
-2. **Account state** — user/tenant/membership must be active. A tenant with **no effective trial/paid subscription (canceled, expired, never subscribed) degrades to the public Free plan** — Free limits, LLM allowed. `SUBSCRIPTION_INACTIVE` 403 remains only as the fail-closed posture when no public `free` plan is configured at all
+2. **Account state** — user/tenant/membership/subscription must be active (`SUBSCRIPTION_INACTIVE` 403)
 3. **Validation** — messages/tools/params bounds (`INVALID_REQUEST` 400)
 4. **Model entitlement** — plan/tenant allowlist, patterns supported; fallbacks checked too (`MODEL_NOT_ENTITLED` 403)
 5. **Rolling token windows** — two independent budgets, either can bind: a 5-hour
    burst window and a 7-day weekly window, both in normalized tokens summed
    from `llm_calls` (`WINDOW_QUOTA_EXCEEDED` 429 with `window`, `quota_tokens`,
    `used_tokens` and the exact `resets_at` — the earliest instant usage drops
-   back below quota; clients schedule the retry from it). When the completed
-   usage alone is still under quota but in-flight calls hold the remaining
-   budget, the same code is returned with `in_flight: true` and
-   `reserved_tokens` — the window is not exhausted, the budget is merely
-   claimed by running calls; retry after a few seconds (no `resets_at` is
-   published: claims release at call completion, not window expiry)
+   back below quota; clients schedule the retry from it)
 6. **Rate limits** — RPM per user + per tenant (Redis sliding window, `RATE_LIMITED` 429 with `retry_after_ms`)
 7. **Concurrency** — in-flight LLM calls per user + per tenant (`CONCURRENCY_LIMIT` 429)
-8. **In-flight token reservation** — every admitted call atomically claims an
-   estimate of its token cost (payload-derived, clamped to
-   `NEXAU_QUOTA_RESERVE_{MIN,MAX}_TOKENS`) against each window's REMAINING
-   budget. This is what makes window 5 race-free: without it, N parallel
-   admits each see the same completed-usage position and collectively
-   overshoot the window. Claims settle when the call's usage row lands
-   (failed calls release immediately; completed calls after a 2s pipeline
-   margin). Fail-open on Redis loss, TTL-backed for crash recovery
-   (`NEXAU_QUOTA_RESERVE_*` keys, `internal/llm/reserve.go`)
-9. **Tunnel** — forward to the private Bifrost gateway (cloud-side credential; clients never see provider keys)
+8. **Tunnel** — forward to the private Bifrost gateway (cloud-side credential; clients never see provider keys)
 
 **stream=true (default for agent use)** — SSE:
 
@@ -179,7 +165,6 @@ rolling-window computation the enforcement gate uses.
       {
         "window": "5h",
         "used_tokens": 12345,
-        "reserved_tokens": 8192,
         "quota_tokens": 2000000,
         "used_percent": 0,
         "resets_at": null
@@ -187,7 +172,6 @@ rolling-window computation the enforcement gate uses.
       {
         "window": "weekly",
         "used_tokens": 210000,
-        "reserved_tokens": 8192,
         "quota_tokens": 10000000,
         "used_percent": 2,
         "resets_at": null
@@ -202,10 +186,7 @@ rolling-window computation the enforcement gate uses.
 `resets_at` is present only on a window that is at or over quota — it is the
 exact earliest instant usage drops back below quota (rolling windows shrink
 as old calls age out, so recovery is per-usage, not a fixed boundary). Under
-quota it is `null`: there is nothing to wait for. `reserved_tokens` is the
-in-flight claim running calls hold against the window; `used_percent` uses
-the effective position (`used + reserved`), so the bar shows 100% exactly
-when the gate rejects. Token values are
+quota it is `null`: there is nothing to wait for. Token values are
 normalized tokens (the quota currency), not raw provider counts — see
 `docs/TABLES.md` for the accounting model.
 
@@ -226,20 +207,26 @@ client-reported counts). Window defaults to the trailing 30 days; max span
 
 ---
 
-## Payments (credit top-ups)
+## Payments (plan subscriptions — plans only)
+
+A purchase is a PLAN PERIOD (a SKU): `plan_pro_1m` (₹1,999/30d) or
+`plan_pro_1y` (₹19,999/365d). A captured order activates/extends the
+tenant's Pro subscription (renewals stack); expiry returns the tenant to
+Free automatically. No credit packs, no wallet.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| GET | `/v1/payments/catalog` | Bearer | Purchasable credit packs |
-| POST | `/v1/payments/checkout` | Bearer | Create order (Idempotency-Key honored) |
-| POST | `/v1/payments/confirm` | Bearer | Razorpay Checkout handshake |
+| GET | `/v1/payments/catalog` | Bearer | Purchasable plan SKUs |
+| POST | `/v1/payments/checkout` | Bearer | Create order `{sku_id}` (Idempotency-Key honored) |
+| POST | `/v1/payments/confirm` | Bearer | Settle after paying (provider handshake — see FRONTEND-PAYMENTS.md §3) |
 | GET | `/v1/payments/orders/{order_id}` | Bearer | Order status (reconciles if pending) |
 | GET | `/v1/payments/history` | Bearer | Tenant orders, newest first |
-| GET | `/v1/payments/balance` | Bearer | Credit balance + last top-up |
-| POST | `/v1/payments/webhook` | HMAC | Provider events (signature is the auth) |
+| GET | `/v1/payments/subscription` | Bearer | Entitlement position (plan, paid-through, days remaining) |
+| POST | `/v1/payments/webhook` | signature | Provider events (X-Razorpay-Signature / Stripe-Signature / X-VERIFY — the active provider's header) |
 
 Provider disabled ⇒ `PAYMENTS_DISABLED` 503 on the same paths (stable
-contract). See `docs/PAYMENT-GATEWAY.md`.
+contract). Full client flow: `docs/FRONTEND-PAYMENTS.md`; gateway
+internals: `docs/PAYMENT-GATEWAY.md`.
 
 ---
 

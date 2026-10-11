@@ -11,13 +11,13 @@ import (
 	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
-func TestWebhook_Captured_AppliesCredits(t *testing.T) {
+func TestWebhook_Captured_ActivatesPlan(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 	payID := f.provider.Capture(o.ProviderOrderID)
 
-	body := payment.BuildWebhookBody("evt_w1", payment.EventPaymentCaptured, o.ProviderOrderID, payID, pack.AmountPaise)
+	body := payment.BuildWebhookBody("evt_w1", payment.EventPaymentCaptured, o.ProviderOrderID, payID, sku.AmountPaise)
 	if err := f.svc.HandleWebhook(context.Background(), body, f.provider.SignWebhook(body), "10.0.0.1"); err != nil {
 		t.Fatal(err)
 	}
@@ -25,19 +25,19 @@ func TestWebhook_Captured_AppliesCredits(t *testing.T) {
 	if got.Status != payment.StatusPaid {
 		t.Fatalf("status = %s, want paid", got.Status)
 	}
-	b, _ := f.store.Balance(context.Background(), tenantA)
-	if b.Balance != pack.Credits {
-		t.Fatalf("balance = %d, want %d", b.Balance, pack.Credits)
+	st, _ := f.store.Subscription(context.Background(), tenantA)
+	if st.Status != payment.SubActive || st.PlanCode != sku.PlanCode {
+		t.Fatalf("plan not activated: %+v", st)
 	}
 }
 
 func TestWebhook_BadSignature_FailClosed(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 	payID := f.provider.Capture(o.ProviderOrderID)
 
-	body := payment.BuildWebhookBody("evt_bad", payment.EventPaymentCaptured, o.ProviderOrderID, payID, pack.AmountPaise)
+	body := payment.BuildWebhookBody("evt_bad", payment.EventPaymentCaptured, o.ProviderOrderID, payID, sku.AmountPaise)
 	if err := f.svc.HandleWebhook(context.Background(), body, "forged", "10.0.0.1"); err == nil {
 		t.Fatal("forged webhook accepted")
 	}
@@ -49,38 +49,35 @@ func TestWebhook_BadSignature_FailClosed(t *testing.T) {
 
 func TestWebhook_Duplicate_NoDoubleCredit(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 	payID := f.provider.Capture(o.ProviderOrderID)
 
-	body := payment.BuildWebhookBody("evt_dup", payment.EventPaymentCaptured, o.ProviderOrderID, payID, pack.AmountPaise)
+	body := payment.BuildWebhookBody("evt_dup", payment.EventPaymentCaptured, o.ProviderOrderID, payID, sku.AmountPaise)
 	sig := f.provider.SignWebhook(body)
 	for i := 0; i < 3; i++ { // provider re-delivers
 		if err := f.svc.HandleWebhook(context.Background(), body, sig, "10.0.0.1"); err != nil {
 			t.Fatalf("delivery %d failed: %v", i+1, err)
 		}
 	}
-	if n := f.store.ledgerCountForOrder(o.ID); n != 1 {
-		t.Fatalf("ledger entries = %d, want 1", n)
-	}
-	b, _ := f.store.Balance(context.Background(), tenantA)
-	if b.Balance != pack.Credits {
-		t.Fatalf("balance = %d, want %d", b.Balance, pack.Credits)
+	st, _ := f.store.Subscription(context.Background(), tenantA)
+	if st.Status != payment.SubActive || st.DaysRemaining > sku.PeriodDays {
+		t.Fatalf("plan activated more than once: %+v", st)
 	}
 }
 
 func TestWebhook_OutOfOrder_FailedAfterCaptured(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 	payID := f.provider.Capture(o.ProviderOrderID)
 
-	captured := payment.BuildWebhookBody("evt_o1", payment.EventPaymentCaptured, o.ProviderOrderID, payID, pack.AmountPaise)
+	captured := payment.BuildWebhookBody("evt_o1", payment.EventPaymentCaptured, o.ProviderOrderID, payID, sku.AmountPaise)
 	if err := f.svc.HandleWebhook(context.Background(), captured, f.provider.SignWebhook(captured), "10.0.0.1"); err != nil {
 		t.Fatal(err)
 	}
 	// Late failure event must NOT regress the paid order.
-	failed := payment.BuildWebhookBody("evt_o2", payment.EventPaymentFailed, o.ProviderOrderID, payID, pack.AmountPaise)
+	failed := payment.BuildWebhookBody("evt_o2", payment.EventPaymentFailed, o.ProviderOrderID, payID, sku.AmountPaise)
 	if err := f.svc.HandleWebhook(context.Background(), failed, f.provider.SignWebhook(failed), "10.0.0.1"); err != nil {
 		t.Fatalf("late failed event errored: %v", err)
 	}
@@ -88,16 +85,15 @@ func TestWebhook_OutOfOrder_FailedAfterCaptured(t *testing.T) {
 	if got.Status != payment.StatusPaid {
 		t.Fatalf("paid order regressed to %s", got.Status)
 	}
-	b, _ := f.store.Balance(context.Background(), tenantA)
-	if b.Balance != pack.Credits {
-		t.Fatalf("balance changed after late failure: %d", b.Balance)
+	if st, _ := f.store.Subscription(context.Background(), tenantA); st.Status != payment.SubActive {
+		t.Fatalf("subscription regressed after late failure: %+v", st)
 	}
 }
 
 func TestWebhook_AmountMismatch_TamperAlarm(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 	payID := f.provider.Capture(o.ProviderOrderID)
 
 	// Correctly signed, but claims ₹1 for a ₹500 order.
@@ -109,8 +105,8 @@ func TestWebhook_AmountMismatch_TamperAlarm(t *testing.T) {
 	if got.Status != payment.StatusPending {
 		t.Fatal("tampered amount mutated order")
 	}
-	if b, _ := f.store.Balance(context.Background(), tenantA); b.Balance != 0 {
-		t.Fatalf("tampered amount minted credits: %d", b.Balance)
+	if st, _ := f.store.Subscription(context.Background(), tenantA); st.Status != payment.SubNone {
+		t.Fatalf("tampered amount activated a plan: %+v", st)
 	}
 }
 

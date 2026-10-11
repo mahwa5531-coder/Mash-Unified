@@ -61,26 +61,12 @@ what), §11 (every payment key).
 
 ### Commonly tuned (all optional)
 
-Every connection URL is env-driven and validated at boot (absolute `http(s)`
-shape, exact key named on failure) — repointing OAuth, payments, Bifrost,
-OTel or the web redirect targets between prod/staging/test is a pure env
-change, never a code change.
-
 | Key | Default | What it does |
 |---|---|---|
 | `NEXAU_HTTP_ADDR` | `:8080` | listen address |
 | `NEXAU_ALLOWED_ORIGINS` | — | CORS allow-list (browsers need it; native desktop doesn't) |
 | `NEXAU_AUTH_MODE` | `local` | `local` (this API mints JWTs) or `jwks` (external IdP) |
 | `NEXAU_AUTH_GOOGLE_CLIENT_ID/SECRET/REDIRECT_URL` | — | Google OAuth (required in production) |
-| `NEXAU_AUTH_GOOGLE_AUTH_URL/TOKEN_URL/JWKS_URL` | Google production endpoints | endpoint overrides — point at a test/fake OAuth server without code changes |
-| `NEXAU_AUTH_GOOGLE_ISSUERS` | `accounts.google.com,https://accounts.google.com` | accepted ID-token issuers. MUST be set (to the test server's issuer) whenever the endpoint overrides point at a non-Google server — the issuer check is a security boundary, so it is explicit config, never inferred |
-| `NEXAU_RAZORPAY_API_BASE` | `https://api.razorpay.com/v1` | payment-gateway API base — repoint at a sandbox/mock gateway via env |
-| `NEXAU_QUOTA_RESERVE_ENABLED` | `true` | in-flight token reservation (race-free rolling windows) |
-| `NEXAU_QUOTA_RESERVE_MIN_TOKENS` | `1024` | per-call reservation floor |
-| `NEXAU_QUOTA_RESERVE_MAX_TOKENS` | `32768` | per-call reservation ceiling (one huge request must not starve the tenant window) |
-| `NEXAU_QUOTA_RESERVE_DEFAULT_OUT_TOKENS` | `4096` | output budget assumed when the request declares none |
-| `NEXAU_QUOTA_RESERVE_TTL` | `30m` | crash backstop — must exceed `NEXAU_STREAM_MAX_DURATION` |
-| `NEXAU_QUOTA_RESERVE_SETTLE_DELAY` | `2s` | release delay covering the async metering flush (≈4× `NEXAU_METER_FLUSH_INTERVAL`) |
 | `NEXAU_RATE_REQ_PER_MIN_USER/TENANT` | see `.env.example` | rate-limit budgets |
 
 ## 3. Bring-up

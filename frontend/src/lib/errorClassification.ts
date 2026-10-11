@@ -132,7 +132,7 @@ export function classifyError(
   if (isQuota) {
     return {
       category: 'quota',
-      title: 'Baseline Model Quota Reached',
+      title: 'Plan Token Quota Reached',
       description: 'Your plan has reached its rolling baseline token allocation. Check the quota banner for refresh time.',
       rawDetails: raw,
       errorId: errorId || undefined,

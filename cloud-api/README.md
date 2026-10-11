@@ -7,7 +7,7 @@ things:
 
 1. **Identity** — Google OAuth only, via a web-to-desktop handshake
 2. **Entitlements** — plans (Free/Pro), quotas, rate limits
-3. **Billing** — prepaid credit top-ups (Razorpay)
+3. **Billing** — plan subscriptions, plans only (PhonePe default; Razorpay/Stripe selectable): a captured purchase activates/extends Pro; no credit packs
 4. **The LLM tunnel** — `POST /v1/chat/completions` → private [Bifrost](https://github.com/maximhq/bifrost) gateway (SSE, verbatim passthrough, metered)
 
 Go monolith · PostgreSQL (Aiven) + Redis · one binary · stateless replicas.
@@ -97,7 +97,9 @@ the payments repo PG-integration suite opts in via `NEXAU_TEST_DATABASE_URL`.
 | `docs/api.md` | HTTP reference — every route, every error code |
 | `docs/ARCHITECTURE.md` | package map, the tunnel hot path, data model, invariants |
 | `docs/DESKTOP-CONNECTION.md` | the desktop↔cloud contract end to end |
-| `docs/PAYMENT-GATEWAY.md` | Razorpay integration, ledger, exactly-once credits |
+| `docs/PAYMENT-GATEWAY.md` | Razorpay + Stripe + PhonePe integration, exactly-once subscription activation |
+| `docs/FRONTEND-PAYMENTS.md` | the client-facing endpoint map + per-provider call sequences |
+| `docs/MODELS-AND-PRICING.md` | **launch decisions**: October-2026 model lineup, normalization weights, Free/Pro plans, Indian-market pricing, ZDR matrix |
 | `docs/CIRCUIT-BREAKER.md` | Bifrost-path breaker design |
 | `docs/DEPLOYMENT.md` | deployment + ops runbook |
 | `docs/CLEANUP-2026-10-05.md` | the simplification audit trail |

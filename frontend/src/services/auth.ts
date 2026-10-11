@@ -35,7 +35,6 @@ export interface AuthUser {
   quota?: QuotaInfo;
   usage?: UsageInfo;
   limits?: Record<string, number>;
-  models?: string[];
   credits_remaining?: number;
   accounts?: Array<{
     email: string;
@@ -49,7 +48,13 @@ export async function fetchAuthMe(): Promise<AuthUser | null> {
   try {
     const res = await safeFetch(`${BASE_URL}/api/auth/me`);
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    if (typeof window !== 'undefined' && data?.access_token) {
+      try {
+        localStorage.setItem('nexau_access_token', data.access_token);
+      } catch {}
+    }
+    return data;
   } catch (err) {
     console.warn("Failed to fetch auth state:", err);
     return null;
@@ -61,7 +66,13 @@ export async function syncAuthMe(): Promise<AuthUser | null> {
     const res = await safeFetch(`${BASE_URL}/api/auth/sync`, { method: "POST" });
     if (!res.ok) return null;
     const body = await res.json();
-    return body?.data || null;
+    const data = body?.data || null;
+    if (typeof window !== 'undefined' && data?.access_token) {
+      try {
+        localStorage.setItem('nexau_access_token', data.access_token);
+      } catch {}
+    }
+    return data;
   } catch (err) {
     console.warn("Failed to sync auth state:", err);
     return null;
@@ -70,6 +81,11 @@ export async function syncAuthMe(): Promise<AuthUser | null> {
 
 export async function logoutUser(): Promise<boolean> {
   try {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('nexau_access_token');
+      } catch {}
+    }
     const res = await safeFetch(`${BASE_URL}/api/auth/logout`, { method: "POST" });
     return res.ok;
   } catch (err) {

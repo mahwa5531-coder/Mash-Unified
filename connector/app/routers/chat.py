@@ -169,6 +169,14 @@ async def stream_query_bridge(
     workspace_target = resolved_context.get("workspace_uri", "No Repo")
     resolved_context["_raw_message"] = payload.messages  # for title extraction
 
+    # Ensure live valid token for cloud gateway dispatch FIRST before any database state is written (DEF-10)
+    from app.routers.auth import ensure_valid_token
+    live_token = await ensure_valid_token()
+    mash_env = os.getenv("MASH_ENV", "production").lower()
+    auth_required = os.getenv("MASH_AUTH_REQUIRED", "").lower() in ("true", "1", "yes") or mash_env == "production"
+    if auth_required and (not live_token or live_token == "bearer-pending-auth"):
+        raise HTTPException(status_code=401, detail="Authentication required. Please sign in to MASH.")
+
     try:
         eng = get_engine()
     except Exception:
@@ -181,14 +189,6 @@ async def stream_query_bridge(
     user_prompt = payload.messages
 
     effective_agent_config = server._default_agent_config
-    
-    # Ensure live valid token for cloud gateway dispatch
-    from app.routers.auth import ensure_valid_token
-    live_token = await ensure_valid_token()
-    mash_env = os.getenv("MASH_ENV", "production").lower()
-    auth_required = os.getenv("MASH_AUTH_REQUIRED", "").lower() in ("true", "1", "yes") or mash_env == "production"
-    if auth_required and (not live_token or live_token == "bearer-pending-auth"):
-        raise HTTPException(status_code=401, detail="Authentication required. Please sign in to MASH.")
 
     if live_token and effective_agent_config and effective_agent_config.llm_config:
         if effective_agent_config.llm_config.api_key != live_token:

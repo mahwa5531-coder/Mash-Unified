@@ -27,11 +27,10 @@ func NewPayments(p *pgxpool.Pool) *PaymentsRepo { return &PaymentsRepo{Pool: p} 
 // Compile-time contract check.
 var _ payment.Store = (*PaymentsRepo)(nil)
 
-// constraint names → payment package sentinels (migration 000010).
+// constraint names → payment package sentinels (migration 000006).
 const (
 	cnIdempotency = "uq_payment_orders_idempotency"
 	cnProviderOrd = "uq_payment_orders_provider_order"
-	cnLedger      = "credit_ledger_order_id_kind_key"
 )
 
 func mapPgErr(err error) error {
@@ -42,8 +41,6 @@ func mapPgErr(err error) error {
 			return payment.ErrOrderExistsIdem
 		case cnProviderOrd:
 			return payment.ErrOrderExistsProvider
-		case cnLedger:
-			return payment.ErrOrderExistsIdem // ledger race backstop: treat as already-applied path
 		}
 	}
 	return err
@@ -53,14 +50,16 @@ func mapPgErr(err error) error {
 // COALESCEd to ” because the Go layer represents "absent" as the zero
 // string (the write side mirrors this with NULLIF — see CreateOrder).
 const orderCols = `id, tenant_id, user_id, provider, provider_order_id,
-        COALESCE(provider_payment_id, ''), pack_id, currency, amount_paise, credits, status,
+        COALESCE(provider_payment_id, ''), COALESCE(provider_client_secret, ''), COALESCE(provider_checkout_url, ''),
+        sku_id, plan_code, period_days, currency, amount_paise, status,
         COALESCE(failure_reason, ''), COALESCE(idempotency_key, ''), COALESCE(request_hash, ''),
         created_at, updated_at, paid_at, expires_at`
 
 func scanOrder(row pgx.Row) (*payment.Order, error) {
 	var o payment.Order
 	err := row.Scan(&o.ID, &o.TenantID, &o.UserID, &o.Provider, &o.ProviderOrderID, &o.ProviderPaymentID,
-		&o.PackID, &o.Currency, &o.AmountPaise, &o.Credits, &o.Status, &o.FailureReason, &o.IdempotencyKey,
+		&o.ProviderClientSecret, &o.ProviderCheckoutURL,
+		&o.SKUID, &o.PlanCode, &o.PeriodDays, &o.Currency, &o.AmountPaise, &o.Status, &o.FailureReason, &o.IdempotencyKey,
 		&o.RequestHash, &o.CreatedAt, &o.UpdatedAt, &o.PaidAt, &o.ExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, payment.ErrNotFound
@@ -81,12 +80,14 @@ func scanOrder(row pgx.Row) (*payment.Order, error) {
 func (r *PaymentsRepo) CreateOrder(ctx context.Context, o *payment.Order) error {
 	_, err := r.Pool.Exec(ctx, `
                 INSERT INTO payment_orders (id, tenant_id, user_id, provider, provider_order_id,
-                        provider_payment_id, pack_id, currency, amount_paise, credits, status,
+                        provider_payment_id, provider_client_secret, provider_checkout_url,
+                        sku_id, plan_code, period_days, currency, amount_paise, status,
                         failure_reason, idempotency_key, request_hash, created_at, updated_at, paid_at, expires_at)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
-                        NULLIF($13,''), NULLIF($14,''), $15,$16,$17,$18)`,
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
+                        $15, NULLIF($16,''), NULLIF($17,''), $18,$19,$20,$21)`,
 		o.ID, o.TenantID, o.UserID, o.Provider, o.ProviderOrderID, o.ProviderPaymentID,
-		o.PackID, o.Currency, o.AmountPaise, o.Credits, o.Status, o.FailureReason, o.IdempotencyKey,
+		o.ProviderClientSecret, o.ProviderCheckoutURL,
+		o.SKUID, o.PlanCode, o.PeriodDays, o.Currency, o.AmountPaise, o.Status, o.FailureReason, o.IdempotencyKey,
 		o.RequestHash, o.CreatedAt, o.UpdatedAt, o.PaidAt, o.ExpiresAt)
 	return mapPgErr(err)
 }
@@ -164,8 +165,9 @@ func (r *PaymentsRepo) MarkAttempted(ctx context.Context, orderID, providerPayme
 
 // ApplyPaid — THE money transaction. Row lock serializes racing appliers
 // (confirm / webhook / reconcile); the status guard makes re-application
-// a no-op; the ledger UNIQUE(order_id, kind) is the durable backstop that
-// makes double-crediting impossible even under a storage-level bug.
+// a no-op; and the SUBSCRIPTION ACTIVATION (extend-or-insert, stacking
+// periods) runs in the same transaction, so an order can never be paid
+// without its plan period landing — and never activates twice.
 func (r *PaymentsRepo) ApplyPaid(ctx context.Context, orderID, providerPaymentID string) (bool, *payment.Order, error) {
 	tx, err := r.Pool.Begin(ctx)
 	if err != nil {
@@ -173,15 +175,16 @@ func (r *PaymentsRepo) ApplyPaid(ctx context.Context, orderID, providerPaymentID
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// Serialize on the order row (and read the order's own credits — the
-	// caller NEVER passes an amount to credit).
+	// Serialize on the order row (and read the order's own plan snapshot —
+	// the caller NEVER passes a plan or period).
 	var (
-		tenantID string
-		credits  int64
+		tenantID   string
+		planCode   string
+		periodDays int
 	)
 	err = tx.QueryRow(ctx,
-		`SELECT tenant_id, credits FROM payment_orders WHERE id = $1 FOR UPDATE`,
-		orderID).Scan(&tenantID, &credits)
+		`SELECT tenant_id, plan_code, period_days FROM payment_orders WHERE id = $1 FOR UPDATE`,
+		orderID).Scan(&tenantID, &planCode, &periodDays)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil, payment.ErrNotFound
 	}
@@ -211,25 +214,17 @@ func (r *PaymentsRepo) ApplyPaid(ctx context.Context, orderID, providerPaymentID
 		return false, o, nil
 	}
 
-	// Balance read INSIDE the transaction (after the row lock): the
-	// balance_after ledger snapshot is consistent with the bump.
-	var balanceAfter int64
-	err = tx.QueryRow(ctx, `
-                INSERT INTO credit_balances (tenant_id, balance)
-                VALUES ($1, $2)
-                ON CONFLICT (tenant_id) DO UPDATE
-                   SET balance = credit_balances.balance + EXCLUDED.balance,
-                       updated_at = now()
-                RETURNING balance`, tenantID, credits).Scan(&balanceAfter)
-	if err != nil {
-		return false, nil, err
-	}
-
-	if _, err := tx.Exec(ctx, `
-                INSERT INTO credit_ledger (id, tenant_id, order_id, kind, credits, balance_after)
-                VALUES ($1, $2, $3, 'topup', $4, $5)`,
-		ids.New("led"), tenantID, orderID, credits, balanceAfter); err != nil {
-		return false, nil, mapPgErr(err) // cnLedger → already applied race
+	// Plan activation (plans only — this is the entire point of a paid
+	// order). Guarded by plan_code <> '' so a hypothetical credit-era row
+	// could never crash the path; a missing plan (deleted mid-flight) is
+	// logged-and-skipped: the money is real, the order stays paid, ops
+	// resolves the plan manually. That is a checkout-validated path
+	// (PlanExists) failing only on operator action between checkout and
+	// capture.
+	if planCode != "" && periodDays > 0 {
+		if err := activateSubscription(ctx, tx, tenantID, planCode, periodDays); err != nil {
+			return false, nil, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -240,6 +235,63 @@ func (r *PaymentsRepo) ApplyPaid(ctx context.Context, orderID, providerPaymentID
 		return true, nil, err
 	}
 	return true, o, nil
+}
+
+// activateSubscription extends the tenant's effective subscription (or
+// inserts a fresh one) INSIDE the ApplyPaid transaction:
+//
+//	extend: current_period_end = GREATEST(now(), current_period_end) + period
+//	        (stacking renewals: paying twice back-to-back never loses days)
+//	insert: current_period = now → now + period (first purchase)
+//
+// The partial unique index uq_subscriptions_tenant_active (one row per
+// tenant in trialing/active/past_due) arbitrates: rows in expired/canceled
+// states do NOT hold the slot, so re-subscribing inserts cleanly.
+func activateSubscription(ctx context.Context, tx pgx.Tx, tenantID, planCode string, periodDays int) error {
+	// Resolve the plan id INSIDE the transaction (plan_code → plans.id).
+	var planID string
+	err := tx.QueryRow(ctx, `SELECT id FROM plans WHERE code = $1`, planCode).Scan(&planID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Missing plan: order stays paid (money real), activation skipped.
+		// Checkout already validated existence — this is operator drift.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	tag, err := tx.Exec(ctx, `
+                UPDATE subscriptions SET
+                       plan_id = $2,
+                       status = 'active',
+                       current_period_start = CASE
+                           WHEN current_period_end IS NULL OR current_period_end <= now()
+                               THEN now() ELSE current_period_start END,
+                       current_period_end = GREATEST(now(), COALESCE(current_period_end, now()))
+                           + make_interval(days => $3),
+                       cancel_at_period_end = FALSE,
+                       updated_at = now()
+                 WHERE tenant_id = $1
+                   AND status IN ('trialing','active','past_due')`, tenantID, planID, periodDays)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() > 0 {
+		return nil
+	}
+
+	// No effective row (fresh tenant, or prior sub expired/canceled):
+	// insert a new active subscription.
+	_, err = tx.Exec(ctx, `
+                INSERT INTO subscriptions (id, tenant_id, plan_id, status,
+                        current_period_start, current_period_end)
+                VALUES ($1, $2, $3, 'active', now(), now() + make_interval(days => $4))`,
+		ids.New("sub"), tenantID, planID, periodDays)
+	// A concurrent activation racing the insert lands on the unique
+	// partial index — but we hold the ORDER row lock, and every activation
+	// path goes through an order, so this cannot race in practice. If it
+	// ever fires, the retry (webhook redelivery) converges via the UPDATE.
+	return mapPgErr(err)
 }
 
 // ApplyFailed — pending/attempted → failed (never overwrites paid).
@@ -299,43 +351,45 @@ func (r *PaymentsRepo) RecordWebhookEvent(ctx context.Context, ev *payment.Webho
 	return false, nil
 }
 
-// Balance returns the tenant's credit balance (0 when never topped up).
-func (r *PaymentsRepo) Balance(ctx context.Context, tenantID string) (*payment.Balance, error) {
-	b := &payment.Balance{TenantID: tenantID}
-	err := r.Pool.QueryRow(ctx, `SELECT balance FROM credit_balances WHERE tenant_id = $1`, tenantID).
-		Scan(&b.Balance)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return b, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	// Last top-up metadata (left join: balance may exist without ledger
-	// rows only in pathological states; treat as zero top-ups).
-	_ = r.Pool.QueryRow(ctx, `
-                SELECT credits, created_at FROM credit_ledger
-                 WHERE tenant_id = $1 AND kind = 'topup'
-                 ORDER BY created_at DESC LIMIT 1`, tenantID).Scan(&b.LastTopupAmount, &b.LastTopupAt)
-	return b, nil
+// PlanExists validates that a SKU's plan_code resolves to a plans row
+// (checkout-time guard: orders must never reference unactivatable plans).
+func (r *PaymentsRepo) PlanExists(ctx context.Context, planCode string) (bool, error) {
+	var exists bool
+	err := r.Pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM plans WHERE code = $1)`, planCode).Scan(&exists)
+	return exists, err
 }
 
-// Ledger returns the tenant's ledger entries newest-first (bounded).
-func (r *PaymentsRepo) Ledger(ctx context.Context, tenantID string, limit int) ([]*payment.LedgerEntry, error) {
-	rows, err := r.Pool.Query(ctx, `
-                SELECT id, tenant_id, order_id, kind, credits, balance_after, created_at
-                  FROM credit_ledger WHERE tenant_id = $1
-                 ORDER BY created_at DESC LIMIT $2`, tenantID, limit)
+// Subscription returns the tenant's entitlement position (plans only —
+// there is no credit balance; the subscription IS the wallet). Effective
+// rows must still be inside their paid-through window: an active-status
+// row whose current_period_end has passed reads as SubNone (the identity
+// resolver's free-plan fallback then applies — the read-side expiry
+// check, no sweeper needed).
+func (r *PaymentsRepo) Subscription(ctx context.Context, tenantID string) (*payment.SubscriptionState, error) {
+	st := &payment.SubscriptionState{TenantID: tenantID, Status: payment.SubNone}
+	var periodEnd *time.Time
+	err := r.Pool.QueryRow(ctx, `
+                SELECT pl.code, pl.name, sub.status, sub.current_period_end
+                  FROM subscriptions sub
+                  JOIN plans pl ON pl.id = sub.plan_id
+                 WHERE sub.tenant_id = $1
+                   AND sub.status IN ('trialing','active','past_due')
+                   AND (sub.current_period_end IS NULL OR sub.current_period_end > now())
+                 ORDER BY sub.status = 'past_due' ASC, sub.created_at DESC
+                 LIMIT 1`, tenantID).
+		Scan(&st.PlanCode, &st.PlanName, &st.Status, &periodEnd)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return st, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []*payment.LedgerEntry
-	for rows.Next() {
-		var e payment.LedgerEntry
-		if err := rows.Scan(&e.ID, &e.TenantID, &e.OrderID, &e.Kind, &e.Credits, &e.BalanceAfter, &e.CreatedAt); err != nil {
-			return nil, err
+	st.CurrentPeriodEnd = periodEnd
+	if periodEnd != nil {
+		st.DaysRemaining = int(time.Until(*periodEnd).Hours() / 24)
+		if st.DaysRemaining < 0 {
+			st.DaysRemaining = 0
 		}
-		out = append(out, &e)
 	}
-	return out, rows.Err()
+	return st, nil
 }

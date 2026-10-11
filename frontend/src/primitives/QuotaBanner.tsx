@@ -29,7 +29,7 @@ export interface QuotaBannerProps {
 export function QuotaBanner({
   open = true,
   onOpenChange,
-  title = "Baseline model quota reached",
+  title = "Plan quota limit reached",
   refreshDate,
   description,
   onSeePlans,
@@ -61,7 +61,7 @@ export function QuotaBanner({
     onOpenChange?.(false);
   };
 
-  const bodyText = description || `Your plan's baseline quota will refresh on ${formattedRefreshTime}. To continue running autonomous turns now, switch models or upgrade tier.`;
+  const bodyText = description || `Your plan's baseline quota will refresh on ${formattedRefreshTime}. To continue running autonomous turns now, upgrade your plan tier or wait for renewal.`;
 
   return (
     <div

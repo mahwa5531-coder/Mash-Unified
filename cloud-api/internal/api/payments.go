@@ -14,15 +14,15 @@ import (
 // the router checks a.payments != nil; disabled deployments answer
 // 503 PAYMENTS_DISABLED on the same paths, keeping the contract stable).
 //
-// Surface (design §10):
+// Surface (docs/FRONTEND-PAYMENTS.md):
 //
-//	GET  /v1/payments/catalog         purchasable packs
+//	GET  /v1/payments/catalog         purchasable plan SKUs (plans only)
 //	POST /v1/payments/checkout        create order (Idempotency-Key honored)
-//	POST /v1/payments/confirm         Razorpay Checkout handshake
+//	POST /v1/payments/confirm         settle after paying (provider handshake)
 //	GET  /v1/payments/orders/{id}     order status (reconciles if pending)
 //	GET  /v1/payments/history         tenant orders, newest first
-//	GET  /v1/payments/balance         credit balance + last top-up
-//	POST /v1/payments/webhook         provider events (HMAC is the auth)
+//	GET  /v1/payments/subscription    entitlement position (plan + paid-through)
+//	POST /v1/payments/webhook         provider events (signature is the auth)
 //
 // Handlers stay thin: decode → service → encode. Money decisions never
 // live here.
@@ -37,16 +37,20 @@ func (a *API) handlePaymentCatalog(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, payment.ErrDisabled)
 		return
 	}
-	packs := a.payments.Packs()
-	out := make([]payment.Pack, len(packs))
-	copy(out, packs)
-	writeOK(w, map[string]any{"packs": out})
+	skus := a.payments.SKUs()
+	out := make([]payment.PlanSKU, len(skus))
+	copy(out, skus)
+	writeOK(w, map[string]any{"skus": out})
 }
 
-// handlePaymentCheckout: POST /v1/payments/checkout {pack_id}
+// handlePaymentCheckout: POST /v1/payments/checkout {sku_id}
 //
 // Idempotency-Key is honored (strongly recommended for every client:
 // network retries must never fork orders).
+//
+// The response relays the provider's browser handles: key_id (razorpay
+// Checkout.js), client_secret (stripe), redirect_url (phonepe hosted
+// PAY_PAGE — send the browser there wholesale).
 func (a *API) handlePaymentCheckout(w http.ResponseWriter, r *http.Request) {
 	if !a.paymentsEnabled() {
 		writeError(w, r, payment.ErrDisabled)
@@ -58,35 +62,46 @@ func (a *API) handlePaymentCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		PackID string `json:"pack_id"`
+		SKUID string `json:"sku_id"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, r, domain.ErrValidation("malformed JSON body"))
 		return
 	}
-	if req.PackID == "" {
-		writeError(w, r, domain.ErrValidation("pack_id is required"))
+	if req.SKUID == "" {
+		writeError(w, r, domain.ErrValidation("sku_id is required"))
 		return
 	}
 
 	o, err := a.payments.Checkout(r.Context(), idn.Tenant.ID, idn.User.ID,
-		req.PackID, r.Header.Get("Idempotency-Key"))
+		req.SKUID, r.Header.Get("Idempotency-Key"))
 	if err != nil {
 		writeError(w, r, domain.AsError(err))
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]any{
+	resp := map[string]any{
 		"order":             o.ClientViewOf(),
-		"key_id":            a.payments.PublicKeyID(), // public by design (Checkout.js)
+		"key_id":            a.payments.PublicKeyID(), // public by design
 		"provider":          o.Provider,
 		"provider_order_id": o.ProviderOrderID,
-	})
+	}
+	if o.ProviderCheckoutURL != "" { // phonepe: hosted payment page
+		resp["redirect_url"] = o.ProviderCheckoutURL
+	}
+	if o.ProviderClientSecret != "" { // stripe: Stripe.js handle
+		resp["client_secret"] = o.ProviderClientSecret
+	}
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 // handlePaymentConfirm: POST /v1/payments/confirm
 //
-// Body: the three fields Razorpay Checkout.js hands the browser.
+// Body is provider-shaped with a generic core. firstNonEmpty resolution
+// order: generic fields → legacy razorpay_* spellings → stripe / phonepe
+// variants. The service verifies whatever the active provider defines
+// (razorpay: HMAC triple; stripe/phonepe: server-side fetch is the
+// authority — no client secret exists).
 func (a *API) handlePaymentConfirm(w http.ResponseWriter, r *http.Request) {
 	if !a.paymentsEnabled() {
 		writeError(w, r, payment.ErrDisabled)
@@ -98,21 +113,39 @@ func (a *API) handlePaymentConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
+		// Generic core.
+		ProviderOrderID   string `json:"provider_order_id"`
+		ProviderPaymentID string `json:"provider_payment_id"`
+		ProviderSignature string `json:"provider_signature"`
+
+		// Legacy razorpay spellings (Checkout.js posts these verbatim).
 		RazorpayOrderID   string `json:"razorpay_order_id"`
 		RazorpayPaymentID string `json:"razorpay_payment_id"`
 		RazorpaySignature string `json:"razorpay_signature"`
+
+		// Stripe: the PaymentIntent id (client_secret optional — the
+		// server-side fetch is the authority, it is never trusted).
+		PaymentIntentID string `json:"payment_intent_id"`
+		ClientSecret    string `json:"client_secret"`
+
+		// PhonePe: the merchantTransactionId (= PAY-<our order suffix>).
+		MerchantTransactionID string `json:"merchant_transaction_id"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, r, domain.ErrValidation("malformed JSON body"))
 		return
 	}
-	if req.RazorpayOrderID == "" || req.RazorpayPaymentID == "" || req.RazorpaySignature == "" {
-		writeError(w, r, domain.ErrValidation("razorpay_order_id, razorpay_payment_id and razorpay_signature are required"))
+
+	orderID := firstNonEmpty(req.ProviderOrderID, req.RazorpayOrderID, req.PaymentIntentID, req.MerchantTransactionID)
+	paymentID := firstNonEmpty(req.ProviderPaymentID, req.RazorpayPaymentID, req.PaymentIntentID, req.MerchantTransactionID)
+	signature := firstNonEmpty(req.ProviderSignature, req.RazorpaySignature)
+
+	if orderID == "" || paymentID == "" {
+		writeError(w, r, domain.ErrValidation("provider_order_id and provider_payment_id are required"))
 		return
 	}
 
-	o, err := a.payments.Confirm(r.Context(), idn.Tenant.ID,
-		req.RazorpayOrderID, req.RazorpayPaymentID, req.RazorpaySignature)
+	o, err := a.payments.Confirm(r.Context(), idn.Tenant.ID, orderID, paymentID, signature)
 	if err != nil {
 		writeError(w, r, domain.AsError(err))
 		return
@@ -163,8 +196,12 @@ func (a *API) handlePaymentHistory(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{"orders": out})
 }
 
-// handlePaymentBalance: GET /v1/payments/balance
-func (a *API) handlePaymentBalance(w http.ResponseWriter, r *http.Request) {
+// handlePaymentSubscription: GET /v1/payments/subscription
+//
+// Plans only: there is no credit balance — the subscription IS the
+// wallet. Returns the effective plan (SubNone = the free default), the
+// paid-through date, and days remaining.
+func (a *API) handlePaymentSubscription(w http.ResponseWriter, r *http.Request) {
 	if !a.paymentsEnabled() {
 		writeError(w, r, payment.ErrDisabled)
 		return
@@ -174,20 +211,21 @@ func (a *API) handlePaymentBalance(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, domain.ErrUnauthorized(nil))
 		return
 	}
-	b, err := a.payments.Balance(r.Context(), idn.Tenant.ID)
+	st, err := a.payments.Subscription(r.Context(), idn.Tenant.ID)
 	if err != nil {
 		writeError(w, r, domain.AsError(err))
 		return
 	}
-	writeOK(w, b)
+	writeOK(w, st)
 }
 
 // handlePaymentWebhook: POST /v1/payments/webhook
 //
-// Unauthenticated by token BY DESIGN: the HMAC signature over the raw
+// Unauthenticated by token BY DESIGN: the provider signature over the raw
 // body is the route's entire authentication (design §13). The handler
 // reads the raw bytes untouched (no decode/re-marshal — that would break
-// the MAC), and only then hands off to the service.
+// the MAC), resolves the active provider's signature header, and hands
+// off to the service.
 func (a *API) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 	if !a.paymentsEnabled() {
 		writeError(w, r, payment.ErrDisabled)
@@ -200,14 +238,32 @@ func (a *API) handlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, domain.ErrValidation("unreadable body"))
 		return
 	}
+	// The signature header is provider-specific: razorpay
+	// X-Razorpay-Signature, stripe Stripe-Signature, phonepe X-VERIFY.
+	sig := r.Header.Get("X-Razorpay-Signature")
+	switch a.payments.ProviderName() {
+	case payment.ProviderStripe:
+		sig = r.Header.Get("Stripe-Signature")
+	case payment.ProviderPhonepe:
+		sig = r.Header.Get("X-VERIFY")
+	}
 	ip := clientIP(r, a.cfg.TrustProxyHeaders)
-	if err := a.payments.HandleWebhook(r.Context(), body,
-		r.Header.Get("X-Razorpay-Signature"), ip); err != nil {
+	if err := a.payments.HandleWebhook(r.Context(), body, sig, ip); err != nil {
 		writeError(w, r, domain.AsError(err))
 		return
 	}
 	// 200 only after the state change has committed (service contract).
 	w.WriteHeader(http.StatusOK)
+}
+
+// firstNonEmpty returns the first non-empty argument ("" when all empty).
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // parseBoundedInt parses a query int clamped to [min, max] with fallback.

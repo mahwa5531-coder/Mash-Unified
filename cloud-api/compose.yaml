@@ -43,7 +43,12 @@ services:
     image: maximhq/bifrost:latest
     environment:
       # Bifrost's own persistence — SEPARATE logical ownership (spec §13).
-      BIFROST_PROVIDER_KEYS_OPENAI: "${BIFROST_OPENAI_API_KEY:-}"
+      # The launch model lineup (docs/MODELS-AND-PRICING.md) spans three
+      # providers; enable the ones you use. All are no-training-on-API-data
+      # upstream (ZDR where noted in the doc).
+      BIFROST_PROVIDER_KEYS_OPENAI: "${BIFROST_OPENAI_API_KEY:-}"     # GPT-6 Luna + GPT-6.1 Sol
+      BIFROST_PROVIDER_KEYS_ANTHROPIC: "${BIFROST_ANTHROPIC_API_KEY:-}" # Claude Sonnet/Opus 5.5
+      BIFROST_PROVIDER_KEYS_GOOGLE: "${BIFROST_GOOGLE_API_KEY:-}"     # Gemini Flash + Argon
       BIFROST_TRANSPORT_BUFFER_SIZE: "16384"
     ports:
       - "8081:8080"
@@ -63,12 +68,6 @@ services:
       NEXAU_BIFROST_URL: "http://bifrost:8080"
       NEXAU_BIFROST_API_KEY: "${BIFROST_API_KEY:-}"
       NEXAU_AUTH_MODE: "local"
-      # All connection URLs (Bifrost, Google OAuth endpoints + issuers,
-      # Razorpay API base, OTel) are env-driven and boot-validated; repoint
-      # this stack at test doubles purely via .env — no code changes. See
-      # docs/DEPLOYMENT.md §2 for the full key table.
-      # In-flight quota reservation (race-free rolling windows) is ON by
-      # default; tune via NEXAU_QUOTA_RESERVE_* keys.
       # SECURITY (2026-09-19 audit, finding 1): the JWT signing secret is a
       # deployment credential and is NEVER committed. Compose fails fast with
       # this message when it is missing. Generate one:

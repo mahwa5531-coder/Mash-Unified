@@ -74,32 +74,23 @@ def _build_agent_config() -> AgentConfig:
     app_cfg = AppConfig.load()
     vault = load_secure_vault() or {}
 
+    # The desktop connector communicates exclusively with the MASH Cloud API layer
     cloud_gateway = (
         os.getenv("CLOUD_GATEWAY_URL")
         or os.getenv("GATEWAY_URL")
+        or os.getenv("MASH_GATEWAY_URL")
+        or os.getenv("MASH_API_URL")
         or app_cfg.model.gateway_url
-        or "https://api.mash.ai"
+        or "http://127.0.0.1:8080"
     )
-    custom_base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("LLM_BASE_URL")
-    custom_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY") or os.getenv("NVIDIA_API_KEY") or os.getenv("OPENROUTER_API_KEY")
-    custom_model = os.getenv("OPENAI_MODEL") or os.getenv("LLM_MODEL")
 
-    if cloud_gateway:
-        # In cloud gateway mode: vault access_token is authoritative; fall back to custom_key or bearer placeholder
-        active_key = (
-            vault.get("access_token")
-            or vault.get("api_key")
-            or custom_key
-            or "bearer-pending-auth"
-        )
-    else:
-        active_key = (
-            custom_key
-            or vault.get("api_key")
-            or vault.get("access_token")
-            or ("sk-local-test" if custom_base_url else "")
-        )
-    active_model = custom_model or app_cfg.model.default_model or "mash-audit-v1"
+    active_key = (
+        vault.get("access_token")
+        or vault.get("api_key")
+        or "bearer-pending-auth"
+    )
+    # Default model format strictly follows the cloud-api "provider/model" contract
+    active_model = os.getenv("MASH_MODEL") or app_cfg.model.default_model or "openai/gpt-6-luna"
 
     active_api_type = os.getenv("LLM_API_TYPE", "openai_chat_completion")
     is_mock = os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes") or active_key.lower() in ("mock", "none", "test")
@@ -107,20 +98,12 @@ def _build_agent_config() -> AgentConfig:
     if is_mock:
         active_key = active_key or "mock"
         default_base_url = "http://mock"
-    elif cloud_gateway:
+    else:
         clean_gw = cloud_gateway.rstrip("/")
         if clean_gw.endswith("/v1/agent"):
             clean_gw = clean_gw[:-6]
-        # ponytail: Point directly to OpenAI-compatible /v1 root (hits /v1/chat/completions)
+        # Direct tunnel to OpenAI-compatible Cloud API endpoint (/v1/chat/completions)
         default_base_url = clean_gw if clean_gw.endswith("/v1") else f"{clean_gw}/v1"
-    elif custom_base_url:
-        default_base_url = custom_base_url
-    elif active_key.startswith("sk-or-"):
-        default_base_url = "https://openrouter.ai/api/v1"
-        if not ("/" in active_model):
-            active_model = "google/gemini-2.5-flash"
-    else:
-        default_base_url = "https://openrouter.ai/api/v1"
 
     thinking_budget = int(os.getenv("LLM_THINKING_BUDGET", "16384"))
     extra_llm_params: dict[str, Any] = {}

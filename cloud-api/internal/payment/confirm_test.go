@@ -1,20 +1,22 @@
-// confirm_test.go — scenarios: the client handshake path (Razorpay
-// Checkout.js posts order/payment/signature). Three-legged verification,
-// tenant isolation, and confirm-after-webhook idempotency.
+// confirm_test.go — scenarios: the client handshake path (the provider
+// completion fields posted by the browser). Three-legged verification,
+// tenant isolation, confirm-after-webhook idempotency, and subscription
+// activation on success.
 package payment_test
 
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
-func TestConfirm_HappyPath_CreditsApplied(t *testing.T) {
+func TestConfirm_HappyPath_PlanActivated(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
+	sku := firstSKU(t)
 
-	o, err := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	o, err := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,72 +30,107 @@ func TestConfirm_HappyPath_CreditsApplied(t *testing.T) {
 	if confirmed.Status != payment.StatusPaid || confirmed.PaidAt == nil {
 		t.Fatalf("order not paid: %+v", confirmed)
 	}
-	b, _ := f.store.Balance(context.Background(), tenantA)
-	if b.Balance != pack.Credits {
-		t.Fatalf("balance = %d, want %d", b.Balance, pack.Credits)
+	// The plan activated: effective subscription = pro, ~sku period left.
+	st, _ := f.store.Subscription(context.Background(), tenantA)
+	if st.Status != payment.SubActive || st.PlanCode != sku.PlanCode {
+		t.Fatalf("subscription not activated: %+v", st)
 	}
-	if n := f.store.ledgerCountForOrder(o.ID); n != 1 {
-		t.Fatalf("ledger entries = %d, want 1", n)
+	if st.DaysRemaining < sku.PeriodDays-1 || st.DaysRemaining > sku.PeriodDays {
+		t.Fatalf("days remaining = %d, want ~%d", st.DaysRemaining, sku.PeriodDays)
 	}
 }
 
-func TestConfirm_BadSignature_Rejected(t *testing.T) {
+func TestConfirm_ForgedSignature_Rejected(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+
+	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 	payID := f.provider.Capture(o.ProviderOrderID)
 
-	if _, err := f.svc.Confirm(context.Background(), tenantA, o.ProviderOrderID, payID, "deadbeef"); err == nil {
-		t.Fatal("forged signature accepted")
+	if _, err := f.svc.Confirm(context.Background(), tenantA, o.ProviderOrderID, payID, "forged"); err == nil {
+		t.Fatal("forged handshake accepted")
 	}
-	// Order must remain pending (no state change from a bad handshake).
 	got, _ := f.store.OrderByID(context.Background(), o.ID)
 	if got.Status != payment.StatusPending {
-		t.Fatalf("bad signature mutated order to %s", got.Status)
+		t.Fatal("forged confirm mutated state")
+	}
+	if _, ok := f.store.subscriptionPeriodEnd(tenantA); ok {
+		t.Fatal("forged confirm activated a plan")
 	}
 }
 
-func TestConfirm_TenantIsolation(t *testing.T) {
+func TestConfirm_CrossTenant_Is404(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+
+	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 	payID := f.provider.Capture(o.ProviderOrderID)
 	sig := f.provider.SignCheckout(o.ProviderOrderID, payID)
 
-	// tenantB must NOT see or confirm tenantA's order (404, not 403).
+	// tenantB confirms tenantA's order: identical 404, no existence oracle.
 	if _, err := f.svc.Confirm(context.Background(), tenantB, o.ProviderOrderID, payID, sig); err == nil {
-		t.Fatal("cross-tenant confirm allowed")
+		t.Fatal("cross-tenant confirm accepted")
 	}
-	if _, err := f.svc.GetOrder(context.Background(), tenantB, o.ID); err == nil {
-		t.Fatal("cross-tenant read allowed")
+	if _, ok := f.store.subscriptionPeriodEnd(tenantA); ok {
+		t.Fatal("cross-tenant confirm activated a plan")
 	}
 }
 
-func TestConfirm_Idempotent_AfterWebhook(t *testing.T) {
+func TestConfirm_AfterWebhook_ReturnsPaidOrder(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
-	payID := f.provider.Capture(o.ProviderOrderID)
-	sig := f.provider.SignCheckout(o.ProviderOrderID, payID)
+	sku := firstSKU(t)
 
-	// Webhook wins first.
-	body := payment.BuildWebhookBody("evt_c1", payment.EventPaymentCaptured, o.ProviderOrderID, payID, pack.AmountPaise)
+	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
+	payID := f.provider.Capture(o.ProviderOrderID)
+
+	// Webhook lands FIRST (normal production ordering).
+	body := payment.BuildWebhookBody("evt_c1", payment.EventPaymentCaptured, o.ProviderOrderID, payID, sku.AmountPaise)
 	if err := f.svc.HandleWebhook(context.Background(), body, f.provider.SignWebhook(body), "10.0.0.1"); err != nil {
 		t.Fatal(err)
 	}
-	// Confirm after webhook → success, NOT conflict, no double credit.
+	// Then the browser posts confirm: settled success, not conflict — and
+	// CRITICALLY the plan activated exactly once (stacking must NOT fire).
+	sig := f.provider.SignCheckout(o.ProviderOrderID, payID)
 	confirmed, err := f.svc.Confirm(context.Background(), tenantA, o.ProviderOrderID, payID, sig)
 	if err != nil {
-		t.Fatalf("confirm after webhook failed: %v", err)
+		t.Fatal(err)
 	}
 	if confirmed.Status != payment.StatusPaid {
-		t.Fatalf("status = %s", confirmed.Status)
+		t.Fatalf("confirm-after-webhook status = %s", confirmed.Status)
 	}
-	if n := f.store.ledgerCountForOrder(o.ID); n != 1 {
-		t.Fatalf("ledger entries = %d, want 1 (double credit!)", n)
+	st, _ := f.store.Subscription(context.Background(), tenantA)
+	if st.DaysRemaining > sku.PeriodDays {
+		t.Fatalf("period stacked twice: %d days", st.DaysRemaining)
 	}
-	b, _ := f.store.Balance(context.Background(), tenantA)
-	if b.Balance != pack.Credits {
-		t.Fatalf("balance = %d, want exactly %d", b.Balance, pack.Credits)
+}
+
+func TestConfirm_StackingRenewals(t *testing.T) {
+	f := newFixture(t)
+	sku := firstSKU(t)
+	ctx := context.Background()
+
+	// First purchase: fresh activation.
+	o1, _ := f.svc.Checkout(ctx, tenantA, userA, sku.ID, "")
+	pay1 := f.provider.Capture(o1.ProviderOrderID)
+	sig1 := f.provider.SignCheckout(o1.ProviderOrderID, pay1)
+	if _, err := f.svc.Confirm(ctx, tenantA, o1.ProviderOrderID, pay1, sig1); err != nil {
+		t.Fatal(err)
+	}
+	end1, _ := f.store.subscriptionPeriodEnd(tenantA)
+
+	// Second purchase while active: periods STACK (no lost days).
+	time.Sleep(10 * time.Millisecond)
+	o2, _ := f.svc.Checkout(ctx, tenantA, userA, sku.ID, "")
+	pay2 := f.provider.Capture(o2.ProviderOrderID)
+	sig2 := f.provider.SignCheckout(o2.ProviderOrderID, pay2)
+	if _, err := f.svc.Confirm(ctx, tenantA, o2.ProviderOrderID, pay2, sig2); err != nil {
+		t.Fatal(err)
+	}
+	end2, _ := f.store.subscriptionPeriodEnd(tenantA)
+	// Stacking: the second period rides on TOP of the first's end, so the
+	// gap between the two ends is exactly ~one SKU period (not from-now).
+	want := time.Duration(sku.PeriodDays)*24*time.Hour - time.Hour
+	if got := end2.Sub(end1); got < want {
+		t.Fatalf("stacked period = %v, want ~%v (one more SKU period on top of the existing end)", got, want)
 	}
 }

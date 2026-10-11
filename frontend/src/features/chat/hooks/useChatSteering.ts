@@ -8,12 +8,10 @@ interface UseChatSteeringOptions {
   activeSessionIdRef: React.RefObject<string | null>;
   sessionId: string | null;
   onSendMessage: (
-    model?: string,
-    effort?: string,
     text?: string,
     isRetry?: boolean,
-    targetSessionId?: string,
-    isImmediate?: boolean
+    isImmediate?: boolean,
+    targetSessionId?: string
   ) => Promise<void>;
 }
 
@@ -45,7 +43,7 @@ export function useChatSteering({
       queueSteeringMessage(activeSid, msgToInject).catch(() => {});
     } else {
       // Agent is idle: dispatch immediately as a normal turn
-      await onSendMessage(undefined, undefined, msgToInject, false, activeSid, false);
+      await onSendMessage(msgToInject, false, false, activeSid);
     }
   }, [activeSessionIdRef, sessionId, onSendMessage]);
 

@@ -20,13 +20,13 @@ export function formatErrorMessage(rawErr: string): string {
   const innerMsg = innerMsgMatch ? innerMsgMatch[1] : null;
 
   if (rawErr.includes("404") || (innerMsg && innerMsg.toLowerCase().includes("unavailable"))) {
-    return innerMsg || "The selected model is unavailable or has been deprecated. Please switch to an available model.";
+    return innerMsg || "The requested service or route is temporarily unavailable. Please try again shortly.";
   }
   if (rawErr.includes("429") || rawErr.toLowerCase().includes("rate limit") || rawErr.toLowerCase().includes("quota")) {
-    return innerMsg || "Rate limit or token quota exceeded. Please switch models or try again shortly.";
+    return innerMsg || "Plan token quota reached. Please wait for your renewal window or upgrade tier.";
   }
   if (rawErr.includes("401") || rawErr.toLowerCase().includes("unauthorized")) {
-    return "API authentication failed. Please verify provider credentials or gateway key.";
+    return "API authentication failed. Please sign in to your MASH account.";
   }
   if (innerMsg) {
     return innerMsg;

@@ -76,37 +76,19 @@ type GoogleProvider struct {
 	authURL      string
 	tokenURL     string
 	jwksURL      string
-	issuers      map[string]bool // accepted ID-token `iss` values (config-driven)
 	hc           httpClient
 	keys         *googleKeys
 }
 
-// defaultGoogleIssuers are Google's two documented forms (no scheme / with
-// scheme). A deployment pointing the endpoints at a test or proxy OAuth
-// server overrides this list via NEXAU_AUTH_GOOGLE_ISSUERS — the issuer check
-// is a security boundary, so it is explicit configuration, never inferred
-// from the endpoint URLs.
-var defaultGoogleIssuers = []string{"accounts.google.com", "https://accounts.google.com"}
-
 // NewGoogleProvider builds the provider (hc nil → http.DefaultClient).
-// issuers nil/empty → Google's documented forms.
-func NewGoogleProvider(clientID, clientSecret, redirectURI, authURL, tokenURL, jwksURL string, issuers []string, hc httpClient) *GoogleProvider {
+func NewGoogleProvider(clientID, clientSecret, redirectURI, authURL, tokenURL, jwksURL string, hc httpClient) *GoogleProvider {
 	if hc == nil {
 		hc = http.DefaultClient
-	}
-	if len(issuers) == 0 {
-		issuers = defaultGoogleIssuers
-	}
-	m := make(map[string]bool, len(issuers))
-	for _, s := range issuers {
-		if s = strings.TrimSpace(s); s != "" {
-			m[s] = true
-		}
 	}
 	return &GoogleProvider{
 		clientID: clientID, clientSecret: clientSecret, redirectURI: redirectURI,
 		authURL: authURL, tokenURL: tokenURL, jwksURL: jwksURL,
-		issuers: m, hc: hc, keys: &googleKeys{url: jwksURL, hc: hc},
+		hc: hc, keys: &googleKeys{url: jwksURL, hc: hc},
 	}
 }
 
@@ -161,11 +143,10 @@ func (g *GoogleProvider) Exchange(ctx context.Context, code string) (*GoogleIden
 	return g.verifyIDToken(ctx, tok.IDToken)
 }
 
-// googleIssuersAre reports whether the ID token's issuer is one this
-// deployment accepts (Google's documented forms by default; overridden via
-// NEXAU_AUTH_GOOGLE_ISSUERS when the endpoints point at a test/fake server).
-func (g *GoogleProvider) issuerAccepted(iss string) bool {
-	return g.issuers[iss]
+// googleIssuers are both accepted forms (Google documents both).
+var googleIssuers = map[string]bool{
+	"accounts.google.com":         true,
+	"https://accounts.google.com": true,
 }
 
 // verifyIDToken checks RS256 signature against Google's JWKS and validates
@@ -196,7 +177,7 @@ func (g *GoogleProvider) verifyIDToken(ctx context.Context, raw string) (*Google
 	if !parsed.Valid {
 		return nil, domain.ErrOAuthProvider(errors.New("id token invalid"))
 	}
-	if !g.issuerAccepted(body.Issuer) {
+	if !googleIssuers[body.Issuer] {
 		return nil, domain.ErrOAuthProvider(fmt.Errorf("id token issuer %q", body.Issuer))
 	}
 	if len(body.Audience) == 0 || body.Audience[0] != g.clientID {

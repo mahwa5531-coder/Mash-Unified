@@ -19,6 +19,9 @@ import (
 //     Concurrent calls on one order must serialize exactly as the SQL does
 //     (row lock + status guard): exactly one returns applied=true, the rest
 //     observe the winner's result with applied=false.
+//   - ApplyPaid additionally ACTIVATES THE SUBSCRIPTION in the same
+//     transaction (extend-or-insert, stacking periods) — exactly once,
+//     under the same order-row lock.
 //   - RecordWebhookEvent deduplicates by EventID (second delivery returns
 //     duplicate=true, never an error).
 type Store interface {
@@ -40,11 +43,11 @@ type Store interface {
 	// never a money-moving transition).
 	MarkAttempted(ctx context.Context, orderID, providerPaymentID string) error
 
-	// ApplyPaid moves an order into `paid` and appends the topup ledger
-	// entry + balance bump in ONE transaction. Returns applied=false when
-	// the order was already paid (idempotent no-op, not an error). The
-	// credits are read from the order row itself — callers pass the order
-	// id, never a client-supplied amount.
+	// ApplyPaid moves an order into `paid` and activates/extends the
+	// tenant's subscription (plan_code + period_days, both read from the
+	// order row — callers never pass amounts) in ONE transaction. Returns
+	// applied=false when the order was already paid (idempotent no-op,
+	// not an error).
 	ApplyPaid(ctx context.Context, orderID, providerPaymentID string) (applied bool, order *Order, err error)
 
 	// ApplyFailed marks failed (only from pending/attempted); applied=false
@@ -58,12 +61,14 @@ type Store interface {
 	// RecordWebhookEvent persists the raw event for audit + dedupe.
 	RecordWebhookEvent(ctx context.Context, ev *WebhookEvent) (duplicate bool, err error)
 
-	// Balance returns the tenant's current credit balance (0 when the
-	// tenant never topped up).
-	Balance(ctx context.Context, tenantID string) (*Balance, error)
+	// PlanExists validates that a catalog SKU's plan_code resolves to a
+	// real plans row (checkout-time guard: an order must never reference a
+	// plan that cannot be activated at capture).
+	PlanExists(ctx context.Context, planCode string) (bool, error)
 
-	// Ledger returns the tenant's ledger entries newest-first (bounded).
-	Ledger(ctx context.Context, tenantID string, limit int) ([]*LedgerEntry, error)
+	// Subscription returns the tenant's entitlement position (Status
+	// SubNone when no effective row — the free default).
+	Subscription(ctx context.Context, tenantID string) (*SubscriptionState, error)
 
 	// ExpireStale sweeps non-terminal orders whose expires_at has passed.
 	// Returns the number expired (sweeper calls this periodically).

@@ -30,8 +30,8 @@ func TestService_WithRazorpayClientAgainstFakeServer(t *testing.T) {
 		OrderTTL: time.Minute, SweepInterval: time.Hour, HistoryLimit: 10,
 	})
 
-	pack := firstPack(t)
-	o, err := svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+	o, err := svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestService_WithRazorpayClientAgainstFakeServer(t *testing.T) {
 
 	// Complete at the "provider", then confirm through the real client
 	// path (signature + FetchPayment).
-	payID := fake.captureOrder(o.ProviderOrderID, pack.AmountPaise)
+	payID := fake.captureOrder(o.ProviderOrderID, sku.AmountPaise)
 	sig := client.SignCheckoutPair(o.ProviderOrderID, payID)
 	confirmed, err := svc.Confirm(context.Background(), tenantA, o.ProviderOrderID, payID, sig)
 	if err != nil {
@@ -54,12 +54,12 @@ func TestService_WithRazorpayClientAgainstFakeServer(t *testing.T) {
 	// Webhook through the REAL razorpay ParseWebhook + VerifyWebhookSignature
 	// path, signed with the client's webhook secret — arriving AFTER the
 	// confirm already paid the order (the normal ordering in production).
-	body := payment.BuildWebhookBody("evt_rzp_1", payment.EventPaymentCaptured, o.ProviderOrderID, payID, pack.AmountPaise)
+	body := payment.BuildWebhookBody("evt_rzp_1", payment.EventPaymentCaptured, o.ProviderOrderID, payID, sku.AmountPaise)
 	whSig := client.SignWebhookBody(body)
 	if err := svc.HandleWebhook(context.Background(), body, whSig, "127.0.0.1"); err != nil {
 		t.Fatalf("signed webhook rejected: %v", err)
 	}
-	// Duplicate delivery (Razorpay retries): acknowledged, still one credit.
+	// Duplicate delivery (Razorpay retries): acknowledged, one activation.
 	if err := svc.HandleWebhook(context.Background(), body, whSig, "127.0.0.1"); err != nil {
 		t.Fatalf("duplicate webhook delivery rejected: %v", err)
 	}
@@ -67,12 +67,9 @@ func TestService_WithRazorpayClientAgainstFakeServer(t *testing.T) {
 	if err := svc.HandleWebhook(context.Background(), body, "forged", "127.0.0.1"); err == nil {
 		t.Fatal("forged webhook accepted through razorpay client")
 	}
-	if n := store.ledgerCountForOrder(o.ID); n != 1 {
-		t.Fatalf("ledger entries = %d, want exactly 1 (confirm + webhook + duplicate)", n)
-	}
-	b, _ := store.Balance(context.Background(), tenantA)
-	if b.Balance != pack.Credits {
-		t.Fatalf("balance = %d, want exactly %d", b.Balance, pack.Credits)
+	st, _ := store.Subscription(context.Background(), tenantA)
+	if st.Status != payment.SubActive || st.PlanCode != sku.PlanCode || st.DaysRemaining > sku.PeriodDays {
+		t.Fatalf("subscription = %+v, want exactly one activation of %s", st, sku.PlanCode)
 	}
 }
 

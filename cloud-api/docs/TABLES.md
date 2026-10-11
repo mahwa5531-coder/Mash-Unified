@@ -16,7 +16,7 @@ Identity & tenancy     tenants · users · tenant_members
 Plans & entitlement    plans · subscriptions · entitlements
 Devices & sessions     devices · refresh_tokens
 Usage & accounting     llm_calls · token_normalization
-Payments & credits     payment_orders · payment_webhook_events · credit_ledger · credit_balances
+Payments & plans      payment_orders · payment_webhook_events (plans only — the credit tables were dropped in 000012; subscriptions IS the wallet)
 ```
 
 ---
@@ -197,12 +197,7 @@ A tenant's effective plan state. Status: `trialing` \| `active` \| `past_due`
 (grace: allowed, metered) \| `canceled` \| `expired`. One effective
 subscription per tenant (partial unique index on `tenant_id` where status in
 the three effective states). `current_period_end` + `cancel_at_period_end`
-drive renewal/autopay semantics. **Free fallback:** when no subscription is in
-an effective state (canceled, expired, or never subscribed), the identity
-resolver degrades the tenant to the public `free` plan automatically — a
-canceled Pro falls back to Free limits (never a hard block). The fallback is a
-read-time entitlement (synthetic active sub on `plans` where `code='free' and
-is_public`); the real subscription rows keep the billing history untouched.
+drive renewal/autopay semantics.
 
 ### `entitlements` — migration 0003
 
@@ -313,6 +308,10 @@ the ledger; the ledger remains the audit source of truth.
 | 000006 | `payments.sql` | `payment_orders`, `payment_webhook_events`, `credit_ledger`, `credit_balances` |
 | 000007 | `seed_plans.sql` | Free / Pro seeds with window budgets |
 | 000008 | `normalization.sql` | `token_normalization`; `llm_calls.raw_*` audit columns; retires `monthly_token_quota` from `plans.limits` (idempotent — fresh installs and monthly-era upgrades converge) |
+| 000009 | `payments_stripe.sql` | `payment_orders.provider_client_secret` (Stripe PaymentIntents browser handle) |
+| 000010 | `payments_phonepe.sql` | `payment_orders.provider_checkout_url` (PhonePe hosted PAY_PAGE redirect handle) |
+| 000011 | `model_economics.sql` | Launch model lineup: price-proportional `token_normalization` rows (weights widened to NUMERIC(12,6)) + Free plan restricted to the cheap+fast models. See `MODELS-AND-PRICING.md` |
+| 000012 | `plans_only.sql` | **Plans-only commerce**: drops `credit_ledger` + `credit_balances`; `pack_id`→`sku_id`; adds `plan_code` + `period_days`; drops `credits`. A paid order activates/extends the subscription (extend-or-insert, stacking periods) in the same transaction |
 
 Migrations run once, version-tracked in `schema_migrations`, guarded by a
 PostgreSQL advisory lock (safe under horizontal scale / rolling deploys).

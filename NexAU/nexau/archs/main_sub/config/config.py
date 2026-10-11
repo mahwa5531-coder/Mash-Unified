@@ -233,7 +233,7 @@ class AgentConfig(
     def _validate_sandbox_config(cls, value: object) -> SandboxConfig | None:
         if value is None:
             return None
-        if isinstance(value, (LocalSandboxConfig, E2BSandboxConfig)):
+        if isinstance(value, LocalSandboxConfig):
             return value
         if isinstance(value, dict):
             return parse_sandbox_config(cast(dict[str, Any], value))

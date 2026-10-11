@@ -12,11 +12,11 @@ import (
 
 func TestGetOrder_ReconcilesMissedWebhook(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 
 	// The webhook was LOST — but the provider captured. GetOrder must
-	// reconcile: provider truth → paid → credits minted.
+	// reconcile: provider truth → paid → plan activated.
 	f.provider.Capture(o.ProviderOrderID)
 
 	got, err := f.svc.GetOrder(context.Background(), tenantA, o.ID)
@@ -26,16 +26,16 @@ func TestGetOrder_ReconcilesMissedWebhook(t *testing.T) {
 	if got.Status != payment.StatusPaid {
 		t.Fatalf("reconcile missed the capture: %s", got.Status)
 	}
-	b, _ := f.store.Balance(context.Background(), tenantA)
-	if b.Balance != pack.Credits {
-		t.Fatalf("reconcile did not mint credits: %d", b.Balance)
+	st, _ := f.store.Subscription(context.Background(), tenantA)
+	if st.Status != payment.SubActive {
+		t.Fatalf("reconcile did not activate the plan: %+v", st)
 	}
 }
 
 func TestSweepOnce_ExpiresStaleOrders(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+	o, _ := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 
 	// Age the order past its TTL, then sweep.
 	f.store.mu.Lock()
@@ -55,8 +55,7 @@ func TestSweepOnce_ExpiresStaleOrders(t *testing.T) {
 	if applied, _, _ := f.store.ApplyPaid(context.Background(), o.ID, "pay_late"); !applied {
 		t.Fatal("late capture after expiry must apply")
 	}
-	b, _ := f.store.Balance(context.Background(), tenantA)
-	if b.Balance != pack.Credits {
-		t.Fatalf("late-capture credits missing: %d", b.Balance)
+	if st, _ := f.store.Subscription(context.Background(), tenantA); st.Status != payment.SubActive {
+		t.Fatalf("late-capture activation missing: %+v", st)
 	}
 }

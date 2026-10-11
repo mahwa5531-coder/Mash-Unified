@@ -64,23 +64,22 @@ func New(cfg Config) *Service {
 // disabled mode is a nil service, so every handler can ask uniformly).
 func (s *Service) Enabled() bool { return s != nil && s.provider != nil && s.store != nil }
 
-// Packs lists the purchasable catalog (display order).
-func (s *Service) Packs() []Pack { return s.catalog.Packs() }
+// SKUs lists the purchasable plan catalog (display order).
+func (s *Service) SKUs() []PlanSKU { return s.catalog.SKUs() }
 
-// PublicKeyID exposes the browser-safe provider key id (Checkout.js).
+// ProviderName exposes the active provider (the API layer maps it to the
+// right webhook signature header: X-Razorpay-Signature | Stripe-Signature
+// | X-VERIFY).
+func (s *Service) ProviderName() string { return s.provider.Name() }
+
+// PublicKeyID exposes the browser-safe provider key id (razorpay
+// Checkout.js; empty for providers without one).
 func (s *Service) PublicKeyID() string { return s.provider.PublicKeyID() }
 
-// Balance returns the tenant's credit position.
-func (s *Service) Balance(ctx context.Context, tenantID string) (*Balance, error) {
-	return s.store.Balance(ctx, tenantID)
-}
-
-// Ledger returns the tenant's ledger entries newest-first.
-func (s *Service) Ledger(ctx context.Context, tenantID string, limit int) ([]*LedgerEntry, error) {
-	if limit <= 0 || limit > s.cfg.HistoryLimit {
-		limit = s.cfg.HistoryLimit
-	}
-	return s.store.Ledger(ctx, tenantID, limit)
+// Subscription returns the tenant's entitlement position (what a purchase
+// buys, what expiry means; SubNone = the free default).
+func (s *Service) Subscription(ctx context.Context, tenantID string) (*SubscriptionState, error) {
+	return s.store.Subscription(ctx, tenantID)
 }
 
 // History returns the tenant's orders newest-first.
@@ -96,6 +95,6 @@ func (s *Service) History(ctx context.Context, tenantID string, limit int) ([]*O
 // means a stuck client or scripted abuse).
 func checkoutBudgetKey(userID string) string { return "pay:checkout:user:" + userID }
 
-// webhookBudgetKey is the per-IP webhook throttle. Razorpay retries only
+// webhookBudgetKey is the per-IP webhook throttle. Providers retry only
 // on non-2xx; healthy traffic is well under any sane budget.
 func webhookBudgetKey(ip string) string { return "pay:webhook:ip:" + ip }

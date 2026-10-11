@@ -314,7 +314,7 @@ export default function ChatCanvas({
               <QuotaBanner
                 open={showQuotaBanner}
                 onOpenChange={setShowQuotaBanner}
-                onSeePlans={() => onOpenSettings?.('plans')}
+                onSeePlans={() => onOpenSettings?.('usage')}
                 onDismiss={() => setShowQuotaBanner(false)}
               />
             </div>

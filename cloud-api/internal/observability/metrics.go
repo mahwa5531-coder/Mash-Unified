@@ -138,7 +138,7 @@ type Metrics struct {
 	RedisOps               *Counter   // redis.commands{op,status}
 	PoolSaturation         *Gauge     // pg.pool_saturation_pct
 	PaymentOrders          *Counter   // payment.orders{provider,event,status}
-	PaymentCredits         *Counter   // payment.credits_applied{provider}
+	PaymentPlanActivations *Counter   // payment.plan_days_activated{provider,plan}
 	PaymentWebhooks        *Counter   // payment.webhooks{outcome,event}
 }
 
@@ -168,10 +168,10 @@ func NewMetrics() *Metrics {
 		MeterQueueDepth:        NewGauge("mash_meter_queue_depth", "Usage recorder queue depth"),
 		MeterBatchLatencyMS:    NewHistogram("mash_meter_batch_latency_ms", "Usage batch flush duration ms", latencyBuckets...),
 
-		RedisOps:        NewCounter("mash_redis_commands_total", "Redis commands by op/status"),
-		PoolSaturation:  NewGauge("mash_pg_pool_saturation_pct", "PostgreSQL pool saturation percentage"),
-		PaymentOrders:   NewCounter("mash_payment_orders_total", "Payment orders by provider/event/status"),
-		PaymentCredits:  NewCounter("mash_payment_credits_applied_total", "Credits minted by provider"),
-		PaymentWebhooks: NewCounter("mash_payment_webhooks_total", "Webhook outcomes by event type"),
+		RedisOps:               NewCounter("mash_redis_commands_total", "Redis commands by op/status"),
+		PoolSaturation:         NewGauge("mash_pg_pool_saturation_pct", "PostgreSQL pool saturation percentage"),
+		PaymentOrders:          NewCounter("mash_payment_orders_total", "Payment orders by provider/event/status"),
+		PaymentPlanActivations: NewCounter("mash_payment_plan_days_activated_total", "Plan days activated by provider/plan"),
+		PaymentWebhooks:        NewCounter("mash_payment_webhooks_total", "Webhook outcomes by event type"),
 	}
 }

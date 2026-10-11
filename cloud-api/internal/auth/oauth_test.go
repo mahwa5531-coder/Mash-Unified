@@ -253,7 +253,7 @@ func newOAuthTestEnv(t *testing.T) *oauthTestEnv {
 
 		Google: NewGoogleProvider("test-client-id", "test-client-secret",
 			"https://api.example.test/v1/auth/oauth/google/callback",
-			"https://accounts.google.example/auth", fg.tokURL, fg.jwksURL, nil, fg.srv.Client()),
+			"https://accounts.google.example/auth", fg.tokURL, fg.jwksURL, fg.srv.Client()),
 		OAuth:   env.oauth,
 		Devices: env.devices,
 	}
@@ -302,7 +302,7 @@ func extractQueryParam(t *testing.T, rawURL, key string) string {
 // ---- tests ------------------------------------------------------------------------
 
 func TestGoogleAuthCodeURL(t *testing.T) {
-	g := NewGoogleProvider("cid", "csecret", "https://api.x.test/cb", "https://auth.example/auth", "https://tok.example/token", "https://jwks.example/certs", nil, nil)
+	g := NewGoogleProvider("cid", "csecret", "https://api.x.test/cb", "https://auth.example/auth", "https://tok.example/token", "https://jwks.example/certs", nil)
 	url := g.AuthCodeURL("thestate")
 	for _, want := range []string{
 		"client_id=cid", "redirect_uri=", "response_type=code",
@@ -532,44 +532,3 @@ func TestExchangeWebGrant(t *testing.T) {
 // silence unused warnings for fmt/err helpers used conditionally by cases.
 var _ = fmt.Sprintf
 var _ = errors.New
-
-// TestGoogleCustomIssuerConfigured proves the issuer allowlist is deployment
-// config, not code: a fake OAuth server issuing tokens under its OWN issuer
-// (the exact situation of pointing NEXAU_AUTH_GOOGLE_*_URL at a test server)
-// is accepted when the issuer is configured and rejected when it is not.
-func TestGoogleCustomIssuerConfigured(t *testing.T) {
-	env := newOAuthTestEnv(t)
-	const customIss = "https://oauth.test.mash.local"
-
-	// The provider the deployment would build from env: endpoints at the
-	// fake, issuer list containing the fake's issuer.
-	custom := NewGoogleProvider("test-client-id", "test-client-secret",
-		"https://api.example.test/v1/auth/oauth/google/callback",
-		"https://accounts.google.example/auth", env.fg.tokURL, env.fg.jwksURL,
-		[]string{customIss}, env.fg.srv.Client())
-
-	forge := func(iss string) string {
-		claims := env.fg.idClaimsFn()
-		claims["iss"] = iss
-		tk := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-		tk.Header["kid"] = env.fg.kid
-		signed, err := tk.SignedString(env.fg.key)
-		if err != nil {
-			t.Fatalf("sign: %v", err)
-		}
-		return signed
-	}
-
-	// Accepted when configured.
-	if _, err := custom.verifyIDToken(context.Background(), forge(customIss)); err != nil {
-		t.Fatalf("custom issuer must be accepted when configured: %v", err)
-	}
-	// Rejected with default issuers (the old hardcoded-map behavior).
-	if _, err := env.svc.Google.verifyIDToken(context.Background(), forge(customIss)); err == nil {
-		t.Fatal("custom issuer must be rejected by the default (Google-only) allowlist")
-	}
-	// Google's issuer still rejected by the custom-only deployment.
-	if _, err := custom.verifyIDToken(context.Background(), forge("https://accounts.google.com")); err == nil {
-		t.Fatal("unconfigured Google issuer must be rejected by the custom allowlist")
-	}
-}

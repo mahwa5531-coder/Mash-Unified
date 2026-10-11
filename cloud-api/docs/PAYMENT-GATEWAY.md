@@ -1,16 +1,29 @@
-# Payment Gateway — System Design (Razorpay)
+# Payment Gateway — System Design (multi-provider, plans only)
+
+**Commerce model (docs/MODELS-AND-PRICING.md §4): plans only.** The only
+purchasable thing is a PLAN PERIOD (a SKU: plan_pro_1m / plan_pro_1y). A
+captured order activates or extends the tenant's subscription in the same
+transaction that marks it paid — no credits, no wallet. The subscription's
+paid-through date IS the balance; expiry (read-side, automatic) returns the
+tenant to the Free plan's limits + model allowlist.
+
+**Providers:** razorpay | stripe | phonepe | mock | disabled — exactly one
+active per deployment (NEXAU_PAYMENT_PROVIDER). PhonePe is the default
+launch gateway; the others stay selectable behind the same Provider seam.
 
 Status: implemented · Owner: `internal/payment` · Migration: `000010_payments.sql`
 
 ## 1. Scope & goals
 
-Prepaid **credit top-ups** for tenants, paid in INR through Razorpay. The module
-owns the full money path: checkout, client-side handshake verification, signed
-webhooks, reconciliation, an append-only credit ledger and a per-tenant balance.
+**Plan-period purchases** for tenants (plans only — no credit packs), paid
+in INR through the selected provider. The module owns the full money path:
+checkout, client-side handshake verification, signed webhooks,
+reconciliation, and subscription activation with stacking renewal periods.
 
-Non-goals (v1, deliberately): subscription billing (the `plans`/`subscriptions`
-tables already own that), refunds (webhook is recorded but does not reverse
-balance), multi-currency (INR only — Razorpay constraint), invoices/GST.
+Non-goals (v1, deliberately): auto-recurring billing (renewals are explicit
+purchases; PhonePe UPI AutoPay subscriptions are a future round), refunds
+(webhook is recorded but does not reverse), multi-currency (INR only),
+invoices/GST.
 
 ## 1b. Who owns what — Razorpay vs this module
 
@@ -20,11 +33,11 @@ these five things:
 
 | Concern | Owner | Why the merchant side still needs code |
 |---|---|---|
-| Card/UPI/netbanking UI, mandates, auto-capture, settlement, refunds, subscription deductions | **Razorpay** | none — we never touch it |
+| Card/UPI/netbanking UI, hosted payment page, mandates, auto-capture, settlement, refunds | **the provider** (Razorpay / Stripe / PhonePe) | none — we never touch it |
 | Payment attempts & retries, webhook delivery & re-delivery | **Razorpay** | we must DEDUPE redeliveries (at-least-once delivery) |
-| "This payment is real" | Razorpay signs, **we verify** | an unauthenticated POST to `/v1/payments/webhook` is one curl away from free credits without HMAC verification |
-| "This payment belongs to this order, is captured, for this amount" | **we cross-check** (confirm fetch + amount match) | a valid signature on a hand-crafted ₹1 payment must never mint a ₹500 pack |
-| "Credits apply exactly once" | **we own** (DB row lock + status guard + ledger UNIQUE) | webhook + confirm + poll arrive for the same payment in any order — the DB arbitrates |
+| "This payment is real" | the provider signs, **we verify** (Razorpay HMAC / Stripe t+v1 / PhonePe X-VERIFY) | an unauthenticated POST to `/v1/payments/webhook` is one curl away from free Pro without signature verification |
+| "This payment belongs to this order, is captured, for this amount" | **we cross-check** (confirm fetch + amount match) | a valid signature on a hand-crafted ₹1 payment must never activate a ₹1,999 plan |
+| "The plan activates exactly once" | **we own** (DB row lock + status guard, activation in the same transaction) | webhook + confirm + poll arrive for the same payment in any order — the DB arbitrates |
 | "One checkout per idempotency key" | **we own** (unique index) | network retries must not fork orders |
 | Missed webhook recovery | **we own** (read-through reconcile + sweeper) | webhooks get dropped; money must still land |
 
@@ -198,7 +211,7 @@ Rules (enforced in `domain.go` AND in SQL `WHERE` guards — belt and braces):
 - Every transition is a single conditional `UPDATE ... WHERE status IN (...)`
   — the row counts decide who won; no read-modify-write races.
 
-## 5. Exactly-once credit application (the crux)
+## 5. Exactly-once subscription activation (the crux)
 
 Three concurrent writers can reach the same order: client confirm, webhook
 delivery, reconciliation poll. All funnel into one transactional store call:
@@ -258,7 +271,22 @@ bounded to one tenant's own payment bursts.
 - Catalog amounts are validated to `[100, 10_000_000]` paise (₹1 – ₹1,00,000,
   Razorpay's per-order bounds).
 
-## 8. Credit ledger model
+## 8. Subscription activation model (plans only)
+
+Retired with migration 000012: the credit ledger and balances tables are
+DROPPED. `ApplyPaid` now runs extend-or-insert on `subscriptions` inside
+the same transaction as the order→paid transition:
+
+    extend: current_period_end = GREATEST(now(), current_period_end) + period
+            (stacking renewals: paying twice back-to-back never loses days)
+    insert: current_period = now → now + period (first purchase)
+
+Expiry is READ-SIDE: `Effective()` and the subscription read filter on
+`current_period_end > now()`; a lapsed Pro tenant falls back to the free
+plan via the identity resolver's free-plan default (no sweeper needed).
+The partial unique index `uq_subscriptions_tenant_active` keeps one
+effective row per tenant; expired/canceled rows vacate the slot, so
+re-subscribing inserts cleanly.
 
 Append-only. `kind ∈ {topup, adjustment, refund}` (v1 writes only `topup`;
 the enum leaves room for the v2 refund reversal and manual adjustments without
@@ -309,13 +337,13 @@ Razorpay client transport rules:
 
 | Route | Auth | Notes |
 |---|---|---|
-| `GET  /v1/payments/catalog` | user | purchasable packs (id, label, amount, credits) |
-| `POST /v1/payments/checkout` | user | `Idempotency-Key` honored (strongly recommended); 429 on per-user budget |
-| `POST /v1/payments/confirm` | user | Razorpay Checkout handshake; owns-order check |
+| `GET  /v1/payments/catalog` | user | purchasable plan SKUs (id, label, plan_code, period_days, amount) |
+| `POST /v1/payments/checkout` | user | `{sku_id}`; `Idempotency-Key` honored (strongly recommended); 429 on per-user budget |
+| `POST /v1/payments/confirm` | user | provider handshake (generic + per-provider spellings); owns-order check |
 | `GET  /v1/payments/orders/{id}` | user | own order only; pending orders trigger a bounded upstream re-check |
 | `GET  /v1/payments/history?limit=` | user | tenant's orders, newest first, capped |
-| `GET  /v1/payments/balance` | user | tenant credit balance + last top-up |
-| `POST /v1/payments/webhook` | **signature** | unauthenticated by token, authenticated by HMAC |
+| `GET  /v1/payments/subscription` | user | entitlement position (plan, paid-through, days remaining) |
+| `POST /v1/payments/webhook` | **signature** | unauthenticated by token; authenticated by the active provider's scheme (X-Razorpay-Signature / Stripe-Signature / X-VERIFY) |
 
 All handlers are thin (decode → service → encode), matching the codebase rule
 that business logic never lives in `internal/api`.
@@ -324,12 +352,40 @@ that business logic never lives in `internal/api`.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `NEXAU_PAYMENT_PROVIDER` | `disabled` | `disabled` \| `mock` \| `razorpay` |
+| `NEXAU_PAYMENT_PROVIDER` | `disabled` | `disabled` \| `mock` \| `razorpay` \| `stripe` \| `phonepe` |
+| `NEXAU_PAYMENT_CATALOG_JSON` | built-in plan SKUs | JSON array override `[{id,label,plan_code,period_days,amount_paise,badge?}]` (plans only — validation fails boot on a bad override) |
+
+**Razorpay** (all three required in razorpay mode):
+
+| Key | Default | Meaning |
+|---|---|---|
 | `NEXAU_RAZORPAY_KEY_ID` | — | e.g. `rzp_test_ABC123…` (Dashboard → API Keys, **Test** mode) |
 | `NEXAU_RAZORPAY_KEY_SECRET` | — | paired secret (also used to verify Checkout handshakes) |
 | `NEXAU_RAZORPAY_WEBHOOK_SECRET` | — | Dashboard → Settings → Webhooks secret (different from key secret) |
 | `NEXAU_RAZORPAY_API_BASE` | `https://api.razorpay.com/v1` | override only for tests/proxies |
-| `NEXAU_PAYMENT_CATALOG_JSON` | built-in packs | JSON array override `[{id,label,amount_paise,credits,badge?}]` |
+
+**Stripe** (API key + webhook secret required in stripe mode):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `NEXAU_STRIPE_API_KEY` | — | `sk_test_…` / `sk_live_…` (or `rk_…` restricted) |
+| `NEXAU_STRIPE_PUBLISHABLE_KEY` | — | `pk_…` — browser-safe, relayed to clients as `key_id` |
+| `NEXAU_STRIPE_WEBHOOK_SECRET` | — | `whsec_…` (Developers → Webhooks → Signing secret) |
+| `NEXAU_STRIPE_API_BASE` | `https://api.stripe.com/v1` | override only for tests/proxies |
+
+**PhonePe** (merchant trio + redirect URL required in phonepe mode; the
+launch default — full preprod guide in MODELS-AND-PRICING.md §7 and
+FRONTEND-PAYMENTS.md §3):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `NEXAU_PHONEPE_MERCHANT_ID` | — | `MERCHANTUAT` (preprod) / production id |
+| `NEXAU_PHONEPE_SALT_KEY` | — | the server secret (PG → API keys) |
+| `NEXAU_PHONEPE_SALT_INDEX` | `1` | selects the active key in the dashboard |
+| `NEXAU_PHONEPE_REDIRECT_URL` | — | the FRONTEND return page (absolute URL; gets `?order_id=` appended) |
+| `NEXAU_PHONEPE_REDIRECT_MODE` | `POST` | `POST` \| `REDIRECT` (plain GET — simplest for SPAs) |
+| `NEXAU_PHONEPE_CALLBACK_URL` | — | public API base + `/v1/payments/webhook` (X-VERIFY signed callbacks) |
+| `NEXAU_PHONEPE_API_BASE` | `https://api.phonepe.com/apis/pg` | preprod: `https://api-preprod.phonepe.com/apis/pg` |
 | `NEXAU_PAYMENT_ORDER_TTL` | `15m` | pending order expiry (sweeper) |
 | `NEXAU_PAYMENT_SWEEP_INTERVAL` | `1m` | sweeper cadence |
 | `NEXAU_PAYMENT_HISTORY_LIMIT` | `50` | max page for history |

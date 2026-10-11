@@ -16,42 +16,31 @@ func TestWindowViewMath(t *testing.T) {
 	a := &API{} // usage repo nil: recovery lookup degrades to omitted
 	idn := &auth.Identity{Tenant: auth.TenantInfo{ID: "ten_t"}}
 
-	v := a.windowView(nil, idn, "5h", 1000, 0, 0, 5*time.Hour)
+	v := a.windowView(nil, idn, "5h", 1000, 0, 5*time.Hour)
 	if v["used_percent"] != int64(0) || v["window"] != "5h" {
 		t.Fatalf("empty window: %+v", v)
 	}
 	if v["quota_tokens"] != int64(1000) || v["used_tokens"] != int64(0) {
 		t.Fatalf("token fields: %+v", v)
 	}
-	if v["reserved_tokens"] != int64(0) {
-		t.Fatalf("reserved defaults to 0: %+v", v)
-	}
 	if _, has := v["resets_at"]; !has || v["resets_at"] != nil {
 		t.Fatalf("under-quota resets_at must be present-and-nil: %+v", v)
 	}
 
 	// 999/1000 → 99% (admitted); 1000/1000 → 100% (rejected: used >= quota).
-	if got := a.windowView(nil, idn, "5h", 1000, 999, 0, 5*time.Hour)["used_percent"]; got != int64(99) {
+	if got := a.windowView(nil, idn, "5h", 1000, 999, 5*time.Hour)["used_percent"]; got != int64(99) {
 		t.Fatalf("999/1000 = %v, want 99", got)
 	}
-	if got := a.windowView(nil, idn, "5h", 1000, 1000, 0, 5*time.Hour)["used_percent"]; got != int64(100) {
+	if got := a.windowView(nil, idn, "5h", 1000, 1000, 5*time.Hour)["used_percent"]; got != int64(100) {
 		t.Fatalf("1000/1000 = %v, want 100", got)
 	}
 	// Over-quota clamps at 100 for display (rejection is the gate's job).
-	if got := a.windowView(nil, idn, "weekly", 1000, 5000, 0, 7*24*time.Hour)["used_percent"]; got != int64(100) {
+	if got := a.windowView(nil, idn, "weekly", 1000, 5000, 7*24*time.Hour)["used_percent"]; got != int64(100) {
 		t.Fatalf("5000/1000 = %v, want clamped 100", got)
 	}
 	// Rounding floors: 1/3 of quota → 33%.
-	if got := a.windowView(nil, idn, "5h", 3, 1, 0, 5*time.Hour)["used_percent"]; got != int64(33) {
+	if got := a.windowView(nil, idn, "5h", 3, 1, 5*time.Hour)["used_percent"]; got != int64(33) {
 		t.Fatalf("1/3 = %v, want 33", got)
-	}
-	// The bar uses the EFFECTIVE position (used+reserved): the gate rejects
-	// at effective >= quota, and the bar shows 100% exactly then.
-	if got := a.windowView(nil, idn, "5h", 1000, 600, 400, 5*time.Hour)["used_percent"]; got != int64(100) {
-		t.Fatalf("600 used + 400 reserved = %v, want 100 (reservation pressure)", got)
-	}
-	if got := a.windowView(nil, idn, "5h", 1000, 599, 400, 5*time.Hour)["used_percent"]; got != int64(99) {
-		t.Fatalf("599 used + 400 reserved = %v, want 99", got)
 	}
 }
 

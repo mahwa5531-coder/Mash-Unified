@@ -107,49 +107,47 @@ func (r *IdentityResolver) load(ctx context.Context, userID, tenantID string) (*
 	if err != nil {
 		return nil, store.MapDBError(err)
 	}
-	if sub == nil {
-		// No effective trial/paid subscription (canceled, expired, or never
-		// subscribed): every tenant degrades to the public Free plan — a
-		// canceled Pro falls back to Free limits instead of a hard block.
-		fb, ferr := r.Subs.FreeFallback(ctx)
-		if ferr != nil {
-			return nil, store.MapDBError(ferr)
-		}
-		if fb != nil {
-			fb.TenantID = tenantID
-			sub = fb
-		}
-		// fb == nil: no public free plan configured — keep the fail-closed
-		// SUBSCRIPTION_INACTIVE posture (403 on LLM, /v1/me still renders).
-	}
+
+	// FREE-PLAN DEFAULT: a tenant without an effective (paid, unexpired)
+	// subscription is not plan-less-and-unbounded — it falls back to the
+	// 'free' plan's limits + model allowlist. Plans only: Free is what you
+	// are until you buy Pro; expiry returns you here automatically.
+	var planLimits domain.PlanLimits
+	var planInfo PlanInfo
+	var planModels []string
 	if sub != nil {
 		id.SubscriptionStatus = sub.Status
-		id.Plan = PlanInfo{ID: sub.Plan.ID, Code: sub.Plan.Code, Name: sub.Plan.Name}
+		planInfo = PlanInfo{ID: sub.Plan.ID, Code: sub.Plan.Code, Name: sub.Plan.Name}
+		planLimits = sub.Plan.Limits
+		planModels = sub.Plan.Models
+	} else if fp, ferr := r.Subs.PlanByCode(ctx, "free"); ferr == nil && fp != nil {
+		id.SubscriptionStatus = "none"
+		planInfo = PlanInfo{ID: fp.ID, Code: fp.Code, Name: fp.Name}
+		planLimits = fp.Limits
+		planModels = fp.Models
+	} else if ferr != nil {
+		return nil, store.MapDBError(ferr)
+	}
+	if planInfo.Code != "" {
+		id.Plan = planInfo
 		id.Limits = Limits{
-			RequestsPerMinuteUser:    sub.Plan.Limits.RequestsPerMinuteUser,
-			RequestsPerMinuteTenant:  sub.Plan.Limits.RequestsPerMinuteTenant,
-			ConcurrentRequestsUser:   sub.Plan.Limits.ConcurrentRequestsUser,
-			ConcurrentRequestsTenant: sub.Plan.Limits.ConcurrentRequestsTenant,
-			MaxRequestBytes:          sub.Plan.Limits.MaxRequestBytes,
-			Window5hTokens:           sub.Plan.Limits.Window5hTokens,
-			WindowWeeklyTokens:       sub.Plan.Limits.WindowWeeklyTokens,
+			RequestsPerMinuteUser:    planLimits.RequestsPerMinuteUser,
+			RequestsPerMinuteTenant:  planLimits.RequestsPerMinuteTenant,
+			ConcurrentRequestsUser:   planLimits.ConcurrentRequestsUser,
+			ConcurrentRequestsTenant: planLimits.ConcurrentRequestsTenant,
+			MaxRequestBytes:          planLimits.MaxRequestBytes,
+			Window5hTokens:           planLimits.Window5hTokens,
+			WindowWeeklyTokens:       planLimits.WindowWeeklyTokens,
 		}
 	}
 
-	models, restricted, err := r.Ents.ModelsAllowlist(ctx, tenantID, subPlanModels(sub))
+	models, restricted, err := r.Ents.ModelsAllowlist(ctx, tenantID, planModels)
 	if err != nil {
 		return nil, store.MapDBError(err)
 	}
 	id.Models = models
 	id.Restricted = restricted
 	return id, nil
-}
-
-func subPlanModels(sub *domain.Subscription) []string {
-	if sub == nil {
-		return nil
-	}
-	return sub.Plan.Models
 }
 
 func identityCacheKey(userID, tenantID string) string {

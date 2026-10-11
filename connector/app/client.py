@@ -122,7 +122,7 @@ class MAShClient:
         """Fetches live token usage and percentage against quota from cloud."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.get(
-                f"{self.base_url}/v1/me/usage",
+                f"{self.base_url}/v1/usage",
                 headers={
                     "Authorization": f"Bearer {access_token}",
                     "Accept": "application/json",

@@ -60,9 +60,7 @@ export function useChatStream({
     activeSessionIdRef.current = sessionId;
   }, [sessionId]);
 
-  const DEFAULT_MODEL = 'default';
   const thinkingBudget = 'high';
-  const lastModelRef = useRef<{ model: string; effort: string }>({ model: 'default', effort: 'high' });
 
   // 1. Atomised Buffer Flusher
   const { flushActiveStreamBuffer, scheduleFlush, cancelFlush } = useSseBufferFlusher({
@@ -219,33 +217,15 @@ export function useChatStream({
   }, []);
 
   const handleSendMessage = async (
-    explicitModelOrText?: string,
-    explicitEffort?: string,
-    explicitText?: string,
+    textToSend?: string,
     isRetry: boolean = false,
-    targetSessionId?: string,
-    isImmediate: boolean = false
+    isImmediate: boolean = false,
+    targetSessionId?: string
   ) => {
-    let model = DEFAULT_MODEL;
-    let thinkingEffort = thinkingBudget;
-    let textToSend = explicitText;
-
-    if (explicitText === undefined && explicitModelOrText !== undefined) {
-      if (explicitModelOrText.includes(' ') || explicitModelOrText.includes('\n') || explicitEffort === undefined) {
-        textToSend = explicitModelOrText;
-      } else {
-        model = explicitModelOrText;
-      }
-    } else {
-      if (explicitModelOrText) model = explicitModelOrText;
-      if (explicitEffort) thinkingEffort = explicitEffort;
-    }
-
-    lastModelRef.current = { model, effort: thinkingEffort };
     const rawText = textToSend !== undefined ? textToSend : inputPrompt;
     if (!rawText.trim()) return;
     const userText = rawText.trim();
-    if (explicitText === undefined && textToSend === undefined) {
+    if (textToSend === undefined) {
       handleSetInputPrompt('');
     }
 
@@ -540,8 +520,7 @@ export function useChatStream({
           working_directory: pendingWorkspacePath || (sessionRepo && sessionRepo !== 'No Repo' ? sessionRepo : 'No Repo'),
           section: (pendingWorkspacePath || (sessionRepo && sessionRepo !== 'No Repo')) ? 'workspace' : 'conversation',
           ...(isNewSession ? { title, custom_title: title } : {}),
-          model,
-          thinking_effort: thinkingEffort,
+          thinking_effort: thinkingBudget,
         },
         targetSession.abortController?.signal
       );
@@ -609,7 +588,7 @@ export function useChatStream({
       if (nextQueuedMsg) {
         removeSessionQueueItem(activeSid, 0).catch(() => {});
         setTimeout(() => {
-          handleSendMessage(undefined, undefined, nextQueuedMsg!, false, activeSid);
+          handleSendMessage(nextQueuedMsg!, false, false, activeSid);
         }, 80);
       }
     }
@@ -656,11 +635,9 @@ export function useChatStream({
   }, [flushActiveStreamBuffer]);
 
   const handleRetry = useCallback((userText?: string, targetSid?: string) => {
-    const m = lastModelRef.current.model;
-    const e = lastModelRef.current.effort;
     const sidToUse = targetSid || activeSessionIdRef.current || sessionId;
     if (!sidToUse) return;
-    handleSendMessage(m, e, userText, true, sidToUse);
+    handleSendMessage(userText, true, false, sidToUse);
   }, [sessionId, handleSendMessage]);
 
   const handleUndo = useCallback((flatIdx?: number, userText?: string, turnIdx?: number) => {

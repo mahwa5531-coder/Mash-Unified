@@ -32,7 +32,9 @@ import (
 	"github.com/mash-cloud/mash-api/internal/middleware"
 	"github.com/mash-cloud/mash-api/internal/observability"
 	"github.com/mash-cloud/mash-api/internal/payment"
+	"github.com/mash-cloud/mash-api/internal/payment/phonepe"
 	"github.com/mash-cloud/mash-api/internal/payment/razorpay"
+	"github.com/mash-cloud/mash-api/internal/payment/stripe"
 	"github.com/mash-cloud/mash-api/internal/ratelimit"
 	"github.com/mash-cloud/mash-api/internal/store"
 	"github.com/mash-cloud/mash-api/internal/store/repos"
@@ -129,12 +131,10 @@ func run() error {
 	if cfg.Auth.GoogleClientID != "" && cfg.Auth.GoogleClientSecret != "" && cfg.Auth.GoogleRedirectURL != "" {
 		google = auth.NewGoogleProvider(
 			cfg.Auth.GoogleClientID, cfg.Auth.GoogleClientSecret, cfg.Auth.GoogleRedirectURL,
-			cfg.Auth.GoogleAuthURL, cfg.Auth.GoogleTokenURL, cfg.Auth.GoogleJWKSURL,
-			cfg.Auth.GoogleIssuers, nil)
+			cfg.Auth.GoogleAuthURL, cfg.Auth.GoogleTokenURL, cfg.Auth.GoogleJWKSURL, nil)
 		oauthStore = repos.NewOAuthUsers(pg.Pool)
 		devices = repos.NewDevices(pg.Pool)
-		logger.Info("google sign-in enabled", "redirect", cfg.Auth.GoogleRedirectURL,
-			"issuers", len(cfg.Auth.GoogleIssuers))
+		logger.Info("google sign-in enabled", "redirect", cfg.Auth.GoogleRedirectURL)
 	}
 
 	authSvc := &auth.Service{
@@ -202,19 +202,13 @@ func run() error {
 			NonStreamTimeout: cfg.BifrostReqTimeout,
 		},
 		SlotTTL: cfg.Rate.SlotTimeout,
-		Reserve: llm.ReserveConfig{
-			Enabled:     cfg.Quota.ReserveEnabled,
-			MinTokens:   cfg.Quota.ReserveMinTokens,
-			MaxTokens:   cfg.Quota.ReserveMaxTokens,
-			DefaultOut:  cfg.Quota.ReserveDefaultOut,
-			TTL:         cfg.Quota.ReserveTTL,
-			SettleDelay: cfg.Quota.ReserveSettleDelay,
-		},
 	}
 
-	// 11. Payments (prepaid credit top-ups; docs/PAYMENT-GATEWAY.md).
+	// 11. Payments (plan purchases — plans only; docs/PAYMENT-GATEWAY.md).
 	// Provider modes: disabled (nil service, routes answer 503), mock
-	// (dev/tests, fixed secrets, no network), razorpay (production).
+	// (dev/tests, fixed secrets, no network), and the three production
+	// gateways — razorpay, stripe, phonepe — one active per deployment,
+	// selected by NEXAU_PAYMENT_PROVIDER.
 	var paySvc *payment.Service
 	var payProvider payment.Provider
 	switch cfg.Payments.Provider {
@@ -223,6 +217,19 @@ func run() error {
 			KeyID: cfg.Payments.RazorpayKeyID, KeySecret: cfg.Payments.RazorpayKeySecret,
 			WebhookSecret: cfg.Payments.RazorpayWebhookSecret,
 			BaseURL:       cfg.Payments.RazorpayAPIBase,
+		})
+	case "stripe":
+		payProvider = stripe.New(stripe.Config{
+			APIKey: cfg.Payments.StripeAPIKey, PublishableKey: cfg.Payments.StripePublishableKey,
+			WebhookSecret: cfg.Payments.StripeWebhookSecret,
+			BaseURL:       cfg.Payments.StripeAPIBase,
+		})
+	case "phonepe":
+		payProvider = phonepe.New(phonepe.Config{
+			MerchantID: cfg.Payments.PhonepeMerchantID, SaltKey: cfg.Payments.PhonepeSaltKey,
+			SaltIndex: cfg.Payments.PhonepeSaltIndex, RedirectURL: cfg.Payments.PhonepeRedirectURL,
+			RedirectMode: cfg.Payments.PhonepeRedirectMode, CallbackURL: cfg.Payments.PhonepeCallbackURL,
+			BaseURL: cfg.Payments.PhonepeAPIBase,
 		})
 	case "mock":
 		mock := payment.NewMockProvider()
@@ -246,7 +253,7 @@ func run() error {
 		})
 		paySvc.StartSweeper(rootCtx) // stops with rootCtx at shutdown
 		logger.Info("payments enabled", "provider", cfg.Payments.Provider,
-			"packs", len(paySvc.Packs()), "order_ttl", cfg.Payments.OrderTTL.String())
+			"skus", len(paySvc.SKUs()), "order_ttl", cfg.Payments.OrderTTL.String())
 	}
 
 	// 12. HTTP surface.

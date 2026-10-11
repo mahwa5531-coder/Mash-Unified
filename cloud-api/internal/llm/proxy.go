@@ -52,23 +52,6 @@ type Timing struct {
 	NonStreamTimeout time.Duration // full budget of a non-streaming call
 }
 
-// ReserveConfig bounds the in-flight token reservation — the fix for the
-// concurrent-overshoot race in the rolling windows. Usage becomes visible to
-// the window gate only when the llm_calls row lands (async, post-completion);
-// without a reservation, N admits that pass the check in parallel each see
-// the same DB position and collectively overshoot the window. Every admitted
-// call therefore claims an ESTIMATE of its cost against the window's
-// remaining budget, atomically in Redis, and settles the claim when its usage
-// row is about to land.
-type ReserveConfig struct {
-	Enabled     bool
-	MinTokens   int64         // per-call floor (default 1024)
-	MaxTokens   int64         // per-call ceiling (default 32768): one huge request must not starve the tenant window
-	DefaultOut  int64         // output budget when the request declares none (default 4096)
-	TTL         time.Duration // crash backstop — must exceed Timing.MaxDuration
-	SettleDelay time.Duration // release delay covering the metering flush lag
-}
-
 // Proxy is the LLM tunnel service. It is safe for concurrent use.
 type Proxy struct {
 	Bifrost BifrostClient
@@ -84,7 +67,6 @@ type Proxy struct {
 	Rate    RateRules
 	Timing  Timing
 	SlotTTL time.Duration // concurrency-slot TTL backstop (crash recovery)
-	Reserve ReserveConfig // in-flight window reservation (see ReserveConfig)
 
 	active atomic.Int64 // live in-flight calls (metrics gauge source)
 }
@@ -117,7 +99,7 @@ type Sink interface {
 // JSON body (OpenAI-compatible contract: the client gets the completion
 // object or an HTTP error, never a wrapper).
 func (p *Proxy) Complete(ctx context.Context, idn *auth.Identity, req *Request) ([]byte, *domain.Error) {
-	release, res, de := p.admit(ctx, idn, req)
+	release, de := p.admit(ctx, idn, req)
 	if de != nil {
 		return nil, de
 	}
@@ -131,7 +113,7 @@ func (p *Proxy) Complete(ctx context.Context, idn *auth.Identity, req *Request) 
 	resp, err := p.Bifrost.Completion(cctx, req.ToBifrost())
 	if err != nil {
 		de := domain.AsError(err)
-		p.record(ctx, idn, req, callID, callMeta{status: domain.CallFailed, errCode: de.Code, started: started}, res)
+		p.record(ctx, idn, req, callID, callMeta{status: domain.CallFailed, errCode: de.Code, started: started})
 		return nil, de
 	}
 
@@ -151,7 +133,7 @@ func (p *Proxy) Complete(ctx context.Context, idn *auth.Identity, req *Request) 
 		started:     started,
 		completedAt: time.Now().UTC(),
 	}
-	p.record(ctx, idn, req, callID, meta, res)
+	p.record(ctx, idn, req, callID, meta)
 	// OpenAI-compatible contract: the verbatim completion object (re-marshaled
 	// from the decoded response — the Extras map carries unknown fields).
 	blob, err := json.Marshal(resp)
@@ -171,7 +153,7 @@ func (p *Proxy) Complete(ctx context.Context, idn *auth.Identity, req *Request) 
 // write failure) abort the upstream and return nil: there is nobody left to
 // report to, but the usage seen so far is still metered.
 func (p *Proxy) Stream(ctx context.Context, idn *auth.Identity, req *Request, sink Sink) *domain.Error {
-	release, res, de := p.admit(ctx, idn, req)
+	release, de := p.admit(ctx, idn, req)
 	if de != nil {
 		return de
 	}
@@ -190,7 +172,7 @@ func (p *Proxy) Stream(ctx context.Context, idn *auth.Identity, req *Request, si
 	reader, err := p.Bifrost.CompletionStream(bctx, req.ToBifrost())
 	if err != nil {
 		de := domain.AsError(err)
-		p.record(ctx, idn, req, callID, callMeta{status: domain.CallFailed, errCode: de.Code, started: started}, res)
+		p.record(ctx, idn, req, callID, callMeta{status: domain.CallFailed, errCode: de.Code, started: started})
 		return de // pre-stream: caller answers with a real HTTP error
 	}
 	defer reader.Close()
@@ -208,7 +190,7 @@ func (p *Proxy) Stream(ctx context.Context, idn *auth.Identity, req *Request, si
 					status: domain.CallCancelled, errCode: "CLIENT_DISCONNECTED",
 					usage: usage, latency: int(time.Since(started).Milliseconds()),
 					resolved: model, provider: provider, started: started,
-				}, res)
+				})
 				return nil
 			}
 			de := domain.AsError(err)
@@ -223,7 +205,7 @@ func (p *Proxy) Stream(ctx context.Context, idn *auth.Identity, req *Request, si
 				status: domain.CallFailed, errCode: de.Code,
 				usage: usage, latency: int(time.Since(started).Milliseconds()),
 				resolved: model, provider: provider, started: started,
-			}, res)
+			})
 			return de
 		}
 		if done {
@@ -231,7 +213,7 @@ func (p *Proxy) Stream(ctx context.Context, idn *auth.Identity, req *Request, si
 				status: domain.CallCompleted,
 				usage:  usage, latency: int(time.Since(started).Milliseconds()),
 				resolved: model, provider: provider, started: started,
-			}, res)
+			})
 			return nil
 		}
 		if chunk != nil {
@@ -262,7 +244,7 @@ func (p *Proxy) Stream(ctx context.Context, idn *auth.Identity, req *Request, si
 					status: domain.CallCancelled, errCode: "CLIENT_DISCONNECTED",
 					usage: usage, latency: int(time.Since(started).Milliseconds()),
 					resolved: model, provider: provider, started: started,
-				}, res)
+				})
 				return nil
 			}
 			forwarded = true
@@ -285,10 +267,7 @@ type callMeta struct {
 	completedAt time.Time
 }
 
-func (p *Proxy) record(ctx context.Context, idn *auth.Identity, req *Request, callID string, m callMeta, res *reservation) {
-	// Settle the window reservation first — even when no meter is wired
-	// (tests), a claimed budget must go back to the pool.
-	p.settleReservation(res, m.usage != nil)
+func (p *Proxy) record(ctx context.Context, idn *auth.Identity, req *Request, callID string, m callMeta) {
 	if p.Meter == nil {
 		return
 	}
@@ -320,28 +299,25 @@ func (p *Proxy) record(ctx context.Context, idn *auth.Identity, req *Request, ca
 }
 
 // admit runs every pre-flight gate in order and returns the slot-release
-// function plus the window reservation on success:
+// function on success:
 //
 //	account/tenant/subscription state → payload validation → model
 //	entitlement (primary + fallbacks) → rolling token windows (5h + weekly)
-//	→ RPM sliding window (user + tenant) → concurrency slots (user + tenant)
-//	→ in-flight token reservation (5h + weekly, atomic).
-//
-// The reservation is LAST so a denial never orphans an RPM event or a slot.
-func (p *Proxy) admit(ctx context.Context, idn *auth.Identity, req *Request) (func(), *reservation, *domain.Error) {
+//	→ RPM sliding window (user + tenant) → concurrency slots (user + tenant).
+func (p *Proxy) admit(ctx context.Context, idn *auth.Identity, req *Request) (func(), *domain.Error) {
 	// Account/tenant/subscription state (the auth middleware admits
 	// SUBSCRIPTION_INACTIVE identities so /v1/me can render state; the LLM
 	// path is where it becomes binding).
 	if reason := idn.CanRun(); reason != "" {
 		if reason == "SUBSCRIPTION_INACTIVE" {
-			return nil, nil, domain.ErrSubscriptionInactive()
+			return nil, domain.ErrSubscriptionInactive()
 		}
-		return nil, nil, domain.ErrForbidden("Account state does not permit this request.")
+		return nil, domain.ErrForbidden("Account state does not permit this request.")
 	}
 
 	// Payload validation.
 	if de := req.Validate(p.Limits); de != nil {
-		return nil, nil, de
+		return nil, de
 	}
 
 	// Model entitlement (allowlist with patterns). Every fallback must be
@@ -349,11 +325,11 @@ func (p *Proxy) admit(ctx context.Context, idn *auth.Identity, req *Request) (fu
 	// must not bypass the primary check.
 	if idn.Restricted {
 		if !modelAllowed(idn.Models, req.Model) {
-			return nil, nil, domain.ErrModelNotEntitled(req.Model)
+			return nil, domain.ErrModelNotEntitled(req.Model)
 		}
 		for _, fb := range req.Fallbacks {
 			if !modelAllowed(idn.Models, fb) {
-				return nil, nil, domain.ErrModelNotEntitled(fb)
+				return nil, domain.ErrModelNotEntitled(fb)
 			}
 		}
 	}
@@ -362,16 +338,16 @@ func (p *Proxy) admit(ctx context.Context, idn *auth.Identity, req *Request) (fu
 	// budget and a 7-day weekly budget — either can bind. Enforced at the
 	// point of consumption. Query failure fails OPEN (availability posture;
 	// the quota gate is a plan-abuse bound, not a security boundary).
-	// Under-metering is the visible, correctable failure mode — and skips
-	// the reservation too (no authoritative position to reserve against).
-	var pos *domain.WindowUsage
+	// Under-metering is the visible, correctable failure mode.
 	if (idn.Limits.Window5hTokens > 0 || idn.Limits.WindowWeeklyTokens > 0) && p.Usage != nil {
-		var err error
-		pos, err = p.Usage.WindowUsage(ctx, idn.Tenant.ID)
-		if err != nil {
-			pos = nil
-		} else if de := p.checkWindows(ctx, idn, pos); de != nil {
-			return nil, nil, de
+		pos, err := p.Usage.WindowUsage(ctx, idn.Tenant.ID)
+		if err == nil {
+			if q := idn.Limits.Window5hTokens; q > 0 && pos.Used5h >= q {
+				return nil, p.windowBlocked(ctx, idn, "5h", 5*time.Hour, q, pos.Used5h)
+			}
+			if q := idn.Limits.WindowWeeklyTokens; q > 0 && pos.UsedWeekly >= q {
+				return nil, p.windowBlocked(ctx, idn, "weekly", 7*24*time.Hour, q, pos.UsedWeekly)
+			}
 		}
 	}
 
@@ -404,7 +380,7 @@ func (p *Proxy) admit(ctx context.Context, idn *auth.Identity, req *Request) (fu
 		if retry <= 0 {
 			retry = time.Second
 		}
-		return nil, nil, domain.ErrRateLimited(retry.Milliseconds(), "llm_rpm")
+		return nil, domain.ErrRateLimited(retry.Milliseconds(), "llm_rpm")
 	}
 
 	// Concurrency slots (Redis counters, TTL backstop for crashed holders).
@@ -412,7 +388,7 @@ func (p *Proxy) admit(ctx context.Context, idn *auth.Identity, req *Request) (fu
 	if concUser > 0 && p.Limiter.Acquire(ctx, concUserKey(idn.User.ID), concUser, p.SlotTTL) {
 		held = append(held, concUserKey(idn.User.ID))
 	} else if concUser > 0 {
-		return nil, nil, domain.ErrConcurrencyLimited("user")
+		return nil, domain.ErrConcurrencyLimited("user")
 	}
 	if concTenant > 0 && p.Limiter.Acquire(ctx, concTenantKey(idn.Tenant.ID), concTenant, p.SlotTTL) {
 		held = append(held, concTenantKey(idn.Tenant.ID))
@@ -420,24 +396,7 @@ func (p *Proxy) admit(ctx context.Context, idn *auth.Identity, req *Request) (fu
 		for _, k := range held {
 			p.Limiter.Release(ctx, k, p.SlotTTL)
 		}
-		return nil, nil, domain.ErrConcurrencyLimited("tenant")
-	}
-
-	// In-flight token reservation — the LAST gate. Atomically claims an
-	// estimate of this call's cost against each window's REMAINING budget
-	// (quota − used − already-reserved): concurrent admits can no longer
-	// double-spend the same remaining budget. Skipped when the window
-	// position query failed (fail-open posture) or the feature is off.
-	var res *reservation
-	if pos != nil && p.Reserve.Enabled && p.Limiter != nil {
-		var de *domain.Error
-		res, de = p.reserveWindows(ctx, idn, req, pos)
-		if de != nil {
-			for _, k := range held {
-				p.Limiter.Release(context.WithoutCancel(ctx), k, p.SlotTTL)
-			}
-			return nil, nil, de
-		}
+		return nil, domain.ErrConcurrencyLimited("tenant")
 	}
 
 	var released bool
@@ -449,7 +408,7 @@ func (p *Proxy) admit(ctx context.Context, idn *auth.Identity, req *Request) (fu
 		for _, k := range held {
 			p.Limiter.Release(context.WithoutCancel(ctx), k, p.SlotTTL)
 		}
-	}, res, nil
+	}, nil
 }
 
 // windowBlocked renders the quota rejection with the exact recovery instant

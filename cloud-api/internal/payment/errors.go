@@ -18,9 +18,16 @@ var (
 		return &domain.Error{Code: "PAYMENTS_DISABLED", Message: "Payments are not enabled on this deployment.", HTTP: http.StatusServiceUnavailable}
 	}()
 
-	// ErrPackNotFound — catalog miss (404).
-	ErrPackNotFound = func(packID string) *domain.Error {
-		return &domain.Error{Code: "PACK_NOT_FOUND", Message: "The requested credit pack is not available.", HTTP: http.StatusNotFound, Details: map[string]any{"pack_id": packID}}
+	// ErrSKUNotFound — catalog miss (404).
+	ErrSKUNotFound = func(skuID string) *domain.Error {
+		return &domain.Error{Code: "SKU_NOT_FOUND", Message: "The requested plan is not available.", HTTP: http.StatusNotFound, Details: map[string]any{"sku_id": skuID}}
+	}
+
+	// ErrPlanNotFound — the SKU's plan_code has no plans row (409: the
+	// catalog references a plan the deployment does not have — operator
+	// misconfiguration, not a client error).
+	ErrPlanNotFound = func(planCode string) *domain.Error {
+		return &domain.Error{Code: "PLAN_NOT_CONFIGURED", Message: "The plan behind this purchase is not configured on this deployment.", HTTP: http.StatusConflict, Details: map[string]any{"plan_code": planCode}}
 	}
 
 	// ErrOrderNotFound — unknown or cross-tenant order (404; identical body
@@ -74,7 +81,7 @@ var (
 		return &domain.Error{Code: "RATE_LIMITED", Message: "Too many checkout requests. Please wait and retry.", HTTP: http.StatusTooManyRequests, Details: map[string]any{"scope": "checkout_user"}}
 	}()
 
-	// errIdemReuse — same Idempotency-Key, different pack (422; mirrors the
+	// errIdemReuse — same Idempotency-Key, different sku (422; mirrors the
 	// runs idempotency contract exactly).
 	errIdemReuse = func() *domain.Error {
 		return &domain.Error{Code: "IDEMPOTENCY_KEY_REUSE", Message: "The Idempotency-Key was reused with a different request body.", HTTP: http.StatusUnprocessableEntity}

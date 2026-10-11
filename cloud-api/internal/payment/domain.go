@@ -1,26 +1,38 @@
-// Package payment implements the prepaid credit top-up flow (Razorpay):
-// checkout, client-handshake confirmation, signed webhooks, reconciliation,
-// and an append-only credit ledger with per-tenant balances.
+// Package payment implements the plan-purchase flow (plans only — no
+// individual credits are sold): checkout, client-handshake confirmation,
+// signed webhooks, reconciliation, and subscription activation with
+// stacking renewal periods.
+//
+// # Commerce model (docs/MODELS-AND-PRICING.md §4)
+//
+// The ONLY purchasable thing is a PLAN PERIOD (a SKU): e.g. Pro monthly
+// (₹1,999 / 30 days) or Pro annual (₹19,999 / 365 days). A captured order
+// activates or extends the tenant's subscription in the SAME transaction
+// that marks the order paid — no credits, no wallet, no balance. Free is
+// the default state of every tenant (enforced by the identity resolver's
+// free-plan fallback, identity.go), never something you buy.
 //
 // # Architecture (docs/PAYMENT-GATEWAY.md)
 //
-//	api ──► payment.Service ──► Provider (interface: razorpay.Client | MockProvider)
+//	api ──► payment.Service ──► Provider (interface: razorpay.Client |
+//	                             stripe.Client | phonepe.Client | MockProvider)
 //	             │
 //	             └──────────► Store (interface: repos.Payments | test fakes)
 //
 // The package owns exactly two seams — Provider (money transmission) and
 // Store (persistence) — both defined here, implemented elsewhere. Wire DTOs
-// never cross the razorpay/ boundary; persistence details never cross
+// never cross the provider boundaries; persistence details never cross
 // repos/.
 //
 // # Invariants (enforced jointly by service guards and SQL, see apply.go)
 //
-//   - Credits apply EXACTLY ONCE per order (row lock + status guard +
-//     UNIQUE(order_id, kind) on the ledger).
+//   - A paid order activates the subscription EXACTLY ONCE (row lock +
+//     status guard; renewal extension happens in the same transaction).
 //   - "paid" is absorbing: no later event can regress a paid order.
+//   - Renewals stack: paid_through = GREATEST(now, paid_through) + period.
 //   - Money is integer paise, INR only; floats never appear on this path.
-//   - The webhook route authenticates by HMAC over the raw body — it is the
-//     only unauthenticated route this package mounts.
+//   - The webhook route authenticates by provider signature over the raw
+//     body — it is the only unauthenticated route this package mounts.
 package payment
 
 import "time"
@@ -35,33 +47,39 @@ const (
 )
 
 // Payment providers known to the service (mock exists for dev + tests).
+// Exactly one is active per deployment (NEXAU_PAYMENT_PROVIDER).
 const (
 	ProviderRazorpay = "razorpay"
+	ProviderStripe   = "stripe"
+	ProviderPhonepe  = "phonepe"
 	ProviderMock     = "mock"
 )
 
-// Order is a single purchasable top-up: one local row, one provider order.
-// Amounts are integer paise; credits are snapshotted at creation so catalog
-// edits never mutate in-flight orders.
+// Order is a single plan purchase: one local row, one provider order.
+// Amounts are integer paise; plan_code + period_days are snapshotted at
+// creation so catalog edits never mutate in-flight orders.
 type Order struct {
-	ID                string
-	TenantID          string
-	UserID            string
-	Provider          string
-	ProviderOrderID   string
-	ProviderPaymentID string
-	PackID            string
-	Currency          string
-	AmountPaise       int64
-	Credits           int64
-	Status            string
-	FailureReason     string
-	IdempotencyKey    string
-	RequestHash       string
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	PaidAt            *time.Time
-	ExpiresAt         time.Time
+	ID                   string
+	TenantID             string
+	UserID               string
+	Provider             string
+	ProviderOrderID      string
+	ProviderPaymentID    string
+	ProviderClientSecret string // stripe: browser handle (public by design)
+	ProviderCheckoutURL  string // phonepe: hosted PAY_PAGE url (public by design)
+	SKUID                string // catalog SKU id ("plan_pro_1m")
+	PlanCode             string // snapshot: plans.code the purchase activates
+	PeriodDays           int    // snapshot: days the activation extends
+	Currency             string
+	AmountPaise          int64
+	Status               string
+	FailureReason        string
+	IdempotencyKey       string
+	RequestHash          string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	PaidAt               *time.Time
+	ExpiresAt            time.Time
 }
 
 // ClientView is the JSON shape returned by the API layer (no secrets).
@@ -70,10 +88,11 @@ type ClientView struct {
 	ProviderOrderID   string     `json:"provider_order_id"`
 	ProviderPaymentID string     `json:"provider_payment_id,omitempty"`
 	Provider          string     `json:"provider"`
-	PackID            string     `json:"pack_id"`
+	SKUID             string     `json:"sku_id"`
+	PlanCode          string     `json:"plan_code"`
+	PeriodDays        int        `json:"period_days"`
 	Currency          string     `json:"currency"`
 	AmountPaise       int64      `json:"amount_paise"`
-	Credits           int64      `json:"credits"`
 	Status            string     `json:"status"`
 	FailureReason     string     `json:"failure_reason,omitempty"`
 	CreatedAt         time.Time  `json:"created_at"`
@@ -86,8 +105,9 @@ func (o *Order) ClientViewOf() ClientView {
 	return ClientView{
 		OrderID: o.ID, ProviderOrderID: o.ProviderOrderID, ProviderPaymentID: o.ProviderPaymentID,
 		Provider: o.Provider,
-		PackID:   o.PackID, Currency: o.Currency, AmountPaise: o.AmountPaise,
-		Credits: o.Credits, Status: o.Status, FailureReason: o.FailureReason,
+		SKUID:    o.SKUID, PlanCode: o.PlanCode, PeriodDays: o.PeriodDays,
+		Currency: o.Currency, AmountPaise: o.AmountPaise,
+		Status: o.Status, FailureReason: o.FailureReason,
 		CreatedAt: o.CreatedAt, PaidAt: o.PaidAt, ExpiresAt: o.ExpiresAt,
 	}
 }
@@ -96,8 +116,8 @@ func (o *Order) ClientViewOf() ClientView {
 // except the paid-absorbing rule: paid can still be entered, never left).
 //
 // The transition RULES themselves live in exactly one place outside this
-// file: the SQL WHERE guards of migration 000010 (mirrored by the test
-// fakeStore). There is deliberately no parallel in-memory state-machine
+// file: the SQL WHERE guards of the payment_orders table (mirrored by the
+// test fakeStore). There is deliberately no parallel in-memory state-machine
 // validator in production code — the store is the single authority:
 //
 //	pending   → attempted, paid, failed, expired
@@ -109,36 +129,30 @@ func Terminal(status string) bool {
 	switch status {
 	case StatusPaid, StatusFailed, StatusExpired:
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
-// LedgerEntry is one append-only credit mutation. v1 writes only kind=topup;
-// the enum reserves adjustment (manual ops) and refund (v2 reversal).
-type LedgerEntry struct {
-	ID           string
-	TenantID     string
-	OrderID      string
-	Kind         string
-	Credits      int64
-	BalanceAfter int64
-	CreatedAt    time.Time
+// SubscriptionState is the tenant's entitlement position — what a plan
+// purchase buys and what expiry means. Replaces the retired credit
+// balance: the "wallet" IS the subscription's paid-through date.
+type SubscriptionState struct {
+	TenantID         string     `json:"tenant_id"`
+	PlanCode         string     `json:"plan_code"` // "" = no active row → free default
+	PlanName         string     `json:"plan_name"`
+	Status           string     `json:"status"` // active | trialing | past_due | none
+	CurrentPeriodEnd *time.Time `json:"current_period_end,omitempty"`
+	DaysRemaining    int        `json:"days_remaining"` // 0 when none; rounded down
 }
 
-// Ledger kinds.
+// Subscription status vocabulary (mirrors the DB CHECK constraint).
 const (
-	LedgerTopup      = "topup"
-	LedgerAdjustment = "adjustment"
-	LedgerRefund     = "refund"
+	SubNone     = "none" // no effective row — the free-plan default
+	SubActive   = "active"
+	SubTrialing = "trialing"
+	SubPastDue  = "past_due"
 )
-
-// Balance is the tenant's credit position + last top-up metadata.
-type Balance struct {
-	TenantID        string     `json:"tenant_id"`
-	Balance         int64      `json:"balance"`
-	LastTopupAt     *time.Time `json:"last_topup_at,omitempty"`
-	LastTopupAmount int64      `json:"last_topup_credits,omitempty"`
-}
 
 // WebhookEvent is a normalized provider event (already signature-verified
 // by the Provider before the service sees it).
@@ -172,6 +186,7 @@ func (e *WebhookEvent) Handled() bool {
 	switch e.Type {
 	case EventPaymentCaptured, EventPaymentFailed, EventOrderPaid:
 		return true
+	default:
+		return false
 	}
-	return false
 }

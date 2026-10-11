@@ -1,12 +1,15 @@
 // harness_test.go — the shared test rig for the payment service suite.
 //
 // fakeStore is an in-memory payment.Store whose concurrency semantics
-// MIRROR THE SQL (migration 000010) exactly:
+// MIRROR THE SQL exactly:
 //
 //   - global mutex ≈ row locks (coarse but strictly stronger — races that
 //     pass here would pass in PG too; races that fail here must fail in PG)
 //   - conditional transitions ≈ `UPDATE ... WHERE status IN (...)`
 //   - maps keyed by the same unique constraints as the migration
+//   - ApplyPaid activates the subscription in the same critical section
+//     (extend-or-insert, stacking periods) — exactly like the SQL
+//     transaction in repos/payments.go
 //
 // If a test needs PG-truth (e.g. to prove the SQL itself), the repo
 // integration test against a real database covers that layer.
@@ -19,7 +22,6 @@ package payment_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -29,14 +31,21 @@ import (
 	"github.com/mash-cloud/mash-api/internal/payment"
 )
 
+// fakeSubscription is the in-memory effective-subscription row.
+type fakeSubscription struct {
+	planCode  string
+	status    string // active | trialing | past_due
+	periodEnd time.Time
+}
+
 type fakeStore struct {
 	mu         sync.Mutex
 	orders     map[string]*payment.Order        // by id
 	byProvider map[string]*payment.Order        // provider|orderID → order
 	byIdem     map[string]*payment.Order        // tenant|key → order
 	events     map[string]*payment.WebhookEvent // by event id
-	ledger     []*payment.LedgerEntry
-	balances   map[string]int64
+	subs       map[string]*fakeSubscription     // tenant → effective sub
+	plans      map[string]bool                  // plan codes that exist
 	seq        int
 	failNext   atomic.Bool // fault injection
 }
@@ -45,7 +54,7 @@ func newFakeStore() *fakeStore {
 	return &fakeStore{
 		orders: map[string]*payment.Order{}, byProvider: map[string]*payment.Order{},
 		byIdem: map[string]*payment.Order{}, events: map[string]*payment.WebhookEvent{},
-		balances: map[string]int64{},
+		subs: map[string]*fakeSubscription{}, plans: map[string]bool{"free": true, "pro": true},
 	}
 }
 
@@ -151,8 +160,9 @@ func (f *fakeStore) MarkAttempted(_ context.Context, orderID, providerPaymentID 
 	return nil
 }
 
-// ApplyPaid mirrors the SQL transaction: state guard + ledger unique +
-// balance bump, atomically under the store mutex.
+// ApplyPaid mirrors the SQL transaction: state guard + subscription
+// activation (extend-or-insert, stacking periods), atomically under the
+// store mutex.
 func (f *fakeStore) ApplyPaid(_ context.Context, orderID, providerPaymentID string) (bool, *payment.Order, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -163,24 +173,31 @@ func (f *fakeStore) ApplyPaid(_ context.Context, orderID, providerPaymentID stri
 	if o.Status == payment.StatusPaid {
 		return false, cloneOrder(o), nil // state guard: no-op replay
 	}
-	for _, e := range f.ledger { // UNIQUE(order_id, kind) backstop
-		if e.OrderID == orderID && e.Kind == payment.LedgerTopup {
-			return false, cloneOrder(o), nil
-		}
-	}
 	o.Status = payment.StatusPaid
 	if providerPaymentID != "" {
 		o.ProviderPaymentID = providerPaymentID
 	}
 	now := time.Now().UTC()
 	o.PaidAt = &now
-	f.balances[o.TenantID] += o.Credits
-	f.seq++
-	f.ledger = append(f.ledger, &payment.LedgerEntry{
-		ID: fmt.Sprintf("led_%d", f.seq), TenantID: o.TenantID, OrderID: orderID,
-		Kind: payment.LedgerTopup, Credits: o.Credits, BalanceAfter: f.balances[o.TenantID],
-		CreatedAt: now,
-	})
+
+	// Plan activation — mirrors activateSubscription: extend-or-insert.
+	if o.PlanCode != "" && o.PeriodDays > 0 && f.plans[o.PlanCode] {
+		if sub, exists := f.subs[o.TenantID]; exists && sub.status != "expired" && sub.status != "canceled" && sub.periodEnd.After(now) {
+			sub.planCode = o.PlanCode
+			sub.status = "active"
+			sub.periodEnd = sub.periodEnd.Add(time.Duration(o.PeriodDays) * 24 * time.Hour) // stacking
+		} else if sub, exists := f.subs[o.TenantID]; exists {
+			// Expired-in-place row: reactivate from now.
+			sub.planCode = o.PlanCode
+			sub.status = "active"
+			sub.periodEnd = now.Add(time.Duration(o.PeriodDays) * 24 * time.Hour)
+		} else {
+			f.subs[o.TenantID] = &fakeSubscription{
+				planCode: o.PlanCode, status: "active",
+				periodEnd: now.Add(time.Duration(o.PeriodDays) * 24 * time.Hour),
+			}
+		}
+	}
 	return true, cloneOrder(o), nil
 }
 
@@ -230,44 +247,40 @@ func (f *fakeStore) RecordWebhookEvent(_ context.Context, ev *payment.WebhookEve
 	return false, nil
 }
 
-func (f *fakeStore) Balance(_ context.Context, tenantID string) (*payment.Balance, error) {
+// PlanExists mirrors the repo: does the plan code resolve?
+func (f *fakeStore) PlanExists(_ context.Context, planCode string) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	b := &payment.Balance{TenantID: tenantID, Balance: f.balances[tenantID]}
-	for i := len(f.ledger) - 1; i >= 0; i-- {
-		if f.ledger[i].TenantID == tenantID {
-			b.LastTopupAmount = f.ledger[i].Credits
-			t := f.ledger[i].CreatedAt
-			b.LastTopupAt = &t
-			break
-		}
-	}
-	return b, nil
+	return f.plans[planCode], nil
 }
 
-func (f *fakeStore) Ledger(_ context.Context, tenantID string, limit int) ([]*payment.LedgerEntry, error) {
+// Subscription mirrors the repo: effective row must be unexpired.
+func (f *fakeStore) Subscription(_ context.Context, tenantID string) (*payment.SubscriptionState, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	var out []*payment.LedgerEntry
-	for i := len(f.ledger) - 1; i >= 0 && len(out) < limit; i-- {
-		if f.ledger[i].TenantID == tenantID {
-			out = append(out, f.ledger[i])
-		}
+	st := &payment.SubscriptionState{TenantID: tenantID, Status: payment.SubNone}
+	sub, ok := f.subs[tenantID]
+	if !ok || sub.status == "expired" || sub.status == "canceled" || !sub.periodEnd.After(time.Now()) {
+		return st, nil
 	}
-	return out, nil
+	st.PlanCode = sub.planCode
+	st.PlanName = "Pro"
+	st.Status = sub.status
+	end := sub.periodEnd
+	st.CurrentPeriodEnd = &end
+	st.DaysRemaining = int(time.Until(end).Hours() / 24)
+	return st, nil
 }
 
-// ledgerCountForOrder: exactly-once assertion helper.
-func (f *fakeStore) ledgerCountForOrder(orderID string) int {
+// subscriptionPeriodEnd: assertion helper — the effective paid-through.
+func (f *fakeStore) subscriptionPeriodEnd(tenantID string) (time.Time, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	n := 0
-	for _, e := range f.ledger {
-		if e.OrderID == orderID {
-			n++
-		}
+	sub, ok := f.subs[tenantID]
+	if !ok {
+		return time.Time{}, false
 	}
-	return n
+	return sub.periodEnd, true
 }
 
 // ---------------------------------------------------------------------------
@@ -327,22 +340,20 @@ const (
 	tenantB = "ten_B"
 )
 
-func firstPack(t *testing.T) payment.Pack {
+func firstSKU(t *testing.T) payment.PlanSKU {
 	t.Helper()
-	packs := mustCatalog(t).Packs()
-	if len(packs) == 0 {
-		t.Fatal("empty catalog")
+	skus := mustCatalog(t).SKUs()
+	if len(skus) == 0 {
+		t.Fatal("catalog is empty")
 	}
-	return packs[0]
+	return skus[0]
 }
 
-// mustCheckout: one-line happy-path checkout for scenarios that care about
-// what happens AFTER creation.
-func mustCheckout(t *testing.T, f *fixture, packID, idemKey string) *payment.Order {
+func mustCheckout(t *testing.T, f *fixture, skuID, idemKey string) *payment.Order {
 	t.Helper()
-	o, err := f.svc.Checkout(context.Background(), tenantA, userA, packID, idemKey)
+	o, err := f.svc.Checkout(context.Background(), tenantA, userA, skuID, idemKey)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("checkout %s: %v", skuID, err)
 	}
 	return o
 }

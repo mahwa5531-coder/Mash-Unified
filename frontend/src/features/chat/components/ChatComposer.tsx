@@ -96,8 +96,10 @@ export default function ChatComposer({
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
+      if (isUploading) {
+        return;
+      }
       e.preventDefault();
-      if (isUploading) return;
       handleSendClick();
     }
   };

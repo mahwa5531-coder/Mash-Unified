@@ -128,13 +128,13 @@ async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | 
                             win["used_percent"] = win["percent"]
             meta["quota"] = quota_data
 
-        # Also fetch live usage from /v1/me/usage if available
+        # Also fetch live usage from /v1/usage if available
         try:
             usage_data = await client.get_usage(token)
             if usage_data:
                 meta["usage"] = usage_data
         except Exception as ue:
-            logger.debug("Cloud /v1/me/usage sync skipped: %s", ue)
+            logger.debug("Cloud /v1/usage sync skipped: %s", ue)
 
         vault = load_secure_vault() or {}
         save_secure_vault(vault, meta)

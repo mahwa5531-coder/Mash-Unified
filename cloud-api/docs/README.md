@@ -11,7 +11,9 @@ to the section you need otherwise.
 | [`TABLES.md`](TABLES.md) | **The data dictionary**: every table + where the 5h/weekly window budgets live (`plans.limits`) and where the token-normalization values live (`token_normalization`) — both hot-changeable via SQL | Schema questions, operator dials |
 | [`CLEANUP-2026-10-05.md`](CLEANUP-2026-10-05.md) | **The simplification audit trail**: what was deleted (agent runtime, non-Google auth), what replaced it, the DB re-provisioning step | Why the codebase looks like this |
 | [`DESKTOP-CONNECTION.md`](DESKTOP-CONNECTION.md) | Web-to-desktop handshake, OAuth flow, exchange codes, stream semantics | Desktop client integration |
-| [`PAYMENT-GATEWAY.md`](PAYMENT-GATEWAY.md) | Razorpay integration: who owns what, flows, exactly-once crediting, env keys, security posture | Anything money-related |
+| [`PAYMENT-GATEWAY.md`](PAYMENT-GATEWAY.md) | Payment-gateway integration (Razorpay/Stripe/PhonePe): who owns what, flows, exactly-once subscription activation, env keys, security posture | Anything money-related |
+| [`FRONTEND-PAYMENTS.md`](FRONTEND-PAYMENTS.md) | The client-facing endpoint map + per-provider call sequences (plans-only purchase flow) | Coding the frontend checkout |
+| [`MODELS-AND-PRICING.md`](MODELS-AND-PRICING.md) | **The launch decision doc**: October-2026 model lineup (GPT-6 Luna, Gemini 3.8 Flash, Claude Sonnet 5.5…), price-proportional normalization weights, Free/Pro plan design, Indian-market pricing strategy, ZDR/no-training matrix | Models, plans, pricing, data-retention policy |
 | [`CIRCUIT-BREAKER.md`](CIRCUIT-BREAKER.md) | Upstream (Bifrost) failure isolation and recovery behavior | Debugging upstream outages |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | **Fresh-to-deploy runbook**: prerequisites, required env keys, compose/bare-metal bring-up, smoke tests, rollback | Standing the service up |
 | [`OPERATIONS.md`](OPERATIONS.md) | Runbook: metrics, alerts, common incidents, audit history | On-call |

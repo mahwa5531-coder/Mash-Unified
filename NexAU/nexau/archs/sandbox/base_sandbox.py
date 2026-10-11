@@ -216,7 +216,7 @@ def parse_sandbox_config(
     """
     if raw is None:
         return None
-    if isinstance(raw, (LocalSandboxConfig, E2BSandboxConfig)):
+    if isinstance(raw, LocalSandboxConfig):
         return raw
     raw = dict(raw)  # shallow copy to avoid mutating caller's dict
     if "type" not in raw:

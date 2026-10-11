@@ -26,17 +26,6 @@ async def list_skills():
     }
 
 
-@router.get("/models")
-async def list_models():
-    """List supported LLM models and active configurations."""
-    return {
-        "models": [
-            {"id": "gemini-2.5-flash", "provider": "google", "name": "Gemini 2.5 Flash"},
-            {"id": "gemini-3.5-flash-lite", "provider": "google", "name": "Gemini 3.5 Flash Lite"},
-            {"id": "gpt-4o", "provider": "openai", "name": "GPT-4o"},
-            {"id": "claude-3-5-sonnet", "provider": "anthropic", "name": "Claude 3.5 Sonnet"},
-        ]
-    }
 
 
 @router.get("/system/health")

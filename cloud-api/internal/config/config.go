@@ -6,7 +6,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"runtime"
 	"strconv"
@@ -51,9 +50,6 @@ type Config struct {
 
 	// Authentication (Google OAuth only; tokens minted locally)
 	Auth AuthConfig
-
-	// Quota reservation (in-flight window claims; see llm.ReserveConfig)
-	Quota QuotaConfig
 
 	// Payments (prepaid credit top-ups via Razorpay; docs/PAYMENT-GATEWAY.md)
 	Payments PaymentConfig
@@ -110,12 +106,6 @@ type AuthConfig struct {
 	GoogleAuthURL  string
 	GoogleTokenURL string
 	GoogleJWKSURL  string
-	// Accepted ID-token issuers. Defaults are Google's two documented forms;
-	// a deployment pointing the endpoints at a test/fake OAuth server MUST
-	// set this to that server's issuer or every login fails — the issuer
-	// check is a security boundary, so it is explicit config, never
-	// inferred from the endpoint URLs.
-	GoogleIssuers []string
 
 	// Web-to-desktop handshake (60-second single-use exchange codes).
 	WebSuccessURL     string        // post-OAuth redirect target (receives ?grant=...)
@@ -132,21 +122,6 @@ type AuthConfig struct {
 	MaxDesktopCodePerMin    int // POST /v1/auth/desktop/code per user per minute (default 30)
 	MaxRefreshPerIP         int // POST /v1/auth/refresh (rotation + PG writes, default 60)
 	MaxOAuthPerIP           int // GET  /v1/auth/oauth/google{,/callback} (Redis state, default 60)
-}
-
-// QuotaConfig bounds the in-flight token reservation that closes the
-// concurrent-overshoot race in the rolling plan windows (5h / weekly).
-// Usage rows land in PostgreSQL only at call completion; without a claim,
-// N parallel admits each see the same position and can collectively exceed
-// the window. Every admitted call reserves an estimate, atomically, until
-// its usage row lands.
-type QuotaConfig struct {
-	ReserveEnabled     bool          // NEXAU_QUOTA_RESERVE_ENABLED (default true)
-	ReserveMinTokens   int64         // per-call floor (default 1024)
-	ReserveMaxTokens   int64         // per-call ceiling (default 32768)
-	ReserveDefaultOut  int64         // output budget when the request declares none (default 4096)
-	ReserveTTL         time.Duration // crash backstop; must exceed StreamMaxDuration (default 30m)
-	ReserveSettleDelay time.Duration // release delay covering the metering flush lag (default 2s)
 }
 
 // BifrostConfig is the upstream gateway connection.
@@ -207,14 +182,27 @@ type LogConfig struct {
 
 // PaymentConfig wires the payment gateway module.
 type PaymentConfig struct {
-	Provider string // disabled | mock | razorpay
+	Provider string // disabled | mock | razorpay | stripe | phonepe
 
 	RazorpayKeyID         string
 	RazorpayKeySecret     string
 	RazorpayWebhookSecret string
 	RazorpayAPIBase       string // "" → razorpay.DefaultBaseURL
 
-	// CatalogJSON optionally overrides the built-in credit packs.
+	StripeAPIKey         string // sk_… / rk_…
+	StripePublishableKey string // pk_… (relayed to clients as key_id)
+	StripeWebhookSecret  string // whsec_…
+	StripeAPIBase        string // "" → stripe.DefaultBaseURL
+
+	PhonepeMerchantID   string // MERCHANTUAT (test) / production id
+	PhonepeSaltKey      string // server secret
+	PhonepeSaltIndex    string // "1" (selects the active dashboard key)
+	PhonepeRedirectURL  string // frontend return page (absolute URL)
+	PhonepeRedirectMode string // POST | REDIRECT
+	PhonepeCallbackURL  string // public API base + /v1/payments/webhook
+	PhonepeAPIBase      string // "" → phonepe.DefaultBaseURL (preprod override)
+
+	// CatalogJSON optionally overrides the built-in plan SKUs.
 	CatalogJSON string
 
 	// MockAutoCapture: in mock mode, provider orders capture themselves
@@ -299,7 +287,6 @@ func Load() (*Config, error) {
 		GoogleAuthURL:      envStr("NEXAU_AUTH_GOOGLE_AUTH_URL", "https://accounts.google.com/o/oauth2/v2/auth"),
 		GoogleTokenURL:     envStr("NEXAU_AUTH_GOOGLE_TOKEN_URL", "https://oauth2.googleapis.com/token"),
 		GoogleJWKSURL:      envStr("NEXAU_AUTH_GOOGLE_JWKS_URL", "https://www.googleapis.com/oauth2/v3/certs"),
-		GoogleIssuers:      envListDefault("NEXAU_AUTH_GOOGLE_ISSUERS", []string{"accounts.google.com", "https://accounts.google.com"}),
 
 		WebSuccessURL:     strings.TrimRight(os.Getenv("NEXAU_AUTH_WEB_SUCCESS_URL"), "/"),
 		WebLoginURL:       strings.TrimRight(os.Getenv("NEXAU_AUTH_WEB_LOGIN_URL"), "/"),
@@ -335,6 +322,17 @@ func Load() (*Config, error) {
 		RazorpayKeySecret:     os.Getenv("NEXAU_RAZORPAY_KEY_SECRET"),
 		RazorpayWebhookSecret: os.Getenv("NEXAU_RAZORPAY_WEBHOOK_SECRET"),
 		RazorpayAPIBase:       strings.TrimRight(os.Getenv("NEXAU_RAZORPAY_API_BASE"), "/"),
+		StripeAPIKey:          strings.TrimSpace(os.Getenv("NEXAU_STRIPE_API_KEY")),
+		StripePublishableKey:  strings.TrimSpace(os.Getenv("NEXAU_STRIPE_PUBLISHABLE_KEY")),
+		StripeWebhookSecret:   strings.TrimSpace(os.Getenv("NEXAU_STRIPE_WEBHOOK_SECRET")),
+		StripeAPIBase:         strings.TrimRight(os.Getenv("NEXAU_STRIPE_API_BASE"), "/"),
+		PhonepeMerchantID:     strings.TrimSpace(os.Getenv("NEXAU_PHONEPE_MERCHANT_ID")),
+		PhonepeSaltKey:        strings.TrimSpace(os.Getenv("NEXAU_PHONEPE_SALT_KEY")),
+		PhonepeSaltIndex:      envStr("NEXAU_PHONEPE_SALT_INDEX", "1"),
+		PhonepeRedirectURL:    strings.TrimSpace(os.Getenv("NEXAU_PHONEPE_REDIRECT_URL")),
+		PhonepeRedirectMode:   strings.ToUpper(envStr("NEXAU_PHONEPE_REDIRECT_MODE", "POST")),
+		PhonepeCallbackURL:    strings.TrimSpace(os.Getenv("NEXAU_PHONEPE_CALLBACK_URL")),
+		PhonepeAPIBase:        strings.TrimRight(os.Getenv("NEXAU_PHONEPE_API_BASE"), "/"),
 		CatalogJSON:           os.Getenv("NEXAU_PAYMENT_CATALOG_JSON"),
 		OrderTTL:              envDur("NEXAU_PAYMENT_ORDER_TTL", 15*time.Minute),
 		SweepInterval:         envDur("NEXAU_PAYMENT_SWEEP_INTERVAL", time.Minute),
@@ -403,16 +401,6 @@ func Load() (*Config, error) {
 	// Token accounting: how long a normalization-rules read stays fresh
 	// (UPDATE token_normalization ... takes effect within this TTL).
 	c.NormCacheTTL = envDur("NEXAU_NORM_CACHE_TTL", 30*time.Second)
-
-	// Quota reservation (in-flight window claims)
-	c.Quota = QuotaConfig{
-		ReserveEnabled:     envBool("NEXAU_QUOTA_RESERVE_ENABLED", true),
-		ReserveMinTokens:   envInt64("NEXAU_QUOTA_RESERVE_MIN_TOKENS", 1024),
-		ReserveMaxTokens:   envInt64("NEXAU_QUOTA_RESERVE_MAX_TOKENS", 32768),
-		ReserveDefaultOut:  envInt64("NEXAU_QUOTA_RESERVE_DEFAULT_OUT_TOKENS", 4096),
-		ReserveTTL:         envDur("NEXAU_QUOTA_RESERVE_TTL", 30*time.Minute),
-		ReserveSettleDelay: envDur("NEXAU_QUOTA_RESERVE_SETTLE_DELAY", 2*time.Second),
-	}
 
 	// Logging
 	c.Log = LogConfig{
@@ -486,8 +474,40 @@ func (c *Config) validate() error {
 		if !strings.HasPrefix(c.Payments.RazorpayKeyID, "rzp_") {
 			errs = append(errs, "NEXAU_RAZORPAY_KEY_ID should look like rzp_test_… or rzp_live_… (Razorpay Dashboard → API Keys)")
 		}
+	case "stripe":
+		if c.Payments.StripeAPIKey == "" {
+			errs = append(errs, "NEXAU_STRIPE_API_KEY is required when NEXAU_PAYMENT_PROVIDER=stripe")
+		}
+		if c.Payments.StripeWebhookSecret == "" {
+			errs = append(errs, "NEXAU_STRIPE_WEBHOOK_SECRET is required when NEXAU_PAYMENT_PROVIDER=stripe")
+		}
+		if !strings.HasPrefix(c.Payments.StripeAPIKey, "sk_") && !strings.HasPrefix(c.Payments.StripeAPIKey, "rk_") {
+			errs = append(errs, "NEXAU_STRIPE_API_KEY should look like sk_test_… / sk_live_… (or rk_… restricted)")
+		}
+		if c.Payments.StripePublishableKey != "" && !strings.HasPrefix(c.Payments.StripePublishableKey, "pk_") {
+			errs = append(errs, "NEXAU_STRIPE_PUBLISHABLE_KEY should look like pk_test_… / pk_live_…")
+		}
+	case "phonepe":
+		if c.Payments.PhonepeMerchantID == "" {
+			errs = append(errs, "NEXAU_PHONEPE_MERCHANT_ID is required when NEXAU_PAYMENT_PROVIDER=phonepe")
+		}
+		if c.Payments.PhonepeSaltKey == "" {
+			errs = append(errs, "NEXAU_PHONEPE_SALT_KEY is required when NEXAU_PAYMENT_PROVIDER=phonepe")
+		}
+		if c.Payments.PhonepeRedirectURL == "" {
+			errs = append(errs, "NEXAU_PHONEPE_REDIRECT_URL is required when NEXAU_PAYMENT_PROVIDER=phonepe (the frontend return page — PhonePe sends the browser back there with ?order_id=)")
+		}
+		if c.Payments.PhonepeCallbackURL != "" && !isAbsoluteURL(c.Payments.PhonepeCallbackURL) {
+			errs = append(errs, "NEXAU_PHONEPE_CALLBACK_URL must be an absolute URL (https://…/v1/payments/webhook)")
+		}
+		if !isAbsoluteURL(c.Payments.PhonepeRedirectURL) {
+			errs = append(errs, "NEXAU_PHONEPE_REDIRECT_URL must be an absolute URL (https://…/return)")
+		}
+		if m := c.Payments.PhonepeRedirectMode; m != "POST" && m != "REDIRECT" {
+			errs = append(errs, fmt.Sprintf("NEXAU_PHONEPE_REDIRECT_MODE must be POST or REDIRECT, got %q", m))
+		}
 	default:
-		errs = append(errs, fmt.Sprintf("NEXAU_PAYMENT_PROVIDER must be disabled|mock|razorpay, got %q", c.Payments.Provider))
+		errs = append(errs, fmt.Sprintf("NEXAU_PAYMENT_PROVIDER must be disabled|mock|razorpay|stripe|phonepe, got %q", c.Payments.Provider))
 	}
 	if c.Payments.OrderTTL < time.Minute {
 		errs = append(errs, "NEXAU_PAYMENT_ORDER_TTL must be ≥1m")
@@ -550,52 +570,6 @@ func (c *Config) validate() error {
 		errs = append(errs, "NEXAU_AUTH_OAUTH_STATE_TTL must be within [1m,1h]")
 	}
 
-	// URL-shape validation: every connection URL is env-driven (operators
-	// repoint them between prod/staging/test WITHOUT code changes), so a
-	// typo must fail at BOOT with the exact key named — not at first
-	// request with a confusing transport error.
-	for _, u := range []struct{ key, val string }{
-		{"NEXAU_AUTH_GOOGLE_AUTH_URL", c.Auth.GoogleAuthURL},
-		{"NEXAU_AUTH_GOOGLE_TOKEN_URL", c.Auth.GoogleTokenURL},
-		{"NEXAU_AUTH_GOOGLE_JWKS_URL", c.Auth.GoogleJWKSURL},
-		{"NEXAU_AUTH_GOOGLE_REDIRECT_URL", c.Auth.GoogleRedirectURL},
-		{"NEXAU_AUTH_WEB_SUCCESS_URL", c.Auth.WebSuccessURL},
-		{"NEXAU_AUTH_WEB_LOGIN_URL", c.Auth.WebLoginURL},
-		{"NEXAU_BIFROST_URL", c.Bifrost.BaseURL},
-		{"NEXAU_BIFROST_HEALTH_URL", c.Bifrost.HealthURL},
-		{"NEXAU_RAZORPAY_API_BASE", c.Payments.RazorpayAPIBase},
-		{"NEXAU_OTEL_TRACE_ENDPOINT", c.OTel.TraceEndpoint},
-		{"NEXAU_OTEL_METRIC_ENDPOINT", c.OTel.MetricEndpoint},
-	} {
-		if u.val != "" && !validHTTPURL(u.val) {
-			errs = append(errs, fmt.Sprintf("%s must be an absolute http(s) URL, got %q", u.key, u.val))
-		}
-	}
-
-	// Google issuers: trimmed, de-duplicated, bounded (the map is probed
-	// per login; a runaway list is a misconfiguration).
-	if iss := normalizeIssuers(c.Auth.GoogleIssuers); len(iss) > 0 {
-		c.Auth.GoogleIssuers = iss
-	} else {
-		errs = append(errs, "NEXAU_AUTH_GOOGLE_ISSUERS must list at least one issuer")
-	}
-
-	// Quota reservation bounds.
-	if c.Quota.ReserveEnabled {
-		if c.Quota.ReserveMaxTokens < c.Quota.ReserveMinTokens {
-			errs = append(errs, "NEXAU_QUOTA_RESERVE_MAX_TOKENS must be ≥ MIN_TOKENS")
-		}
-		if c.Quota.ReserveMinTokens < 1 {
-			errs = append(errs, "NEXAU_QUOTA_RESERVE_MIN_TOKENS must be ≥1")
-		}
-		if c.Quota.ReserveTTL <= c.StreamMaxDuration {
-			errs = append(errs, "NEXAU_QUOTA_RESERVE_TTL must exceed NEXAU_STREAM_MAX_DURATION (crash backstop)")
-		}
-		if c.Quota.ReserveSettleDelay < 0 {
-			errs = append(errs, "NEXAU_QUOTA_RESERVE_SETTLE_DELAY must be ≥0")
-		}
-	}
-
 	if len(errs) > 0 {
 		return fmt.Errorf("config validation failed:\n  - %s", strings.Join(errs, "\n  - "))
 	}
@@ -603,6 +577,11 @@ func (c *Config) validate() error {
 }
 
 // --- env helpers (no external dependency) ---
+
+// isAbsoluteURL reports whether s parses as an absolute http(s) URL.
+func isAbsoluteURL(s string) bool {
+	return strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://")
+}
 
 func envStr(key, def string) string {
 	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
@@ -674,15 +653,9 @@ func envDur(key string, def time.Duration) time.Duration {
 }
 
 func envList(key string) []string {
-	return envListDefault(key, nil)
-}
-
-// envListDefault reads a comma-separated list, falling back to def when unset
-// or empty. A list-type knob with production defaults (e.g. Google issuers).
-func envListDefault(key string, def []string) []string {
 	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {
-		return def
+		return nil
 	}
 	parts := strings.Split(v, ",")
 	out := make([]string, 0, len(parts))
@@ -710,33 +683,3 @@ func runtimeNumCPU() int {
 // ErrNoAuthPath is a sentinel used by main.go to warn (not fail) when no
 // Google OAuth is configured — no client could ever log in.
 var ErrNoAuthPath = errors.New("config: google oauth not configured")
-
-// validHTTPURL reports whether s parses as an absolute http/https URL with a
-// host. Boot-time shape check for every env-driven connection URL — catches
-// typos ("api.razorpay.com/v1" without a scheme) before they become runtime
-// transport mysteries.
-func validHTTPURL(s string) bool {
-	u, err := url.Parse(s)
-	if err != nil {
-		return false
-	}
-	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
-}
-
-// normalizeIssuers trims, de-duplicates and bounds the accepted issuer list.
-func normalizeIssuers(in []string) []string {
-	seen := make(map[string]bool, len(in))
-	out := make([]string, 0, len(in))
-	for _, s := range in {
-		s = strings.TrimSpace(s)
-		if s == "" || seen[s] {
-			continue
-		}
-		if len(out) >= 8 {
-			break
-		}
-		seen[s] = true
-		out = append(out, s)
-	}
-	return out
-}

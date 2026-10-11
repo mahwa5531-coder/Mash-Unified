@@ -12,22 +12,34 @@ import (
 	"github.com/mash-cloud/mash-api/internal/observability"
 )
 
-// Checkout starts a purchase: resolves the pack, creates the provider
-// order, and persists the local pending order. Idempotent by Idempotency-Key
-// (unique (tenant_id, idempotency_key)); replay returns the original order.
+// Checkout starts a plan purchase: resolves the SKU, validates the plan
+// exists, creates the provider order, and persists the local pending
+// order. Idempotent by Idempotency-Key (unique (tenant_id,
+// idempotency_key)); replay returns the original order.
 //
 // Concurrency: two racing checkouts with the same key both reach the
 // provider (orphan provider orders are free — an unpaid order costs
 // nothing), but only one local row can win the unique insert; the loser
 // re-reads by key and replays the winner's order. Net: exactly one local
 // order per idempotency key, ever.
-func (s *Service) Checkout(ctx context.Context, tenantID, userID, packID, idempotencyKey string) (*Order, error) {
+func (s *Service) Checkout(ctx context.Context, tenantID, userID, skuID, idempotencyKey string) (*Order, error) {
 	if !s.Enabled() {
 		return nil, ErrDisabled
 	}
-	pack, ok := s.catalog.Get(packID)
+	sku, ok := s.catalog.Get(skuID)
 	if !ok {
-		return nil, ErrPackNotFound(packID)
+		return nil, ErrSKUNotFound(skuID)
+	}
+
+	// Plans only: the SKU must reference a plan this deployment actually
+	// has, or capture-time activation would fail (money real, nothing to
+	// activate). Validate BEFORE creating anything.
+	exists, err := s.store.PlanExists(ctx, sku.PlanCode)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrPlanNotFound(sku.PlanCode)
 	}
 
 	// Per-user budget: a stuck client retry-storming checkout must not fan
@@ -39,12 +51,12 @@ func (s *Service) Checkout(ctx context.Context, tenantID, userID, packID, idempo
 		}
 	}
 
-	// Idempotent replay: same key + same pack → same order. Different pack
+	// Idempotent replay: same key + same sku → same order. Different sku
 	// with the same key is a client bug (reuse) — surfaced as 422 exactly
 	// like the runs idempotency contract.
 	if idempotencyKey != "" {
 		if existing, err := s.store.OrderByIdempotencyKey(ctx, tenantID, idempotencyKey); err == nil && existing != nil {
-			if existing.RequestHash != checkoutRequestHash(packID) {
+			if existing.RequestHash != checkoutRequestHash(skuID) {
 				return nil, errIdemReuse
 			}
 			s.count("idem_replay", existing.Status)
@@ -59,35 +71,41 @@ func (s *Service) Checkout(ctx context.Context, tenantID, userID, packID, idempo
 	orderID := ids.New("pay")
 
 	po, err := s.provider.CreateOrder(ctx, CreateOrderRequest{
-		AmountPaise: pack.AmountPaise,
+		AmountPaise: sku.AmountPaise,
 		Currency:    "INR",
 		Receipt:     orderID,
 		Notes: map[string]string{
 			"order_id":  orderID,
 			"tenant_id": tenantID,
-			"pack_id":   pack.ID,
+			"sku_id":    sku.ID,
+			"plan_code": sku.PlanCode,
 		},
 	})
 	if err != nil {
 		return nil, mapProviderError(err)
 	}
-	if po.AmountPaise != pack.AmountPaise {
+	if po.AmountPaise != sku.AmountPaise {
 		// Provider echoed a different amount than requested — contract
 		// drift or a proxy misbehaving. Nothing charged (nothing created
-		// locally); fail loudly, never mint credits on an unknown amount.
-		return nil, ErrProviderRequest(fmt.Errorf("provider echoed amount %d, want %d", po.AmountPaise, pack.AmountPaise))
+		// locally); fail loudly, never activate a plan on an unknown amount.
+		return nil, ErrProviderRequest(fmt.Errorf("provider echoed amount %d, want %d", po.AmountPaise, sku.AmountPaise))
 	}
 
 	now := time.Now().UTC()
 	o := &Order{
 		ID: orderID, TenantID: tenantID, UserID: userID,
 		Provider: s.provider.Name(), ProviderOrderID: po.ID,
-		PackID: pack.ID, Currency: "INR",
-		AmountPaise: pack.AmountPaise, Credits: pack.Credits, // snapshot
-		Status:         StatusPending,
-		IdempotencyKey: idempotencyKey,
-		RequestHash:    checkoutRequestHash(packID),
-		CreatedAt:      now, UpdatedAt: now,
+		ProviderClientSecret: po.ClientSecret, // stripe: browser handle
+		ProviderCheckoutURL:  po.CheckoutURL,  // phonepe: hosted PAY_PAGE
+		SKUID:                sku.ID,
+		PlanCode:             sku.PlanCode,   // snapshot
+		PeriodDays:           sku.PeriodDays, // snapshot
+		Currency:             "INR",
+		AmountPaise:          sku.AmountPaise,
+		Status:               StatusPending,
+		IdempotencyKey:       idempotencyKey,
+		RequestHash:          checkoutRequestHash(skuID),
+		CreatedAt:            now, UpdatedAt: now,
 		ExpiresAt: now.Add(s.cfg.OrderTTL),
 	}
 	if err := s.store.CreateOrder(ctx, o); err != nil {
@@ -97,7 +115,7 @@ func (s *Service) Checkout(ctx context.Context, tenantID, userID, packID, idempo
 			// duplicated it — Stripe/Razorpay-grade idempotency semantics).
 			if idempotencyKey != "" {
 				if existing, err2 := s.store.OrderByIdempotencyKey(ctx, tenantID, idempotencyKey); err2 == nil && existing != nil {
-					if existing.RequestHash != checkoutRequestHash(packID) {
+					if existing.RequestHash != checkoutRequestHash(skuID) {
 						return nil, errIdemReuse
 					}
 					return existing, nil
@@ -116,10 +134,10 @@ func (s *Service) Checkout(ctx context.Context, tenantID, userID, packID, idempo
 }
 
 // checkoutRequestHash binds the idempotency key to the request content.
-// v1 content = pack id (the only client-chosen field; tenant/user come from
+// v1 content = sku id (the only client-chosen field; tenant/user come from
 // the verified identity, so they cannot drift between retries).
-func checkoutRequestHash(packID string) string {
-	h := sha256.Sum256([]byte("checkout|" + packID))
+func checkoutRequestHash(skuID string) string {
+	h := sha256.Sum256([]byte("checkout|" + skuID))
 	return hex.EncodeToString(h[:])
 }
 

@@ -17,7 +17,7 @@ import (
 // network retries). Exactly ONE local order may exist afterwards.
 func TestConcurrent_CheckoutSameIdempotencyKey(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
+	sku := firstSKU(t)
 
 	const n = 32
 	var wg sync.WaitGroup
@@ -29,7 +29,7 @@ func TestConcurrent_CheckoutSameIdempotencyKey(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			orders[i], errs[i] = f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "race-key")
+			orders[i], errs[i] = f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "race-key")
 		}(i)
 	}
 	close(start)
@@ -52,7 +52,7 @@ func TestConcurrent_CheckoutSameIdempotencyKey(t *testing.T) {
 	f.store.mu.Lock()
 	rows := 0
 	for _, o := range f.store.orders {
-		if o.TenantID == tenantA && o.PackID == pack.ID {
+		if o.TenantID == tenantA && o.SKUID == sku.ID {
 			rows++
 		}
 	}
@@ -66,8 +66,8 @@ func TestConcurrent_CheckoutSameIdempotencyKey(t *testing.T) {
 // competing completion paths × 12 goroutines each. EXACTLY ONE credit.
 func TestConcurrent_ConfirmWebhookReconcileStorm(t *testing.T) {
 	f := newFixture(t)
-	pack := firstPack(t)
-	o, err := f.svc.Checkout(context.Background(), tenantA, userA, pack.ID, "")
+	sku := firstSKU(t)
+	o, err := f.svc.Checkout(context.Background(), tenantA, userA, sku.ID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestConcurrent_ConfirmWebhookReconcileStorm(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			body := payment.BuildWebhookBody(fmt.Sprintf("evt_storm_%d", i), payment.EventPaymentCaptured, o.ProviderOrderID, payID, pack.AmountPaise)
+			body := payment.BuildWebhookBody(fmt.Sprintf("evt_storm_%d", i), payment.EventPaymentCaptured, o.ProviderOrderID, payID, sku.AmountPaise)
 			_ = f.svc.HandleWebhook(context.Background(), body, f.provider.SignWebhook(body), "10.0.0.9")
 		}()
 	}
@@ -109,12 +109,9 @@ func TestConcurrent_ConfirmWebhookReconcileStorm(t *testing.T) {
 	close(start)
 	wg.Wait()
 
-	if n := f.store.ledgerCountForOrder(o.ID); n != 1 {
-		t.Fatalf("EXACTLY-ONCE VIOLATED: %d ledger entries for order %s", n, o.ID)
-	}
-	b, _ := f.store.Balance(context.Background(), tenantA)
-	if b.Balance != pack.Credits {
-		t.Fatalf("EXACTLY-ONCE VIOLATED: balance = %d, want %d", b.Balance, pack.Credits)
+	st, _ := f.store.Subscription(context.Background(), tenantA)
+	if st.Status != payment.SubActive || st.DaysRemaining > sku.PeriodDays {
+		t.Fatalf("EXACTLY-ONCE VIOLATED: subscription = %+v (want one activation of %dd)", st, sku.PeriodDays)
 	}
 	got, _ := f.store.OrderByID(context.Background(), o.ID)
 	if got.Status != payment.StatusPaid {
@@ -127,7 +124,7 @@ func TestConcurrent_ConfirmWebhookReconcileStorm(t *testing.T) {
 // balances under load (each tenant must see EXACTLY their own credits).
 func TestConcurrent_ManyUsersManyOrders(t *testing.T) {
 	f := newFixture(t)
-	packs := mustCatalog(t).Packs()
+	skus := mustCatalog(t).SKUs()
 
 	const tenants = 50
 	const perTenant = 4
@@ -137,10 +134,9 @@ func TestConcurrent_ManyUsersManyOrders(t *testing.T) {
 		wg.Add(1)
 		go func(tnID string, tn int) {
 			defer wg.Done()
-			var wantCredits int64
 			for i := 0; i < perTenant; i++ {
-				pack := packs[i%len(packs)]
-				o, err := f.svc.Checkout(context.Background(), tnID, "usr", pack.ID, fmt.Sprintf("k-%s-%d", tnID, i))
+				sku := skus[i%len(skus)]
+				o, err := f.svc.Checkout(context.Background(), tnID, "usr", sku.ID, fmt.Sprintf("k-%s-%d", tnID, i))
 				if err != nil {
 					t.Errorf("%s checkout %d: %v", tnID, i, err)
 					return
@@ -154,21 +150,22 @@ func TestConcurrent_ManyUsersManyOrders(t *testing.T) {
 						return
 					}
 				} else {
-					body := payment.BuildWebhookBody(fmt.Sprintf("evt_%s_%d", tnID, i), payment.EventPaymentCaptured, o.ProviderOrderID, payID, pack.AmountPaise)
+					body := payment.BuildWebhookBody(fmt.Sprintf("evt_%s_%d", tnID, i), payment.EventPaymentCaptured, o.ProviderOrderID, payID, sku.AmountPaise)
 					if err := f.svc.HandleWebhook(context.Background(), body, f.provider.SignWebhook(body), "10.0.0.5"); err != nil {
 						t.Errorf("%s webhook %d: %v", tnID, i, err)
 						return
 					}
 				}
-				wantCredits += pack.Credits
 			}
-			b, err := f.store.Balance(context.Background(), tnID)
+			// perTenant activations of the same plan → period ≈ perTenant ×
+			// the SKU period (stacking, tenant-isolated).
+			st, err := f.store.Subscription(context.Background(), tnID)
 			if err != nil {
-				t.Errorf("%s balance: %v", tnID, err)
+				t.Errorf("%s subscription: %v", tnID, err)
 				return
 			}
-			if b.Balance != wantCredits {
-				t.Errorf("%s balance = %d, want %d", tnID, b.Balance, wantCredits)
+			if st.Status != payment.SubActive || st.DaysRemaining < perTenant*25 {
+				t.Errorf("%s subscription = %+v, want stacked >= %d days", tnID, st, perTenant*25)
 			}
 		}(tnID, tn)
 	}
