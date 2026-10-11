@@ -107,7 +107,7 @@ def _build_agent_config() -> AgentConfig:
         model=active_model,
         base_url=default_base_url,
         api_key=active_key,
-        max_tokens=int(os.getenv("LLM_MAX_TOKENS", "16384")),
+        max_tokens=int(os.getenv("LLM_MAX_TOKENS")) if os.getenv("LLM_MAX_TOKENS") else None,
         timeout=float(os.getenv("LLM_TIMEOUT", "120.0")),
         stream_idle_timeout=float(os.getenv("LLM_STREAM_IDLE_TIMEOUT", "45.0")),
         max_retries=int(os.getenv("LLM_MAX_RETRIES", "3")),
