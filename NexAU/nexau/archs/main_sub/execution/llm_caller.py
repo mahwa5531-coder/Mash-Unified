@@ -872,25 +872,11 @@ def call_llm_with_openai_chat_completion(
             typed_msg = cast(dict[str, object], msg)
             if typed_msg.get("role") == "assistant" and typed_msg.get("content") == "" and typed_msg.get("tool_calls"):
                 del typed_msg["content"]
-    kwargs["messages"] = messages
     extra_params = kwargs.pop("extra_params", None)
     if extra_params and isinstance(extra_params, dict):
         existing_extra_body = dict(kwargs.get("extra_body") or {})
         existing_extra_body.update(extra_params)
         kwargs["extra_body"] = existing_extra_body
-    if "reasoning" in kwargs:
-        existing_extra_body = dict(kwargs.get("extra_body") or {})
-        existing_extra_body["reasoning"] = kwargs.pop("reasoning")
-        kwargs["extra_body"] = existing_extra_body
-    if "provider" in kwargs:
-        existing_extra_body = dict(kwargs.get("extra_body") or {})
-        existing_extra_body["provider"] = kwargs.pop("provider")
-        kwargs["extra_body"] = existing_extra_body
-    kwargs.pop("thinkingConfig", None)
-    if "extra_body" in kwargs and isinstance(kwargs["extra_body"], dict):
-        r = kwargs["extra_body"].get("reasoning")
-        if isinstance(r, dict) and "effort" in r and "max_tokens" in r:
-            r.pop("max_tokens", None)
 
     if llm_config:
         req_headers = _build_bifrost_headers(llm_config, model_call_params)
@@ -1006,25 +992,11 @@ async def call_llm_with_openai_chat_completion_async(
             typed_msg = cast(dict[str, object], msg)
             if typed_msg.get("role") == "assistant" and typed_msg.get("content") == "" and typed_msg.get("tool_calls"):
                 del typed_msg["content"]
-    kwargs["messages"] = messages
     extra_params = kwargs.pop("extra_params", None)
     if extra_params and isinstance(extra_params, dict):
         existing_extra_body = dict(kwargs.get("extra_body") or {})
         existing_extra_body.update(extra_params)
         kwargs["extra_body"] = existing_extra_body
-    if "reasoning" in kwargs:
-        existing_extra_body = dict(kwargs.get("extra_body") or {})
-        existing_extra_body["reasoning"] = kwargs.pop("reasoning")
-        kwargs["extra_body"] = existing_extra_body
-    if "provider" in kwargs:
-        existing_extra_body = dict(kwargs.get("extra_body") or {})
-        existing_extra_body["provider"] = kwargs.pop("provider")
-        kwargs["extra_body"] = existing_extra_body
-    kwargs.pop("thinkingConfig", None)
-    if "extra_body" in kwargs and isinstance(kwargs["extra_body"], dict):
-        r = kwargs["extra_body"].get("reasoning")
-        if isinstance(r, dict) and "effort" in r and "max_tokens" in r:
-            r.pop("max_tokens", None)
 
     if llm_config:
         req_headers = _build_bifrost_headers(llm_config, model_call_params)
@@ -1117,73 +1089,7 @@ async def call_llm_with_openai_chat_completion_async(
         raise exc
 
 
-# ==============================================================================
-# ponytail: Legacy provider stubs maintained solely for backwards compatibility with tests.
-# All active traffic in MASh exclusively routes through openai_chat_completion.
-# ==============================================================================
-
-def call_llm_with_anthropic_chat_completion(*args: Any, **kwargs: Any) -> Any:
-    raise NotImplementedError("Direct Anthropic calls removed; MASh only supports openai_chat_completion.")
-
-async def call_llm_with_anthropic_chat_completion_async(*args: Any, **kwargs: Any) -> Any:
-    raise NotImplementedError("Direct Anthropic calls removed; MASh only supports openai_chat_completion.")
-
-def call_llm_with_openai_responses(*args: Any, **kwargs: Any) -> Any:
-    raise NotImplementedError("OpenAI responses API removed; MASh only supports openai_chat_completion.")
-
-async def call_llm_with_openai_responses_async(*args: Any, **kwargs: Any) -> Any:
-    raise NotImplementedError("OpenAI responses API removed; MASh only supports openai_chat_completion.")
-
-def call_llm_with_generate_with_token(*args: Any, **kwargs: Any) -> Any:
-    raise NotImplementedError("Generate with token removed; MASh only supports openai_chat_completion.")
-
-def call_llm_with_google_genai(*args: Any, **kwargs: Any) -> Any:
-    raise NotImplementedError("Direct Google GenAI SDK calls removed; MASh only supports openai_chat_completion.")
-
-async def call_llm_with_google_genai_async(*args: Any, **kwargs: Any) -> Any:
-    raise NotImplementedError("Direct Google GenAI SDK calls removed; MASh only supports openai_chat_completion.")
-
-call_llm_with_gemini_rest = call_llm_with_google_genai
-call_llm_with_gemini_rest_async = call_llm_with_google_genai_async
-
-def _apply_anthropic_cache_control(kwargs: dict[str, Any], *args: Any, **extra: Any) -> dict[str, Any]:
-    return kwargs
-
-def _strip_thinking_signatures(messages: list[Any]) -> list[Any]:
-    return messages
-
-def _is_thinking_signature_error(exc: BaseException) -> bool:
-    return False
-
-def _strip_or_raise_on_signature_error(exc: BaseException, messages: list[Any]) -> list[Any]:
-    raise exc
-
-def record_thinking_signature_event(layer: str, **fields: Any) -> None:
+def record_thinking_signature_event(*args: Any, **kwargs: Any) -> None:
+    """No-op stub for backward-compatibility with model_response forensic hooks."""
     pass
 
-def _bound_openai_prompt_cache_key(key: str) -> str:
-    return key
-
-def _strip_responses_api_artifacts(messages: list[Any]) -> list[Any]:
-    return messages
-
-def _default_openai_responses_parallel_tool_calls(llm_config: Any = None) -> bool:
-    return True
-
-def _normalize_token_ids(value: object, *, context: str = "") -> list[int]:
-    return []
-
-def _normalize_generate_with_token_finish_reason(value: Any) -> str:
-    return "stop"
-
-def _normalize_generate_with_token_usage(payload: dict[str, Any]) -> dict[str, Any]:
-    return {}
-
-def convert_tools_to_gemini(tools: Any) -> list[Any]:
-    return []
-
-def _enrich_gemini_trace_outputs(*args: Any, **kwargs: Any) -> None:
-    pass
-
-def _gemini_sanitize_parameters(params: dict[str, object]) -> dict[str, object]:
-    return params
