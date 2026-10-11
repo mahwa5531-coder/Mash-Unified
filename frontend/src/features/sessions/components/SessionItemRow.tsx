@@ -41,6 +41,8 @@ export function SessionItemRow({
   return (
     <div
       key={`${isPinnedContext ? 'pin_' : ''}${s.session_id}`}
+      data-session-item={s.session_id}
+      data-testid="session-item"
       onClick={() => onSessionClick(s)}
       onContextMenu={(e) => onOpenMenu(e, s.session_id)}
       className={`group/item relative h-[30px] mx-1 px-2.5 rounded-lg cursor-pointer flex justify-between items-center select-none transition-colors ${
