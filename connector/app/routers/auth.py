@@ -283,48 +283,29 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
 
     # If single-use exchange code received from browser loopback
     if payload.code:
-        cloud_url = (
-            os.getenv("CLOUD_GATEWAY_URL")
-            or os.getenv("GATEWAY_URL")
-            or os.getenv("NEXAU_CLOUD_API_URL")
-            or config.model.gateway_url
-            or "https://api.mash.ai"
-        ).rstrip("/")
-        
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(
-                    f"{cloud_url}/v1/auth/desktop/exchange",
-                    json={
-                        "code": payload.code,
-                        "device_name": "MASH Desktop",
-                        "platform": "windows",
-                    },
-                    headers={"Content-Type": "application/json"},
-                )
-                
-                if resp.status_code == 200:
-                    data = resp.json()
-                    now = int(time.time())
-                    user_info = data.get("user", {})
-                    payload.access_token = data.get("access_token")
-                    payload.refresh_token = data.get("refresh_token")
-                    payload.expires_at = now + data.get("expires_in", 3600)
-                    payload.email = user_info.get("email") or payload.email
-                    payload.name = user_info.get("display_name") or payload.name or "User"
-                    logger.info("Successfully exchanged mcode with Cloud API for %s", payload.email)
-                elif resp.status_code == 400 and meta.get("authenticated"):
-                    # Other channel won the dual-channel race; desktop is already authenticated
-                    logger.info("mcode already consumed; desktop already authenticated.")
-                    return {
-                        "success": True,
-                        "authenticated": True,
-                        "email": meta.get("email"),
-                        "accounts": meta.get("accounts", []),
-                    }
-                else:
-                    logger.error("Cloud exchange failed: %s %s", resp.status_code, resp.text)
-                    raise HTTPException(status_code=resp.status_code, detail=f"Cloud exchange failed: {resp.text}")
+            client = MAShClient()
+            data = await client.exchange_desktop_code(payload.code)
+            now = int(time.time())
+            user_info = data.get("user", {})
+            payload.access_token = data.get("access_token")
+            payload.refresh_token = data.get("refresh_token")
+            payload.expires_at = now + data.get("expires_in", 3600)
+            payload.email = user_info.get("email") or payload.email
+            payload.name = user_info.get("display_name") or payload.name or "User"
+            logger.info("Successfully exchanged mcode with Cloud API for %s", payload.email)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400 and meta.get("authenticated"):
+                # Other channel won the dual-channel race; desktop is already authenticated
+                logger.info("mcode already consumed; desktop already authenticated.")
+                return {
+                    "success": True,
+                    "authenticated": True,
+                    "email": meta.get("email"),
+                    "accounts": meta.get("accounts", []),
+                }
+            logger.error("Cloud exchange failed: %s %s", e.response.status_code, e.response.text)
+            raise HTTPException(status_code=e.response.status_code, detail=f"Cloud exchange failed: {e.response.text}")
         except HTTPException:
             raise
         except Exception as e:
