@@ -9,12 +9,28 @@ export interface AttachedFile {
   path: string;
   previewUrl?: string;
   error?: boolean;
+  size?: number;
+  isFolder?: boolean;
 }
 
-export function useChatAttachments(sessionId?: string | null) {
-  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+export const MAX_CHAT_ATTACHMENTS = 5;
+
+export interface UseChatAttachmentsOptions {
+  onInvalidMedia?: (hasError: boolean) => void;
+  initialFiles?: AttachedFile[];
+}
+
+export function useChatAttachments(
+  sessionId?: string | null,
+  options?: UseChatAttachmentsOptions | ((hasError: boolean) => void)
+) {
+  const onInvalidMedia = typeof options === 'function' ? options : options?.onInvalidMedia;
+  const initialFiles = typeof options === 'object' ? options.initialFiles : undefined;
+
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>(initialFiles || []);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [hasInvalidMedia, setHasInvalidMedia] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createdBlobUrlsRef = useRef<Set<string>>(new Set());
 
@@ -30,13 +46,24 @@ export function useChatAttachments(sessionId?: string | null) {
   const handleUploadFiles = async (files: FileList | File[]) => {
     const validFiles = Array.from(files);
     if (validFiles.length === 0) return;
+
+    // ponytail: Single root guard protecting all 3 vectors (Drag & Drop, File Picker, Clipboard Paste)
+    if (attachedFiles.length + validFiles.length > MAX_CHAT_ATTACHMENTS) {
+      setHasInvalidMedia(true);
+      onInvalidMedia?.(true);
+    }
+
+    const availableSlots = Math.max(0, MAX_CHAT_ATTACHMENTS - attachedFiles.length);
+    const filesToUpload = validFiles.slice(0, availableSlots);
+    if (filesToUpload.length === 0) return;
+
     setIsUploading(true);
     setUploadError(null);
     const uploadedList: AttachedFile[] = [];
     const sid = sessionId || 'default_session';
 
     try {
-      for (const file of validFiles) {
+      for (const file of filesToUpload) {
         const res = await uploadSessionFile(sid, file);
         if (res && res.path) {
           const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(file.name);
@@ -49,6 +76,7 @@ export function useChatAttachments(sessionId?: string | null) {
             name: file.name, 
             path: res.path,
             previewUrl,
+            size: file.size,
           });
         } else {
           setUploadError(`Failed to upload ${file.name}`);
@@ -100,12 +128,16 @@ export function useChatAttachments(sessionId?: string | null) {
 
   const clearAttachments = () => {
     setAttachedFiles([]);
+    setHasInvalidMedia(false);
+    onInvalidMedia?.(false);
   };
 
   return {
     attachedFiles,
     isUploading,
     uploadError,
+    hasInvalidMedia,
+    setHasInvalidMedia,
     fileInputRef,
     handleUploadFiles,
     handleFileChange,

@@ -10,6 +10,7 @@ import {
   Unit04Pills,
   Unit04BWorkingPapers,
   Unit04CQuotaBanner,
+  Unit04DInvalidMediaBanner,
   Unit05FileTabs,
   Unit06Breadcrumbs,
   Unit07Logos,
@@ -108,6 +109,9 @@ export default function DesignSystemPreviewPage() {
           setQuotaBannerOpen={setQuotaBannerOpen}
           onSelectComponent={setLastClicked}
         />
+
+        {/* UNIT 4D: Invalid Media / Attachment Limit Banner */}
+        <Unit04DInvalidMediaBanner onSelectComponent={setLastClicked} />
 
         {/* UNIT 5: FileTab Primitive */}
         <Unit05FileTabs onSelectComponent={setLastClicked} />

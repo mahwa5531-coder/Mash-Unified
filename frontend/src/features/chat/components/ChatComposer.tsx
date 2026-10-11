@@ -2,11 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { KeyboardEvent, DragEvent } from 'react';
-import { useChatAttachments } from '@/features/chat/hooks/useChatAttachments';
+import { useChatAttachments, type AttachedFile } from '@/features/chat/hooks/useChatAttachments';
 import { AttachedFilesList } from './composer/AttachedFilesList';
 import { ComposerActions } from './composer/ComposerActions';
 
-export type { AttachedFile } from '@/features/chat/hooks/useChatAttachments';
+export type { AttachedFile };
 
 export interface ChatComposerProps {
   sessionId?: string | null;
@@ -17,6 +17,8 @@ export interface ChatComposerProps {
   isStreaming: boolean;
   disabled?: boolean;
   sessionRepo?: string;
+  onInvalidMedia?: (show: boolean) => void;
+  initialAttachedFiles?: AttachedFile[];
 }
 
 export default function ChatComposer({
@@ -28,6 +30,8 @@ export default function ChatComposer({
   isStreaming,
   disabled = false,
   sessionRepo,
+  onInvalidMedia,
+  initialAttachedFiles,
 }: ChatComposerProps) {
   const [localPrompt, setLocalPrompt] = useState<string>(inputPrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -44,7 +48,10 @@ export default function ChatComposer({
     handleUploadFiles,
     removeAttachedFile,
     clearAttachments,
-  } = useChatAttachments(sessionId);
+  } = useChatAttachments(sessionId, {
+    onInvalidMedia,
+    initialFiles: initialAttachedFiles,
+  });
 
   // Sync when parent changes inputPrompt (e.g. on Undo or reset)
   useEffect(() => {
@@ -138,6 +145,11 @@ export default function ChatComposer({
 
       {/* Attached Files Chips */}
       <AttachedFilesList attachedFiles={attachedFiles} onRemove={removeAttachedFile} />
+
+      {/* Differentiation Line - Only rendered when files/folders are attached */}
+      {attachedFiles.length > 0 && (
+        <div className="h-[1px] bg-zinc-200/80 dark:bg-white/[0.08] my-1 mx-0.5 shrink-0" />
+      )}
 
       {/* Main Input Textarea */}
       <textarea 

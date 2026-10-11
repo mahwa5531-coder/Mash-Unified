@@ -128,13 +128,12 @@ def get_project_cache_dir(project_id: str) -> Path:
 
 def scaffold_nexau_system_storage() -> Path:
     """Scaffold global NexAU system directories on disk (~/.nexau/...).
-    Ensures database, brain, agents, vault, templates, and cache exist on clean install.
+    Ensures database, brain, agents, templates, and cache exist on clean install.
     """
     home = get_nexau_home()
     (home / "database").mkdir(parents=True, exist_ok=True)
     (home / "brain").mkdir(parents=True, exist_ok=True)
     (home / "agents").mkdir(parents=True, exist_ok=True)
-    (home / "vault").mkdir(parents=True, exist_ok=True)
     (home / "templates").mkdir(parents=True, exist_ok=True)
     (home / "cache").mkdir(parents=True, exist_ok=True)
     get_installation_id()

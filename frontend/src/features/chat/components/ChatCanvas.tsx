@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, History } from 'lucide-react';
 import ChatComposer from '@/features/chat/components/ChatComposer';
-import { QuotaBanner } from '@/primitives';
+import { QuotaBanner, InvalidMediaBanner } from '@/primitives';
 import { classifyError } from '@/lib/errorClassification';
 import UserMessage from '@/features/chat/components/messages/UserMessage';
 import AssistantMessage from '@/features/chat/components/messages/AssistantMessage';
@@ -72,6 +72,7 @@ export default function ChatCanvas({
 
   const [isQueueExpanded, setIsQueueExpanded] = useState<boolean>(true);
   const [showQuotaBanner, setShowQuotaBanner] = useState<boolean>(false);
+  const [showInvalidMediaBanner, setShowInvalidMediaBanner] = useState<boolean>(false);
 
   // ponytail: Live DOM RAM window - strictly mount at most 100 turns in DOM to prevent tab freezes and RAM bloat
   const MAX_LIVE_TURNS = 100;
@@ -84,10 +85,11 @@ export default function ChatCanvas({
     }
   }, [isStreaming]);
 
-  // Reset window and dismiss quota banner when session changes
+  // Reset window and dismiss quota/media banners when session changes
   useEffect(() => {
     setWindowOffsetFromEnd(0);
     setShowQuotaBanner(false);
+    setShowInvalidMediaBanner(false);
   }, [sessionId]);
 
   const startIndex = Math.max(0, turns.length - MAX_LIVE_TURNS - windowOffsetFromEnd);
@@ -317,6 +319,17 @@ export default function ChatCanvas({
             </div>
           )}
 
+          {/* Invalid Media Banner (Attachment Limit Exceeded) */}
+          {showInvalidMediaBanner && (
+            <div className="mb-2 w-full">
+              <InvalidMediaBanner
+                open={showInvalidMediaBanner}
+                onOpenChange={setShowInvalidMediaBanner}
+                onDismiss={() => setShowInvalidMediaBanner(false)}
+              />
+            </div>
+          )}
+
           <ChatComposer
             key={sessionId || 'new-session'}
             sessionId={sessionId}
@@ -327,6 +340,7 @@ export default function ChatCanvas({
             isStreaming={isStreaming}
             disabled={Boolean(sessionId && !isHistoryLoaded)}
             sessionRepo={sessionRepo}
+            onInvalidMedia={setShowInvalidMediaBanner}
           />
         </div>
       </div>

@@ -4,6 +4,7 @@ export * from './Unit03Callouts';
 export * from './Unit04Pills';
 export * from './Unit04BWorkingPapers';
 export * from './Unit04CQuotaBanner';
+export * from './Unit04DInvalidMediaBanner';
 export * from './Unit05FileTabs';
 export * from './Unit06Breadcrumbs';
 export * from './Unit07Logos';
