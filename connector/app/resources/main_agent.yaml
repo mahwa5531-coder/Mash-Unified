@@ -8,9 +8,9 @@ system_prompt: ../prompts/statutory_auditor.j2
 system_prompt_type: jinja
 
 llm_config:
-  model: ${env.LLM_MODEL:-google/gemini-2.5-flash}
-  base_url: ${env.LLM_BASE_URL:-https://openrouter.ai/api/v1}
-  api_key: ${env.LLM_API_KEY:-sk-local-test}
+  model: ${env.MASH_MODEL:-openai/gpt-6-luna}
+  base_url: ${env.CLOUD_GATEWAY_URL:-http://127.0.0.1:8080/v1}
+  api_key: ${env.MASH_API_KEY:-bearer-pending-auth}
   api_type: ${env.LLM_API_TYPE:-openai_chat_completion}
 
 tools:
