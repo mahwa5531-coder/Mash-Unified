@@ -336,14 +336,15 @@ export default function Sidebar({
 
   return (
     <div 
-      className="bg-zinc-100/80 dark:bg-[#121214] h-full flex flex-col text-zinc-700 dark:text-zinc-300 font-sans shrink-0 select-none relative transition-colors"
+      className="bg-[var(--bg-sidebar)] border-r border-zinc-200/80 dark:border-white/[0.08] h-full flex flex-col text-zinc-700 dark:text-zinc-300 font-sans shrink-0 select-none relative transition-colors"
       style={{ width: `${effectiveWidth}px` }}
       onClick={() => setActiveMenuSessionId(null)}
     >
       {/* Resizer Handle */}
       <div 
-        className="absolute right-0 top-0 w-1 h-full cursor-col-resize z-50 hover:bg-sky-500/60 transition-colors"
+        className="absolute -right-0.5 top-0 w-1.5 h-full cursor-col-resize z-50 hover:bg-zinc-400/40 dark:hover:bg-white/15 active:bg-zinc-500/60 dark:active:bg-white/25 transition-colors"
         onMouseDown={startResizing}
+        title="Drag to resize sidebar"
       />
 
       {/* Top Header Bar & Quick Actions */}
@@ -394,7 +395,7 @@ export default function Sidebar({
 
         {/* Ambient Bottom Scroll Fade */}
         <div 
-          className={`pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-zinc-50 via-zinc-50/80 dark:from-[#121214] dark:via-[#121214]/80 to-transparent transition-opacity duration-300 z-10 ${
+          className={`pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-[var(--bg-sidebar)] via-[var(--bg-sidebar)]/80 to-transparent transition-opacity duration-300 z-10 ${
             canScrollDown ? 'opacity-100' : 'opacity-0'
           }`}
         />

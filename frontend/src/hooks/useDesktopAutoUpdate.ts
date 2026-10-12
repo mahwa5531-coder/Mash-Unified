@@ -68,7 +68,7 @@ export function useDesktopAutoUpdate() {
       };
 
       pollUpdates();
-      intervalId = setInterval(pollUpdates, 2500);
+      intervalId = setInterval(pollUpdates, 30000);
     }
 
     return () => {

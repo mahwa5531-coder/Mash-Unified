@@ -98,7 +98,7 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
         {/* Bottom-Right Actions Bar (Timestamp, Copy, Undo) */}
         <div className="absolute bottom-2 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 select-none pointer-events-none group-hover:pointer-events-auto">
           {displayTime && (
-            <span className="text-[11.5px] font-mono text-sky-600 dark:text-sky-400 select-none mr-0.5 tracking-tight font-medium">
+            <span className="text-[11.5px] font-mono text-zinc-400 dark:text-zinc-500 select-none mr-0.5 tracking-tight font-medium">
               {displayTime}
             </span>
           )}

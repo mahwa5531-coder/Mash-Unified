@@ -19,7 +19,7 @@ export function SidebarHeader({
   return (
     <>
       {/* Row 2: Top Header Bar (height h-9 = 36px, matching Row 2 of window) */}
-      <div className="h-9 bg-zinc-100/90 dark:bg-[#121214] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center gap-1.5 px-3 select-none shrink-0 transition-colors">
+      <div className="h-9 bg-[var(--bg-sidebar)] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center gap-1.5 px-3 select-none shrink-0 transition-colors">
         <div className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-100 flex items-center justify-center font-bold text-[11px] shadow-xs select-none mr-1">
           M
         </div>

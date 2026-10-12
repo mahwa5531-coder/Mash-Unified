@@ -26,6 +26,7 @@
   --color-input: var(--m-border-subtle);
   --color-primary: var(--m-accent);
   --color-primary-foreground: var(--m-accent-foreground, #ffffff);
+  --color-sidebar: var(--m-bg-sidebar);
 }
 
 :root {
@@ -33,6 +34,7 @@
   --border: var(--m-border-subtle);
   --foreground: var(--m-text-primary);
   --bg-app: var(--m-bg-app);
+  --bg-sidebar: var(--m-bg-sidebar);
   --bg-surface: var(--m-bg-surface);
   --bg-hover: var(--m-bg-surface-hover);
   --bg-active: var(--m-bg-surface-active);
@@ -54,6 +56,7 @@
   --border: var(--m-border-subtle);
   --foreground: var(--m-text-primary);
   --bg-app: var(--m-bg-app);
+  --bg-sidebar: var(--m-bg-sidebar);
   --bg-surface: var(--m-bg-surface);
   --bg-hover: var(--m-bg-surface-hover);
   --bg-active: var(--m-bg-surface-active);

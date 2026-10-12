@@ -57,6 +57,13 @@ async def get_system_info():
     }
 
 
+@router.get("/system/updates")
+@router.get("/api/system/updates")
+async def get_system_updates():
+    """Return current desktop update state."""
+    return {"status": "idle", "version": "1.0.0"}
+
+
 import asyncio
 import logging
 from pathlib import Path

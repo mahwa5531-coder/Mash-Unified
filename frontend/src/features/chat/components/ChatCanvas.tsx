@@ -147,20 +147,18 @@ export default function ChatCanvas({
   }, [lastAiMsg?.error]);
 
   const handleProceed = useCallback(() => {
-    send(undefined, undefined, "Proceed with the implementation plan");
+    send("Proceed with the implementation plan");
   }, [send]);
 
   const handleContinue = useCallback(() => {
     send(
-      undefined,
-      undefined,
       "Continue from where you were interrupted. Please pick up right where the previous step stopped without re-doing completed work."
     );
     scrollDomToBottom();
   }, [send, scrollDomToBottom]);
 
   const handleSend = useCallback((text: string) => {
-    send(undefined, undefined, text);
+    send(text);
     scrollDomToBottom();
   }, [send, scrollDomToBottom]);
 

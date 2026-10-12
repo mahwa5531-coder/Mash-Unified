@@ -15,7 +15,7 @@ export function SidebarFooter({ onOpenSettings, authUser }: SidebarFooterProps) 
   const planName = (authUser?.plan || 'pro').toUpperCase();
 
   return (
-    <div className="mt-auto p-2 bg-zinc-100/80 dark:bg-[#121214] shrink-0 border-t border-zinc-200/50 dark:border-white/[0.04] flex items-center justify-between gap-1.5">
+    <div className="mt-auto p-2 bg-[var(--bg-sidebar)] shrink-0 border-t border-zinc-200/50 dark:border-white/[0.04] flex items-center justify-between gap-1.5">
       {authUser?.authenticated ? (
         <button
           type="button"

@@ -6,7 +6,8 @@
 
 :root {
   /* Surface & Canvas (Light Theme) */
-  --m-bg-app: #F7F8F9;
+  --m-bg-app: #F9F9F9;
+  --m-bg-sidebar: #F0F1F3;
   --m-bg-surface: #FFFFFF;
   --m-bg-surface-hover: #F1F3F5;
   --m-bg-surface-active: #E9ECEF;
@@ -16,7 +17,7 @@
   --m-border-strong: #C7CBD1;
 
   /* Text Contrast Hierarchy (Light Theme) */
-  --m-text-primary: #18181B;
+  --m-text-primary: #101010;
   --m-text-secondary: #4B4B52;
   --m-text-muted: #5F5F66;
 
@@ -38,7 +39,8 @@
 [data-theme="dark"],
 .dark {
   /* Surface & Canvas (Dark Theme) */
-  --m-bg-app: #101012;
+  --m-bg-app: #101010;
+  --m-bg-sidebar: #0D0D0F;
   --m-bg-surface: #141416;
   --m-bg-surface-hover: rgba(255, 255, 255, 0.05);
   --m-bg-surface-active: rgba(255, 255, 255, 0.09);
@@ -49,15 +51,15 @@
 
   /* Text Contrast Hierarchy (Dark Theme - WCAG AA) */
   --m-text-primary: #F4F4F6;
-  --m-text-secondary: #D4D4D8;
+  --m-text-secondary: #CCCCCC;
   --m-text-muted: #A1A1AA;
 
   /* Interactive / Brand Accent (Dark Theme - 4.6:1 contrast) */
-  --m-accent: #2F9BE8;
-  --m-accent-hover: #1F87D6;
-  --m-accent-soft: rgba(47, 155, 232, 0.14);
+  --m-accent: #007ACC;
+  --m-accent-hover: #0062A3;
+  --m-accent-soft: rgba(0, 122, 204, 0.14);
   --m-accent-contrast: #FFFFFF;
-  --m-focus-ring: #2F9BE8;
+  --m-focus-ring: #007ACC;
 
   /* Audit Semantic Colors (Dark Theme) */
   --m-success: #34D399;
