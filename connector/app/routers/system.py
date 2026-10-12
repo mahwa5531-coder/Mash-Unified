@@ -65,45 +65,6 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 
-class UpdateStateRequest(BaseModel):
-    status: str
-    version: str | None = "1.2.0"
-    progress: int | None = 0
-
-
-_desktop_update_state = {
-    "status": "idle",
-    "version": "1.2.0",
-    "progress": 0,
-}
-
-
-@router.get("/system/updates")
-async def get_system_updates():
-    """Returns background auto-update status."""
-    return _desktop_update_state
-
-
-@router.post("/system/updates/set-state")
-async def set_system_update_state(req: UpdateStateRequest):
-    """Sync or mock updater status."""
-    _desktop_update_state["status"] = req.status
-    if req.version:
-        _desktop_update_state["version"] = req.version
-    if req.progress is not None:
-        _desktop_update_state["progress"] = req.progress
-    return {"status": "ok", "state": _desktop_update_state}
-
-
-@router.post("/system/updates/restart")
-async def restart_system_app():
-    """Trigger application shutdown and relaunch for applying pending updates."""
-    _desktop_update_state["status"] = "idle"
-    return {
-        "status": "restarting",
-        "action": "quit_and_install",
-        "message": "Application shutting down for binary swap and scheduled relaunch."
-    }
 
 
 class SelectFolderRequest(BaseModel):
