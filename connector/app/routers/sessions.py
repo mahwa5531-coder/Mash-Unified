@@ -101,6 +101,17 @@ def clean_user_steering_envelope(text: str) -> str:
     return text
 
 
+def clean_protocol_sentinels(text: str) -> str:
+    """ponytail: strip [DONE]/[END] protocol sentinels, prompt tags, and heading wrappers."""
+    if not text or not isinstance(text, str):
+        return text or ""
+    cleaned = re.sub(r'</?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity)>\s*', '', text, flags=re.IGNORECASE)
+    cleaned = re.sub(r'^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*$', '', cleaned, flags=re.IGNORECASE | re.MULTILINE)
+    cleaned = re.sub(r'(?:^|\n)\s*\[(?:DONE|END|done|end)\]\s*(?=\n|$)', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'(\s*\[(?:DONE|END|done|end)\]\s*)+$', '', cleaned, flags=re.IGNORECASE)
+    return cleaned.strip()
+
+
 def _parse_epoch_seconds(val: Any) -> float:
     """Parse any datetime, ISO string, timestamp (ns, ms, sec) into unix epoch float seconds (UTC)."""
     if not val:
@@ -663,12 +674,17 @@ async def get_transcript(
                         })
                     continue
 
-                # Defensively strip mid-flight steering protocol envelope from user messages
+                # Defensively strip protocol envelopes and sentinels
                 if role_str == "user":
-                    combined_text = clean_user_steering_envelope(combined_text)
+                    combined_text = clean_protocol_sentinels(clean_user_steering_envelope(combined_text))
                     for s in steps:
                         if s.get("type") == "text" and isinstance(s.get("content"), str):
-                            s["content"] = clean_user_steering_envelope(s["content"])
+                            s["content"] = clean_protocol_sentinels(clean_user_steering_envelope(s["content"]))
+                elif role_str == "assistant":
+                    combined_text = clean_protocol_sentinels(combined_text)
+                    for s in steps:
+                        if s.get("type") == "text" and isinstance(s.get("content"), str):
+                            s["content"] = clean_protocol_sentinels(s["content"])
 
                 if combined_text or thoughts or tools:
                     created_at_val = getattr(action, "created_at", None)

@@ -5,15 +5,9 @@ export type MessageInterleavedUnit =
   | { type: 'worklog'; id: string; steps: ExecutionStep[]; thoughts: string[]; tools: ToolCall[] }
   | { type: 'prose'; id: string; content: string };
 
-function cleanProseContent(raw?: string): string {
-  if (!raw || typeof raw !== 'string') return '';
-  const trimmed = raw.trim();
-  if (trimmed === '[empty]' || /^\[?(DONE|END|done|end)\]?$/i.test(trimmed)) return '';
-  return raw
-    .replace(/\[VERIFIED\]\s*/gi, '')
-    .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '')
-    .trim();
-}
+import { cleanAssistantContent } from '@/features/chat/utils/sessionHistoryParser';
+
+const cleanProseContent = cleanAssistantContent;
 
 /**
  * ponytail: Interleaved Sequential Units — clean chronological flow where worklogs and authentic prose alternate

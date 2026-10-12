@@ -4,7 +4,7 @@ import {
   sessionStore, 
   clearSessionStore,
   SessionRuntimeState
-} from '../src/features/chat';
+} from '../src/features/chat/state/sessionStore';
 import { parseSessionHistory, buildTurns } from '../src/features/chat/utils/turns';
 import { Message } from '../src/types/chat';
 

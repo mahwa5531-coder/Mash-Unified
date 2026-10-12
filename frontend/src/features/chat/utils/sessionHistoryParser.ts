@@ -1,30 +1,43 @@
 import { Message } from '@/types/chat';
 
-// ponytail: strip NexAU reasoning-only [empty] sentinel, [VERIFIED] marker, and [DONE]/[END] protocol sentinels
-function cleanAssistantContent(raw?: string): string {
+// ponytail: strip NexAU reasoning-only [empty] sentinel, [VERIFIED] marker, [DONE]/[END] protocol sentinels,
+// and prompt/protocol tag leakage (<user message>, <user_message>, etc.)
+export function cleanAssistantContent(raw?: string): string {
   if (!raw || typeof raw !== 'string') return '';
   const trimmed = raw.trim();
   if (trimmed === '[empty]' || /^\[?(DONE|END|done|end)\]?$/i.test(trimmed)) return '';
-  return raw
+  return trimmed
     .replace(/\[VERIFIED\]\s*/gi, '')
-    .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '');
+    .replace(/<\/?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity)>\s*/gi, '')
+    .replace(/^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*$/gim, '')
+    .replace(/(?:^|\n)\s*\[(DONE|END|done|end)\]\s*(?=\n|$)/gi, '')
+    .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '')
+    .trim();
 }
 
-// ponytail: strip internal mid-flight steering protocol envelopes from user prompt text
+// ponytail: strip internal mid-flight steering protocol envelopes and prompt tags from user prompt text
 export function cleanUserSteeringEnvelope(text?: string): string {
   if (!text || typeof text !== 'string') return '';
-  if (text.includes('<USER_STEERING>') || text.includes('[USER MID-FLIGHT INSTRUCTION]:') || text.includes('</USER_STEERING>')) {
-    const match = text.match(/<USER_STEERING>[\s\S]*?(?:\[USER MID-FLIGHT INSTRUCTION\]:)?\s*([\s\S]*?)(?:\s*Adapt your current plan and respond to this instruction immediately\.?)?\s*<\/USER_STEERING>/i);
+  let cleaned = text;
+  if (cleaned.includes('<USER_STEERING>') || cleaned.includes('[USER MID-FLIGHT INSTRUCTION]:') || cleaned.includes('</USER_STEERING>')) {
+    const match = cleaned.match(/<USER_STEERING>[\s\S]*?(?:\[USER MID-FLIGHT INSTRUCTION\]:)?\s*([\s\S]*?)(?:\s*Adapt your current plan and respond to this instruction immediately\.?)?\s*<\/USER_STEERING>/i);
     if (match && match[1] && match[1].trim()) {
-      return match[1].trim();
+      cleaned = match[1].trim();
+    } else {
+      cleaned = cleaned
+        .replace(/<\/?USER_STEERING>/gi, '')
+        .replace(/\[USER MID-FLIGHT INSTRUCTION\]:\s*/gi, '')
+        .replace(/Adapt your current plan and respond to this instruction immediately\.?/gi, '')
+        .trim();
     }
-    return text
-      .replace(/<\/?USER_STEERING>/gi, '')
-      .replace(/\[USER MID-FLIGHT INSTRUCTION\]:\s*/gi, '')
-      .replace(/Adapt your current plan and respond to this instruction immediately\.?/gi, '')
-      .trim();
   }
-  return text;
+
+  return cleaned
+    .replace(/<\/?(?:user[\s_]+message|user_rules|user_information|identity)>\s*/gi, '')
+    .replace(/^(?:#+\s*)?User\s+Message\s*:\s*$/gim, '')
+    .replace(/(?:^|\n)\s*\[(DONE|END|done|end)\]\s*(?=\n|$)/gi, '')
+    .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '')
+    .trim();
 }
 
 // ponytail: transforms raw NexAU DB action records into structured chat Message[] for rendering
