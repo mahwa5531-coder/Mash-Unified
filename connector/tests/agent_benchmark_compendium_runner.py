@@ -15,7 +15,7 @@ except Exception:
 
 BASE_URL = "http://127.0.0.1:8000"
 DB_PATH = pathlib.Path.home() / ".nexau" / "database" / "nexau.db"
-SANDBOX_DIR = pathlib.Path(r"C:\Users\rama\Downloads\Mash\scratch\sandbox")
+SANDBOX_DIR = (pathlib.Path(__file__).resolve().parent.parent.parent / "scratch" / "sandbox").resolve()
 
 class NexAUTestEngineer:
     def __init__(self, session_id: str):
@@ -277,7 +277,7 @@ def run_compendium_benchmark():
     qa.send_nlp_prompt(
         benchmark_name="GAIA-AuditRecon",
         category="General Assistant & Reasoning",
-        prompt="Inspect the audit memorandum PDF at 'C:/Users/rama/Downloads/Mash/scratch/sandbox/sample_audit.pdf'. "
+        prompt=f"Inspect the audit memorandum PDF at '{SANDBOX_DIR.as_posix()}/sample_audit.pdf'. "
                "Run a python command with fitz to extract page 0 text, and verify if Total Liabilities plus Net Equity equals Total Assets ($5,240,000). Show the math.",
         validation_fn=val_gaia
     )

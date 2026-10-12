@@ -15,7 +15,7 @@ except Exception:
 
 BASE_URL = "http://127.0.0.1:8000"
 DB_PATH = pathlib.Path.home() / ".nexau" / "database" / "nexau.db"
-SANDBOX_DIR = pathlib.Path(r"C:\Users\rama\Downloads\Mash\scratch\sandbox")
+SANDBOX_DIR = (pathlib.Path(__file__).resolve().parent.parent.parent / "scratch" / "sandbox").resolve()
 
 class ToolBenchEvaluator:
     """
@@ -228,7 +228,7 @@ def run_full_toolbench_evaluation():
     tb.execute_task(
         "I1-4", "I1_SINGLE_TOOL",
         "Run this python shell command using run_shell_command:\n"
-        "python -c \"import csv; rows=list(csv.DictReader(open(r'C:/Users/rama/Downloads/Mash/scratch/sandbox/vendors.csv'))); approved_sum=sum(float(r['TotalBilled']) for r in rows if r['Status']=='Approved'); print(f'APPROVED_TOTAL={approved_sum}')\"\n"
+        f"python -c \"import csv; rows=list(csv.DictReader(open(r'{SANDBOX_DIR.as_posix()}/vendors.csv'))); approved_sum=sum(float(r['TotalBilled']) for r in rows if r['Status']=='Approved'); print(f'APPROVED_TOTAL={{approved_sum}}')\"\n"
         "State the APPROVED_TOTAL amount.",
         v_i1_4
     )
@@ -329,7 +329,7 @@ def run_full_toolbench_evaluation():
     tb.execute_task(
         "I3-2", "I3_INTER_CATEGORY",
         "Run this python command using run_shell_command to read the sample audit PDF and print its text:\n"
-        "python -c \"import fitz; doc=fitz.open(r'C:/Users/rama/Downloads/Mash/scratch/sandbox/sample_audit.pdf'); print(doc[0].get_text())\"\n"
+        f"python -c \"import fitz; doc=fitz.open(r'{SANDBOX_DIR.as_posix()}/sample_audit.pdf'); print(doc[0].get_text())\"\n"
         "Tell me the Net Equity reported in the memorandum.",
         v_i3_2
     )

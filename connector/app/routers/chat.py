@@ -222,18 +222,28 @@ async def stream_query_bridge(
     # We just yield events and sync last_user_view_time for the unread badge.
 
     async def sse_event_stream():
+        # ponytail: 15s SSE heartbeat comment keeps wire alive during long tool runs (>60s)
+        event_iter = server.handle_streaming_request(
+            message=user_prompt,
+            user_id=user_id,
+            agent_config=effective_agent_config,
+            session_id=sid,
+            context=resolved_context,
+            variables=ContextValue(template={k: v if isinstance(v, str) else json.dumps(v) for k, v in resolved_context.items()}),
+        ).__aiter__()
+
         try:
-            async for event in server.handle_streaming_request(
-                message=user_prompt,
-                user_id=user_id,
-                agent_config=effective_agent_config,
-                session_id=sid,
-                context=resolved_context,
-                variables=ContextValue(template={k: v if isinstance(v, str) else json.dumps(v) for k, v in resolved_context.items()}),
-            ):
+            while True:
                 if await request.is_disconnected():
                     raise asyncio.CancelledError("Client disconnected")
-                yield f"data: {event.model_dump_json()}\n\n"
+
+                try:
+                    event = await asyncio.wait_for(event_iter.__anext__(), timeout=15.0)
+                    yield f"data: {event.model_dump_json()}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+                except StopAsyncIteration:
+                    break
         except (asyncio.CancelledError, GeneratorExit):
             # ponytail: Client disconnected mid-stream — terminate running agent immediately to prevent wasted execution/token burn
             logger.info("Client disconnected from stream for session %s. Terminating running agent immediately.", sid)

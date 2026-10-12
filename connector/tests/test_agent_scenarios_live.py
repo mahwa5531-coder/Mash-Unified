@@ -15,7 +15,7 @@ except Exception:
 
 BASE_URL = "http://127.0.0.1:8000"
 DB_PATH = pathlib.Path.home() / ".nexau" / "database" / "nexau.db"
-SANDBOX_DIR = pathlib.Path("C:/Users/rama/Downloads/Mash/scratch/sandbox")
+SANDBOX_DIR = (pathlib.Path(__file__).resolve().parent.parent.parent / "scratch" / "sandbox").resolve()
 
 def get_db_stats(session_id: str):
     if not DB_PATH.exists():
@@ -209,7 +209,7 @@ def run_all_scenarios():
     s4 = send_nlp_turn(
         session_id,
         "Run this exact python shell command using run_shell_command:\n"
-        "python -c \"import csv; rows=list(csv.DictReader(open(r'C:/Users/rama/Downloads/Mash/scratch/sandbox/accounts.csv'))); total=sum(float(r['Balance']) for r in rows if r['Category']=='Assets'); print(f'TOTAL_ASSETS={total}')\"\n"
+        f"python -c \"import csv; rows=list(csv.DictReader(open(r'{SANDBOX_DIR.as_posix()}/accounts.csv'))); total=sum(float(r['Balance']) for r in rows if r['Category']=='Assets'); print(f'TOTAL_ASSETS={{total}}')\"\n"
         "State the calculated TOTAL_ASSETS value in your answer."
     )
     results.append(("S4_PYTHON_CSV_ANALYSIS", s4))
@@ -219,7 +219,7 @@ def run_all_scenarios():
     s5 = send_nlp_turn(
         session_id,
         "Run this exact python command using run_shell_command to render page 0 of the audit PDF to an image and extract its text:\n"
-        "python -c \"import fitz; doc=fitz.open(r'C:/Users/rama/Downloads/Mash/scratch/sandbox/sample_audit.pdf'); p=doc[0]; p.get_pixmap().save(r'C:/Users/rama/Downloads/Mash/scratch/sandbox/sample_audit_page0.png'); print(p.get_text())\"\n"
+        f"python -c \"import fitz; doc=fitz.open(r'{SANDBOX_DIR.as_posix()}/sample_audit.pdf'); p=doc[0]; p.get_pixmap().save(r'{SANDBOX_DIR.as_posix()}/sample_audit_page0.png'); print(p.get_text())\"\n"
         "Tell me the Net Equity reported in the output."
     )
     results.append(("S5_PDF_IMAGE_EXTRACTION", s5))

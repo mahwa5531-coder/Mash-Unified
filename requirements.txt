@@ -11,7 +11,7 @@
 fastexcel>=0.11.0
 python-calamine>=0.8.0
 openpyxl>=3.1.0
-polars>=1.0.0
+polars==1.44.1
 duckdb>=1.0.0
 PyMuPDF>=1.24.0
 

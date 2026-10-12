@@ -126,8 +126,7 @@ async def test_scenario_matrix():
             assert tree_status == 200
 
             # Legitimate file inside allowed workspace
-            import urllib.parse
-            good_file = "c:/Users/rama/Downloads/Mash/RUN_GUIDE.md"
+            good_file = str((Path(__file__).resolve().parent.parent.parent / "RUN_GUIDE.md").resolve()).replace("\\", "/")
             good_status, _ = await request(client, f"/api/files/content?path={urllib.parse.quote(good_file)}")
             print(f"  -> Legitimate workspace file read: status={good_status}")
             assert good_status == 200
