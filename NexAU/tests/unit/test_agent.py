@@ -37,7 +37,6 @@ from nexau.archs.tool.tool_registry import ToolRegistry
 from nexau.archs.tracer.core import BaseTracer, Span, SpanType
 from nexau.core.adapters.legacy import messages_from_legacy_openai_chat
 from nexau.core.messages import Message, Role, TextBlock, ToolResultBlock
-from nexau.core.serializers.anthropic_messages import serialize_ump_to_anthropic_messages_payload
 from nexau.core.serializers.openai_chat import serialize_ump_to_openai_chat_payload
 
 
@@ -741,25 +740,6 @@ class TestAgent:
             payload = serialize_ump_to_openai_chat_payload(agent.history)
             tool_dict = next((m for m in payload if m.get("role") == "tool" and m.get("tool_call_id") == "call_stop"), None)
             assert tool_dict is not None, "Expected Chat payload role=tool message with matching tool_call_id"
-
-            # And when converting to Anthropic Messages (Bedrock), tool_result must appear immediately after tool_use.
-            anthropic_ump = messages_from_legacy_openai_chat(payload + [{"role": "user", "content": "hi"}])
-            _, anthropic_msgs = serialize_ump_to_anthropic_messages_payload(anthropic_ump)
-            idx = next(
-                i
-                for i, m in enumerate(anthropic_msgs)
-                if m.get("role") == "assistant"
-                and any(
-                    isinstance(b, dict) and b.get("type") == "tool_use" and b.get("id") == "call_stop" for b in (m.get("content") or [])
-                )
-            )
-            assert idx + 1 < len(anthropic_msgs), "Expected a message after tool_use"
-            next_msg = anthropic_msgs[idx + 1]
-            assert next_msg.get("role") == "user"
-            next_blocks = next_msg.get("content") or []
-            assert any(
-                isinstance(b, dict) and b.get("type") == "tool_result" and b.get("tool_use_id") == "call_stop" for b in next_blocks
-            ), "Expected an immediate tool_result block following the tool_use"
 
     def test_run_with_history(self, agent_config, global_storage):
         """Test agent run with existing history."""

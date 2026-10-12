@@ -28,10 +28,6 @@ import json
 from typing import Any
 
 from nexau.core.messages import Message, Role, ToolResultBlock
-from nexau.core.serializers.anthropic_messages import (
-    serialize_ump_to_anthropic_messages_payload,
-)
-from nexau.core.serializers.gemini_messages import serialize_ump_to_gemini_messages_payload
 from nexau.core.serializers.openai_chat import serialize_ump_to_openai_chat_payload
 
 # Unique strings that should never appear in payload sent to LLM.
@@ -99,33 +95,6 @@ def test_completion_provider_serializer_drops_raw_output() -> None:
     assert any(isinstance(item, dict) and "OK: 42 lines processed" in str(item.get("content")) for item in payload), (
         f"expected llm-visible content to reach payload: {payload}"
     )
-
-
-def test_anthropic_messages_serializer_drops_raw_output() -> None:
-    """RFC-0024: Anthropic ``tool_result`` blocks must not carry raw_output."""
-    msgs = [_make_message_with_raw_output()]
-    payload = serialize_ump_to_anthropic_messages_payload(msgs)
-    _assert_no_raw_output_leak(payload, label="anthropic_messages")
-
-
-def test_gemini_serializer_drops_raw_output() -> None:
-    """RFC-0024: Gemini ``functionResponse`` parts must not carry raw_output.
-
-    Gemini wants a prior tool_use to anchor func_name, so we precede the
-    tool result with the matching assistant message that requested it.
-    """
-    from nexau.core.messages import ToolUseBlock
-
-    msgs = [
-        Message.user("trigger demo_tool"),
-        Message(
-            role=Role.ASSISTANT,
-            content=[ToolUseBlock(id="call_invariant_1", name="demo_tool", input={})],
-        ),
-        _make_message_with_raw_output(),
-    ]
-    contents, _ = serialize_ump_to_gemini_messages_payload(msgs)
-    _assert_no_raw_output_leak(contents, label="gemini_messages")
 
 
 # ---------------------------------------------------------------------------

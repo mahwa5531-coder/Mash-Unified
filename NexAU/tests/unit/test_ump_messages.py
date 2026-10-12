@@ -5,7 +5,6 @@ from _pytest.logging import LogCaptureFixture
 
 from nexau.core.adapters.legacy import messages_from_legacy_openai_chat
 from nexau.core.messages import Message, Role, TextBlock, ToolResultBlock, ToolUseBlock
-from nexau.core.serializers.anthropic_messages import serialize_ump_to_anthropic_messages_payload
 from nexau.core.serializers.openai_chat import serialize_ump_to_openai_chat_payload
 
 
@@ -136,46 +135,6 @@ def test_legacy_roundtrip_preserves_empty_reasoning_content() -> None:
     assert payload == legacy
 
 
-def test_anthropic_serializer_uses_blocks_from_legacy_input() -> None:
-    legacy: list[dict[str, Any]] = [
-        {"role": "system", "content": "sys"},
-        {"role": "user", "content": "hi"},
-        {
-            "role": "assistant",
-            "content": "tool time",
-            "tool_calls": [
-                {
-                    "id": "call_1",
-                    "type": "function",
-                    "function": {"name": "calculator", "arguments": {"expr": "2+2"}},
-                },
-            ],
-        },
-        {"role": "tool", "tool_call_id": "call_1", "content": "4"},
-    ]
-
-    ump_messages = messages_from_legacy_openai_chat(legacy)
-    system, messages = serialize_ump_to_anthropic_messages_payload(ump_messages)
-    assert system == [{"type": "text", "text": "sys"}]
-    assert messages[0]["role"] == "user"
-    assert messages[0]["content"] == [{"type": "text", "text": "hi"}]
-
-    assert messages[1]["role"] == "assistant"
-    assistant_blocks = messages[1]["content"]
-    assert any(b.get("type") == "text" and b.get("text") == "tool time" for b in assistant_blocks)
-    assert any(
-        b.get("type") == "tool_use" and b.get("id") == "call_1" and b.get("name") == "calculator" and b.get("input") == {"expr": "2+2"}
-        for b in assistant_blocks
-    )
-
-    # Bedrock Claude only allows roles: "user" | "assistant".
-    # Tool results are represented as a user message containing a tool_result block.
-    assert messages[2]["role"] == "user"
-    assert messages[2]["content"] == [
-        {"type": "tool_result", "tool_use_id": "call_1", "content": "4", "is_error": False},
-    ]
-
-
 def test_legacy_structured_content_list_is_preserved_as_text_blocks() -> None:
     legacy: list[dict[str, Any]] = [
         {"role": "user", "content": [{"type": "text", "text": "a"}, {"type": "text", "text": "b"}]},
@@ -241,32 +200,6 @@ def test_injected_tool_image_user_message_is_merged_back_into_tool_result() -> N
     assert any(getattr(p, "type", None) == "image" for p in tr.content)
 
 
-def test_anthropic_serializer_embeds_tool_result_images_as_anthropic_image_blocks() -> None:
-    legacy: list[dict[str, Any]] = [
-        {"role": "assistant", "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "file_read", "arguments": "{}"}}]},
-        {"role": "tool", "tool_call_id": "call_1", "content": "Done <image>"},
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "Images returned by tool call call_1:"},
-                {"type": "image_url", "image_url": {"url": "https://example.com/a.png"}},
-            ],
-        },
-    ]
-
-    ump_messages = messages_from_legacy_openai_chat(legacy)
-    system, messages = serialize_ump_to_anthropic_messages_payload(ump_messages)
-    assert system == []
-    # Tool results are represented as a user message containing a tool_result block.
-    tool_result_msg = next(m for m in messages if m.get("role") == "user" and isinstance(m.get("content"), list))
-    tool_result_block = next(b for b in tool_result_msg["content"] if isinstance(b, dict) and b.get("type") == "tool_result")
-    assert tool_result_block["tool_use_id"] == "call_1"
-    assert isinstance(tool_result_block["content"], list)
-    # Images are emitted as sibling blocks outside tool_result for maximum compatibility.
-    assert not any(isinstance(p, dict) and p.get("type") == "image" for p in tool_result_block["content"])
-    assert any(isinstance(p, dict) and p.get("type") == "image" for p in tool_result_msg["content"])
-
-
 def test_unknown_role_logs_warning_and_coerces_to_user(caplog: LogCaptureFixture) -> None:
     legacy: list[dict[str, Any]] = [{"role": "developer", "content": "hi"}]
 
@@ -275,44 +208,3 @@ def test_unknown_role_logs_warning_and_coerces_to_user(caplog: LogCaptureFixture
 
     assert ump[0].role == Role.USER
     assert any("Unknown role" in rec.getMessage() and "coercing to user" in rec.getMessage() for rec in caplog.records)
-
-
-def test_anthropic_adapter_carries_cache_flag_from_metadata() -> None:
-    """Test that Message metadata['cache'] is propagated as _cache on system blocks."""
-    from nexau.core.adapters.anthropic_messages import AnthropicMessagesAdapter
-    from nexau.core.messages import Message, TextBlock
-
-    messages = [
-        Message(role=Role.SYSTEM, content=[TextBlock(text="static prompt")], metadata={"cache": True}),
-        Message(role=Role.SYSTEM, content=[TextBlock(text="dynamic prompt")], metadata={"cache": False}),
-        Message(role=Role.USER, content=[TextBlock(text="hello")]),
-    ]
-
-    adapter = AnthropicMessagesAdapter()
-    system_blocks, convo = adapter.to_vendor_format(messages)
-
-    assert len(system_blocks) == 2
-    assert system_blocks[0]["text"] == "static prompt"
-    assert system_blocks[0]["_cache"] is True
-    assert system_blocks[1]["text"] == "dynamic prompt"
-    assert system_blocks[1]["_cache"] is False
-
-    assert len(convo) == 1
-    assert convo[0]["role"] == "user"
-
-
-def test_anthropic_adapter_no_cache_metadata_omits_flag() -> None:
-    """Test that system blocks without metadata['cache'] don't get _cache key."""
-    from nexau.core.adapters.anthropic_messages import AnthropicMessagesAdapter
-    from nexau.core.messages import Message, TextBlock
-
-    messages = [
-        Message(role=Role.SYSTEM, content=[TextBlock(text="no metadata")]),
-        Message(role=Role.USER, content=[TextBlock(text="hello")]),
-    ]
-
-    adapter = AnthropicMessagesAdapter()
-    system_blocks, _ = adapter.to_vendor_format(messages)
-
-    assert len(system_blocks) == 1
-    assert "_cache" not in system_blocks[0]

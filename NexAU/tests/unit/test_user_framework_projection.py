@@ -2,7 +2,6 @@
 
 from nexau.core.messages import ImageBlock, Message, Role, TextBlock
 from nexau.core.serializers.openai_chat import serialize_ump_to_openai_chat_payload
-from nexau.core.serializers.openai_responses import prepare_openai_responses_api_input
 from nexau.core.serializers.user_projection import coalesce_user_shaped_messages
 
 
@@ -74,18 +73,3 @@ def test_empty_framework_is_canonical_but_has_no_provider_turn() -> None:
     assert projected == [first, second]
     assert chat_payload == []
     assert empty_framework.role == Role.FRAMEWORK
-
-
-def test_openai_responses_consumes_the_same_coalesced_provider_turn() -> None:
-    chat_payload = serialize_ump_to_openai_chat_payload(
-        [
-            Message.user("question"),
-            Message(role=Role.FRAMEWORK, content=[TextBlock(text="reminder")]),
-        ]
-    )
-
-    response_items, instructions = prepare_openai_responses_api_input(chat_payload)
-
-    assert instructions is None
-    assert "question" in str(response_items)
-    assert "reminder" in str(response_items)

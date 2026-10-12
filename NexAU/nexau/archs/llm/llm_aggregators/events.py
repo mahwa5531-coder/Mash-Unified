@@ -9,10 +9,7 @@ Usage:
     from nexau.archs.llm.llm_aggregators import (
         Aggregator,
         Event,
-        ImageMessageStartEvent,
-    )
-    from nexau.archs.llm.llm_aggregators.openai_responses import (
-        OpenAIResponsesAggregator,
+        OpenAIChatCompletionAggregator,
     )
 """
 
