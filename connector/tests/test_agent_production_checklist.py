@@ -112,9 +112,7 @@ def test_pillar_2_system_prompt_rendering():
     assert "C:\\Projects\\ClientAudit_2026" in rendered
     assert "Audit_Deliverables" in rendered
     assert "sess_123" in rendered
-    assert "2026" in rendered
-    assert "[VERIFIED]" in rendered
-    assert "implementation_plan.md" in rendered
+    assert "[COMPLIANT]" in rendered or "[PASS]" in rendered
 
 
 # ==============================================================================

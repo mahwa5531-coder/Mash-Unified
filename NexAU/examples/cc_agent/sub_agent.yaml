@@ -17,7 +17,7 @@ llm_config: # Support environment variable replacement in YAML config
   stream: True
   temperature: 1
 
-  api_type: openai_responses
+  api_type: openai_chat_completion
   reasoning:
     effort: "medium"
     summary: "detailed"

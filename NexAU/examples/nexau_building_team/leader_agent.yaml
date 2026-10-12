@@ -13,7 +13,7 @@ llm_config:
   max_tokens: 16000
   stream: true
 
-  api_type: openai_responses
+  api_type: openai_chat_completion
   reasoning:
     effort: "medium"
     summary: "detailed"
