@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { BASE_URL } from '@/services/client';
+import { BASE_URL, safeFetch } from '@/services/client';
 
 export type UpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready';
 
@@ -53,7 +53,7 @@ export function useDesktopAutoUpdate() {
 
     if (!electron) {
       const pollUpdates = () => {
-        fetch(`${BASE_URL}/api/system/updates`)
+        safeFetch(`${BASE_URL}/api/system/updates`)
           .then(res => res.ok ? res.json() : null)
           .then(data => {
             if (isMounted && data?.status) {
@@ -87,7 +87,7 @@ export function useDesktopAutoUpdate() {
       }
       // HTTP connector fallback
       try {
-        await fetch(`${BASE_URL}/api/system/updates/restart`, { method: 'POST' });
+        await safeFetch(`${BASE_URL}/api/system/updates/restart`, { method: 'POST' });
       } catch {}
       // Reset state upon restart trigger
       setUpdateState({ status: 'idle' });

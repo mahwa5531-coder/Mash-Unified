@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Message } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
-import { BASE_URL } from '@/services/client';
+import { BASE_URL, safeFetch } from '@/services/client';
 import { fetchTranscript, renameSession, markSessionViewed, queueSteeringMessage, fetchSessionQueue, removeSessionQueueItem } from '@/services/sessions';
 import { streamQuery } from '@/services/stream';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
@@ -262,7 +262,7 @@ export function useChatStream({
       targetSession.abortController = null;
       targetSession.isStreaming = false;
       try {
-        await fetch(`${BASE_URL}/stop`, {
+        await safeFetch(`${BASE_URL}/stop`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: activeSid, user_id: 'default_user', force: true }),
@@ -626,7 +626,7 @@ export function useChatStream({
     ctrl?.abort();
 
     try {
-      await fetch(`${BASE_URL}/stop`, {
+      await safeFetch(`${BASE_URL}/stop`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: curSid, user_id: 'default_user', force: true }),
@@ -660,7 +660,7 @@ export function useChatStream({
     }
     setIsStreaming(false);
     if (userText) handleSetInputPrompt(userText);
-    fetch(`${BASE_URL}/sessions/${activeSid}/undo`, {
+    safeFetch(`${BASE_URL}/sessions/${activeSid}/undo`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from_turn: turnIdx ?? 0 }),
