@@ -3,6 +3,7 @@
 import os
 import sys
 import time
+import urllib.parse
 import httpx
 import pytest
 from pathlib import Path

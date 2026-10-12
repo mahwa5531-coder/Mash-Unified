@@ -191,6 +191,54 @@ def _rg_grep(
     return matches
 
 
+def _format_results(
+    matches: list[dict[str, Any]],
+    pattern: str,
+    search_location: str,
+    strategy_used: str,
+    max_matches: int = DEFAULT_TOTAL_MAX_MATCHES,
+    filter_desc: str = "",
+) -> dict[str, Any]:
+    if not matches:
+        no_match_msg = f'No matches found for pattern "{pattern}" {search_location}{filter_desc}.'
+        return {
+            "content": no_match_msg,
+            "returnDisplay": "No matches found",
+        }
+
+    was_truncated = len(matches) >= max_matches
+    matches_by_file: dict[str, list[dict[str, Any]]] = {}
+    for match in matches:
+        file_key = match["filePath"]
+        if file_key not in matches_by_file:
+            matches_by_file[file_key] = []
+        matches_by_file[file_key].append(match)
+
+    for file_matches in matches_by_file.values():
+        file_matches.sort(key=lambda m: m["lineNumber"])
+
+    match_count = len(matches)
+    match_term = "match" if match_count == 1 else "matches"
+    truncation_note = f" (results limited to {max_matches} matches for performance)" if was_truncated else ""
+
+    llm_content = (
+        f'Found {match_count} {match_term} for pattern "{pattern}" '
+        f"{search_location}{filter_desc}{truncation_note} (strategy: {strategy_used}):\n---\n"
+    )
+
+    for file_path, file_matches in matches_by_file.items():
+        llm_content += f"File: {file_path}\n"
+        for match in file_matches:
+            trimmed_line = str(match.get("line") or match.get("lineContent") or "").strip()
+            llm_content += f"L{match['lineNumber']}: {trimmed_line}\n"
+        llm_content += "---\n"
+
+    return {
+        "content": llm_content.strip(),
+        "returnDisplay": f"Found {match_count} {match_term}{' (limited)' if was_truncated else ''}",
+    }
+
+
 def search_file_content(
     pattern: str | None = None,
     dir_path: str | None = None,
@@ -336,51 +384,14 @@ def search_file_content(
         search_location = f'in path "{search_dir_display}"'
         filter_desc = f' (filter: "{include}")' if include else ""
 
-        # No matches found
-        if not matches:
-            no_match_msg = f'No matches found for pattern "{pattern}" {search_location}{filter_desc}.'
-            return {
-                "content": no_match_msg,
-                "returnDisplay": "No matches found",
-            }
-
-        # Check if results were truncated
-        was_truncated = len(matches) >= max_matches
-
-        # Group matches by file
-        matches_by_file: dict[str, list[dict[str, Any]]] = {}
-        for match in matches:
-            file_key = match["filePath"]
-            if file_key not in matches_by_file:
-                matches_by_file[file_key] = []
-            matches_by_file[file_key].append(match)
-
-        # Sort matches within each file by line number
-        for file_matches in matches_by_file.values():
-            file_matches.sort(key=lambda m: m["lineNumber"])
-
-        # Build result
-        match_count = len(matches)
-        match_term = "match" if match_count == 1 else "matches"
-
-        truncation_note = f" (results limited to {max_matches} matches for performance)" if was_truncated else ""
-
-        llm_content = (
-            f'Found {match_count} {match_term} for pattern "{pattern}" '
-            f"{search_location}{filter_desc}{truncation_note} (strategy: {strategy_used}):\n---\n"
+        return _format_results(
+            matches=matches,
+            pattern=pattern or "",
+            search_location=search_location,
+            strategy_used=strategy_used,
+            max_matches=max_matches,
+            filter_desc=filter_desc,
         )
-
-        for file_path, file_matches in matches_by_file.items():
-            llm_content += f"File: {file_path}\n"
-            for match in file_matches:
-                trimmed_line = str(match.get("line") or match.get("lineContent") or "").strip()
-                llm_content += f"L{match['lineNumber']}: {trimmed_line}\n"
-            llm_content += "---\n"
-
-        return {
-            "content": llm_content.strip(),
-            "returnDisplay": f"Found {match_count} {match_term}{' (limited)' if was_truncated else ''}",
-        }
 
     except Exception as e:
         error_msg = f"Error during grep search operation: {str(e)}"
