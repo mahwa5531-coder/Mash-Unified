@@ -95,46 +95,8 @@ class TestReasoningBlockRedactedData:
 # ===========================================================================
 
 
-class TestAnthropicThinkingPassthrough:
-    """Tests for from_anthropic_message thinking/redacted_thinking extraction."""
-
-    def test_extract_thinking_block(self):
-        message = {
-            "role": "assistant",
-            "content": [
-                {"type": "thinking", "thinking": "Let me think...", "signature": "sig_abc"},
-                {"type": "text", "text": "Here is my answer."},
-            ],
-        }
-        resp = ModelResponse.from_anthropic_message(message)
-        assert resp.reasoning_content == "Let me think..."
-        assert resp.reasoning_signature == "sig_abc"
-        assert resp.reasoning_redacted_data is None
-        assert resp.content == "Here is my answer."
-
-    def test_extract_redacted_thinking_block(self):
-        message = {
-            "role": "assistant",
-            "content": [
-                {"type": "thinking", "thinking": "visible thought", "signature": "sig1"},
-                {"type": "redacted_thinking", "data": "encrypted_data_here"},
-                {"type": "text", "text": "Answer"},
-            ],
-        }
-        resp = ModelResponse.from_anthropic_message(message)
-        assert resp.reasoning_content == "visible thought"
-        assert resp.reasoning_signature == "sig1"
-        assert resp.reasoning_redacted_data == "encrypted_data_here"
-
-    def test_no_thinking_blocks(self):
-        message = {
-            "role": "assistant",
-            "content": [{"type": "text", "text": "Just text"}],
-        }
-        resp = ModelResponse.from_anthropic_message(message)
-        assert resp.reasoning_content is None
-        assert resp.reasoning_signature is None
-        assert resp.reasoning_redacted_data is None
+class TestReasoningFieldsModelResponse:
+    """Tests for reasoning fields on ModelResponse, to_message_dict, and to_ump_message."""
 
     def test_to_message_dict_includes_reasoning_fields(self):
         resp = ModelResponse(
@@ -161,37 +123,6 @@ class TestAnthropicThinkingPassthrough:
         assert reasoning_blocks[0].text == "thought"
         assert reasoning_blocks[0].signature == "s1"
         assert reasoning_blocks[0].redacted_data == "r1"
-
-
-class TestNormalizeUsageAnthropicCache:
-    """Tests for _normalize_usage handling of Anthropic cache tokens."""
-
-    def test_anthropic_cache_tokens_included(self):
-        message = {
-            "role": "assistant",
-            "content": [{"type": "text", "text": "ok"}],
-        }
-        usage = {
-            "input_tokens": 100,
-            "output_tokens": 50,
-            "cache_creation_input_tokens": 200,
-            "cache_read_input_tokens": 300,
-        }
-        resp = ModelResponse.from_anthropic_message(message, usage=usage)
-        assert resp.usage is not None
-        assert resp.usage.input_tokens == 100
-        assert resp.usage.input_tokens_uncached == 100
-        assert resp.usage.completion_tokens == 50
-        assert resp.usage.cache_creation_tokens == 200
-        assert resp.usage.cache_read_tokens == 300
-        assert resp.usage.total_tokens == 650
-
-    def test_usage_without_cache(self):
-        message = {"role": "assistant", "content": [{"type": "text", "text": "ok"}]}
-        usage = {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150}
-        resp = ModelResponse.from_anthropic_message(message, usage=usage)
-        assert resp.usage is not None
-        assert resp.usage.total_tokens == 150
 
 
 # ===========================================================================

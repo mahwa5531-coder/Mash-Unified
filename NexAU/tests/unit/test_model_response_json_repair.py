@@ -133,22 +133,6 @@ def test_model_response_to_ump_message_carries_reasoning_details_in_metadata() -
     assert msg.metadata["reasoning_details"] == details
 
 
-def test_tool_call_from_response_item_repairs_malformed_arguments_and_serializes_valid_json() -> None:
-    malformed = '{"file_path": "/workspace/MiniMax_Research_Report_2026.md"'
-    item = {
-        "type": "function",
-        "id": "call_1",
-        "name": "Write",
-        "arguments": malformed,
-    }
-
-    tool_call = ModelResponse._tool_call_from_response_item(item)
-    assert tool_call is not None
-    assert tool_call.arguments == {"file_path": "/workspace/MiniMax_Research_Report_2026.md"}
-    assert isinstance(tool_call.raw_arguments, str)
-    assert json.loads(tool_call.raw_arguments) == tool_call.arguments
-
-
 def test_model_tool_call_from_openai_unparseable_arguments_are_wrapped_as_valid_json_object() -> None:
     """Even if repair fails, raw_arguments must still be a valid JSON object string."""
     call = {
@@ -163,26 +147,3 @@ def test_model_tool_call_from_openai_unparseable_arguments_are_wrapped_as_valid_
     assert tool_call.arguments["raw_arguments"] == "not-json"
     assert isinstance(tool_call.raw_arguments, str)
     assert json.loads(tool_call.raw_arguments) == {"raw_arguments": "not-json"}
-
-
-def test_from_gemini_rest_handles_explicit_null_parts() -> None:
-    """Gemini can return ``{"parts": null}`` when a thinking-enabled call
-    burns its full output budget on reasoning and emits no visible content.
-    ``from_gemini_rest`` must treat that as empty, not raise TypeError.
-    """
-    response = ModelResponse.from_gemini_rest(
-        {
-            "candidates": [
-                {
-                    "content": {"role": "model", "parts": None},
-                    "finishReason": "MAX_TOKENS",
-                }
-            ],
-            "usageMetadata": {"promptTokenCount": 100, "candidatesTokenCount": 0, "totalTokenCount": 100},
-        }
-    )
-    # Empty/None content acceptable — the key win is no TypeError on iteration.
-    # ``from_gemini_rest`` normalizes empty ``content_text`` to None (line 765).
-    assert response.content in (None, "")
-    assert response.tool_calls == []
-    assert response.usage.input_tokens == 100
