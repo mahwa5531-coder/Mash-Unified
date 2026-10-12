@@ -1,16 +1,17 @@
-import os
-import re
-import math
 import hashlib
+import math
+import re
 from pathlib import Path
-from typing import Any, Optional, List, Dict, Tuple
-import python_calamine
+from typing import Any
+
 import polars as pl
+import python_calamine
 
 from nexau.archs.platform.path_helpers import (
     get_project_cache_dir,
     get_session_brain_dir,
 )
+
 
 def _col_index_to_letter(col_idx: int) -> str:
     """Convert 0-based column index to Excel column letter (0 -> 'A', 27 -> 'AB')."""
@@ -33,7 +34,7 @@ def _clean_val(val: Any) -> str:
     s = str(val).strip()
     return s
 
-def _detect_block_type(grid: List[List[Any]]) -> str:
+def _detect_block_type(grid: list[list[Any]]) -> str:
     """
     Classify 2D grid into one of 4 primitives:
     - text_block: 1 non-empty column or mostly single cell lines
@@ -43,35 +44,35 @@ def _detect_block_type(grid: List[List[Any]]) -> str:
     """
     if not grid or not grid[0]:
         return "text_block"
-    
+
     nrows = len(grid)
     ncols = len(grid[0])
-    
+
     if ncols == 1:
         return "text_block"
-    
+
     # Check populated columns per row
     populated_per_row = [sum(1 for c in r if _clean_val(c)) for r in grid]
     max_pop = max(populated_per_row) if populated_per_row else 0
     min_pop = min(populated_per_row) if populated_per_row else 0
-    
+
     if max_pop <= 1:
         return "text_block"
-    
+
     # Key-Value Vertical check
     if ncols == 2 or max_pop == 2:
         # Check if first column has labels (text) and second has values
         col0_is_str = sum(1 for r in grid if isinstance(r[0], str) and _clean_val(r[0]))
         if col0_is_str >= (nrows * 0.6):
             return "kv_vertical"
-            
+
     # Dense table check: uniform number of columns and header-like first row
     if min_pop >= (ncols * 0.6) and nrows >= 2:
         return "dense_table"
-        
+
     return "unstructured_table"
 
-def _render_dense_table_markdown(grid: List[List[Any]]) -> str:
+def _render_dense_table_markdown(grid: list[list[Any]]) -> str:
     """Render a dense table with header and rows."""
     if not grid:
         return ""
@@ -88,7 +89,7 @@ def _render_dense_table_markdown(grid: List[List[Any]]) -> str:
         lines.append("| " + " | ".join(row_vals) + " |")
     return "\n".join(lines)
 
-def _render_kv_vertical_markdown(grid: List[List[Any]]) -> str:
+def _render_kv_vertical_markdown(grid: list[list[Any]]) -> str:
     """Render a 2-column key-value table."""
     lines = ["| Label | Value |", "|---|---|"]
     for r in grid:
@@ -98,28 +99,28 @@ def _render_kv_vertical_markdown(grid: List[List[Any]]) -> str:
             lines.append(f"| {label} | {val} |")
     return "\n".join(lines)
 
-def _render_unstructured_coordinate_grid(grid: List[List[Any]], start_row: int, start_col: int) -> str:
+def _render_unstructured_coordinate_grid(grid: list[list[Any]], start_row: int, start_col: int) -> str:
     """Render a 2D Visual Coordinate Grid with Excel column letters and row numbers."""
     ncols = len(grid[0]) if grid else 0
     col_letters = [_col_index_to_letter(start_col + i) for i in range(ncols)]
-    
+
     lines = []
     lines.append("|   | " + " | ".join(col_letters) + " |")
     lines.append("|---|" + "|".join(["---"] * ncols) + "|")
-    
+
     for i, row in enumerate(grid):
         row_num = start_row + i + 1
         cells = [_clean_val(c) for c in row]
         lines.append(f"| **{row_num}** | " + " | ".join(cells) + " |")
-        
+
     return "\n".join(lines)
 
 def parse_excel_to_markdown(
     file_path: str,
-    project_id: Optional[str] = None,
-    session_id: Optional[str] = None,
+    project_id: str | None = None,
+    session_id: str | None = None,
     max_inline_rows: int = 100,
-    sheet_name: Optional[str] = None,
+    sheet_name: str | None = None,
 ) -> str:
     """
     Parse an Excel workbook (.xlsx, .xls) into clean Markdown with automatic
@@ -129,7 +130,7 @@ def parse_excel_to_markdown(
     path_obj = Path(file_path)
     if not path_obj.exists():
         return f"Error: Excel file not found at {file_path}"
-        
+
     stem = path_obj.stem
     path_hash = hashlib.sha256(str(path_obj.resolve()).lower().encode()).hexdigest()[:8]
     bundle_name = f"{stem}_{path_hash}_fast_bundle"
@@ -140,7 +141,7 @@ def parse_excel_to_markdown(
         cache_dir = get_project_cache_dir(project_id) / bundle_name
     else:
         cache_dir = Path.home() / ".nexau" / "cache" / bundle_name
-        
+
     try:
         wb = python_calamine.CalamineWorkbook.from_path(str(path_obj))
         sheet_names = wb.sheet_names
@@ -158,7 +159,7 @@ def parse_excel_to_markdown(
                 sheets_data.append((name, rows))
         except Exception:
             return f"Error reading file: {e}"
-        
+
     if sheet_name:
         req_norm = sheet_name.strip().lower()
         matched = [(name, grid) for name, grid in sheets_data if name.strip().lower() == req_norm]
@@ -181,17 +182,17 @@ def parse_excel_to_markdown(
             f"# Excel Workbook: {path_obj.name}",
             f"**Sheets ({len(sheet_names)}):** {', '.join(sheet_names)}\n",
         ]
-    
+
     # Cap multi-sheet workbooks to protect LLM context window
     MAX_FULL_SHEETS = 2
     is_multi_sheet = len(sheets_data) > 3 and not sheet_name
     index_rows = []
-    
+
     for s_idx, (sheet_name, raw_grid) in enumerate(sheets_data, 1):
         if not raw_grid or not any(any(_clean_val(c) for c in row) for row in raw_grid):
             output_parts.append(f"## Sheet {s_idx}: {sheet_name} (Empty)")
             continue
-            
+
         # Find non-empty bounding box
         min_r, max_r = len(raw_grid), -1
         min_c, max_c = 100000, -1
@@ -202,23 +203,23 @@ def parse_excel_to_markdown(
                     if r_idx > max_r: max_r = r_idx
                     if c_idx < min_c: min_c = c_idx
                     if c_idx > max_c: max_c = c_idx
-                    
+
         if max_r == -1:
             output_parts.append(f"## Sheet {s_idx}: {sheet_name} (Empty)")
             continue
-            
+
         # Trim grid to bounding box
         bounded_grid = [row[min_c : max_c + 1] for row in raw_grid[min_r : max_r + 1]]
         total_rows = len(bounded_grid)
         total_cols = len(bounded_grid[0]) if bounded_grid else 0
-        
+
         start_cell = f"{_col_index_to_letter(min_c)}{min_r + 1}"
         end_cell = f"{_col_index_to_letter(max_c)}{max_r + 1}"
         loc_str = f"{sheet_name}!{start_cell}:{end_cell}"
-        
+
         # Partition or classify the grid
         block_type = _detect_block_type(bounded_grid)
-        
+
         if is_multi_sheet and s_idx > MAX_FULL_SHEETS:
             index_rows.append(f"| {s_idx} | `{sheet_name}` | {total_rows} rows, {total_cols} cols | `{block_type}` |")
             continue
@@ -226,7 +227,7 @@ def parse_excel_to_markdown(
         output_parts.append(f"## Sheet {s_idx}: {sheet_name} ({total_rows} rows, {total_cols} cols)")
         output_parts.append(f"**Location:** `{loc_str}`")
         output_parts.append(f"**Type:** `{block_type}`")
-        
+
         if block_type == "dense_table":
             if total_rows <= max_inline_rows:
                 output_parts.append(_render_dense_table_markdown(bounded_grid))
@@ -235,10 +236,10 @@ def parse_excel_to_markdown(
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 clean_sheet_stem = re.sub(r"[^\w\-]", "_", sheet_name)
                 parquet_path = cache_dir / f"{stem}_{clean_sheet_stem}.parquet"
-                
+
                 headers = [_clean_val(c) or f"col_{i+1}" for i, c in enumerate(bounded_grid[0])]
                 # Ensure unique headers
-                seen: Dict[str, int] = {}
+                seen: dict[str, int] = {}
                 unique_headers = []
                 for h in headers:
                     if h in seen:
@@ -247,20 +248,20 @@ def parse_excel_to_markdown(
                     else:
                         seen[h] = 0
                         unique_headers.append(h)
-                        
+
                 data_rows = bounded_grid[1:]
                 col_data = {h: [] for h in unique_headers}
                 for r in data_rows:
                     for i, h in enumerate(unique_headers):
                         val = r[i] if i < len(r) else None
                         col_data[h].append(val)
-                        
+
                 df = pl.DataFrame(col_data, strict=False)
                 df.write_parquet(parquet_path)
-                
+
                 output_parts.append(f"**Storage:** `{parquet_path}`")
                 output_parts.append(f"**Schema:** `{unique_headers}`")
-                output_parts.append(f"**Sample Preview (First 5 Rows):**\n" + _render_dense_table_markdown(bounded_grid[:6]))
+                output_parts.append("**Sample Preview (First 5 Rows):**\n" + _render_dense_table_markdown(bounded_grid[:6]))
                 output_parts.append(f"> [!TIP]\n> Query this dataset with DuckDB in Python:\n> `duckdb.read_parquet(r'{parquet_path}')`\n")
         elif block_type == "kv_vertical":
             output_parts.append(_render_kv_vertical_markdown(bounded_grid))
@@ -271,7 +272,7 @@ def parse_excel_to_markdown(
                 val = " ".join(_clean_val(c) for c in r if _clean_val(c))
                 if val:
                     output_parts.append(f"> {val}")
-                    
+
         output_parts.append("\n---\n")
 
     if index_rows:
@@ -285,5 +286,5 @@ def parse_excel_to_markdown(
             f"> To read the data from any indexed sheet, call: `read_file(file_path=\"{file_path}\", sheet_name=\"<Sheet Name>\")`\n"
             f"> NEVER guess or hallucinate financial numbers without inspecting the specific sheet!\n"
         )
-        
+
     return "\n".join(output_parts)

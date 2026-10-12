@@ -1,12 +1,14 @@
 ﻿import sys
 from pathlib import Path
-import pytest
+
 import httpx
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
 from app.main import app, lifespan
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():

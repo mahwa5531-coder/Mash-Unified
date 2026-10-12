@@ -9,7 +9,6 @@ Returns absolute paths sorted by modification time (newest first).
 
 import fnmatch
 import os
-import re
 import shlex
 import shutil
 import sys

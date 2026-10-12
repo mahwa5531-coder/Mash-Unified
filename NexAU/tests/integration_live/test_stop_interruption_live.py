@@ -1,13 +1,14 @@
-import os
-import sys
-import json
 import asyncio
+import json
+import sys
 from pathlib import Path
+
 import httpx
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from nexau_ui_backend.main import app, lifespan
+
 
 @pytest.mark.anyio
 async def test_stop_interruption_live():
@@ -38,7 +39,7 @@ async def test_stop_interruption_live():
                                         asyncio.create_task(send_stop())
                                 except:
                                     pass
-                except Exception as e:
+                except Exception:
                     pass
 
             async def send_stop():

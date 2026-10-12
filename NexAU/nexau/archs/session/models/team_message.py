@@ -11,7 +11,7 @@
 
 """Team message data models.
 
-RFC-0002: Agent Team 
+RFC-0002: Agent Team
 
 Stores inter-agent messages within a team, including
 direct messages and broadcasts.
@@ -19,7 +19,7 @@ direct messages and broadcasts.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -27,7 +27,7 @@ from sqlmodel import Field, SQLModel
 class TeamMessageModel(SQLModel, table=True):
     """Team message model for inter-agent communication.
 
-    RFC-0002: 
+    RFC-0002:
 
     Attributes:
         user_id: User identifier (primary key).
@@ -57,4 +57,4 @@ class TeamMessageModel(SQLModel, table=True):
     delivered: bool = Field(default=False)
     delivered_at: datetime | None = Field(default=None)
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -89,7 +89,7 @@ class RoundAndTokenReminderMiddleware(Middleware):
                 if not sess_id and hasattr(hook_input.agent_state, "global_storage"):
                     sess_id = hook_input.agent_state.global_storage.get("session_id")
 
-            from nexau.archs.session.steering import pop_steering_messages, _STEERING_MAILBOXES, _LOCK
+            from nexau.archs.session.steering import _LOCK, _STEERING_MAILBOXES, pop_steering_messages
             if sess_id:
                 steering_messages = pop_steering_messages(str(sess_id))
 

@@ -11,7 +11,7 @@
 
 """update_task_status tool - update task status on the task board.
 
-RFC-0002:  () 
+RFC-0002:  ()
 """
 
 from __future__ import annotations
@@ -32,11 +32,11 @@ async def update_task_status(
 ) -> UpdateTaskStatusResult | ToolError:
     """Update task status (pending -> in_progress -> completed).
 
-    RFC-0002: 
+    RFC-0002:
 
-     completed: 
-    1.  (deliverable_path) 
-    2.  leader agent 
+     completed:
+    1.  (deliverable_path)
+    2.  leader agent
     """
     ts = require_team_state(agent_state)
 

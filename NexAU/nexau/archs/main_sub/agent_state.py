@@ -191,8 +191,8 @@ class AgentState:
         """Get the sandbox associated with the agent state.
 
         1:  start_sync()  sandbox
-        2:  asyncio 
-        3: E2B SDK  httpx 
+        2:  asyncio
+        3: E2B SDK  httpx
         4:  sandbox_manager,  sandbox
         """
         # start_sync / sandbox
@@ -207,7 +207,7 @@ class AgentState:
     def add_tool(self, tool: "Tool") -> None:
         """Dynamically add an eager tool into the current execution context.
 
-        RFC-0005:  ToolRegistry,  Executor . 
+        RFC-0005:  ToolRegistry,  Executor .
         Deferred runtime additions are intentionally unsupported for now.
         """
         if tool.defer_loading:

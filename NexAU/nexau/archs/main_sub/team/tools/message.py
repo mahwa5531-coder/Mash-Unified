@@ -11,7 +11,7 @@
 
 """message tool - send a point-to-point message to a teammate.
 
-RFC-0002: 
+RFC-0002:
 """
 
 from __future__ import annotations
@@ -31,10 +31,10 @@ async def message(
 ) -> MessageResult:
     """Send a message to a specific teammate.
 
-    RFC-0002: 
+    RFC-0002:
 
-     message bus  enqueue_message  agent. 
-     agent  executor  _message_available . 
+     message bus  enqueue_message  agent.
+     agent  executor  _message_available .
     """
     ts = require_team_state(agent_state)
     msg = await ts.message_bus.send(

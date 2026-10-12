@@ -1,14 +1,16 @@
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.abspath("connector"))
 sys.path.insert(0, os.path.abspath("NexAU"))
 
 import io
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from app.routers.uploads import upload_file
 from fastapi import HTTPException
 from fastapi.datastructures import UploadFile
-
-from app.routers.uploads import upload_file, MAX_UPLOAD_SIZE_BYTES
 
 
 @pytest.mark.asyncio
@@ -18,7 +20,7 @@ async def test_upload_within_limit():
 
     data = b"Hello world within 30 MB"
     file = UploadFile(filename="small.txt", file=io.BytesIO(data))
-    
+
     with patch("app.routers.uploads.get_session_brain_dir") as mock_dir:
         import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:

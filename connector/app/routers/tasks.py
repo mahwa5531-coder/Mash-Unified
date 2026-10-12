@@ -1,8 +1,7 @@
-import os
-import json
 import asyncio
+import json
 from pathlib import Path
-from typing import Any
+
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
@@ -17,8 +16,8 @@ async def list_active_tasks(session_id: str | None = None):
     seen_commands = set()
 
     try:
-        from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
+        from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
         sandbox = get_sandbox(None)
         bg_tasks = sandbox.list_background_tasks()
         for pid, info in bg_tasks.items():
@@ -48,9 +47,11 @@ async def list_active_tasks(session_id: str | None = None):
 async def kill_task(pid: int):
     """Terminate an active background task by its PID."""
     try:
-        from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
+        import subprocess
+        import sys
+
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
-        import sys, subprocess
+        from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
         sandbox = get_sandbox(None)
         res = sandbox.kill_background_task(pid)
         is_success = (res.status == SandboxStatus.SUCCESS)
@@ -62,7 +63,8 @@ async def kill_task(pid: int):
 
         return {"success": is_success, "pid": pid, "status": str(res.status) if is_success else "killed"}
     except Exception as e:
-        import sys, subprocess
+        import subprocess
+        import sys
         if sys.platform == "win32":
             try:
                 subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
@@ -128,8 +130,8 @@ async def stream_task_log(task_id: str, request: Request):
     """Stream live task terminal logs as SSE (OpenHands pattern)."""
     # ponytail: tail active sandbox stdout/stderr or task log file asynchronously with chunk deltas
     async def generate():
-        from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
+        from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
 
         pid, clean = _normalize_task_id(task_id)
         sandbox = None
@@ -160,7 +162,7 @@ async def stream_task_log(task_id: str, request: Request):
                 # Tail stdout
                 if stdout_path and stdout_path.exists():
                     try:
-                        with open(stdout_path, "r", encoding="utf-8", errors="replace") as f:
+                        with open(stdout_path, encoding="utf-8", errors="replace") as f:
                             f.seek(out_offset)
                             chunk = f.read()
                             if chunk:
@@ -172,7 +174,7 @@ async def stream_task_log(task_id: str, request: Request):
                 # Tail stderr
                 if stderr_path and stderr_path.exists():
                     try:
-                        with open(stderr_path, "r", encoding="utf-8", errors="replace") as f:
+                        with open(stderr_path, encoding="utf-8", errors="replace") as f:
                             f.seek(err_offset)
                             chunk = f.read()
                             if chunk:
@@ -184,7 +186,7 @@ async def stream_task_log(task_id: str, request: Request):
                 # Fallback to task_log_path if stdout/stderr not available
                 if not stdout_path and task_log_path and task_log_path.exists():
                     try:
-                        with open(task_log_path, "r", encoding="utf-8", errors="replace") as f:
+                        with open(task_log_path, encoding="utf-8", errors="replace") as f:
                             f.seek(log_offset)
                             chunk = f.read()
                             if chunk:
@@ -201,7 +203,7 @@ async def stream_task_log(task_id: str, request: Request):
                     # Flush any remaining unread bytes
                     if stdout_path and stdout_path.exists():
                         try:
-                            with open(stdout_path, "r", encoding="utf-8", errors="replace") as f:
+                            with open(stdout_path, encoding="utf-8", errors="replace") as f:
                                 f.seek(out_offset)
                                 chunk = f.read()
                                 if chunk:
@@ -210,7 +212,7 @@ async def stream_task_log(task_id: str, request: Request):
                             pass
                     if stderr_path and stderr_path.exists():
                         try:
-                            with open(stderr_path, "r", encoding="utf-8", errors="replace") as f:
+                            with open(stderr_path, encoding="utf-8", errors="replace") as f:
                                 f.seek(err_offset)
                                 chunk = f.read()
                                 if chunk:

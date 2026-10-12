@@ -1,10 +1,9 @@
 import json
-import sqlite3
 import pathlib
-import urllib.request
-import time
+import sqlite3
 import sys
-import os
+import time
+import urllib.request
 
 # Ensure UTF-8 output across all consoles
 try:
@@ -175,9 +174,9 @@ class NexAUTestEngineer:
         print("\n" + "=" * 80)
         print("          NEXAU AGENT BENCHMARK COMPENDIUM QA EVALUATION REPORT          ")
         print("=" * 80)
-        print(f"Evaluator Mode: QA Test Engineer (Headless, Zero Manual Intervention)")
+        print("Evaluator Mode: QA Test Engineer (Headless, Zero Manual Intervention)")
         print(f"Target Session: {self.session_id}")
-        print(f"Model Under Test: qwen3.5:2b (256k context via Cloudflare endpoint)")
+        print("Model Under Test: qwen3.5:2b (256k context via Cloudflare endpoint)")
         print(f"SQLite DB Audit: {DB_PATH}\n")
 
         passed_count = sum(1 for r in self.results if r["passed"])
@@ -200,7 +199,7 @@ class NexAUTestEngineer:
 def run_compendium_benchmark():
     session_id = f"bench_compendium_{int(time.time())}"
     qa = NexAUTestEngineer(session_id)
-    
+
     # Step 1: Create clean session
     qa.create_clean_session()
     qa.inspect_db("INITIAL SESSION STATE")

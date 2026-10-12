@@ -1,15 +1,16 @@
-import os
 from typing import Annotated
+
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import create_async_engine
-from nexau.archs.session.orm import DatabaseEngine, LoopSafeDatabaseEngine, SQLDatabaseEngine
+from nexau.archs.session.orm import LoopSafeDatabaseEngine, SQLDatabaseEngine
 from nexau.archs.session.session_manager import SessionManager
+from sqlalchemy.ext.asyncio import create_async_engine
 
 _engine: LoopSafeDatabaseEngine | None = None
 _session_manager: SessionManager | None = None
 
 
 from sqlalchemy import event
+
 
 def init_engine(db_url: str) -> LoopSafeDatabaseEngine:
     global _engine
@@ -37,6 +38,7 @@ def init_engine(db_url: str) -> LoopSafeDatabaseEngine:
 
 
 from fastapi import Depends, Request
+
 
 def get_engine(request: Request = None) -> LoopSafeDatabaseEngine:
     if request is not None and hasattr(request, "app") and hasattr(request.app.state, "engine") and request.app.state.engine:

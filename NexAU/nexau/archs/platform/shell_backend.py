@@ -272,7 +272,7 @@ def _windows_shell_path_candidates(kind: WindowsShellKind) -> list[Path]:
 def detect_powershell_backend() -> WindowsShellInstallation | None:
     """Detect the RFC-0019 default Windows shell backend.
 
-    RFC-0019: default PowerShell backend 
+    RFC-0019: default PowerShell backend
 
     Detection follows ``pwsh.exe`` -> ``powershell.exe`` -> ``cmd.exe``.  The
     final ``cmd.exe`` fallback is intentionally marked by its ``kind`` so

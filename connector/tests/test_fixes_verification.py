@@ -1,6 +1,5 @@
 import os
-import re
-import json
+
 
 def test_single_env_and_no_max_iterations_option():
     # 1. Verify connector/.env exists and is the only .env in Mash
@@ -8,8 +7,8 @@ def test_single_env_and_no_max_iterations_option():
     assert os.path.exists(env_path), "connector/.env must exist"
     assert not os.path.exists(r'c:\Users\rama\Downloads\Mash\NexAU\.env'), "NexAU/.env must NOT exist (only 1 single .env in codebase)"
     assert not os.path.exists(r'c:\Users\rama\Downloads\Mash\connector\.env.backup'), "connector/.env.backup must NOT exist"
-    
-    with open(env_path, 'r', encoding='utf-8') as f:
+
+    with open(env_path, encoding='utf-8') as f:
         content = f.read()
     # 2. Verify AGENT_MAX_ITERATIONS option is completely removed from .env
     assert 'AGENT_MAX_ITERATIONS' not in content, "AGENT_MAX_ITERATIONS must be removed from .env so execution is inherently dynamic/infinite"
@@ -17,7 +16,7 @@ def test_single_env_and_no_max_iterations_option():
 
 def test_universal_scrollbar_removal():
     css_path = r'c:\Users\rama\Downloads\Mash\frontend\src\app\globals.css'
-    with open(css_path, 'r', encoding='utf-8') as f:
+    with open(css_path, encoding='utf-8') as f:
         css = f.read()
     # Check that universal scrollbar suppression is present
     assert 'scrollbar-width: none !important;' in css, "globals.css must universally suppress scrollbar-width"
@@ -27,7 +26,7 @@ def test_universal_scrollbar_removal():
 
 def test_process_compat_taskkill_first():
     p_path = r'c:\Users\rama\Downloads\Mash\NexAU\nexau\archs\platform\process_compat.py'
-    with open(p_path, 'r', encoding='utf-8') as f:
+    with open(p_path, encoding='utf-8') as f:
         content = f.read()
     wp_idx = content.find('class WindowsProcessCompat')
     assert wp_idx != -1, "WindowsProcessCompat must exist"
@@ -40,7 +39,7 @@ def test_process_compat_taskkill_first():
 
 def test_tasks_router_kill_fallback():
     t_path = r'c:\Users\rama\Downloads\Mash\connector\app\routers\tasks.py'
-    with open(t_path, 'r', encoding='utf-8') as f:
+    with open(t_path, encoding='utf-8') as f:
         content = f.read()
     kill_fn = content[content.find('async def kill_task'):content.find('async def kill_task')+1000]
     assert 'taskkill' in kill_fn, "tasks.py kill_task must have direct OS fallback"
@@ -49,9 +48,9 @@ def test_tasks_router_kill_fallback():
 def test_turns_sanitization_and_stable_ids():
     turns_path = r'c:\Users\rama\Downloads\Mash\frontend\src\features\chat\utils\turns.ts'
     parser_path = r'c:\Users\rama\Downloads\Mash\frontend\src\features\chat\utils\sessionHistoryParser.ts'
-    with open(turns_path, 'r', encoding='utf-8') as f:
+    with open(turns_path, encoding='utf-8') as f:
         t_content = f.read()
-    with open(parser_path, 'r', encoding='utf-8') as f:
+    with open(parser_path, encoding='utf-8') as f:
         p_content = f.read()
     content = t_content + "\n" + p_content
     assert 'Date.now()' not in t_content, "turns.ts should NOT use Date.now() for step IDs to prevent accordion reset"
@@ -61,7 +60,7 @@ def test_turns_sanitization_and_stable_ids():
 
 def test_accordion_sanitization():
     acc_path = r'c:\Users\rama\Downloads\Mash\frontend\src\features\chat\components\TaskWorkLogAccordion.tsx'
-    with open(acc_path, 'r', encoding='utf-8') as f:
+    with open(acc_path, encoding='utf-8') as f:
         content = f.read()
     assert 'VERIFIED' in content, "TaskWorkLogAccordion must sanitize VERIFIED"
     assert 'Thought for' in content, "TaskWorkLogAccordion must support Thought for label"

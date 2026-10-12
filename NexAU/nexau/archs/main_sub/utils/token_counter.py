@@ -82,7 +82,7 @@ TIKTOKEN_AVAILABLE: Final[bool] = _tiktoken is not None
 def _estimate_image_tokens(image: ImageBlock) -> int:
     """Token cost for one image block.
 
-    Incident fix (Rust counterpart nexau-rs#94):  patch . 
+    Incident fix (Rust counterpart nexau-rs#94):  patch .
 
     Charges Anthropic's official patch-formula cost
     (`estimate_tokens_from_dimensions`) when dimensions can be recovered from

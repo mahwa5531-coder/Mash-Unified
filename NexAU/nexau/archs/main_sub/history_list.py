@@ -42,11 +42,11 @@ logger = logging.getLogger(__name__)
 
 
 def _resize_image_block(block: ImageBlock) -> None:
-    """ ImageBlock . 
+    """ ImageBlock .
 
-    url-only (``base64`` )   --  ., 
-    /failure no-op (``resize_base64_image_if_oversized``  None), 
-    . 
+    url-only (``base64`` )   --  .,
+    /failure no-op (``resize_base64_image_if_oversized``  None),
+    .
     """
     if not block.base64:
         return
@@ -57,13 +57,13 @@ def _resize_image_block(block: ImageBlock) -> None:
 
 
 def _omit_or_resize_image_block(block: ImageBlock) -> TextBlock | None:
-    """ →  ``TextBlock`` ( ``ImageBlock``) ; 
-     ``None`` ( block ) . 
+    """ →  ``TextBlock`` ( ``ImageBlock``) ;
+     ``None`` ( block ) .
 
-    ``image_exceeds_hard_limit``  ``_resize_image_block``: 
+    ``image_exceeds_hard_limit``  ``_resize_image_block``:
      gate  decode  +  payload. url-only (``base64``
-    )  gate ()  resize,  ``None`` 
-    . 
+    )  gate ()  resize,  ``None``
+    .
     """
     if block.base64 and image_exceeds_hard_limit(block.base64):
         return TextBlock(text=OVERSIZED_IMAGE_PLACEHOLDER)
@@ -160,25 +160,25 @@ class HistoryList(list[Message]):
         return bool(self._pending_messages)
 
     def _resize_oversized_images(self, messages: Iterable[Message]) -> None:
-        """ ``DEFAULT_IMAGE_MAX_PIXELS``, 
+        """ ``DEFAULT_IMAGE_MAX_PIXELS``,
          (``image_exceeds_hard_limit``: base64 > 20 MiB  > 60 MP)  omit
-         ( resize,,  decode  +  payload) . 
+         ( resize,,  decode  +  payload) .
 
-         append / extend / replace_all  ``_pending_messages`` 
-          --   persist,, tool result, 
-,  REPLACE,  ``ImageBlock``. 
+         append / extend / replace_all  ``_pending_messages``
+          --   persist,, tool result,
+,  REPLACE,  ``ImageBlock``.
         # 599 ``read_visual_file`` LLM ;
 ,  base64  SQL / JSONL / memory / remote
-        backend. /MCP,: 
+        backend. /MCP,:
 
          ``content`` **** ``ImageBlock``(; → ,
-         →  resize). (``ToolResultBlock`` 
+         →  resize). (``ToolResultBlock``
         ``raw_output``):builtin ,/
-        MCP . 
+        MCP .
 
-        object  --,  LLM  token. 
-        graceful:  try/except, exception, 
-        failurefailure ( read_visual_file " fail") . 
+        object  --,  LLM  token.
+        graceful:  try/except, exception,
+        failurefailure ( read_visual_file " fail") .
         """
         for message in messages:
             try:
@@ -347,8 +347,8 @@ class HistoryList(list[Message]):
         - Different thread (e.g. executor worker) → run_coroutine_threadsafe
         - No owner loop → best-effort asyncio.run (sync-only entry points)
 
-         create_task / run_coroutine_threadsafe  task/future 
-        done-callback error, failure. 
+         create_task / run_coroutine_threadsafe  task/future
+        done-callback error, failure.
 
         Args:
             coro: Coroutine to schedule
@@ -389,8 +389,8 @@ class HistoryList(list[Message]):
     def _on_task_done(self, task: asyncio.Task[object] | asyncio.Future[object] | ConcurrentFuture[object]) -> None:
         """Done-callback for fire-and-forget persistence tasks.
 
-        failure, exception (Python  Task  GC 
-         'Task exception was never retrieved', ) . 
+        failure, exception (Python  Task  GC
+         'Task exception was never retrieved', ) .
         """
         self._background_tasks.discard(task)  # type: ignore[arg-type]
         try:

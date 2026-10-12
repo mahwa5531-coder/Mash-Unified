@@ -22,7 +22,7 @@ YamlValue = dict[str, Any] | list[Any] | str | int | float | bool | None
 def import_from_string(import_string: str) -> Any:
     """Import a function or class from a string specification.
 
-    RFC-0197: module lazy package export. 
+    RFC-0197: module lazy package export.
 
     Args:
         import_string: String in format "module.path:function_name"

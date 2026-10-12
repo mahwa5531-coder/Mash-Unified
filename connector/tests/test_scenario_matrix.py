@@ -4,15 +4,17 @@ import os
 import sys
 import time
 import urllib.parse
+from pathlib import Path
+
 import httpx
 import pytest
-from pathlib import Path
 
 # Ensure roots are in sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
 from app.main import app, lifespan
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -23,7 +25,7 @@ async def request(client: httpx.AsyncClient, path, method="GET", body=None):
         resp = await client.request(method, path, json=body)
     else:
         resp = await client.request(method, path)
-    
+
     try:
         data = resp.json()
         return resp.status_code, data

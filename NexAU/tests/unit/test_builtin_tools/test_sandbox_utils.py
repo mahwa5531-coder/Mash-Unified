@@ -18,9 +18,6 @@ import sys
 from pathlib import Path
 from unittest.mock import Mock
 
-import pytest
-
-from nexau.archs.sandbox import SandboxError
 from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 
 

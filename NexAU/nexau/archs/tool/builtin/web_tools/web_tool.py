@@ -226,8 +226,8 @@ def web_read(
         # Extract markdown if content is HTML (matching Antigravity read_url_content)
         if "html" in content_type.lower():
             try:
-                from bs4 import BeautifulSoup
                 import markdownify
+                from bs4 import BeautifulSoup
 
                 soup = BeautifulSoup(content, "html.parser")
 
@@ -237,7 +237,7 @@ def web_read(
 
                 # Convert HTML to clean structured markdown
                 md_text = markdownify.markdownify(str(soup), heading_style="ATX")
-                
+
                 # Collapse excessive consecutive blank lines
                 cleaned_lines = []
                 prev_empty = False

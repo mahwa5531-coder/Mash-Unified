@@ -21,6 +21,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
+
 from pydantic import BaseModel, Field
 
 from nexau.archs.platform.path_helpers import get_nexau_home
@@ -56,7 +57,7 @@ class AppConfig(BaseModel):
         return get_nexau_home() / "settings.json"
 
     @classmethod
-    def load(cls) -> "AppConfig":
+    def load(cls) -> AppConfig:
         path = cls.get_config_path()
         if not path.exists():
             config = cls()

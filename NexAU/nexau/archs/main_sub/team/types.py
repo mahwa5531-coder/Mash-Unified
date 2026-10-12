@@ -58,7 +58,7 @@ class TaskBlockedError(Exception):
 class TeammateInfo:
     """Teammate instance info.
 
-    RFC-0002: Teammate 
+    RFC-0002: Teammate
     """
 
     agent_id: str
@@ -70,7 +70,7 @@ class TeammateInfo:
 class TaskInfo:
     """Task board entry.
 
-    RFC-0002: 
+    RFC-0002:
     """
 
     task_id: str
@@ -90,7 +90,7 @@ class TaskInfo:
 class SpawnResult:
     """spawn_teammate return value.
 
-    RFC-0002: Teammate 
+    RFC-0002: Teammate
     """
 
     agent_id: str
@@ -101,7 +101,7 @@ class SpawnResult:
 class RemoveTeammateResult:
     """remove_teammate return value.
 
-    RFC-0002: Teammate 
+    RFC-0002: Teammate
     """
 
     agent_id: str
@@ -112,7 +112,7 @@ class RemoveTeammateResult:
 class CreateTaskResult:
     """create_task return value.
 
-    RFC-0002: 
+    RFC-0002:
     """
 
     task_id: str
@@ -127,7 +127,7 @@ class CreateTaskResult:
 class ClaimTaskResult:
     """claim_task return value.
 
-    RFC-0002: 
+    RFC-0002:
     """
 
     task_id: str
@@ -141,7 +141,7 @@ class ClaimTaskResult:
 class UpdateTaskStatusResult:
     """update_task_status return value.
 
-    RFC-0002: 
+    RFC-0002:
     """
 
     task_id: str
@@ -154,7 +154,7 @@ class UpdateTaskStatusResult:
 class ReleaseTaskResult:
     """release_task return value.
 
-    RFC-0002: 
+    RFC-0002:
     """
 
     task_id: str
@@ -166,7 +166,7 @@ class ReleaseTaskResult:
 class MessageResult:
     """message / broadcast return value.
 
-    RFC-0002: 
+    RFC-0002:
     """
 
     message_id: str
@@ -177,7 +177,7 @@ class MessageResult:
 class FinishTeamResult:
     """finish_team return value.
 
-    RFC-0002: 
+    RFC-0002:
     """
 
     summary: str
@@ -193,8 +193,8 @@ class ToolError:
 
     Codes: permission_denied | conflict | blocked | not_found | invalid_state
 
-    ``status``  ``"error"``,  executor  stop-tool: 
-     stop tool  error, executor . 
+    ``status``  ``"error"``,  executor  stop-tool:
+     stop tool  error, executor .
     """
 
     error: str

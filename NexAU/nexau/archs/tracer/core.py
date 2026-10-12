@@ -14,7 +14,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
@@ -23,7 +23,7 @@ def _empty_str_any_dict() -> dict[str, Any]:
     return {}
 
 
-class SpanType(str, Enum):
+class SpanType(StrEnum):
     """Types of spans that can be traced."""
 
     AGENT = "AGENT"

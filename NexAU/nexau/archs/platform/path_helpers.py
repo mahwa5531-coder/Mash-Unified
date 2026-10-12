@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+from datetime import UTC
 from pathlib import Path, PureWindowsPath
 
 _CLI_ROOT_DIR = "nexau"
@@ -66,7 +67,7 @@ def get_database_path() -> Path:
 
 def get_installation_id() -> str:
     """Return the unique permanent machine/installation UUID (~/.nexau/installation_id).
-    
+
     Uses native Windows OS Machine GUID on Windows, with cryptographic UUIDv4 fallback.
     """
     p = get_nexau_home() / "installation_id"
@@ -173,15 +174,15 @@ def scaffold_workspace_storage(workspace_path: str | Path) -> Path:
 
     (ws / "Audit_Deliverables").mkdir(parents=True, exist_ok=True)
     (ws / ".nexau" / "cache").mkdir(parents=True, exist_ok=True)
-    
+
     ws_meta = ws / ".nexau" / "workspace.json"
     if not ws_meta.exists():
         import json
-        from datetime import datetime, timezone
+        from datetime import datetime
         try:
             ws_meta.write_text(json.dumps({
                 "name": ws.name,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "deliverables_dir": "Audit_Deliverables",
                 "version": "1.0.0",
             }, indent=2), encoding="utf-8")

@@ -1,10 +1,9 @@
 import json
-import sqlite3
 import pathlib
-import urllib.request
-import time
+import sqlite3
 import sys
-import os
+import time
+import urllib.request
 
 # Set UTF-8 encoding for console output
 try:
@@ -135,8 +134,8 @@ class ToolBenchEvaluator:
         print("                 OFFICIAL TOOLBENCH EVALUATION SCORECARD                  ")
         print("#" * 85)
         print(f"Session ID: {self.session_id}")
-        print(f"Model: qwen3.5:2b (256k context via Cloudflare Ollama proxy)")
-        print(f"Engine: NexAU Runtime + FastAPI Connector (Headless Execution)")
+        print("Model: qwen3.5:2b (256k context via Cloudflare Ollama proxy)")
+        print("Engine: NexAU Runtime + FastAPI Connector (Headless Execution)")
         print(f"Audit Database: {DB_PATH}\n")
 
         total = len(self.records)
@@ -174,12 +173,12 @@ class ToolBenchEvaluator:
 
 def run_full_toolbench_evaluation():
     session_id = f"toolbench_full_{int(time.time())}"
-    print(f"================================================================================")
-    print(f"  LAUNCHING FULL TOOLBENCH BENCHMARK SUITE FOR NEXAU AGENT")
+    print("================================================================================")
+    print("  LAUNCHING FULL TOOLBENCH BENCHMARK SUITE FOR NEXAU AGENT")
     print(f"  Session ID: {session_id}")
-    print(f"  Total Benchmark Tasks: 15 (5x I1, 5x I2, 5x I3)")
-    print(f"================================================================================")
-    
+    print("  Total Benchmark Tasks: 15 (5x I1, 5x I2, 5x I3)")
+    print("================================================================================")
+
     tb = ToolBenchEvaluator(session_id)
 
     # ═════════════════════════════════════════════════════════════════════════════
@@ -272,7 +271,7 @@ def run_full_toolbench_evaluation():
 
     # Task I2-3: Multi-File Cross-Ledger Reconciliation
     def v_i2_3(resp, tools):
-        called = [t["name"] for t in tools]
+        [t["name"] for t in tools]
         # Cash: 450,000; Approved vendors: 550,000; Difference: -100,000 (shortfall)
         passed = ("450,000" in resp or "450000" in resp) and ("550,000" in resp or "550000" in resp)
         return passed, ["Reconciled Cash ($450,000) against Approved vendor payables ($550,000)"]
@@ -336,7 +335,7 @@ def run_full_toolbench_evaluation():
 
     # Task I3-3: Security Incident Log Forensics + Executive Report
     def v_i3_3(resp, tools):
-        called = [t["name"] for t in tools]
+        [t["name"] for t in tools]
         passed = "9090" in resp and "10.0.0.99" in resp
         return passed, ["Synthesized security incident on port 9090 from 10.0.0.99"]
     tb.execute_task(
@@ -347,7 +346,7 @@ def run_full_toolbench_evaluation():
 
     # Task I3-4: Autonomous Error Diagnosis & Recovery (DFSDT)
     def v_i3_4(resp, tools):
-        called = [t["name"] for t in tools]
+        [t["name"] for t in tools]
         # Should gracefully detect that nonexistent.csv doesn't exist and fall back
         passed = ("does not exist" in resp.lower() or "not found" in resp.lower() or "error" in resp.lower() or "accounts.csv" in resp)
         return passed, ["Handled missing resource gracefully without unhandled exception"]
@@ -359,7 +358,7 @@ def run_full_toolbench_evaluation():
 
     # Task I3-5: End-to-End Autonomous Statutory Balance Sheet Audit
     def v_i3_5(resp, tools):
-        called = [t["name"] for t in tools]
+        [t["name"] for t in tools]
         # Equation: Assets ($5,240,000) = Liabilities ($1,820,000) + Equity ($3,420,000)
         passed = ("5,240,000" in resp or "5240000" in resp) and ("1,820,000" in resp or "1820000" in resp)
         return passed, ["Verified fundamental accounting equilibrium: Assets = Liabilities + Equity"]

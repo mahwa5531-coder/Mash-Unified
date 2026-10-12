@@ -1,32 +1,32 @@
-"""Filter DSL 
+"""Filter DSL
 
- PostgREST  Filter,  JSON, 
-SQLAlchemy, Python  HTTP string. 
+ PostgREST  Filter,  JSON,
+SQLAlchemy, Python  HTTP string.
 """
 
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel
 
 
-class FilterOperator(str, Enum):
+class FilterOperator(StrEnum):
     """PostgREST """
 
-    EQ = "eq"  # 
-    NEQ = "neq"  # 
-    GT = "gt"  # 
-    GTE = "gte"  # 
-    LT = "lt"  # 
-    LTE = "lte"  # 
-    LIKE = "like"  # 
-    ILIKE = "ilike"  # 
+    EQ = "eq"  #
+    NEQ = "neq"  #
+    GT = "gt"  #
+    GTE = "gte"  #
+    LT = "lt"  #
+    LTE = "lte"  #
+    LIKE = "like"  #
+    ILIKE = "ilike"  #
     IN = "in"  # packagelist
     IS = "is"  # IS NULL / IS NOT NULL
 
 
-class LogicalOperator(str, Enum):
+class LogicalOperator(StrEnum):
     """"""
 
     AND = "and"

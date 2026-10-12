@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import signal
-from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -27,16 +26,14 @@ from nexau.archs.main_sub.execution.middleware.context_compaction.middleware imp
     ContextCompactionMiddleware,
 )
 from nexau.archs.main_sub.execution.model_response import ModelResponse
-from nexau.core.serializers.openai_chat import messages_from_legacy_openai_chat
 from nexau.core.messages import (
     Message,
     ReasoningBlock,
     Role,
     TextBlock,
-    ToolResultBlock,
     ToolUseBlock,
 )
-from nexau.core.serializers.openai_chat import serialize_ump_to_openai_chat_payload
+from nexau.core.serializers.openai_chat import messages_from_legacy_openai_chat, serialize_ump_to_openai_chat_payload
 from nexau.core.usage import TokenUsage
 
 # ---------------------------------------------------------------------------

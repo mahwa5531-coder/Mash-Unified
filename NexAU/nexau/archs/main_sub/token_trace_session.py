@@ -82,7 +82,7 @@ def _empty_message_list() -> list[Message]:
 
 
 class TokenTraceContextOverflowError(RuntimeError):
-    """Token trace session  token  max_context_tokens. 
+    """Token trace session  token  max_context_tokens.
 
     Token trace sessions do not support context compaction because
     reconstructing token lists from compacted message text may be inaccurate.
@@ -181,8 +181,8 @@ class TokenTraceSession:
     def _chat_template_kwargs(self) -> dict[str, object]:
         """Extra kwargs forwarded to ``apply_chat_template``.
 
-         ``llm_config.extra_params["chat_template_kwargs"]``, 
-         ``enable_thinking``  chat template . 
+         ``llm_config.extra_params["chat_template_kwargs"]``,
+         ``enable_thinking``  chat template .
         """
         raw = self.llm_config.extra_params.get("chat_template_kwargs")
         if isinstance(raw, dict):
@@ -198,12 +198,12 @@ class TokenTraceSession:
     ) -> list[int]:
         """Encode messages into token ids via HuggingFace AutoTokenizer.
 
-         llm_config.tokenizer_path  HF  tokenizer, 
-         apply_chat_template  Message list token id list. 
+         llm_config.tokenizer_path  HF  tokenizer,
+         apply_chat_template  Message list token id list.
 
         ``llm_config.extra_params["chat_template_kwargs"]`` keyvalue
-         kwargs  ``apply_chat_template``, 
-        ``{"enable_thinking": True}``. 
+         kwargs  ``apply_chat_template``,
+        ``{"enable_thinking": True}``.
         """
         if not messages:
             return []
@@ -246,10 +246,10 @@ class TokenTraceSession:
     async def _post_json_async(self, url: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Async version of _post_json using httpx.AsyncClient.
 
-        P2 async/sync :  HTTP 
+        P2 async/sync :  HTTP
 
-         httpx.AsyncClient  sync requests.post, 
-         HTTP,  event loop. 
+         httpx.AsyncClient  sync requests.post,
+         HTTP,  event loop.
         """
         async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout)) as client:
             response = await client.post(
@@ -268,7 +268,7 @@ class TokenTraceSession:
 
         P2 async/sync :  detokenize
 
-         _post_json_async  HTTP . 
+         _post_json_async  HTTP .
         """
         if not token_ids:
             return ""

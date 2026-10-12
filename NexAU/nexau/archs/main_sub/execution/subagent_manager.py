@@ -239,11 +239,11 @@ class SubAgentManager:
 
         P1 async/sync :  sub-agent  event loop
 
-         Agent.create() (async factory) + run_async() 
-        Agent() (sync __init__ → asyncio.run()) + run() (sync → asyncio.run()), 
-         loop. 
+         Agent.create() (async factory) + run_async()
+        Agent() (sync __init__ → asyncio.run()) + run() (sync → asyncio.run()),
+         loop.
 
-         call_sub_agent() backward compatibility sync . 
+         call_sub_agent() backward compatibility sync .
         """
         from ...main_sub.agent import Agent
         from ..agent_context import get_context

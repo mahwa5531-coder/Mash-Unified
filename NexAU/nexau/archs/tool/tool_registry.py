@@ -11,10 +11,10 @@
 
 """Tool registry with deferred loading support.
 
-RFC-0005: Tool Search - 
+RFC-0005: Tool Search -
 
-ToolRegistry, class. 
- (source),  (inject),  source. 
+ToolRegistry, class.
+ (source),  (inject),  source.
 """
 
 import logging
@@ -33,13 +33,13 @@ class ToolRegistry:
     RFC-0005:  + computed tools + inject
 
     Core interface:
-    - add_source(name, tools): 
+    - add_source(name, tools):
     - compute_eager_tools():  LLM list
-    - compute_deferred_tools(): ToolSearch 
+    - compute_deferred_tools(): ToolSearch
     - compute_serial_tool_names(): list
     - inject(tool_name):  deferred tool
-    - get_all():  () 
-    - search(query, max_results):  deferred 
+    - get_all():  ()
+    - search(query, max_results):  deferred
     """
 
     def __init__(self) -> None:
@@ -50,7 +50,7 @@ class ToolRegistry:
     def add_source(self, name: str, tools: Sequence[Tool]) -> None:
         """Register a tool source (append-only, does not modify existing entries).
 
-        RFC-0005:  (, ) 
+        RFC-0005:  (, )
 
         Args:
             name: Source identifier (e.g. 'config', 'mcp', 'builtin')
@@ -65,7 +65,7 @@ class ToolRegistry:
     def compute_eager_tools(self) -> list[Tool]:
         """Compute tools that should be sent to LLM this turn.
 
-        RFC-0005: defer_loading=false  +  deferred 
+        RFC-0005: defer_loading=false  +  deferred
 
         Returns:
             List of tools to include in LLM tools parameter
@@ -81,7 +81,7 @@ class ToolRegistry:
     def compute_deferred_tools(self) -> list[Tool]:
         """Compute tools available for ToolSearch (not yet injected).
 
-        RFC-0005: defer_loading=true 
+        RFC-0005: defer_loading=true
 
         Returns:
             List of deferred tools not yet injected
@@ -111,7 +111,7 @@ class ToolRegistry:
     def inject(self, tool_name: str) -> bool:
         """Inject a deferred tool so it appears in eager tools next turn.
 
-        RFC-0005:  deferred tool ( source) 
+        RFC-0005:  deferred tool ( source)
 
         Args:
             tool_name: Name of the tool to inject
@@ -133,7 +133,7 @@ class ToolRegistry:
     def get_all(self) -> dict[str, Tool]:
         """Get complete registry (for tool execution lookup).
 
-        RFC-0005:  () 
+        RFC-0005:  ()
 
         Returns:
             Dict mapping tool name to Tool object
@@ -162,7 +162,7 @@ class ToolRegistry:
     ) -> list[Tool]:
         """Search deferred tools and inject matches.
 
-        RFC-0005:  activate 
+        RFC-0005:  activate
 
         Weighted keyword search on name + description + search_hint.
 
@@ -278,7 +278,7 @@ class ToolRegistry:
     def build_deferred_index(self) -> str:
         """Build a compact index of deferred tools for ToolSearch description.
 
-        RFC-0005: description  deferred tools  ( + ) 
+        RFC-0005: description  deferred tools  ( + )
 
         Returns:
             Formatted string listing available deferred tools

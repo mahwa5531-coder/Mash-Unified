@@ -3,11 +3,11 @@
 """Session mid-flight steering mailbox for live user interaction."""
 
 from __future__ import annotations
+
 import threading
-from typing import Dict, List
 
 _LOCK = threading.Lock()
-_STEERING_MAILBOXES: Dict[str, List[str]] = {}
+_STEERING_MAILBOXES: dict[str, list[str]] = {}
 
 
 def queue_steering_message(session_id: str, message: str) -> None:
@@ -18,7 +18,7 @@ def queue_steering_message(session_id: str, message: str) -> None:
         _STEERING_MAILBOXES[session_id].append(message)
 
 
-def pop_steering_messages(session_id: str) -> List[str]:
+def pop_steering_messages(session_id: str) -> list[str]:
     """Pop and clear all queued steering messages for a session."""
     with _LOCK:
         if session_id not in _STEERING_MAILBOXES or not _STEERING_MAILBOXES[session_id]:
@@ -28,7 +28,7 @@ def pop_steering_messages(session_id: str) -> List[str]:
         return messages
 
 
-def peek_steering_messages(session_id: str) -> List[str]:
+def peek_steering_messages(session_id: str) -> list[str]:
     """Peek at currently queued steering messages without removing them."""
     with _LOCK:
         return list(_STEERING_MAILBOXES.get(session_id, []))

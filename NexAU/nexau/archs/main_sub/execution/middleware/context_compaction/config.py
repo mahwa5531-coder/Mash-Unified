@@ -36,7 +36,7 @@ class CompactionConfig(BaseModel):
 
     # Trigger Selection (micro-compact: time_based )
     trigger: Literal["token_threshold", "time_based"] = "token_threshold"
-    gap_threshold_minutes: float = 5  # micro-compact: time_based trigger 
+    gap_threshold_minutes: float = 5  # micro-compact: time_based trigger
 
     # Strategy Selection
     compaction_strategy: Literal["llm_summary", "sliding_window", "tool_result_compaction"] = "tool_result_compaction"
@@ -61,19 +61,19 @@ class CompactionConfig(BaseModel):
 
     # RFC-0021: sandbox
     save_history: bool = True
-    """ (Opt-out: ) . 
+    """ (Opt-out: ) .
 
      ``{sandbox.get_temp_dir()}/.nexau_history_archive/<namespace>/``,
-,  config  --  . 
+,  config  --  .
 
     , summary " search_file_content / read_file
     ",  agent   --  keyvalue,
-     opt-out  (" agent"). 
+     opt-out  (" agent").
 
     :  ``save_history`` (: ), module
      ``archive``  (``HistoryArchiveWriter`` / ``ARCHIVE_SUBDIR`` /
     ``.nexau_history_archive/`` / ``_boundary``)  --  ""
-    (write-once + per-round + grep-friendly), "". 
+    (write-once + per-round + grep-friendly), "".
     """
 
     @model_validator(mode="after")

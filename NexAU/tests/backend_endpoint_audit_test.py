@@ -1,9 +1,10 @@
-import os
-import sys
-import json
-import sqlite3
 import asyncio
+import json
+import os
+import sqlite3
+import sys
 from pathlib import Path
+
 import httpx
 
 # Ensure paths
@@ -17,6 +18,7 @@ except ImportError:
     from backend.app.main import app, lifespan
 
 from nexau.archs.platform.path_helpers import get_database_path
+
 DB_PATH = get_database_path()
 
 def query_db(query: str, params: tuple = ()):
@@ -47,7 +49,7 @@ async def run_full_backend_audit():
     async with lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=60.0) as client:
-            
+
             # -------------------------------------------------------------
             # GROUP 1: Projects Router (/api/projects)
             # -------------------------------------------------------------
@@ -146,11 +148,11 @@ async def run_full_backend_audit():
                                     streamed_events.append(ev)
                                 except:
                                     pass
-                        
+
                         # DB Verification for Session and AgentRunActionModel
                         db_session = query_db("SELECT session_id, context FROM sessions WHERE session_id = ?", (test_session_id,))
                         db_actions = query_db("SELECT count(*) FROM agent_run_actions WHERE session_id = ?", (test_session_id,))
-                        
+
                         action_count = db_actions[0][0] if db_actions else 0
                         if db_session and action_count > 0:
                             record_result("Streaming Bridge", "POST /stream", "PASS", f"Streamed {len(streamed_events)} SSE events, created {action_count} DB actions in SQLite")

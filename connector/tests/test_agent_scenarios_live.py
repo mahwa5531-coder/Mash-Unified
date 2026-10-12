@@ -1,10 +1,9 @@
 import json
-import sqlite3
 import pathlib
-import urllib.request
-import time
+import sqlite3
 import sys
-import os
+import time
+import urllib.request
 
 # Set UTF-8 encoding for stdout/stderr to avoid Windows cp932/cp1252 character crashes
 try:
@@ -22,15 +21,15 @@ def get_db_stats(session_id: str):
         return {"error": "Database not found"}
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    
+
     # Total actions
     cur.execute("SELECT COUNT(*) FROM agent_run_actions")
     total_actions = cur.fetchone()[0]
-    
+
     # Session actions
     cur.execute("SELECT COUNT(*) FROM agent_run_actions WHERE session_id = ?", (session_id,))
     session_actions = cur.fetchone()[0]
-    
+
     # Latest action types for this session
     cur.execute(
         "SELECT action_id, run_id, action_type, created_at, extra FROM agent_run_actions WHERE session_id = ? ORDER BY created_at_ns DESC LIMIT 5",
@@ -45,11 +44,11 @@ def get_db_stats(session_id: str):
             "created_at": r[3],
             "extra": r[4]
         })
-    
+
     # Total sessions
     cur.execute("SELECT COUNT(*) FROM sessions")
     total_sessions = cur.fetchone()[0]
-    
+
     conn.close()
     return {
         "total_actions": total_actions,
@@ -70,11 +69,11 @@ def print_db_snapshot(tag: str, session_id: str):
     print("-" * 60)
 
 def send_nlp_turn(session_id: str, prompt: str, timeout: int = 180):
-    print(f"\n================================================================================")
+    print("\n================================================================================")
     print(f">>> [SCENARIO NLP PROMPT] >>> Session: {session_id}")
     print(f"PROMPT: {prompt}")
-    print(f"================================================================================")
-    
+    print("================================================================================")
+
     url = f"{BASE_URL}/stream"
     payload = json.dumps({
         "session_id": session_id,
@@ -111,7 +110,7 @@ def send_nlp_turn(session_id: str, prompt: str, timeout: int = 180):
                 try:
                     ev = json.loads(data_json)
                     ev_type = ev.get("type", "")
-                    
+
                     if "THINKING" in ev_type:
                         delta = ev.get("delta", "")
                         thinking_text += delta
@@ -135,7 +134,7 @@ def send_nlp_turn(session_id: str, prompt: str, timeout: int = 180):
                         sys.stdout.flush()
                     elif "RUN_FINISHED" in ev_type:
                         print(f"\n[AGENT TURN FINISHED in {time.time()-t0:.2f}s]")
-                except Exception as e:
+                except Exception:
                     pass
 
     print("\n---------------- AGENT FINAL ANSWER ----------------")
@@ -171,11 +170,11 @@ def call_undo(session_id: str, from_turn: int = 1):
 
 def run_all_scenarios():
     session_id = f"auditor_session_{int(time.time())}"
-    print(f"=== INITIATING LIVE NEXAU AGENT SCENARIO MATRIX ===")
+    print("=== INITIATING LIVE NEXAU AGENT SCENARIO MATRIX ===")
     print(f"Target Session ID: {session_id}")
     print(f"Working Directory / Sandbox: {SANDBOX_DIR}")
     print(f"LLM Endpoint: {BASE_URL} -> qwen3.5:2b (256k context)")
-    
+
     print_db_snapshot("INITIAL STATE", session_id)
     results = []
 
@@ -253,7 +252,7 @@ def run_all_scenarios():
 
     # Scenario 9: Event-Sourced Undo / State Rollback
     print("\n--- Testing RFC-0022 Event-Sourced Undo ---")
-    undo_res = call_undo(session_id, from_turn=3)
+    call_undo(session_id, from_turn=3)
     print_db_snapshot("AFTER S9 (UNDO ROLLBACK)", session_id)
 
     # Scenario 10: Post-Undo Verification

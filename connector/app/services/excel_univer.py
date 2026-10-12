@@ -12,7 +12,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ VERTICAL_ALIGN_MAP = {
 }
 
 
-def _clean_hex_color(color_obj: Any) -> Optional[str]:
+def _clean_hex_color(color_obj: Any) -> str | None:
     """Extract a standard #RRGGBB hex color from openpyxl / wolfxl color objects or raw strings."""
     if not color_obj:
         return None
@@ -88,7 +88,7 @@ def _clean_hex_color(color_obj: Any) -> Optional[str]:
     return None
 
 
-def _format_cell_value(val: Any, num_format: Optional[str] = None) -> Tuple[Any, Optional[str]]:
+def _format_cell_value(val: Any, num_format: str | None = None) -> tuple[Any, str | None]:
     """Format cell value for display while preserving raw primitive."""
     if val is None:
         return "", None
@@ -116,18 +116,18 @@ def _parse_csv_to_univer(
     file_path: Path,
     max_rows: int = 15000,
     max_cols: int = 100,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Parse CSV into Univer IWorkbookData schema with bold header row and auto column widths."""
     import csv
 
     sheet_id = "sheet_0"
     sheet_name = file_path.stem or "CSV_Data"
 
-    cell_data: Dict[str, Dict[str, Any]] = {}
-    column_data: Dict[str, Dict[str, Any]] = {}
-    col_max_lens: Dict[int, int] = {}
+    cell_data: dict[str, dict[str, Any]] = {}
+    column_data: dict[str, dict[str, Any]] = {}
+    col_max_lens: dict[int, int] = {}
 
-    styles_dict: Dict[str, Dict[str, Any]] = {
+    styles_dict: dict[str, dict[str, Any]] = {
         "header_style": {
             "bl": 1,
             "bg": {"rgb": "#F4F4F5"},
@@ -141,13 +141,13 @@ def _parse_csv_to_univer(
     max_row_seen = 0
     max_col_seen = 0
 
-    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+    with open(file_path, encoding="utf-8", errors="replace") as f:
         reader = csv.reader(f)
         for r_idx, row in enumerate(reader):
             if r_idx >= max_rows:
                 break
             max_row_seen = max(max_row_seen, r_idx)
-            row_cells: Dict[str, Any] = {}
+            row_cells: dict[str, Any] = {}
             for c_idx, val in enumerate(row):
                 if c_idx >= max_cols:
                     break
@@ -155,7 +155,7 @@ def _parse_csv_to_univer(
                 s_val = str(val).strip()
                 col_max_lens[c_idx] = max(col_max_lens.get(c_idx, 0), len(s_val))
 
-                cell_entry: Dict[str, Any] = {}
+                cell_entry: dict[str, Any] = {}
                 if r_idx == 0:
                     cell_entry = {"v": s_val, "s": "header_style"}
                 else:
@@ -203,16 +203,16 @@ def _parse_with_calamine(
     file_path: Path,
     max_rows: int = 15000,
     max_cols: int = 100,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """High-speed zero-OOM spreadsheet parser using compiled Rust Calamine engine."""
     import python_calamine
 
     wb = python_calamine.CalamineWorkbook.from_path(str(file_path))
     sheet_names = wb.sheet_names
-    univer_sheets: Dict[str, Any] = {}
-    sheet_order: List[str] = []
+    univer_sheets: dict[str, Any] = {}
+    sheet_order: list[str] = []
 
-    styles_dict: Dict[str, Dict[str, Any]] = {
+    styles_dict: dict[str, dict[str, Any]] = {
         "header_style": {
             "bl": 1,
             "bg": {"rgb": "#F4F4F5"},
@@ -228,21 +228,21 @@ def _parse_with_calamine(
         total_h = getattr(sheet, "total_height", getattr(sheet, "height", 0))
         total_w = getattr(sheet, "width", 0)
 
-        cell_data: Dict[str, Any] = {}
-        column_data: Dict[str, Any] = {}
-        col_max_lens: Dict[int, int] = {}
+        cell_data: dict[str, Any] = {}
+        column_data: dict[str, Any] = {}
+        col_max_lens: dict[int, int] = {}
 
         for r_idx, row in enumerate(sheet.iter_rows()):
             if r_idx >= max_rows:
                 break
-            row_cells: Dict[str, Any] = {}
+            row_cells: dict[str, Any] = {}
             for c_idx, val in enumerate(row):
                 if c_idx >= max_cols:
                     break
                 if val is not None and val != "":
                     s_val = str(val)
                     col_max_lens[c_idx] = max(col_max_lens.get(c_idx, 0), len(s_val))
-                    c_entry: Dict[str, Any] = {"v": val}
+                    c_entry: dict[str, Any] = {"v": val}
                     if r_idx == 0:
                         c_entry["s"] = "header_style"
                     elif isinstance(val, (int, float)):
@@ -280,7 +280,7 @@ def parse_excel_to_univer(
     file_path: Path | str,
     max_rows_per_sheet: int = 15000,
     max_cols_per_sheet: int = 100,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Parse an Excel workbook or CSV into the Univer IWorkbookData schema.
     Uses Calamine (Rust engine) for massive datasets (>15MB / >500k rows) and openpyxl
@@ -317,11 +317,11 @@ def parse_excel_to_univer(
             "sheets": {},
         }
 
-    styles_dict: Dict[str, Dict[str, Any]] = {}
-    style_hash_to_id: Dict[str, str] = {}
+    styles_dict: dict[str, dict[str, Any]] = {}
+    style_hash_to_id: dict[str, str] = {}
     style_counter = 0
 
-    def get_style_id(style_data: Dict[str, Any]) -> Optional[str]:
+    def get_style_id(style_data: dict[str, Any]) -> str | None:
         nonlocal style_counter
         if not style_data:
             return None
@@ -335,8 +335,8 @@ def parse_excel_to_univer(
             styles_dict[s_id] = style_data
         return style_hash_to_id[h]
 
-    univer_sheets: Dict[str, Any] = {}
-    sheet_order: List[str] = []
+    univer_sheets: dict[str, Any] = {}
+    sheet_order: list[str] = []
 
     for s_idx, sheet_name in enumerate(sheet_names):
         ws = wb[sheet_name]
@@ -358,7 +358,7 @@ def parse_excel_to_univer(
             pass
 
         # 2. Column Widths (safely guarded for read_only mode)
-        column_data: Dict[str, Dict[str, Any]] = {}
+        column_data: dict[str, dict[str, Any]] = {}
         try:
             if getattr(ws, "column_dimensions", None):
                 for col_letter, col_dim in ws.column_dimensions.items():
@@ -375,8 +375,8 @@ def parse_excel_to_univer(
             pass
 
         # 3. Row Heights & Cell Data
-        cell_data: Dict[str, Dict[str, Any]] = {}
-        row_data: Dict[str, Dict[str, Any]] = {}
+        cell_data: dict[str, dict[str, Any]] = {}
+        row_data: dict[str, dict[str, Any]] = {}
 
         max_row_seen = 0
         max_col_seen = 0
@@ -393,7 +393,7 @@ def parse_excel_to_univer(
             except Exception:
                 pass
 
-            row_cells: Dict[str, Any] = {}
+            row_cells: dict[str, Any] = {}
 
             for c_idx, cell in enumerate(row):
                 if c_idx >= max_cols_per_sheet:
@@ -403,7 +403,7 @@ def parse_excel_to_univer(
                 has_val = val is not None and val != ""
 
                 # Extract style components
-                s_obj: Dict[str, Any] = {}
+                s_obj: dict[str, Any] = {}
 
                 # A. Font
                 if cell.font:
@@ -436,7 +436,7 @@ def parse_excel_to_univer(
 
                 # D. Borders (Crucial for audit double lines)
                 if cell.border:
-                    bd_obj: Dict[str, Any] = {}
+                    bd_obj: dict[str, Any] = {}
                     for side in ("top", "bottom", "left", "right"):
                         b_side = getattr(cell.border, side, None)
                         if b_side and b_side.style:
@@ -459,7 +459,7 @@ def parse_excel_to_univer(
                     max_col_seen = max(max_col_seen, c_idx)
 
                     raw_v, formatted_v = _format_cell_value(val, getattr(cell, "number_format", None))
-                    cell_entry: Dict[str, Any] = {"v": raw_v}
+                    cell_entry: dict[str, Any] = {"v": raw_v}
                     if isinstance(val, str) and val.startswith("="):
                         cell_entry["f"] = val
                     if formatted_v and formatted_v != str(raw_v):

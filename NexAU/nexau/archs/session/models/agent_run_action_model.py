@@ -29,7 +29,7 @@ action_type value:
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal, cast
 
@@ -374,7 +374,7 @@ class AgentRunActionModel(SQLModel, table=True):
     agent_name: str = ""
 
     # === Timestamp ===
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     created_at_ns: int = Field(default_factory=time.time_ns, index=True)
 
     # === Action type (string column, NOT enum-typed at SQL layer) ===
@@ -747,7 +747,7 @@ class AgentRunActionModel(SQLModel, table=True):
     ) -> AgentRunActionModel:
         """Create a RUN_START lifecycle marker.
 
-        reducer  messages ( UNDO ). 
+        reducer  messages ( UNDO ).
         """
         extra = RunStartExtra(
             trace_id=trace_id,

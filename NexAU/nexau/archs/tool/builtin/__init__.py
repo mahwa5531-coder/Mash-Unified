@@ -12,17 +12,17 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from .audit_tools.audit_skill_tool import audit_skill_tool
     from .background_task_manage_tool import background_task_manage_tool
     from .file_tools.apply_patch import apply_patch
     from .file_tools.glob_tool import glob
     from .file_tools.list_directory import list_directory
     from .file_tools.read_file import read_file
-    from .file_tools.read_visual_file import read_visual_file
     from .file_tools.read_many_files import read_many_files
+    from .file_tools.read_visual_file import read_visual_file
     from .file_tools.replace import replace
     from .file_tools.search_file_content import search_file_content
     from .file_tools.write_file import write_file
-    from .audit_tools.audit_skill_tool import audit_skill_tool
     from .mcp_client import (
         MCPClient,
         MCPManager,

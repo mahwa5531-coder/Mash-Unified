@@ -11,7 +11,7 @@
 
 """Shared task board for AgentTeam collaboration.
 
-RFC-0002: 
+RFC-0002:
 
 Provides CRUD operations for team tasks with dependency checking
 and concurrent-safe claim/release via TaskLockService.
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 def _slugify(text: str, max_length: int = 60) -> str:
     """Convert title to URL-safe slug for deliverable file paths.
 
-    RFC-0002:  slug 
+    RFC-0002:  slug
     """
     # 1.
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower())
@@ -55,7 +55,7 @@ def _slugify(text: str, max_length: int = 60) -> str:
 class TaskBoard:
     """Shared task board with dependency-aware task management.
 
-    RFC-0002: 
+    RFC-0002:
 
     All task mutations (claim/release/update_status) are protected
     by TaskLockService to ensure concurrent safety.
@@ -89,7 +89,7 @@ class TaskBoard:
     async def _next_task_id(self) -> str:
         """Generate next task ID (T-001, T-002, etc.).
 
-        RFC-0002:  ID 
+        RFC-0002:  ID
         """
         existing = await self._engine.count(
             TeamTaskModel,
@@ -115,7 +115,7 @@ class TaskBoard:
     async def _is_blocked(self, task: TeamTaskModel) -> bool:
         """Check if task has unfinished dependencies.
 
-        RFC-0002: 
+        RFC-0002:
         """
         if not task.dependencies:
             return False
@@ -147,7 +147,7 @@ class TaskBoard:
     async def get_task_info(self, task_id: str) -> TaskInfo:
         """Get a single task as TaskInfo.
 
-        RFC-0002:  () 
+        RFC-0002:  ()
         """
         task = await self._get_task(task_id)
         blocked = await self._is_blocked(task)
@@ -165,7 +165,7 @@ class TaskBoard:
     ) -> TaskInfo:
         """Create a new task on the board.
 
-        RFC-0002:  () 
+        RFC-0002:  ()
         """
         if task_id is None:
             task_id = await self._next_task_id()
@@ -192,7 +192,7 @@ class TaskBoard:
     async def list_tasks(self, *, status: str | None = None) -> list[TaskInfo]:
         """List tasks, optionally filtered by status.
 
-        RFC-0002:  () 
+        RFC-0002:  ()
         """
         filters_list = self._team_filters()
         if status is not None:
@@ -221,7 +221,7 @@ class TaskBoard:
     ) -> None:
         """Claim a task (assign to agent).
 
-        RFC-0002: 
+        RFC-0002:
 
         Uses lock for concurrent safety.
         Raises TaskBlockedError if dependencies not met.
@@ -250,7 +250,7 @@ class TaskBoard:
     async def release_task(self, *, task_id: str) -> None:
         """Release a claimed task (unassign).
 
-        RFC-0002: 
+        RFC-0002:
         """
         async with self._lock.acquire(
             user_id=self._user_id,
@@ -274,7 +274,7 @@ class TaskBoard:
     ) -> None:
         """Update task status.
 
-        RFC-0002: 
+        RFC-0002:
         """
         async with self._lock.acquire(
             user_id=self._user_id,

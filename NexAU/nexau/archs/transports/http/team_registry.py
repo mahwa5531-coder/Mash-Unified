@@ -11,7 +11,7 @@
 
 """Team instance registry for HTTP endpoints.
 
-RFC-0002: AgentTeam 
+RFC-0002: AgentTeam
 
 Manages AgentTeam instances keyed by (user_id, session_id).
 Team configs are registered at server startup from YAML files.
@@ -35,10 +35,10 @@ logger = logging.getLogger(__name__)
 class TeamRegistry:
     """Registry for managing AgentTeam instances.
 
-    RFC-0002: AgentTeam 
+    RFC-0002: AgentTeam
 
-     team configuration (leader + candidates), 
-    HTTP  (user_id, session_id)  AgentTeam . 
+     team configuration (leader + candidates),
+    HTTP  (user_id, session_id)  AgentTeam .
     """
 
     def __init__(
@@ -83,7 +83,7 @@ class TeamRegistry:
     ) -> AgentTeam:
         """Get existing or create new AgentTeam instance.
 
-        RFC-0002:  AgentTeam 
+        RFC-0002:  AgentTeam
 
         Args:
             user_id: User identifier.
@@ -122,7 +122,7 @@ class TeamRegistry:
     def get(self, user_id: str, session_id: str) -> AgentTeam | None:
         """Get an existing team instance without creating one.
 
-        RFC-0002:  team  () 
+        RFC-0002:  team  ()
 
         Args:
             user_id: User identifier.
@@ -136,7 +136,7 @@ class TeamRegistry:
     def remove(self, user_id: str, session_id: str) -> None:
         """Remove a team instance from the registry.
 
-        RFC-0002:  team 
+        RFC-0002:  team
 
         Args:
             user_id: User identifier.

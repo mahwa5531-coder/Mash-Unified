@@ -1,6 +1,6 @@
 """Agent builtin tool - unified entry point for creating and resuming sub-agents.
 
-RFC-0015:  Sub-agent  Agent 
+RFC-0015:  Sub-agent  Agent
 
 Provides a single `Agent` tool that handles both creating new sub-agents
 and resuming existing ones. When `sub_agent_id` is omitted, a new sub-agent
@@ -21,7 +21,7 @@ def _extract_sub_agent_id(text: str) -> str | None:
     """Extract sub_agent_id from the [sub_agent_id: ...] prefix.
 
     RFC-0015: SubAgentManager string [sub_agent_id: <id>]
-     LLM successfailure sub_agent_id. 
+     LLM successfailure sub_agent_id.
     """
     match = re.match(r"\[sub_agent_id:\s*([^\]]+)\]", text)
     return match.group(1) if match else None
@@ -36,10 +36,10 @@ def call_sub_agent(
 ) -> dict[str, Any]:
     """Delegate work to a sub-agent.
 
-    RFC-0015: Agent 
+    RFC-0015: Agent
 
-     sub_agent_id, . 
-     SubAgentManager.call_sub_agent(). 
+     sub_agent_id, .
+     SubAgentManager.call_sub_agent().
 
     Args:
         sub_agent_name: Name of the sub-agent as configured on the parent agent.

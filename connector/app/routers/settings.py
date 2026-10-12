@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+
 from fastapi import APIRouter
 from nexau.archs.platform.app_config import AppConfig
 

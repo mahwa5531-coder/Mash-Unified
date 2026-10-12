@@ -21,7 +21,6 @@ from sqlalchemy.exc import IntegrityError
 from nexau.core.messages import (
     ImageBlock,
     Message,
-    ReasoningBlock,
     Role,
     TextBlock,
     ToolResultBlock,
@@ -357,15 +356,16 @@ class AgentRunActionService:
             res = await self._engine.create(record)
             # Dual-write to physical transcript.jsonl for agent self-inspection
             try:
-                from nexau.archs.platform.path_helpers import get_session_brain_dir
                 import json as _json
+
+                from nexau.archs.platform.path_helpers import get_session_brain_dir
                 brain_dir = get_session_brain_dir(key.session_id, None)
                 logs_dir = brain_dir / ".system_generated" / "logs"
                 logs_dir.mkdir(parents=True, exist_ok=True)
-                
+
                 t_file = logs_dir / "transcript.jsonl"
                 t_full_file = logs_dir / "transcript_full.jsonl"
-                
+
                 if record.append_messages:
                     with open(t_full_file, "a", encoding="utf-8") as f_full, open(t_file, "a", encoding="utf-8") as f_compact:
                         for msg in record.append_messages:
@@ -390,7 +390,7 @@ class AgentRunActionService:
                                 "created_at": record.created_at.isoformat() if record.created_at else None,
                             }
                             f_full.write(_json.dumps(step_obj) + "\n")
-                            
+
                             compact_step = dict(step_obj)
                             if isinstance(compact_step.get("content"), str) and len(compact_step["content"]) > 1500:
                                 compact_step["content"] = compact_step["content"][:1500] + "... [TRUNCATED]"
@@ -542,13 +542,13 @@ class AgentRunActionService:
     ) -> AgentRunActionModel | None:
         """Persist a RUN_START lifecycle marker (RFC-0022 Phase 2).
 
-        RFC-0022:  run iteration  RUN_START . 
+        RFC-0022:  run iteration  RUN_START .
 
         RUN_START  **Class A** (Reader-NOOP) action -  messages
-,  ``trace_id``  observability  (RFC-0024) . 
+,  ``trace_id``  observability  (RFC-0024) .
 
-        ``idempotency_key=f"{run_id}:start"`` retry / 
-         (DB ) ;  None, . 
+        ``idempotency_key=f"{run_id}:start"`` retry /
+         (DB ) ;  None, .
 
         Returns:
             The created action record, or ``None`` if the row already exists

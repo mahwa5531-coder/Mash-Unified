@@ -1,24 +1,20 @@
 # Copyright (c) Mash. All rights reserved.
 """End-to-end verification of all 10 tools executed inside the live Agent loop."""
 
-import os
-import sys
 import json
-from pathlib import Path
 from unittest.mock import Mock
-import pytest
+
 import httpx
 import respx
-
-from nexau import Agent
 from app.main import _build_agent_config
-
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
     Function,
 )
 from openai.types.completion_usage import CompletionUsage
+
+from nexau import Agent
 
 
 def _execute_tool_in_agent_loop(tool_name: str, arguments: dict, task_prompt: str):

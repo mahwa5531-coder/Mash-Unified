@@ -21,17 +21,13 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import functools
-import hashlib
-import inspect
-import json
 import logging
 import threading
 import time
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from nexau.archs.main_sub.framework_context import FrameworkContext
@@ -61,7 +57,6 @@ from ..tool_call_modes import (
     STRUCTURED_TOOL_CALL_MODES,
     StructuredProviderTarget,
     normalize_tool_call_mode,
-    resolve_structured_provider_target,
 )
 from .hooks import MiddlewareManager, ModelCallParams
 from .model_response import ModelResponse
@@ -370,7 +365,7 @@ class LLMCaller:
         openai_client: Any | None = None,
         shutdown_event: threading.Event | None = None,
         token_trace_session: TokenTraceSession | None = None,
-        framework_context: "FrameworkContext | None" = None,
+        framework_context: FrameworkContext | None = None,
     ) -> ModelResponse | None:
         """Call LLM with the given messages and return normalized response."""
         runtime_client = openai_client if openai_client is not None else self.openai_client
@@ -621,7 +616,7 @@ class LLMCaller:
         openai_client: Any | None = None,
         shutdown_event: threading.Event | None = None,
         token_trace_session: TokenTraceSession | None = None,
-        framework_context: "FrameworkContext | None" = None,
+        framework_context: FrameworkContext | None = None,
     ) -> ModelResponse | None:
         """Async version of call_llm."""
         runtime_client = openai_client if openai_client is not None else self.openai_client

@@ -39,9 +39,10 @@ async def get_system_health():
 @router.get("/info")
 async def get_system_info():
     """Returns the machine installation ID, version, OS, and local database size."""
-    import sys
     import platform
-    from app.paths import get_installation_id, get_nexau_home, get_database_path
+    import sys
+
+    from app.paths import get_database_path, get_installation_id, get_nexau_home
 
     db_path = get_database_path()
     db_size = db_path.stat().st_size if db_path.exists() else 0
@@ -67,6 +68,7 @@ async def get_system_updates():
 import asyncio
 import logging
 from pathlib import Path
+
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -119,8 +121,8 @@ class SelectFolderRequest(BaseModel):
 
 def _open_folder_dialog() -> str | None:
     """Open real native Windows File Explorer folder selection dialog with rapid failover."""
-    import sys
     import subprocess
+    import sys
 
     if sys.platform == "win32":
         # 1. Native IFileOpenDialog with FOS_PICKFOLDERS via native_picker.ps1 (Real modern File Explorer)
@@ -334,9 +336,9 @@ async def get_quickstart_folder():
 @router.get("/system/browse-directories")
 async def browse_directories(path: str | None = None):
     """List subdirectories on the host machine for in-app workspace selection without browser security prompts."""
-    import sys
     import os
     import string
+    import sys
     from pathlib import Path
 
     home = Path.home()
@@ -412,11 +414,11 @@ class OpenFileRequest(BaseModel):
 @router.post("/api/system/open-file")
 async def open_system_file(request: OpenFileRequest):
     """Open a local file or directory with the host operating system's registered application."""
-    import sys
-    import subprocess
     import os
-    from urllib.parse import unquote
     import re
+    import subprocess
+    import sys
+    from urllib.parse import unquote
 
     clean_path = unquote(request.file_path).strip()
     clean_path = re.sub(r"^file:///?", "", clean_path, flags=re.IGNORECASE)

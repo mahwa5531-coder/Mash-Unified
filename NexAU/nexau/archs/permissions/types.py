@@ -14,12 +14,12 @@ if TYPE_CHECKING:
 
 
 class AskPermission(Exception):  # noqa: N818 - signal, not error
-    """Tool function allow/deny  raise. 
+    """Tool function allow/deny  raise.
 
     RFC-0019: Ask exception
 
-     prompt ()  permission_key ( allow ) . 
-    tool_call_id / tool_name  executor . 
+     prompt ()  permission_key ( allow ) .
+    tool_call_id / tool_name  executor .
     """
 
     def __init__(self, *, prompt: str, permission_key: str) -> None:
@@ -29,7 +29,7 @@ class AskPermission(Exception):  # noqa: N818 - signal, not error
 
 
 class PermissionDenied(Exception):  # noqa: N818 - signal, not error
-    """Tool function deny  raise. 
+    """Tool function deny  raise.
 
     RFC-0019: Deny exception
     """
@@ -41,11 +41,11 @@ class PermissionDenied(Exception):  # noqa: N818 - signal, not error
 
 
 class PendingPermissionsError(Exception):
-    """agent.run()  pending_tool_calls  raise. 
+    """agent.run()  pending_tool_calls  raise.
 
-    RFC-0019: 
+    RFC-0019:
 
-     run. 
+     run.
     """
 
     def __init__(self, *, session_id: str, pending: dict[str, Any]) -> None:
@@ -63,7 +63,7 @@ class PendingPermissionsError(Exception):
 
 @dataclass
 class AllowOutcome:
-    """Tool . 
+    """Tool .
 
     RFC-0019:  - Allow
     """
@@ -74,7 +74,7 @@ class AllowOutcome:
 
 @dataclass
 class DenyOutcome:
-    """Tool  deny . 
+    """Tool  deny .
 
     RFC-0019:  - Deny
     """
@@ -86,11 +86,11 @@ class DenyOutcome:
 
 @dataclass
 class AskOutcome:
-    """Tool . 
+    """Tool .
 
     RFC-0019:  - Ask
 
-,  resume  tool. 
+,  resume  tool.
     """
 
     tool_call_id: str

@@ -1,19 +1,17 @@
 import os
 import sys
-import json
-import sqlite3
-import pytest
 from pathlib import Path
+
 import httpx
+import pytest
 
 # Ensure project roots are in sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
-from app.main import app, lifespan
 import app.dependencies as deps
-
-from nexau.archs.session.models import SessionModel, AgentRunActionModel
+from app.main import app, lifespan
+from nexau.archs.session.models import AgentRunActionModel, SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 
 DB_PATH = Path.home() / ".nexau" / "nexau.db"

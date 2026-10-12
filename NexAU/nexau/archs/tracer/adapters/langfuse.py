@@ -67,10 +67,10 @@ _TO_LANGFUSE_FIELD: dict[str, str | None] = {
 
 
 def _flatten_usage_dict(usage: Mapping[str, object]) -> dict[str, int]:
-    """ provider usage dict  details . 
+    """ provider usage dict  details .
 
-    OpenAI  cache/reasoning  prompt_tokens_details  dict . 
-    function int, . 
+    OpenAI  cache/reasoning  prompt_tokens_details  dict .
+    function int, .
     """
     flat: dict[str, int] = {}
     for k, v in usage.items():
@@ -87,12 +87,12 @@ def _flatten_usage_dict(usage: Mapping[str, object]) -> dict[str, int]:
 def _sanitize_usage(usage: Mapping[str, object] | TokenUsage) -> dict[str, int]:
     """Sanitize and map usage data for Langfuse SDK compatibility.
 
-    1.  int value,  pydantic failure. 
+    1.  int value,  pydantic failure.
        : https://github.com/langfuse/langfuse/issues/4961
-    2.  provider  details  (OpenAI prompt_tokens_details ) . 
-    3.  Langfuse,  provider 
+    2.  provider  details  (OpenAI prompt_tokens_details ) .
+    3.  Langfuse,  provider
        cache  Langfuse UI ;  `total_tokens`
-        `total`,  Langfuse . 
+        `total`,  Langfuse .
     """
     if isinstance(usage, TokenUsage):
         raw: dict[str, int] = usage.to_dict()
@@ -663,9 +663,9 @@ class LangfuseTracer(BaseTracer):
         Langfuse accepts strings, dicts, and lists. Complex objects
         need to be converted to JSON strings.
 
-        base64  - Langfuse SDK  MediaManager 
+        base64  - Langfuse SDK  MediaManager
         Anthropic/OpenAI/Vertex  base64, object
-         media reference,  trace . 
+         media reference,  trace .
 
         Args:
             data: Data to serialize

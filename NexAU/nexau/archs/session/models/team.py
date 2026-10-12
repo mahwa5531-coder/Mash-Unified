@@ -11,7 +11,7 @@
 
 """Team data models.
 
-RFC-0002: Agent Team 
+RFC-0002: Agent Team
 
 Stores team configuration including leader, candidate roles,
 and max teammate limits.
@@ -19,7 +19,7 @@ and max teammate limits.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import JSON
 from sqlmodel import Column, Field, SQLModel
@@ -51,5 +51,5 @@ class TeamModel(SQLModel, table=True):
     candidates: dict[str, str] = Field(default_factory=dict, sa_column=Column(JSON))
     max_teammates: int = Field(default=10)
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

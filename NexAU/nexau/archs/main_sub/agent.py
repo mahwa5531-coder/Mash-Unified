@@ -14,8 +14,8 @@
 RFC-0006: Agent  neutral structured tool definitions
 
 Agent  structured  Tool / SubAgent  neutral
-structured definitions;  provider-specific payload  LLMCaller 
- ``llm_config.api_type`` . 
+structured definitions;  provider-specific payload  LLMCaller
+ ``llm_config.api_type`` .
 """
 
 import asyncio
@@ -66,7 +66,6 @@ from nexau.archs.sandbox import (
     BaseSandboxManager,
     LocalSandboxConfig,
     LocalSandboxManager,
-    SandboxConfig,
 )
 from nexau.archs.session import AgentRunActionKey, SessionManager
 from nexau.archs.session.models.agent_run_action_model import RunStatus
@@ -77,8 +76,8 @@ from nexau.archs.tool.tool import StructuredToolDefinition
 from nexau.archs.tool.tool_registry import ToolRegistry
 from nexau.archs.tracer.context import TraceContext
 from nexau.archs.tracer.core import BaseTracer, SpanType
-from nexau.core.serializers.openai_chat import messages_from_legacy_openai_chat
 from nexau.core.messages import Message, Role, TextBlock
+from nexau.core.serializers.openai_chat import messages_from_legacy_openai_chat
 
 # Setup logger for agent execution
 logger = logging.getLogger(__name__)
@@ -531,11 +530,11 @@ class Agent:
     def _reinject_transient_state(self) -> None:
         """Re-inject non-serializable runtime state after storage swap.
 
-        Issue #431: Agent.create()  session  storage  __init__ 
-         storage, . 
-        method,  key . 
+        Issue #431: Agent.create()  session  storage  __init__
+         storage, .
+        method,  key .
 
-        Note: skill_registry  AgentState (per-agent),  global_storage. 
+        Note: skill_registry  AgentState (per-agent),  global_storage.
         """
         # 1. tracer
         self._setup_tracer()
@@ -616,8 +615,8 @@ class Agent:
     def _initialize_async_openai_client(self) -> Any:
         """Initialize async OpenAI/Anthropic client for native async LLM calls.
 
-        async/sync:  AsyncOpenAI / AsyncAnthropic, 
-         call_llm_async  await  to_thread . 
+        async/sync:  AsyncOpenAI / AsyncAnthropic,
+         call_llm_async  await  to_thread .
         """
         llm_config = self.config.llm_config or LLMConfig()
 
@@ -638,11 +637,11 @@ class Agent:
     def _initialize_mcp_tools(self) -> list[Tool]:
         """Initialize tools from MCP servers.
 
-        P1 async/sync : async context  sync MCP 
+        P1 async/sync : async context  sync MCP
 
-         Agent.create()  (create_flag.skip=True), 
-         sync MCP, list. Agent.create() 
-         _initialize_mcp_tools_async() completed MCP . 
+         Agent.create()  (create_flag.skip=True),
+         sync MCP, list. Agent.create()
+         _initialize_mcp_tools_async() completed MCP .
         """
         # async factory path: defer MCP init to Agent.create
         if self.__class__._is_skip_sync_session_init():
@@ -675,10 +674,10 @@ class Agent:
     async def _initialize_mcp_tools_async(self) -> list[Tool]:
         """Initialize tools from MCP servers asynchronously.
 
-        P1 async/sync : async MCP 
+        P1 async/sync : async MCP
 
-         Agent.create(),  async initialize_mcp_tools(), 
-         MCP,  event loop. 
+         Agent.create(),  async initialize_mcp_tools(),
+         MCP,  event loop.
         """
         try:
             from ..tool.builtin import initialize_mcp_tools
@@ -709,11 +708,11 @@ class Agent:
 
         RFC-0006: Agent  neutral structured definitions
 
-        structured, Agent  Tool  neutral definitions; 
-        provider-specific OpenAI / Anthropic / Gemini schema . 
+        structured, Agent  Tool  neutral definitions;
+        provider-specific OpenAI / Anthropic / Gemini schema .
 
-        RFC-0015: Agent  builtin tool  AgentConfig._finalize(), 
-        . 
+        RFC-0015: Agent  builtin tool  AgentConfig._finalize(),
+        .
         """
 
         if not self.use_structured_tool_calls:
@@ -823,7 +822,7 @@ class Agent:
                 user_id=self._user_id,
                 session_id=self._session_id,
                 sandbox_config=sandbox_config,
-                upload_assets=[],  # upload assets 
+                upload_assets=[],  # upload assets
             )
 
             cleanup_manager.register_sandbox_manager(self.sandbox_manager)
@@ -1438,11 +1437,11 @@ class Agent:
     ) -> str | tuple[str, dict[str, Any]]:
         """Run agent with a message and return response (sync entry point).
 
-        P1 async/sync :  syncify 
+        P1 async/sync :  syncify
 
-         sync  (CLI, ) . async  run_async(). 
-         asyncio.run()  run_async(),  syncify 
-         BlockingPortal . 
+         sync  (CLI, ) . async  run_async().
+         asyncio.run()  run_async(),  syncify
+         BlockingPortal .
 
         Args:
             message: User message or list of messages
@@ -1531,10 +1530,10 @@ class Agent:
     ) -> str:
         """Inner execution logic without tracing wrapper.
 
-        RFC-0001: 
+        RFC-0001:
 
-        finally, Exception  CancelledError, 
-         flush . 
+        finally, Exception  CancelledError,
+         flush .
         """
         try:
             response, updated_messages = await self.executor.execute_async(
@@ -1617,8 +1616,8 @@ class Agent:
 
         RFC-0019: interface
 
-         pending_tool_calls  tool_call  decision . 
-         decision  "allow",  permission_key  allow . 
+         pending_tool_calls  tool_call  decision .
+         decision  "allow",  permission_key  allow .
 
         Args:
             tool_call_id: The tool_call_id to resolve
@@ -1659,12 +1658,12 @@ class Agent:
     ) -> None:
         """Resume execution after all pending permissions are resolved.
 
-        RFC-0019: Resume 
+        RFC-0019: Resume
 
-         pending entries: 
+         pending entries:
         - allow / allow_once →  tool
         - deny →  denial ToolResult
-         pending_tool_calls. 
+         pending_tool_calls.
         """
         from nexau.archs.main_sub.framework_context import FrameworkContext
         from nexau.core.messages import ToolResultBlock, coerce_tool_result_content
@@ -1831,15 +1830,15 @@ class Agent:
     async def stop(self, *, force: bool = False, timeout: float = 30.0) -> StopResult:
         """Stop the agent and persist current state.
 
-        RFC-0001: Agent 
+        RFC-0001: Agent
 
-        interface,  force . 
-         force value,  session state. 
+        interface,  force .
+         force value,  session state.
 
         Args:
-            force: True  (completed), 
-                   False  () 
-            timeout: completed ( force=False ) 
+            force: True  (completed),
+                   False  ()
+            timeout: completed ( force=False )
 
         Returns:
             StopResult package
@@ -1851,7 +1850,7 @@ class Agent:
 
         async/sync :  event loop  AsyncOpenAI /
         AsyncAnthropic  httpx.AsyncClient,  GC  event loop
-         __del__ → RuntimeError('Event loop is closed'). 
+         __del__ → RuntimeError('Event loop is closed').
         """
         client = self.executor.llm_caller.async_openai_client
         if client is not None:
@@ -1864,11 +1863,11 @@ class Agent:
     async def _interrupt(self, *, force: bool = False, timeout: float = 30.0) -> StopResult:
         """Internal implementation of stop with state persistence.
 
-        RFC-0001: Agent 
+        RFC-0001: Agent
 
         Args:
-            force: True, False 
-            timeout: completed ( force=False ) 
+            force: True, False
+            timeout: completed ( force=False )
 
         Returns:
             StopResult package
@@ -1922,14 +1921,14 @@ class Agent:
     async def _wait_for_execution_complete(self, *, timeout: float = 30.0) -> None:
         """Wait for current execution to complete or timeout.
 
-        RFC-0001: 
+        RFC-0001:
 
-         executor._execution_done . 
-        stop_signal, execute(), 
-         _execution_done  set, wait() . 
+         executor._execution_done .
+        stop_signal, execute(),
+         _execution_done  set, wait() .
 
         Args:
-            timeout: 
+            timeout:
         """
         # execute
         if not self.executor.is_executing:

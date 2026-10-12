@@ -96,7 +96,7 @@ def _candidate_groups() -> tuple[tuple[str, list[Path]], ...]:
 def detect_git_bash() -> GitBashInstallation | None:
     """Detect Git Bash on Windows.
 
-    RFC-0019: Git Bash 
+    RFC-0019: Git Bash
 
     Discovery order follows RFC-0019: explicit configuration > PATH > common
     installation directories. A candidate is accepted when it exists on disk.
@@ -122,7 +122,7 @@ def detect_git_bash() -> GitBashInstallation | None:
 def _find_unusable_bash_paths() -> list[Path]:
     """Return configured bash paths that exist but are not files.
 
-    RFC-0019: unusable Git Bash 
+    RFC-0019: unusable Git Bash
 
     Called only when ``detect_git_bash()`` returns ``None`` to distinguish
     "completely missing" from "present but not an executable file".
@@ -147,7 +147,7 @@ def explain_git_bash_requirement() -> str:
 def explain_unusable_git_bash(unusable_paths: list[Path]) -> str:
     """Return guidance when Git Bash paths are not executable files.
 
-    RFC-0019: unusable Git Bash 
+    RFC-0019: unusable Git Bash
     """
     paths_str = ", ".join(str(p) for p in unusable_paths)
     return (

@@ -1,6 +1,6 @@
-"""Filter Converter 
+"""Filter Converter
 
- Filter DSL  SQLAlchemy ColumnElement, Python  HTTP string. 
+ Filter DSL  SQLAlchemy ColumnElement, Python  HTTP string.
 """
 
 from __future__ import annotations
@@ -34,14 +34,14 @@ def to_sqlalchemy(
     """ Filter DSL  SQLAlchemy ColumnElement.
 
     Args:
-        filter_: Filter DSL 
-        model_class: SQLModel class, 
+        filter_: Filter DSL
+        model_class: SQLModel class,
 
     Returns:
-        SQLAlchemy ColumnElement[bool] 
+        SQLAlchemy ColumnElement[bool]
 
     Raises:
-        ValueError:  model_class 
+        ValueError:  model_class
 
     Examples:
         >>> from sqlmodel import SQLModel, Field
@@ -71,13 +71,13 @@ def _get_column(
 
     Args:
         model_class: SQLModel class
-        field_name: 
+        field_name:
 
     Returns:
         SQLAlchemy Column object
 
     Raises:
-        ValueError:  model_class 
+        ValueError:  model_class
     """
     if not hasattr(model_class, field_name):
         raise ValueError(f"Field '{field_name}' not found in model {model_class.__name__}")
@@ -93,11 +93,11 @@ def _convert_comparison_filter(
     """ ComparisonFilter  SQLAlchemy .
 
     Args:
-        filter_: ComparisonFilter 
+        filter_: ComparisonFilter
         model_class: SQLModel class
 
     Returns:
-        SQLAlchemy ColumnElement[bool] 
+        SQLAlchemy ColumnElement[bool]
     """
     column = _get_column(model_class, filter_.field)
     op = filter_.op
@@ -138,11 +138,11 @@ def _convert_and_filter(
     """ AndFilter  SQLAlchemy AND .
 
     Args:
-        filter_: AndFilter 
+        filter_: AndFilter
         model_class: SQLModel class
 
     Returns:
-        SQLAlchemy ColumnElement[bool] 
+        SQLAlchemy ColumnElement[bool]
     """
     if not filter_.filters:
         # Empty AND filter should return True (identity element for AND)
@@ -162,11 +162,11 @@ def _convert_or_filter(
     """ OrFilter  SQLAlchemy OR .
 
     Args:
-        filter_: OrFilter 
+        filter_: OrFilter
         model_class: SQLModel class
 
     Returns:
-        SQLAlchemy ColumnElement[bool] 
+        SQLAlchemy ColumnElement[bool]
     """
     if not filter_.filters:
         # Empty OR filter should return False (identity element for OR)
@@ -185,11 +185,11 @@ def _convert_not_filter(
     """ NotFilter  SQLAlchemy NOT .
 
     Args:
-        filter_: NotFilter 
+        filter_: NotFilter
         model_class: SQLModel class
 
     Returns:
-        SQLAlchemy ColumnElement[bool] 
+        SQLAlchemy ColumnElement[bool]
     """
     sub_expression = to_sqlalchemy(filter_.filter, model_class)
     return not_(sub_expression)
@@ -207,11 +207,11 @@ def evaluate(
     """ Python  Filter DSL.
 
     Args:
-        filter_: Filter DSL 
-        record: dictionary Pydantic/SQLModel 
+        filter_: Filter DSL
+        record: dictionary Pydantic/SQLModel
 
     Returns:
-        value, 
+        value,
 
     Examples:
         >>> filter_ = ComparisonFilter.eq("name", "alice")
@@ -250,11 +250,11 @@ def _get_field_value(
 ) -> Any:
     """value.
 
-,  None ( 3.12) . 
+,  None ( 3.12) .
 
     Args:
         record: dictionary
-        field_name: 
+        field_name:
 
     Returns:
         value,  None
@@ -266,8 +266,8 @@ def _safe_compare(a: object, b: object, op: str) -> bool:
     """value.
 
     Args:
-        a: 
-        b: 
+        a:
+        b:
         op:  ('gt', 'gte', 'lt', 'lte')
 
     Returns:
@@ -291,8 +291,8 @@ def _convert_like_pattern_to_regex(pattern: str) -> str:
     """ SQL LIKE .
 
     SQL LIKE :
-    - %  (package) 
-    - _ 
+    - %  (package)
+    - _
 
     Args:
         pattern: SQL LIKE string
@@ -324,11 +324,11 @@ def _evaluate_comparison_filter(
     """ ComparisonFilter.
 
     Args:
-        filter_: ComparisonFilter 
+        filter_: ComparisonFilter
         record: dictionary
 
     Returns:
-        value, 
+        value,
     """
     field_value = _get_field_value(record, filter_.field)
     op = filter_.op
@@ -409,14 +409,14 @@ def _evaluate_and_filter(
 ) -> bool:
     """ AndFilter.
 
-     3.9: and . 
+     3.9: and .
 
     Args:
-        filter_: AndFilter 
+        filter_: AndFilter
         record: dictionary
 
     Returns:
-        value, 
+        value,
     """
     if not filter_.filters:
         # AND True (AND )
@@ -431,14 +431,14 @@ def _evaluate_or_filter(
 ) -> bool:
     """ OrFilter.
 
-     3.10: or . 
+     3.10: or .
 
     Args:
-        filter_: OrFilter 
+        filter_: OrFilter
         record: dictionary
 
     Returns:
-        value, 
+        value,
     """
     if not filter_.filters:
         # OR False (OR )
@@ -453,14 +453,14 @@ def _evaluate_not_filter(
 ) -> bool:
     """ NotFilter.
 
-     3.11: not . 
+     3.11: not .
 
     Args:
-        filter_: NotFilter 
+        filter_: NotFilter
         record: dictionary
 
     Returns:
-        value, 
+        value,
     """
     return not evaluate(filter_.filter, record)
 
@@ -495,10 +495,10 @@ def _url_encode_single_value(value: str | int | float | bool | list[str | int | 
 def _format_filter_for_nested(filter_: Filter) -> str:
     """ Filter  ( and/or ) .
 
-: field.op.value () 
+: field.op.value ()
 
     Args:
-        filter_: Filter DSL 
+        filter_: Filter DSL
 
     Returns:
         string
@@ -519,7 +519,7 @@ def _format_comparison_filter_nested(filter_: ComparisonFilter) -> str:
     : field.op.value
 
     Args:
-        filter_: ComparisonFilter 
+        filter_: ComparisonFilter
 
     Returns:
         string
@@ -546,7 +546,7 @@ def _format_and_filter_nested(filter_: AndFilter) -> str:
     : and(f1,f2,...)
 
     Args:
-        filter_: AndFilter 
+        filter_: AndFilter
 
     Returns:
         string
@@ -564,7 +564,7 @@ def _format_or_filter_nested(filter_: OrFilter) -> str:
     : or(f1,f2,...)
 
     Args:
-        filter_: OrFilter 
+        filter_: OrFilter
 
     Returns:
         string
@@ -582,7 +582,7 @@ def _format_not_filter_nested(filter_: NotFilter) -> str:
      4.6: not  not.filter
 
     Args:
-        filter_: NotFilter 
+        filter_: NotFilter
 
     Returns:
         string
@@ -615,7 +615,7 @@ def to_query_string(filter_: Filter) -> str:
      4.1:  to_query_string(filter: Filter_DSL) -> str method
 
     Args:
-        filter_: Filter DSL 
+        filter_: Filter DSL
 
     Returns:
         PostgREST string
@@ -650,11 +650,11 @@ def to_query_string(filter_: Filter) -> str:
 def _to_query_string_comparison(filter_: ComparisonFilter) -> str:
     """ ComparisonFilter string.
 
-     4.2: ComparisonFilter  "field=op.value" 
-     4.3: in  "field=in.(value1,value2,...)" 
+     4.2: ComparisonFilter  "field=op.value"
+     4.3: in  "field=in.(value1,value2,...)"
 
     Args:
-        filter_: ComparisonFilter 
+        filter_: ComparisonFilter
 
     Returns:
         string
@@ -678,10 +678,10 @@ def _to_query_string_comparison(filter_: ComparisonFilter) -> str:
 def _to_query_string_and(filter_: AndFilter) -> str:
     """ AndFilter string.
 
-     4.4: AndFilter  "and=(filter1,filter2,...)" 
+     4.4: AndFilter  "and=(filter1,filter2,...)"
 
     Args:
-        filter_: AndFilter 
+        filter_: AndFilter
 
     Returns:
         string
@@ -696,10 +696,10 @@ def _to_query_string_and(filter_: AndFilter) -> str:
 def _to_query_string_or(filter_: OrFilter) -> str:
     """ OrFilter string.
 
-     4.5: OrFilter  "or=(filter1,filter2,...)" 
+     4.5: OrFilter  "or=(filter1,filter2,...)"
 
     Args:
-        filter_: OrFilter 
+        filter_: OrFilter
 
     Returns:
         string
@@ -714,11 +714,11 @@ def _to_query_string_or(filter_: OrFilter) -> str:
 def _to_query_string_not(filter_: NotFilter) -> str:
     """ NotFilter string.
 
-     4.6: NotFilter  "not.filter" 
+     4.6: NotFilter  "not.filter"
      ComparisonFilter,  "field=not.op.value"
 
     Args:
-        filter_: NotFilter 
+        filter_: NotFilter
 
     Returns:
         string
@@ -794,7 +794,7 @@ def _url_decode_value(encoded: str) -> str | int | float | bool | None:
 def _split_by_comma_at_depth_zero(s: str) -> list[str]:
     """ 0 string.
 
-, . 
+, .
 
     Args:
         s: string
@@ -840,10 +840,10 @@ def _parse_nested_filter(nested: str) -> Filter:
         nested: string
 
     Returns:
-         Filter 
+         Filter
 
     Raises:
-        ValueError: 
+        ValueError:
     """
     nested = nested.strip()
 
@@ -892,10 +892,10 @@ def _parse_comparison_nested(nested: str) -> Filter:
         nested: string
 
     Returns:
-         Filter 
+         Filter
 
     Raises:
-        ValueError: 
+        ValueError:
     """
     first_dot = nested.find(".")
     if first_dot == -1:
@@ -927,7 +927,7 @@ def _parse_comparison_nested(nested: str) -> Filter:
         # IN value (v1,v2,...)
         if not value_str.startswith("(") or not value_str.endswith(")"):
             raise ValueError(f"Invalid query string format: {nested}")
-        inner = value_str[1:-1]  # 
+        inner = value_str[1:-1]  #
         if not inner:
             values: list[str | int | float] = []
         else:
@@ -967,10 +967,10 @@ def from_query_string(query: str) -> Filter:
         query: PostgREST string
 
     Returns:
-         Filter DSL 
+         Filter DSL
 
     Raises:
-        ValueError: string, 
+        ValueError: string,
 
     Examples:
         >>> from_query_string("name=eq.alice")
@@ -1002,7 +1002,7 @@ def from_query_string(query: str) -> Filter:
         if right.startswith("("):
             if not right.endswith(")"):
                 raise ValueError(f"Invalid query string format: {query}")
-            inner = right[1:-1]  # 
+            inner = right[1:-1]  #
             if not inner:
                 return AndFilter(filters=[])
             parts = _split_by_comma_at_depth_zero(inner)
@@ -1017,7 +1017,7 @@ def from_query_string(query: str) -> Filter:
         if right.startswith("("):
             if not right.endswith(")"):
                 raise ValueError(f"Invalid query string format: {query}")
-            inner = right[1:-1]  # 
+            inner = right[1:-1]  #
             if not inner:
                 return OrFilter(filters=[])
             parts = _split_by_comma_at_depth_zero(inner)
@@ -1062,7 +1062,7 @@ def from_query_string(query: str) -> Filter:
         # IN value (v1,v2,...)
         if not value_str.startswith("(") or not value_str.endswith(")"):
             raise ValueError(f"Invalid query string format: {query}")
-        inner = value_str[1:-1]  # 
+        inner = value_str[1:-1]  #
         if not inner:
             values_list: list[str | int | float] = []
         else:

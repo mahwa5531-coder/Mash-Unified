@@ -22,7 +22,6 @@ import ctypes.wintypes
 import json
 import logging
 import sys
-from pathlib import Path
 from typing import Any
 
 from nexau.archs.platform.path_helpers import get_nexau_home

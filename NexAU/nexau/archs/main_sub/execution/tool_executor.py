@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 class ToolExecutionResult:
     """Raw and LLM-facing tool outputs for a single execution.
 
-    RFC-0017: tool_output + llm_tool_output 
+    RFC-0017: tool_output + llm_tool_output
     """
 
     raw_output: JsonDict
@@ -328,7 +328,7 @@ class ToolExecutor:
     ) -> ToolExecutionResult:
         """Finalize raw and LLM-facing outputs after a tool call.
 
-        RFC-0017: formatter  after_tool middleware 
+        RFC-0017: formatter  after_tool middleware
         """
 
         raw_output = self._normalize_tool_output(result)

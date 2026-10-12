@@ -10,40 +10,37 @@ Deep evaluation of the 7 core agent pillars:
 7. Process Lifecycle & Stop Cancellation Handshake
 """
 
-import os
 import sys
-import yaml
 import tempfile
-import asyncio
 from pathlib import Path
-from jinja2 import Template
 
-import pytest
 import httpx
-import polars as pl
+import pytest
+import yaml
+from jinja2 import Template
 
 # Ensure connector and NexAU are in sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
 from app.main import app, lifespan
-from app.routers.chat import _ensure_project_and_context, resolve_sandbox_work_dir, resolve_deliverables_dir
+from app.routers.chat import (
+    _ensure_project_and_context,
+    resolve_deliverables_dir,
+)
 from app.workspace import is_path_in_base_roots
-from nexau.archs.sandbox.local_sandbox import LocalSandbox
-from nexau.archs.main_sub.execution.middleware.long_tool_output import LongToolOutputMiddleware
 from nexau.archs.main_sub.execution.hooks import AfterToolHookInput
+from nexau.archs.main_sub.execution.middleware.long_tool_output import (
+    LongToolOutputMiddleware,
+)
+from nexau.archs.sandbox.local_sandbox import LocalSandbox
 from nexau.archs.tool.builtin import (
-    view_file,
-    write_file,
     replace_file_content,
     search_file_content,
-    glob,
-    list_directory,
-    run_shell_command,
-    audit_skill_tool,
+    view_file,
+    write_file,
 )
 from nexau.ingestion_pipeline.csv_to_md_parquet import parse_csv_to_markdown
-from nexau.ingestion_pipeline.excel_to_md import parse_excel_to_markdown
 
 
 class MockAgentState:

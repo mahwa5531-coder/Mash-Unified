@@ -359,11 +359,11 @@ class SlidingWindowCompaction:
     ) -> list[Message]:
         """Async version of compact().
 
-        P2 async/sync :  compact 
+        P2 async/sync :  compact
 
-         LLMCaller.call_llm_async()  sync call_llm, 
-         LLM,  event loop. 
-         sync . 
+         LLMCaller.call_llm_async()  sync call_llm,
+         LLM,  event loop.
+         sync .
         """
         self._last_compact_used_fallback = False
         logger.info(f"[SlidingWindowCompaction] Starting async compaction on {len(messages)} messages")
@@ -482,10 +482,10 @@ class SlidingWindowCompaction:
     async def _generate_summary_async(self, messages: list[Message]) -> str:
         """Async version of _generate_summary using LLMCaller.call_llm_async.
 
-        P2 async/sync :  LLM 
+        P2 async/sync :  LLM
 
-         LLMCaller.call_llm_async()  LLM, 
-,  event loop. 
+         LLMCaller.call_llm_async()  LLM,
+,  event loop.
         """
         llm_caller = self._ensure_llm_caller()
         summary_model_name = self.summary_llm_config.model if self.summary_llm_config is not None else self.summary_model

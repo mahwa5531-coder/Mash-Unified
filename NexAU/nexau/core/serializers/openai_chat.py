@@ -48,7 +48,7 @@ def serialize_ump_to_openai_chat_payload(
         role = msg.role.value
         if use_developer_role and role == Role.SYSTEM.value:
             role = "developer"
-        is_older_turn = (msg_idx < total_msgs - 2)
+        (msg_idx < total_msgs - 2)
 
         def _image_part_to_image_parts(img: ImageBlock) -> list[dict[str, Any]]:
             if img.mime_type == "application/pdf" and img.base64:
@@ -56,6 +56,7 @@ def serialize_ump_to_openai_chat_payload(
                 # Render PDF pages to JPEG images using fitz so OpenAI/Qwen vision models can see them.
                 try:
                     import base64 as b64_mod
+
                     import fitz
 
                     raw_bytes = b64_mod.b64decode(img.base64)

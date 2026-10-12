@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0.
 
 from unittest.mock import MagicMock, patch
-import pytest
 
 from nexau.archs.tool.builtin.web_tools import (
     duckduckgo_web_search,

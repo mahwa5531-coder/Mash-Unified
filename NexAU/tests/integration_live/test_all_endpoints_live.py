@@ -1,9 +1,10 @@
-import os
-import sys
-import json
-import sqlite3
 import asyncio
+import json
+import os
+import sqlite3
+import sys
 from pathlib import Path
+
 import httpx
 import pytest
 
@@ -39,7 +40,7 @@ async def test_full_endpoint_suite_live():
     async with lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=60.0) as client:
-            
+
             test_user = "prod_audit_user"
             test_project_dir = str(Path(__file__).parent.parent / "test_scratch_project")
             os.makedirs(test_project_dir, exist_ok=True)
@@ -95,7 +96,7 @@ async def test_full_endpoint_suite_live():
                             streamed_events.append(json.loads(line[5:].strip()))
                         except:
                             pass
-            
+
             db_session = query_db("SELECT session_id, context FROM sessions WHERE session_id = ?", (test_session_id,))
             db_actions = query_db("SELECT count(*) FROM agent_run_actions WHERE session_id = ?", (test_session_id,))
             assert db_session and db_actions[0][0] > 0

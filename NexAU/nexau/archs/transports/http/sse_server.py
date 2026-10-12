@@ -334,7 +334,7 @@ class SSETransportServer(TransportBase[HTTPConfig]):
     def team_registry(self) -> TeamRegistry | None:
         """Get the team registry for config registration.
 
-        RFC-0002:  team 
+        RFC-0002:  team
 
         Returns:
             TeamRegistry instance, or None if not initialized.

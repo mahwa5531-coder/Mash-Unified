@@ -1,25 +1,27 @@
 import json
+import logging
 import os
 import re
 import shutil
-import uuid
-import logging
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-
-from app.dependencies import DatabaseEngineDep, SessionManagerDep, get_engine, _engine
-from app.models.project import ProjectModel
+from fastapi import APIRouter, HTTPException
 from nexau.archs.session import AgentRunActionKey, AgentRunActionService
 from nexau.archs.session.agent_run_action_service import reduce_actions_stream
-from nexau.archs.session.models import SessionModel, AgentRunActionModel
+from nexau.archs.session.id_generator import generate_run_id, generate_session_id
+from nexau.archs.session.models import AgentRunActionModel, SessionModel
 from nexau.archs.session.orm import ComparisonFilter
-from nexau.archs.session.id_generator import generate_session_id, generate_run_id
+from nexau.archs.session.steering import (
+    clear_steering_messages,
+    peek_steering_messages,
+    queue_steering_message,
+)
+from pydantic import BaseModel
+
+from app.dependencies import DatabaseEngineDep
+from app.models.project import ProjectModel
 from app.paths import get_session_brain_dir
-from nexau.archs.session.steering import queue_steering_message, peek_steering_messages, clear_steering_messages
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +119,7 @@ def _parse_epoch_seconds(val: Any) -> float:
     """Parse any datetime, ISO string, timestamp (ns, ms, sec) into unix epoch float seconds (UTC)."""
     if not val:
         return 0.0
-    now = datetime.now(timezone.utc).timestamp()
+    now = datetime.now(UTC).timestamp()
     parsed = 0.0
     if isinstance(val, (int, float)):
         # Range classification:
@@ -137,7 +139,7 @@ def _parse_epoch_seconds(val: Any) -> float:
             return 0.0
     elif isinstance(val, datetime):
         if val.tzinfo is None:
-            parsed = val.astimezone(timezone.utc).timestamp()
+            parsed = val.astimezone(UTC).timestamp()
         else:
             parsed = val.timestamp()
     else:
@@ -145,7 +147,7 @@ def _parse_epoch_seconds(val: Any) -> float:
             s = str(val).strip().replace(" ", "T")
             dt = datetime.fromisoformat(s)
             if dt.tzinfo is None:
-                parsed = dt.astimezone(timezone.utc).timestamp()
+                parsed = dt.astimezone(UTC).timestamp()
             else:
                 parsed = dt.timestamp()
         except Exception:
@@ -221,7 +223,7 @@ async def list_sessions(
 
             latest_activity_sec = max(s_upd_sec, ctx_upd_sec, action_sec, created_sec)
             if latest_activity_sec > 0:
-                updated_iso = datetime.fromtimestamp(latest_activity_sec, tz=timezone.utc).isoformat()
+                updated_iso = datetime.fromtimestamp(latest_activity_sec, tz=UTC).isoformat()
             else:
                 updated_iso = s.updated_at.isoformat() if isinstance(s.updated_at, datetime) else str(s.updated_at or "")
 
@@ -339,8 +341,8 @@ async def list_sessions_by_project(
 
     all_sessions = await eng.find_many(SessionModel)
     matching = [
-        s for s in all_sessions 
-        if (s.context or {}).get("project_id") == target_id 
+        s for s in all_sessions
+        if (s.context or {}).get("project_id") == target_id
         or ((s.context or {}).get("project_id") and str((s.context or {}).get("project_id")).lower() == target_name)
         or ((s.context or {}).get("workspace_uri", "").lower() == target_name)
     ]
@@ -833,7 +835,7 @@ async def mark_session_viewed(
 ):
     """Update the last_user_view_time timestamp when user views a session."""
     eng = _get_engine(engine)
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     if eng:
         try:
             session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))

@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from nexau.archs.main_sub.agent_context import GlobalStorage
@@ -232,7 +232,7 @@ class SessionManager:
 
         if agent_name is not None:
             agent.agent_name = agent_name
-        agent.last_updated = datetime.now(timezone.utc)
+        agent.last_updated = datetime.now(UTC)
         return await self._engine.update(agent)
 
     # Initialization
@@ -277,7 +277,7 @@ class SessionManager:
         merged_context = dict(session.context or {})
         merged_context.update(context)
         session.context = merged_context
-        session.updated_at = datetime.now(timezone.utc)
+        session.updated_at = datetime.now(UTC)
         return await self._update_session(session)
 
     async def update_session_storage(
@@ -299,7 +299,7 @@ class SessionManager:
         """
         session = await self._get_or_create_session(user_id=user_id, session_id=session_id)
         session.storage = storage
-        session.updated_at = datetime.now(timezone.utc)
+        session.updated_at = datetime.now(UTC)
         return await self._update_session(session)
 
     async def update_session_sandbox(
@@ -311,7 +311,7 @@ class SessionManager:
     ) -> SessionModel:
         session = await self._get_or_create_session(user_id=user_id, session_id=session_id)
         session.sandbox_state = sandbox_state
-        session.updated_at = datetime.now(timezone.utc)
+        session.updated_at = datetime.now(UTC)
         return await self._update_session(session)
 
     async def update_session_state(
@@ -342,7 +342,7 @@ class SessionManager:
         merged_context.update(context)
         session.context = merged_context
         session.storage = storage
-        session.updated_at = datetime.now(timezone.utc)
+        session.updated_at = datetime.now(UTC)
         return await self._update_session(session)
 
     # -----------------------------------------------------------------------
@@ -358,7 +358,7 @@ class SessionManager:
     ) -> tuple[list[str], list[str]]:
         """Load allow/deny rules for a tool in a session.
 
-        RFC-0019: FrameworkContext 
+        RFC-0019: FrameworkContext
 
         Returns:
             (allow_rules, deny_rules) tuple of rule content lists
@@ -387,7 +387,7 @@ class SessionManager:
     ) -> PermissionRuleModel:
         """Save a permission rule.
 
-        RFC-0019:  allow 
+        RFC-0019:  allow
 
         Uses upsert to avoid duplicate key errors.
         """
@@ -411,11 +411,11 @@ class SessionManager:
     ) -> None:
         """Initialize permission rules from tool YAML config.
 
-        RFC-0019: Session 
+        RFC-0019: Session
 
-         agent  tool list,  YAML  permissions 
-        allow/deny  source=config . 
-         permissions  tool . 
+         agent  tool list,  YAML  permissions
+        allow/deny  source=config .
+         permissions  tool .
         """
         for tool in tools:
             permissions = getattr(tool, "permissions", None)
@@ -448,7 +448,7 @@ class SessionManager:
     ) -> dict[str, Any] | None:
         """Read pending_tool_calls from session.
 
-        RFC-0019:  Ask 
+        RFC-0019:  Ask
         """
         session = await self.get_session(user_id=user_id, session_id=session_id)
         if session is None:
@@ -464,11 +464,11 @@ class SessionManager:
     ) -> SessionModel:
         """Update pending_tool_calls on session.
 
-        RFC-0019: / Ask 
+        RFC-0019: / Ask
 
-        Set to None to clear (resume ). 
+        Set to None to clear (resume ).
         """
         session = await self._get_or_create_session(user_id=user_id, session_id=session_id)
         session.pending_tool_calls = pending_tool_calls
-        session.updated_at = datetime.now(timezone.utc)
+        session.updated_at = datetime.now(UTC)
         return await self._update_session(session)

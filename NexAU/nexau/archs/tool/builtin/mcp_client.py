@@ -948,14 +948,14 @@ class MCPTool(Tool):
     def _execute_sync(self, **kwargs: Any) -> dict[str, Any]:
         """Execute the MCP tool synchronously (sync-only fallback).
 
-        P1 async/sync : sync-only  + running-loop 
+        P1 async/sync : sync-only  + running-loop
 
-         running event loop  sync  (CLI, ) . 
+         running event loop  sync  (CLI, ) .
         async executor  has_native_async_execute  MCPTool
-         await execute_async(), . 
+         await execute_async(), .
 
         Raises:
-            RuntimeError:  async context 
+            RuntimeError:  async context
         """
         try:
             asyncio.get_running_loop()
@@ -989,10 +989,10 @@ class MCPTool(Tool):
 
         P1 async/sync :  _execute_sync  new_event_loop
 
-         _execute_async(),  MCP RPC, 
-         _execute_sync  event loop 
+         _execute_async(),  MCP RPC,
+         _execute_sync  event loop
          loop session .  execute() / _execute_sync()
-        backward compatibility sync . 
+        backward compatibility sync .
         """
         # RFC-0019: MCP permission check
         ctx: FrameworkContext | None = kwargs.get("ctx")
@@ -1610,13 +1610,13 @@ async def initialize_mcp_tools(server_configs: list[dict[str, Any]]) -> Sequence
 def sync_initialize_mcp_tools(server_configs: list[dict[str, Any]]) -> Sequence[Tool]:
     """Synchronous wrapper for initialize_mcp_tools.
 
-    P1 async/sync :  new_event_loop 
+    P1 async/sync :  new_event_loop
 
-     running event loop  sync  (CLI,, ThreadPoolExecutor worker) 
-     asyncio.run(). async  initialize_mcp_tools(). 
+     running event loop  sync  (CLI,, ThreadPoolExecutor worker)
+     asyncio.run(). async  initialize_mcp_tools().
 
     Raises:
-        RuntimeError:  async context  ( await initialize_mcp_tools()) 
+        RuntimeError:  async context  ( await initialize_mcp_tools())
     """
     try:
         asyncio.get_running_loop()

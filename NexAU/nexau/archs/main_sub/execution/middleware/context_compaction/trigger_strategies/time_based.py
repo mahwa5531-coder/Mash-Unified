@@ -12,8 +12,8 @@
 """Time-based trigger strategy for micro-compact.
 
 micro-compact:  Message .  assistant  created_at
-value (default 5,  Anthropic prompt cache  TTL) . 
-Trigger,  messages . 
+value (default 5,  Anthropic prompt cache  TTL) .
+Trigger,  messages .
 """
 
 import logging
@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 class TimeBasedTrigger:
     """Trigger compaction when the gap since last assistant message exceeds a threshold.
 
-    micro-compact:  messages  assistant  created_at, 
-    .  gap_threshold_minutes . 
+    micro-compact:  messages  assistant  created_at,
+    .  gap_threshold_minutes .
     """
 
     def __init__(self, gap_threshold_minutes: float = 5):
@@ -52,8 +52,8 @@ class TimeBasedTrigger:
     ) -> tuple[bool, str]:
         """Check if compaction should be triggered based on time gap.
 
-        micro-compact:  messages  assistant  created_at, 
-         now - created_at, value.  assistant  created_at  None . 
+        micro-compact:  messages  assistant  created_at,
+         now - created_at, value.  assistant  created_at  None .
         """
         # 1. assistant
         last_assistant_created_at: datetime | None = None

@@ -1,9 +1,10 @@
 # Copyright 2026 NexAU Engine
 # SPDX-License-Identifier: Apache-2.0
-import pytest
 from pathlib import Path
-from nexau.archs.tool.builtin import view_file
+
 from nexau.archs.tool import Tool
+from nexau.archs.tool.builtin import view_file
+
 
 def test_view_file_schema_load():
     schema_path = Path(__file__).resolve().parents[3] / "nexau" / "archs" / "tool" / "builtin" / "schemas" / "view_file.tool.yaml"

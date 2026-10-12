@@ -1,12 +1,12 @@
-import pytest
 import os
 import shutil
-from pathlib import Path
+
+import pytest
+from app.main import app
 from fastapi.testclient import TestClient
 from nexau.archs.llm.llm_config import LLMConfig
-from app.main import app, _build_agent_config
-from app.models.project import ProjectModel
-from nexau.archs.platform.crypto_vault import clear_vault, save_secure_vault
+from nexau.archs.platform.crypto_vault import clear_vault
+
 
 @pytest.fixture
 def client():

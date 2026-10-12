@@ -26,8 +26,8 @@ def format_tool_output_as_xml(context: ToolFormatterContext) -> object:
     RFC-0017: XML formatter
 
     1. string, package
-    2.  / multimodal  XML, 
-    3.  Dict / List /  XML 
+    2.  / multimodal  XML,
+    3.  Dict / List /  XML
     """
 
     sanitized_output = _strip_display_only_fields(context.tool_output)
@@ -50,10 +50,10 @@ def format_tool_output_as_xml(context: ToolFormatterContext) -> object:
 def _unwrap_single_content_field(value: object) -> object | None:
     """Return the bare value for the single-body-field fast path.
 
-    RFC-0017: 
+    RFC-0017:
 
-     display-only  ``{"content": ...}`` 
-    ``{"result": ...}``, value,  XML . 
+     display-only  ``{"content": ...}``
+    ``{"result": ...}``, value,  XML .
     """
 
     if not isinstance(value, dict):

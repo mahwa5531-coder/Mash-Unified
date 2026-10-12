@@ -11,7 +11,7 @@
 
 """remove_teammate tool - remove a teammate instance from the team.
 
-RFC-0002:  teammate 
+RFC-0002:  teammate
 """
 
 from __future__ import annotations
@@ -30,10 +30,10 @@ async def remove_teammate(
 ) -> RemoveTeammateResult | ToolError:
     """Remove a teammate instance.
 
-    RFC-0002:  teammate 
+    RFC-0002:  teammate
 
      idle  teammate.  teammate
-    completed stop . 
+    completed stop .
     """
     ts = require_team_state(agent_state)
     if not ts.is_leader:

@@ -11,7 +11,7 @@
 
 """release_task tool - release a claimed task back to the board.
 
-RFC-0002: 
+RFC-0002:
 """
 
 from __future__ import annotations
@@ -30,9 +30,9 @@ async def release_task(
 ) -> ReleaseTaskResult:
     """Release a claimed task (unassign).
 
-    RFC-0002: 
+    RFC-0002:
 
-     pending,  teammate . 
+     pending,  teammate .
     """
     ts = require_team_state(agent_state)
     await ts.task_board.release_task(task_id=task_id)

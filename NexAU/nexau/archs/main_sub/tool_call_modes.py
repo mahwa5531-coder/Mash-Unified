@@ -11,10 +11,10 @@
 
 """Tool-call mode normalization and provider resolution helpers.
 
-RFC-0006: xml / structured  provider 
+RFC-0006: xml / structured  provider
 
- ``tool_call_mode`` value, legacy alias, 
-structured  ``llm_config.api_type -> provider target`` . 
+ ``tool_call_mode`` value, legacy alias,
+structured  ``llm_config.api_type -> provider target`` .
 """
 
 from __future__ import annotations
@@ -46,8 +46,8 @@ def _warn_legacy_tool_call_mode_alias_once(alias: str) -> None:
 
     RFC-0006:  alias strategy
 
-    ``openai`` / ``anthropic``,  structured tool calling; 
-     provider wire format  ``llm_config.api_type`` . 
+    ``openai`` / ``anthropic``,  structured tool calling;
+     provider wire format  ``llm_config.api_type`` .
     """
 
     with _legacy_tool_call_mode_alias_lock:
@@ -66,10 +66,10 @@ def _warn_legacy_tool_call_mode_alias_once(alias: str) -> None:
 def normalize_tool_call_mode(mode: str | None) -> str:
     """Normalize a ``tool_call_mode`` value and validate it.
 
-    RFC-0006: tool_call_mode 
+    RFC-0006: tool_call_mode
 
     value ``xml`` / ``structured``; ``openai`` / ``anthropic``
-     alias,  ``structured``. 
+     alias,  ``structured``.
     """
 
     # 1. defaultvalue, Python / YAML .
@@ -91,10 +91,10 @@ def normalize_tool_call_mode(mode: str | None) -> str:
 def resolve_structured_provider_target(api_type: str | None) -> StructuredProviderTarget:
     """Resolve the concrete structured-tool provider target from ``api_type``.
 
-    RFC-0006: Provider 
+    RFC-0006: Provider
 
-    structured, provider wire format  ``tool_call_mode``, 
-     ``llm_config.api_type``  adapter target. 
+    structured, provider wire format  ``tool_call_mode``,
+     ``llm_config.api_type``  adapter target.
     """
 
     # 1. api_type structured provider target .

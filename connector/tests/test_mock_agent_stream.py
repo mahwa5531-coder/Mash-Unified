@@ -1,7 +1,7 @@
-import asyncio
 import os
 import sys
 from pathlib import Path
+
 import pytest
 
 # Ensure connector and NexAU are in sys.path
@@ -13,7 +13,6 @@ from nexau.archs.main_sub.execution.llm_caller import (
     call_llm_with_different_client,
     call_llm_with_different_client_async,
 )
-
 
 # N-09: Live mock LLM streaming tests require a scripted mock server or respx fixture.
 pytestmark = pytest.mark.skip(reason="N-09: Requires mock server or mock LLM fixture rather than dead http://mock")

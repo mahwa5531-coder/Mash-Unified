@@ -17,7 +17,7 @@ See models/history.py for details.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -60,5 +60,5 @@ class AgentModel(SQLModel, table=True):
     agent_name: str = ""
 
     # Timestamps (using Field with default_factory for datetime)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))

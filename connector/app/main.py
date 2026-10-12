@@ -1,13 +1,11 @@
 import os
 import sys
-import json
-import contextlib
-from datetime import datetime
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 # ponytail: Explicitly load .env file so new LLM settings apply
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
@@ -27,26 +25,33 @@ for _bd in _bin_dirs:
         if _p not in os.environ.get("PATH", ""):
             os.environ["PATH"] = _p + os.pathsep + os.environ.get("PATH", "")
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import SQLModel
-from dotenv import load_dotenv
-
-from nexau import AgentConfig, LLMConfig
-from nexau.archs.main_sub.execution.middleware.context_compaction import ContextCompactionMiddleware
-from nexau.archs.main_sub.context_value import ContextValue
 from nexau.archs.transports.http import HTTPConfig, SSETransportServer
-from nexau.archs.session.session_manager import SessionManager
+
 from app.dependencies import init_engine
 from app.models.project import ProjectModel
-from app.routers import projects, sessions, chat, artifacts, uploads, tasks, system, auth, settings
-
-
 
 # ──────────────────────────────────────────────
 # DB path (~/.nexau/nexau.db)
 # ──────────────────────────────────────────────
-from app.paths import get_nexau_home, get_database_path, get_session_brain_dir, get_project_cache_dir
+from app.paths import (
+    get_database_path,
+    get_nexau_home,
+)
+from app.routers import (
+    artifacts,
+    auth,
+    chat,
+    projects,
+    sessions,
+    settings,
+    system,
+    tasks,
+    uploads,
+)
+from nexau import AgentConfig, LLMConfig
 
 _DB_DIR = get_nexau_home()
 _DB_PATH = get_database_path()
@@ -59,10 +64,11 @@ _DB_SYNC_URL  = f"sqlite:///{_DB_PATH}"
 
 
 def _build_agent_config() -> AgentConfig:
-    import nexau
     from nexau.archs.main_sub.config import AgentConfig
     from nexau.archs.platform.app_config import AppConfig
-    from nexau.archs.platform.crypto_vault import load_secure_vault, get_auth_metadata
+    from nexau.archs.platform.crypto_vault import load_secure_vault
+
+    import nexau
 
     # Load canonical agent configuration (local Mash manifest preferred)
     local_manifest = Path(__file__).resolve().parent / "resources" / "main_agent.yaml"

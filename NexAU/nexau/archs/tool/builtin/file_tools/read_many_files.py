@@ -391,7 +391,7 @@ def read_many_files(
                             }
                         )
                         continue
-                    
+
                     separator = DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace("{filePath}", file_path)
                     tab_content = tab_res.get("content", "") if isinstance(tab_res, dict) else str(tab_res)
                     content_parts.append(f"{separator}\n\n{tab_content}\n\n")

@@ -1,17 +1,17 @@
-import sys
 import os
+import sys
 from pathlib import Path
-import pytest
+
 import httpx
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
-from app.main import app, lifespan
 from app import dependencies as deps
-from nexau.archs.session.models import SessionModel, AgentRunActionModel
-from nexau.archs.session.orm import ComparisonFilter
-from nexau.core.messages import Message
+from app.main import app, lifespan
+from nexau.archs.session.models import AgentRunActionModel, SessionModel
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -42,11 +42,11 @@ async def test_unitised_steps_extraction_and_correlation():
             # - text block 2
             from nexau.core.messages import (
                 Message,
-                Role,
                 ReasoningBlock,
+                Role,
                 TextBlock,
-                ToolUseBlock,
                 ToolResultBlock,
+                ToolUseBlock,
             )
 
             assistant_msg = Message(

@@ -363,7 +363,7 @@ class AgentLockService:
     ) -> bool:
         """Force-release a lock regardless of holder.
 
-         stop_all(),  run . 
+         stop_all(),  run .
 
         Args:
             session_id: Session identifier

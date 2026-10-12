@@ -13,8 +13,8 @@
 
 RFC-0006: FrameworkContext - type
 
- AgentState,  API . 
-function ctx: FrameworkContext . 
+ AgentState,  API .
+function ctx: FrameworkContext .
 """
 
 from __future__ import annotations
@@ -123,8 +123,8 @@ class ExecutionAPI:
 
     RFC-0006:  shutdown, interface
 
-     threading.Event, tool 
-    ``ctx.execution.is_shutting_down()`` . 
+     threading.Event, tool
+    ``ctx.execution.is_shutting_down()`` .
     """
 
     def __init__(
@@ -137,7 +137,7 @@ class ExecutionAPI:
     def is_shutting_down(self) -> bool:
         """Check if the agent is being stopped.
 
-        RFC-0006: 
+        RFC-0006:
 
         Returns:
             True if a shutdown has been signaled.
@@ -148,7 +148,7 @@ class ExecutionAPI:
 class ToolsAPI:
     """Tools management API.
 
-    RFC-0006:  ToolRegistry, 
+    RFC-0006:  ToolRegistry,
     """
 
     def __init__(
@@ -163,8 +163,8 @@ class ToolsAPI:
 
         RFC-0006:  ToolRegistry.search()
 
-,  LLM  function call. 
-         "+keyword" . 
+,  LLM  function call.
+         "+keyword" .
 
         Args:
             query: Search query string
@@ -207,11 +207,11 @@ class ToolsAPI:
 class FrameworkContext:
     """Typed framework context for tool and middleware authors.
 
-    RFC-0006:  AgentState, type API. 
-    function ctx: FrameworkContext . 
+    RFC-0006:  AgentState, type API.
+    function ctx: FrameworkContext .
 
-: Tools API + Execution API (Phase 1) 
-     skills / agents / sandbox / variables  API. 
+: Tools API + Execution API (Phase 1)
+     skills / agents / sandbox / variables  API.
     """
 
     def __init__(
@@ -276,8 +276,8 @@ class FrameworkContext:
 
         RFC-0019:  tool call  FrameworkContext
 
-         ToolsAPI / ExecutionAPI / HistoryAPI,  permission, 
-         tool call . 
+         ToolsAPI / ExecutionAPI / HistoryAPI,  permission,
+         tool call .
         """
         return FrameworkContext(
             agent_name=self.agent_name,
@@ -312,8 +312,8 @@ class FrameworkContext:
 
         RFC-0006: factorymethod
 
-        defaultvalue, . 
-        tools API  ToolRegistry ( search/add/get ) . 
+        defaultvalue, .
+        tools API  ToolRegistry ( search/add/get ) .
 
         Example::
 

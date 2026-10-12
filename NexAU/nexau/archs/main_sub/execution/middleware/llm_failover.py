@@ -73,7 +73,7 @@ class CircuitBreakerConfig:
     RFC-0003: configuration
 
      provider failure failure_threshold,  recovery_timeout_seconds
-     provider,  fallback. 
+     provider,  fallback.
     """
 
     failure_threshold: int = 3
@@ -88,12 +88,12 @@ class CircuitBreakerConfig:
 class _CircuitBreaker:
     """Simple circuit breaker for the primary provider.
 
-    RFC-0003: 
+    RFC-0003:
 
     : CLOSED → OPEN → HALF_OPEN → CLOSED
     - CLOSED:  provider
     - OPEN: failurevalue,  provider
-    - HALF_OPEN: recovery_timeout 
+    - HALF_OPEN: recovery_timeout
     """
 
     def __init__(self, config: CircuitBreakerConfig) -> None:
@@ -132,9 +132,9 @@ class _CircuitBreaker:
 def _extract_status_code(exc: Exception) -> int | None:
     """Extract HTTP status code from OpenAI/Anthropic SDK exceptions.
 
-    RFC-0003:  SDK exception HTTP 
+    RFC-0003:  SDK exception HTTP
 
-     openai.APIStatusError.status_code  anthropic.APIStatusError.status_code. 
+     openai.APIStatusError.status_code  anthropic.APIStatusError.status_code.
     """
     # openai >= 1.x anthropic >= 0.18 status_code property
     if isinstance(exc, openai.APIStatusError):
@@ -165,8 +165,8 @@ class LLMFailoverMiddleware(Middleware):
 
     RFC-0003: LLM middleware
 
-     provider failure,  provider. 
-     wrap_model_call,  LLMCaller . 
+     provider failure,  provider.
+     wrap_model_call,  LLMCaller .
 
     YAML configuration::
 
@@ -297,9 +297,9 @@ class LLMFailoverMiddleware(Middleware):
 
         RFC-0003: exception
 
-         (OR): 
-        - status_code  trigger.status_codes 
-        - exceptionclass trigger.exception_types 
+         (OR):
+        - status_code  trigger.status_codes
+        - exceptionclass trigger.exception_types
         """
         # status code
         status = _extract_status_code(exc)
@@ -318,8 +318,8 @@ class LLMFailoverMiddleware(Middleware):
 
         RFC-0003:  provider  params
 
-         params,  llm_config  client. 
-         fallback  provider. 
+         params,  llm_config  client.
+         fallback  provider.
         """
         # 1. config
         original_config = params.llm_config

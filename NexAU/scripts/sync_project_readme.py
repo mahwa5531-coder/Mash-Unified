@@ -174,25 +174,25 @@ NexAU ， `nexau` / `nexau-cloud-runtime` / `north-coder`  repo  backlog、itera
 
 ：<{project["url"]}>
 
-## 
+##
 
 - ** Sprint**：`{current_sprint}`
 - ** Sprint**：`{next_sprint}`
 - ****： Sprint（** ~ **）
 
-## 
+##
 
 | Repo |  |  Tag |  |
 |------|------|----------|----------|
 {chr(10).join(repo_rows)}
 
-## 
+##
 
 | # | View | Layout |  |
 |---|------|--------|------|
 {chr(10).join(view_rows)}
 
-## 
+##
 
 ### Status
 
@@ -204,22 +204,22 @@ NexAU ， `nexau` / `nexau-cloud-runtime` / `north-coder`  repo  backlog、itera
 - **Done**：
 - **Blocked**：
 - **Paused**：
-- **Cancelled**： / 
+- **Cancelled**： /
 
-### Close reason → Status 
+### Close reason → Status
 
 - `completed` → **Done**
 - `not_planned` → **Cancelled**
 - `duplicate` → **Cancelled**
 - `reopened` → **In progress**
 
-### 
+###
 
-- **Iteration**： Sprint 
+- **Iteration**： Sprint
 - **Priority**：P0 / P1 / P2 / P3
-- **Module**： Roadmap 
+- **Module**： Roadmap
 
-## 
+##
 
 ### Project  Workflows
 
@@ -229,33 +229,33 @@ NexAU ， `nexau` / `nexau-cloud-runtime` / `north-coder`  repo  backlog、itera
 
 ### Repo Actions Workflows
 
-#### 1. Backlog / Todo / Done 
+#### 1. Backlog / Todo / Done
 - ：`.github/workflows/project-auto-status.yml`
-- ： 10 
+- ： 10
 - ：
   - issue  Iteration  Backlog →  Todo
   - Todo  Iteration  →  Backlog
   - Project Status  Done， issue  open →  `close as completed`
 
-#### 2. Close reason 
+#### 2. Close reason
 - ：`.github/workflows/project-auto-status-on-close.yml`
 - ：`issues.closed`
 - ：
   - `completed` → Done
   - `not_planned` / `duplicate` → Cancelled
 
-#### 3. Milestone 
+#### 3. Milestone
 - ：`.github/workflows/milestone-auto-manage.yml`
 - ： tag
 - ： /  /  Milestone， Milestone
 
-## README 
+## README
 
 - ** 22:00（Asia/Shanghai / UTC+8）** Project README
 -  repo/tag、views、iteration 、workflow ， Project Settings  README
-- README sync workflow  repo Actions 
+- README sync workflow  repo Actions
 
-## Secrets / 
+## Secrets /
 
  repo ：
 
@@ -266,8 +266,8 @@ NexAU ， `nexau` / `nexau-cloud-runtime` / `north-coder`  repo  backlog、itera
 「 issue 」「」，：
 
 1. Project Settings → Workflows  **`Item closed`**  **Disabled**
-2.  repo  **`PROJECT_PAT`**  / 
-3.  workflow run  `Could not resolve to a node` / project permission 
+2.  repo  **`PROJECT_PAT`**  /
+3.  workflow run  `Could not resolve to a node` / project permission
 """
 
 

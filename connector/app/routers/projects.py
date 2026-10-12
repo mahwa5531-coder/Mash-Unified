@@ -1,11 +1,12 @@
 import os
 from pathlib import Path
-from typing import Any
+
 from fastapi import APIRouter, HTTPException
+from nexau.archs.session.orm import ComparisonFilter
 from pydantic import BaseModel
+
 from app.dependencies import DatabaseEngineDep
 from app.models.project import ProjectModel
-from nexau.archs.session.orm import ComparisonFilter
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -98,7 +99,7 @@ async def list_all_projects(engine: DatabaseEngineDep):
     from nexau.archs.session.models import SessionModel
     projects = await engine.find_many(ProjectModel)
     all_sessions = await engine.find_many(SessionModel)
-    
+
     results = []
     seen_names = set()
     for p in reversed(projects):
@@ -106,7 +107,7 @@ async def list_all_projects(engine: DatabaseEngineDep):
         if name_key in seen_names:
             continue
         seen_names.add(name_key)
-        
+
         count = 0
         norm_p_path = os.path.normpath(p.local_folder_path).replace("\\", "/").lower()
         for s in all_sessions:
@@ -117,12 +118,12 @@ async def list_all_projects(engine: DatabaseEngineDep):
             if (pid and (pid == p.id or pid.lower() == name_key)) or \
                (norm_ws and (norm_ws == norm_p_path or os.path.basename(norm_ws) == name_key or ws_uri == p.name)):
                 count += 1
-        
+
         p_dict = p.model_dump() if hasattr(p, "model_dump") else p.dict()
         p_dict["local_folder_path"] = os.path.normpath(p.local_folder_path).replace("\\", "/")
         p_dict["session_count"] = count
         results.append(p_dict)
-    
+
     return {"projects": list(reversed(results))}
 
 
@@ -183,8 +184,10 @@ async def rename_project(project_id: str, request: RenameProjectRequest, engine:
 async def delete_project(project_id: str, engine: DatabaseEngineDep):
     import shutil
     from urllib.parse import unquote
+
+    from nexau.archs.session.models import AgentRunActionModel, SessionModel
+
     from app.paths import get_nexau_home, get_session_brain_dir
-    from nexau.archs.session.models import SessionModel, AgentRunActionModel
 
     clean_id = unquote(project_id).strip()
 
@@ -234,7 +237,7 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
                 # Delete session record from DB
                 await engine.delete(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
                 deleted_sessions_count += 1
-    except Exception as exc:
+    except Exception:
         pass
 
     # 2. Clean up project storage directory in .nexau (~/.nexau/projects/<project_id>/ and <name>/)

@@ -339,15 +339,15 @@ class TransportBase[TTransportConfig](ABC):
     ) -> StopResult:
         """Handle a stop request for a running agent.
 
-        RFC-0001 Phase 4: Transport  stop 
+        RFC-0001 Phase 4: Transport  stop
 
-         Agent  stop(). 
+         Agent  stop().
 
         Args:
             user_id: User ID
             session_id: Session ID
             agent_id: Optional agent ID (if None, stops the first matching agent)
-            force: True, False 
+            force: True, False
             timeout: Maximum seconds to wait for execution to complete
 
         Returns:

@@ -11,7 +11,7 @@
 
 """Team lifecycle manager.
 
-RFC-0002: AgentTeam 
+RFC-0002: AgentTeam
 
 Manages leader + teammate agents, shared task board,
 message bus, and concurrent execution.
@@ -66,9 +66,9 @@ def _safe_deepcopy_config(config: AgentConfig) -> AgentConfig:
 
     RFC-0002:  AgentConfig
 
-    package pickle object ( tracer, 
-    middleware  OpenAI client  httpx  _thread.RLock, 
-    hook package),  deepcopy . 
+    package pickle object ( tracer,
+    middleware  OpenAI client  httpx  _thread.RLock,
+    hook package),  deepcopy .
     """
     # 1. pickle
     saved = {
@@ -104,7 +104,7 @@ def _safe_deepcopy_config(config: AgentConfig) -> AgentConfig:
 class AgentTeam:
     """Team lifecycle manager.
 
-    RFC-0002: AgentTeam 
+    RFC-0002: AgentTeam
 
     Manages leader + teammate agents, shared task board,
     message bus, and concurrent execution.
@@ -201,7 +201,7 @@ class AgentTeam:
     async def initialize(self) -> None:
         """Initialize or restore team state.
 
-        RFC-0002: 
+        RFC-0002:
 
         Steps:
         1. Setup database models
@@ -298,7 +298,7 @@ class AgentTeam:
     async def spawn_teammate(self, role_name: str) -> str:
         """Spawn a new teammate instance and start it in forever-run mode.
 
-        RFC-0002:  Teammate 
+        RFC-0002:  Teammate
 
         Args:
             role_name: Role name from candidates dict.
@@ -411,7 +411,7 @@ class AgentTeam:
     async def remove_teammate(self, agent_id: str) -> None:
         """Remove a teammate instance.
 
-        RFC-0002:  Teammate 
+        RFC-0002:  Teammate
 
         Force-stops the agent's executor to break the forever-run loop,
         then cancels the asyncio.Task as safety net.
@@ -458,9 +458,9 @@ class AgentTeam:
 
         RFC-0002:  Teammate list
 
-         executor.is_idle,  future.done(). 
-        executor  team_mode  tool call  idle, 
-         future,  agent . 
+         executor.is_idle,  future.done().
+        executor  team_mode  tool call  idle,
+         future,  agent .
         """
         results: list[TeammateInfo] = []
         for agent_id, agent in self._teammate_agents.items():
@@ -485,10 +485,10 @@ class AgentTeam:
     def enqueue_user_message(self, to_agent_id: str, content: str) -> None:
         """Enqueue a user message to a specific agent.
 
-        RFC-0002:  agent 
+        RFC-0002:  agent
 
-         send_message_to_agent, method role=user, 
-         stream  agent . 
+         send_message_to_agent, method role=user,
+         stream  agent .
         """
         msg = {"role": "user", "content": content}
 
@@ -533,10 +533,10 @@ class AgentTeam:
     ) -> None:
         """Enqueue a message to a teammate or leader agent.
 
-        RFC-0002:  teammate  leader 
+        RFC-0002:  teammate  leader
 
-         executor.enqueue_message, 
-        executor  _message_available . 
+         executor.enqueue_message,
+        executor  _message_available .
         """
         enqueue_text = f"[Team Message from {from_agent_id}]: {content}"
         msg = {"role": "user", "content": enqueue_text}
@@ -586,7 +586,7 @@ class AgentTeam:
 
         RFC-0002:  leader agent
 
-        completed, idle,  enqueue_message  leader. 
+        completed, idle,  enqueue_message  leader.
         """
         self.send_message_to_agent(
             to_agent_id=self._leader_agent_id,
@@ -597,7 +597,7 @@ class AgentTeam:
     def is_all_idle(self) -> bool:
         """Check if all agents (leader + teammates) are idle.
 
-        RFC-0002:  agent 
+        RFC-0002:  agent
 
         Returns True when leader and all teammates are in the executor's
         team_mode wait loop. Used by watchdog for deadlock detection.
@@ -630,8 +630,8 @@ class AgentTeam:
 
         RFC-0002:  Teammate Agent
 
-        Agent  executor  team_mode, 
-         force_stop() . 
+        Agent  executor  team_mode,
+         force_stop() .
         """
         agent = self._teammate_agents.get(agent_id)
         if agent is None:
@@ -675,9 +675,9 @@ class AgentTeam:
 
         RFC-0002: running Teammate
 
-         teammate  executor,  Future completed, 
-        . DB  ( idle), 
-         run()  _restore_teammates() . 
+         teammate  executor,  Future completed,
+        . DB  ( idle),
+         run()  _restore_teammates() .
         """
         # 1. Force-stop teammate executor
         stopped_ids = list(self._teammate_agents.keys())
@@ -710,9 +710,9 @@ class AgentTeam:
 
         RFC-0002:  spawn  teammate
 
-         DB  stopped  teammate, 
-         Agent . 
-        Agent  session . 
+         DB  stopped  teammate,
+         Agent .
+        Agent  session .
         """
         existing_members = await self._engine.find_many(
             TeamMemberModel,
@@ -803,8 +803,8 @@ class AgentTeam:
 
         RFC-0002:  Team
 
-         Stop method,  leader  teammate . 
-         leader  agent lock,  run . 
+         Stop method,  leader  teammate .
+         leader  agent lock,  run .
         """
         # 1. leader
         if self._leader_agent is not None:
@@ -827,7 +827,7 @@ class AgentTeam:
     async def _update_member_status(self, agent_id: str, status: str) -> None:
         """Update teammate member status in DB.
 
-        RFC-0002:  Teammate 
+        RFC-0002:  Teammate
         """
         try:
             member = await self._engine.find_first(
@@ -854,17 +854,17 @@ class AgentTeam:
     ) -> str:
         """Run the team with the leader agent in forever-run mode.
 
-        RFC-0002:  () 
-        RFC-0014: 
+        RFC-0002:  ()
+        RFC-0014:
 
-        Leader agent  team_mode,  finish_team stop tool. 
-        Teammate agents  spawn_teammate, . 
-         enqueue_message . 
+        Leader agent  team_mode,  finish_team stop tool.
+        Teammate agents  spawn_teammate, .
+         enqueue_message .
 
-        SSE  self._multiplexer: 
-        -  self._multiplexer  ( run_streaming() ), 
-           leader  teammate  AgentEventsMiddleware. 
-        -  self._multiplexer  None, middleware. 
+        SSE  self._multiplexer:
+        -  self._multiplexer  ( run_streaming() ),
+           leader  teammate  AgentEventsMiddleware.
+        -  self._multiplexer  None, middleware.
 
         Args:
             message: User message to send to the leader.
@@ -1033,10 +1033,10 @@ class AgentTeam:
     ) -> AsyncGenerator[TeamStreamEnvelope, None]:
         """Run team with SSE streaming output.
 
-        RFC-0002: Team SSE 
+        RFC-0002: Team SSE
 
-         TeamSSEMultiplexer,  team, 
-         async generator  TeamStreamEnvelope . 
+         TeamSSEMultiplexer,  team,
+         async generator  TeamStreamEnvelope .
 
         Args:
             message: User message to send to the leader.

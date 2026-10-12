@@ -161,7 +161,7 @@ class UserModelFullTraceAdaptiveCompaction:
     def _split_two_segments(self, messages: list[Message]) -> tuple[list[Message], list[Message]]:
         """Split *messages* into two segments at pair-safe unit boundaries.
 
-        RFC-0496:  unit,  tool call/result 
+        RFC-0496:  unit,  tool call/result
         """
         if len(messages) <= 1:
             return messages, []
@@ -209,7 +209,7 @@ class UserModelFullTraceAdaptiveCompaction:
     ) -> tuple[list[Message], bool]:
         """Truncate *segment* to fit within *budget_tokens* at unit boundaries.
 
-        RFC-0496:  unit,  tool call/result 
+        RFC-0496:  unit,  tool call/result
         """
         if not segment:
             return [], False
@@ -276,7 +276,7 @@ class UserModelFullTraceAdaptiveCompaction:
     def _collect_paired_tool_result_indices(messages: list[Message], keep_indices: set[int]) -> set[int]:
         """Return indices of TOOL messages whose matching assistant is already kept.
 
-        RFC-0496:  keep_indices  assistant tool call completed tool result 
+        RFC-0496:  keep_indices  assistant tool call completed tool result
 
         When ``_collect_unresolved_tool_use_indices`` keeps an assistant message
         that contains *both* resolved and unresolved tool calls, the resolved
@@ -353,7 +353,7 @@ class UserModelFullTraceAdaptiveCompaction:
     def _build_pair_safe_units(messages: list[Message]) -> list[list[int]]:
         """Group message indices into pair-safe units for split/truncation.
 
-        RFC-0496:  tool call / result 
+        RFC-0496:  tool call / result
 
         Each unit keeps an assistant tool-call message together with its
         matching tool-result messages, so splitting at unit boundaries
@@ -406,7 +406,7 @@ class UserModelFullTraceAdaptiveCompaction:
     def _flatten_unit_to_text(self, unit_messages: list[Message], budget_tokens: int) -> Message:
         """Convert a multi-message tool-call unit to a single plain-text message.
 
-        RFC-0496:  tool-call 
+        RFC-0496:  tool-call
 
         Used when a complete tool-call iteration exceeds the summary budget.
         Serializes all messages as plain text to avoid emitting orphan

@@ -11,11 +11,11 @@
 
 """ToolSearch builtin tool implementation.
 
-RFC-0005: Tool Search - 
-RFC-0006:  FrameworkContext.tools.search() 
+RFC-0005: Tool Search -
+RFC-0006:  FrameworkContext.tools.search()
 
-ToolSearch  eager tool, LLM . 
-,  LLM  function call. 
+ToolSearch  eager tool, LLM .
+,  LLM  function call.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 def tool_search(query: str, ctx: FrameworkContext, *, max_results: int = 5) -> str:
     """Search for deferred tools and inject them for use.
 
-    RFC-0005:  activate 
+    RFC-0005:  activate
     RFC-0006:  ctx.tools.search(),  ToolRegistry
     """
     matched = ctx.tools.search(query=query, max_results=max_results)

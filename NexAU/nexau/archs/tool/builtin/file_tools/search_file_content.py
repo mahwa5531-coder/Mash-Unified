@@ -7,7 +7,6 @@ Based on gemini-cli's grep.ts implementation.
 Uses prioritized strategies: git grep -> system grep -> JavaScript fallback.
 """
 
-import fnmatch
 import re
 import shlex
 import shutil

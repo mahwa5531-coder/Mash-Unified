@@ -37,7 +37,6 @@ from nexau.archs.tool.tool_registry import ToolRegistry
 from nexau.archs.tracer.core import BaseTracer, Span, SpanType
 from nexau.core.messages import Message, Role, TextBlock, ToolResultBlock
 from nexau.core.serializers.openai_chat import (
-    messages_from_legacy_openai_chat,
     serialize_ump_to_openai_chat_payload,
 )
 

@@ -11,7 +11,7 @@
 
 """finish_team tool - end the team collaboration session.
 
-RFC-0002: 
+RFC-0002:
 """
 
 from __future__ import annotations
@@ -34,10 +34,10 @@ async def finish_team(
 ) -> FinishTeamResult | ToolError:
     """Finish the team collaboration session.
 
-    RFC-0002: 
+    RFC-0002:
 
-     leader . completed. 
-     stop tool,  leader  executor . 
+     leader . completed.
+     stop tool,  leader  executor .
     """
     ts = require_team_state(agent_state)
 

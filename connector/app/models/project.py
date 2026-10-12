@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
+
 from sqlmodel import Field, SQLModel
 
 
@@ -11,5 +12,5 @@ class ProjectModel(SQLModel, table=True):
     user_id: str
     name: str
     local_folder_path: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -22,16 +22,15 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from nexau.archs.session import InMemoryDatabaseEngine, SessionManager
-from nexau.archs.session.models import SessionModel, AgentRunActionModel
-from nexau.archs.session.orm import ComparisonFilter, SQLDatabaseEngine, LoopSafeDatabaseEngine
+from nexau.archs.session.models import AgentRunActionModel, SessionModel
+from nexau.archs.session.orm import ComparisonFilter, LoopSafeDatabaseEngine, SQLDatabaseEngine
 from nexau.core.messages import Message
-
 
 # ── TEST 1: Write-read roundtrip ──────────────────────────────────────────
 
@@ -47,8 +46,8 @@ class TestWriteReadRoundtrip:
 
         session = SessionModel(
             user_id="u1", session_id="s1",
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             context={"project": "test"},
         )
         await engine.create(session)
@@ -59,7 +58,7 @@ class TestWriteReadRoundtrip:
                 user_id="u1", session_id="s1", agent_id="agent_1",
                 run_id="run_1", root_run_id="run_1",
                 agent_name="test_agent",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 action_type="append",
                 append_messages=[Message.user(f"Message {i}")],
             )
@@ -100,8 +99,8 @@ class TestSQLRestartPersistence:
 
             session = SessionModel(
                 user_id="u1", session_id="restart_s1",
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
                 context={"marker": "RESTART_MARKER_42"},
             )
             await engine1.create(session)
@@ -111,7 +110,7 @@ class TestSQLRestartPersistence:
                     action_id=f"restart_act_{i}",
                     user_id="u1", session_id="restart_s1", agent_id="a1",
                     run_id="r1", root_run_id="r1", agent_name="test",
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                     action_type="append",
                     append_messages=[Message.user(f"Turn {i}")],
                 )
@@ -155,8 +154,8 @@ class TestPartialFailureSafety:
         # Create valid session
         session = SessionModel(
             user_id="u1", session_id="partial_s1",
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         await engine.create(session)
 
@@ -164,8 +163,8 @@ class TestPartialFailureSafety:
         try:
             dup = SessionModel(
                 user_id="u1", session_id="partial_s1",
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
             await engine.create(dup)
         except Exception:
@@ -193,8 +192,8 @@ class TestConcurrentWrites:
 
         session = SessionModel(
             user_id="u1", session_id="conc_s1",
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         await engine.create(session)
 
@@ -203,7 +202,7 @@ class TestConcurrentWrites:
                 action_id=f"conc_act_{idx}",
                 user_id="u1", session_id="conc_s1", agent_id="a1",
                 run_id="r1", root_run_id="r1", agent_name="test",
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 action_type="append",
                 append_messages=[Message.user(f"Concurrent msg {idx}")],
             )

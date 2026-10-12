@@ -50,7 +50,7 @@ def duckduckgo_web_search(
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Search the web using DuckDuckGo with domain prioritization and clean citations.
-    
+
     Args:
         query: Search query string.
         domain: Optional domain to restrict the search (e.g., 'arxiv.org', 'github.com').

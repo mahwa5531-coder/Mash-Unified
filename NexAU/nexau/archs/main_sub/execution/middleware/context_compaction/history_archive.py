@@ -13,10 +13,10 @@
 
 RFC-0021: context compaction sandbox
 
-"" +  boundary  append 
-``transcript.jsonl``. Agent  ``read_file`` / ``search_file_content`` . 
+"" +  boundary  append
+``transcript.jsonl``. Agent  ``read_file`` / ``search_file_content`` .
 
-: 
+:
 
 - ** append-only**: ``{sandbox_tmp}/.nexau_history_archive/<namespace>/transcript.jsonl``
 - ****, type:
@@ -25,8 +25,8 @@ RFC-0021: context compaction sandbox
 - **Resume**:  transcript  boundary round,  = max+1
 - **exception**: sandbox  / failure, exception (failure)
 
-: agent  ``search_file_content`` grep transcript.jsonl 
-,  round ; append-only . 
+: agent  ``search_file_content`` grep transcript.jsonl
+,  round ; append-only .
 """
 
 from __future__ import annotations
@@ -46,10 +46,10 @@ from nexau.core.messages import ImageBlock, Message, Role, TextBlock, ToolResult
 logger = logging.getLogger(__name__)
 
 ARCHIVE_SUBDIR = ".nexau_history_archive"
-"""sandbox  (RFC-0021). 
+"""sandbox  (RFC-0021).
 
  config:  ``"../foo"`` class,
-defaultvalue,  use case . 
+defaultvalue,  use case .
 """
 
 TRANSCRIPT_FILENAME = "transcript.jsonl"
@@ -116,7 +116,7 @@ def _archive_namespace(*, agent_state: Any, sandbox: BaseSandbox) -> str:
 
 @dataclass(frozen=True)
 class BoundaryRecord:
-    """RFC-0021:  boundary ,  transcript.jsonl 
+    """RFC-0021:  boundary ,  transcript.jsonl
     ``{"_boundary": {...}}`` 。"""
 
     round: int
@@ -156,10 +156,10 @@ class BoundaryRecord:
 
 
 class HistoryArchiveWriter:
-    """RFC-0021:  + boundary append  sandbox 
-    transcript.jsonl. 
+    """RFC-0021:  + boundary append  sandbox
+    transcript.jsonl.
 
-     sandbox  IO,  LocalSandbox / E2BSandbox . 
+     sandbox  IO,  LocalSandbox / E2BSandbox .
     """
 
     def __init__(
@@ -182,14 +182,14 @@ class HistoryArchiveWriter:
         *,
         agent_state: Any,
     ) -> HistoryArchiveWriter | None:
-        """ agent_state  writer; sandbox  None. 
+        """ agent_state  writer; sandbox  None.
 
          sandbox  ``ARCHIVE_SUBDIR``
         (``.nexau_history_archive``),  config - ;
-        defaultvalue. 
+        defaultvalue.
 
         try :  sandbox  (get_sandbox / get_temp_dir / create_directory),
-        "sandbox "" bug". ``_scan_transcript``  try, . 
+        "sandbox "" bug". ``_scan_transcript``  try, .
         """
         if agent_state is None:
             return None
@@ -279,13 +279,13 @@ class HistoryArchiveWriter:
         run_id: str | None,
         agent_id: str | None,
     ) -> BoundaryRecord | None:
-        """:  removed  + boundary  append  transcript.jsonl. 
+        """:  removed  + boundary  append  transcript.jsonl.
 
         base64 ImageBlock  ``images/{msg_id}-{idx}.{ext}`` ,
-        transcript.jsonl  ``url=file:images/...``  ( transcript ). 
-        URL ImageBlock . 
+        transcript.jsonl  ``url=file:images/...``  ( transcript ).
+        URL ImageBlock .
 
-        failure None, exception  --  failure. 
+        failure None, exception  --  failure.
         """
         if not removed:
             return None
@@ -377,15 +377,15 @@ class HistoryArchiveWriter:
 
     def _externalize_images(self, removed: list[Message]) -> tuple[list[Message], int]:
         """ base64 ImageBlock  ``images/{msg_id}-{path}.{ext}`` ,
-         (list, ). 
+         (list, ).
 
         :
         - **** ImageBlock (USER / ASSISTANT )
         - **** ImageBlock  ``ToolResultBlock.content``  (multimodal )
 
-        -  ``ImageBlock.base64`` ; URL-only 
+        -  ``ImageBlock.base64`` ; URL-only
         - failure ( / decode error)  block  ()
-        -  messages ( ``model_copy(update=...)`` ); 
+        -  messages ( ``model_copy(update=...)`` );
           active context , value
         """
 
@@ -438,7 +438,7 @@ class HistoryArchiveWriter:
                     path_label,
                     exc,
                 )
-                return img  # fallback:  block 
+                return img  # fallback:  block
 
         result: list[Message] = []
         for msg in removed:
@@ -513,13 +513,13 @@ def build_archive_hint(
     archive_dir: str,
     transcript_path: str,
 ) -> str:
-    """RFC-0021:  (). 
+    """RFC-0021:  ().
 
-     agent  transcript.jsonl,  search_file_content / read_file . 
-     writer  sandbox  transcript . 
+     agent  transcript.jsonl,  search_file_content / read_file .
+     writer  sandbox  transcript .
 
-    ** hint **  --  .  TextBlock 
-,  ``\\n\\n`` ;, . 
+    ** hint **  --  .  TextBlock
+,  ``\\n\\n`` ;, .
     """
     return (
         f"📁 [Archive] {total_archived} earlier message(s) archived across "

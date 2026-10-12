@@ -4,18 +4,19 @@ Uses httpx and ASGI Transport.
 """
 
 import asyncio
-import json
-import time
-import httpx
-from pathlib import Path
-import pytest
 import sys
+import time
+from pathlib import Path
+
+import httpx
+import pytest
 
 # Ensure roots are in sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
 from app.main import app, lifespan
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -57,17 +58,17 @@ async def run_folder_selection_validation(client: httpx.AsyncClient):
 
 async def run_concurrent_session_creation(client: httpx.AsyncClient):
     print("[4] Testing concurrent session creation (5 simultaneous requests)...")
-    
+
     tasks = []
     created_ids = []
-    
+
     for i in range(5):
         sid = f"test_race_{int(time.time()*1000)}_{i}"
         created_ids.append(sid)
         is_workspace = (i % 2 == 0)
         repo_name = "Mash" if is_workspace else "No Repo"
         section = "workspace" if is_workspace else "conversation"
-        
+
         payload = {
             "session_id": sid,
             "title": f"Concurrent Test {i}",
@@ -75,13 +76,13 @@ async def run_concurrent_session_creation(client: httpx.AsyncClient):
             "section": section,
         }
         tasks.append(http_post(client, "/sessions", payload))
-    
+
     results = await asyncio.gather(*tasks, return_exceptions=True)
     for idx, r in enumerate(results):
         assert not isinstance(r, Exception), f"Session creation task {idx} failed: {r}"
         assert r.get("status") in ("success", "created"), f"Unexpected result {r}"
 
-    print(f"    Passed! 5 concurrent sessions successfully created with 0 exceptions.")
+    print("    Passed! 5 concurrent sessions successfully created with 0 exceptions.")
 
     # Verify isolation in database
     all_sessions = (await http_get(client, "/sessions")).get("sessions", [])
@@ -136,7 +137,7 @@ async def test_session_isolation_and_concurrency():
     print("=" * 60)
     print("NEXAU WORKBENCH TEST: SESSION ISOLATION & CONCURRENCY")
     print("=" * 60)
-    
+
     async with lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -146,7 +147,7 @@ async def test_session_isolation_and_concurrency():
             test_ids = await run_concurrent_session_creation(client)
             await run_conversation_history_format(client)
             await cleanup_test_sessions(client, test_ids)
-    
+
     print("=" * 60)
     print("ALL TESTS PASSED WITH 100% SUCCESS!")
     print("=" * 60)

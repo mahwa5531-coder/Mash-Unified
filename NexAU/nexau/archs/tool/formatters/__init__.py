@@ -20,10 +20,10 @@ from nexau.core.messages import ToolOutputImage
 class ToolFormatterContext:
     """Execution context passed to tool formatters.
 
-    RFC-0017: formatter  after_tool middleware 
+    RFC-0017: formatter  after_tool middleware
 
     tool_output  runtime ; formatter  LLM
-     llm-facing output. 
+     llm-facing output.
     """
 
     tool_name: str

@@ -6,12 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
-
-from app.models.project import ProjectModel
-from app.paths import get_session_brain_dir
 from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 
+from app.models.project import ProjectModel
+from app.paths import get_session_brain_dir
 
 APP_WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent
 

@@ -39,12 +39,12 @@ async def claim_task(
 
     RFC-0002: /
 
-    - task_id  ( claim-next) 
+    - task_id  ( claim-next)
     - assignee_agent_id  self-claim
-    - assignee_agent_id  leader assignment ( caller  leader) 
+    - assignee_agent_id  leader assignment ( caller  leader)
 
     Teammate : list_tasks() →  task_id → claim_task(task_id)
-     claim retry. 
+     claim retry.
     """
     ts = require_team_state(agent_state)
     caller_id = agent_state.agent_id

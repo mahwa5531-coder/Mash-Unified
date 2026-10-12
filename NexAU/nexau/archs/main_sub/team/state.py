@@ -11,7 +11,7 @@
 
 """Team collaboration context container.
 
-RFC-0002: Team 
+RFC-0002: Team
 
 Lightweight data object stored on AgentState.team_state,
 giving team tools typed access to shared services.
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 class AgentTeamState:
     """Team collaboration context attached to AgentState.
 
-    RFC-0002: Team 
+    RFC-0002: Team
 
     Tools access this via ``agent_state.team_state``.
     """

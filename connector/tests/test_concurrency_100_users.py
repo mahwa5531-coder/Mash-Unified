@@ -27,8 +27,9 @@ Verifies:
 import asyncio
 import json
 import time
-import pytest
+
 import httpx
+import pytest
 import respx
 
 
@@ -41,10 +42,10 @@ async def test_100_concurrent_users_streaming_isolation():
 
     # Custom mock router that returns user-specific tokens
     def cloud_completions_handler(request: httpx.Request):
-        req_data = json.loads(request.content.decode("utf-8"))
-        user_header = request.headers.get("X-User-ID", "unknown")
+        json.loads(request.content.decode("utf-8"))
+        request.headers.get("X-User-ID", "unknown")
         user_num = request.headers.get("X-User-Index", "0")
-        
+
         # User-specific unique forensic token stream
         sse_body = (
             f"data: {{\"type\": \"RUN_STARTED\", \"run_id\": \"run_u{user_num}\"}}\n\n"
@@ -117,11 +118,11 @@ async def test_100_concurrent_users_streaming_isolation():
         idx = res["user_idx"]
         expected_unique_marker = f"[AUDITOR_{idx}_TOKEN_1]"
         expected_tenant_marker = f"tenant_{idx}"
-        
+
         # Must contain its own unique tokens
         assert expected_unique_marker in res["output"], f"User {idx} output missing its unique token"
         assert expected_tenant_marker in res["output"], f"User {idx} output missing its tenant marker"
-        
+
         # Must NEVER contain another user's tokens
         for other_idx in [1, 2, 50, 99, 100]:
             if other_idx != idx:

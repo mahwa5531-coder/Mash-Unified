@@ -5,17 +5,19 @@ Verifies that 2 sessions streaming at the exact same moment do not cross-contami
 
 import asyncio
 import json
-import time
-import pytest
-import httpx
-from pathlib import Path
 import sys
+import time
+from pathlib import Path
+
+import httpx
+import pytest
 
 # Ensure roots are in sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
 from app.main import app, lifespan
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -32,10 +34,10 @@ async def stream_session(client: httpx.AsyncClient, session_id: str, prompt: str
             "section": "workspace" if repo != "No Repo" else "conversation",
         },
     }
-    
+
     tokens = []
     start_time = time.time()
-    
+
     try:
         async with client.stream("POST", url, json=payload, headers={"Accept": "text/event-stream"}, timeout=30.0) as resp:
             async for line in resp.aiter_lines():

@@ -254,7 +254,7 @@ class StdioTransport(TransportBase[StdioConfig]):
     async def _handle_stop_request_model(self, params: dict[str, Any], rpc_id: str) -> None:
         """Handle stop request.
 
-        RFC-0001 Phase 4: Stdio transport stop 
+        RFC-0001 Phase 4: Stdio transport stop
 
         Args:
             params: Request parameters (user_id, session_id, agent_id, force, timeout)

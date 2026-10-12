@@ -1,19 +1,24 @@
 import asyncio
 import csv
 import logging
-import os
 import re
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from app.dependencies import DatabaseEngineDep, get_engine, _engine
-from app.models.project import ProjectModel
-from app.workspace import get_allowed_file_roots, is_path_in_base_roots, resolve_session_workspace, APP_WORKSPACE_ROOT
-from nexau.archs.session.orm import ComparisonFilter
 from nexau.archs.session.models import SessionModel
+from nexau.archs.session.orm import ComparisonFilter
+
+from app.dependencies import DatabaseEngineDep
 from app.paths import get_session_brain_dir
+from app.workspace import (
+    APP_WORKSPACE_ROOT,
+    get_allowed_file_roots,
+    is_path_in_base_roots,
+    resolve_session_workspace,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +55,7 @@ async def list_artifacts(
     """
     eng = _get_engine(engine)
     session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id)) if eng else None
-    
+
     ws = await resolve_session_workspace(eng, session_id) if session else None
     is_project_session = False
     project_dir = None
@@ -192,11 +197,11 @@ async def get_artifact(
 @router.get("/files/content")
 @router.get("/api/files/content")
 async def get_file_content(
-    path: str, 
-    raw: bool = False, 
-    sheet: str | None = None, 
-    page: int = 0, 
-    page_size: int = 200, 
+    path: str,
+    raw: bool = False,
+    sheet: str | None = None,
+    page: int = 0,
+    page_size: int = 200,
     format: str | None = None,
     session_id: str | None = None,
     engine: DatabaseEngineDep = None
@@ -335,7 +340,7 @@ async def get_file_content(
                 }
 
             target_sheet = sheet if (sheet and sheet in sheet_names) else sheet_names[0]
-            
+
             # Bound page and pageSize safely
             safe_page_size = max(10, min(page_size, 1000))
             safe_page = max(0, page)
@@ -414,7 +419,7 @@ async def get_file_content(
             total_cols = 0
 
             # ponytail: Stream CSV line-by-line without allocating 100MB+ in memory
-            with open(p, mode="r", encoding="utf-8", errors="replace") as f:
+            with open(p, encoding="utf-8", errors="replace") as f:
                 csv_reader = csv.reader(f)
                 for idx, r in enumerate(csv_reader):
                     total_rows += 1

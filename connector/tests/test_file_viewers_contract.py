@@ -1,11 +1,12 @@
-import os
 import sys
-import pytest
 from pathlib import Path
+
 import httpx
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.main import app, lifespan
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():

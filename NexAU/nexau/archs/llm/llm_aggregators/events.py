@@ -291,7 +291,7 @@ class ContentBlockedEvent(BaseEvent):
 
     RFC-0027:  (sensitive words) .  ``RunErrorEvent``
      --  ( / class / ), middleware
-    ; run  ``ERROR_OCCURRED`` . 
+    ; run  ``ERROR_OCCURRED`` .
     """
 
     type: Literal["CONTENT_BLOCKED"] = "CONTENT_BLOCKED"  # type: ignore[assignment]
@@ -321,7 +321,7 @@ class TransportErrorEvent(BaseEvent):
 class UserMessageEvent(BaseEvent):
     """Event for user messages sent to an agent during streaming.
 
-    RFC-0002: 
+    RFC-0002:
 
     Attributes:
         content: Message text
@@ -336,7 +336,7 @@ class UserMessageEvent(BaseEvent):
 class TeamMessageEvent(BaseEvent):
     """Event for inter-agent messages via the message bus.
 
-    RFC-0002: Agent 
+    RFC-0002: Agent
 
     Attributes:
         content: Message text

@@ -1,24 +1,24 @@
-import os
-import json
-import copy
 import asyncio
+import copy
+import json
 import logging
-from datetime import datetime, timezone
+import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
 from nexau.archs.main_sub.context_value import ContextValue
 from nexau.archs.sandbox.base_sandbox import LocalSandboxConfig
+from nexau.archs.session.id_generator import generate_session_id
 from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
-from nexau.archs.session.id_generator import generate_session_id
 from nexau.archs.transports.http.sse_server import SSETransportServer
-from app.paths import resolve_deliverables_dir, resolve_sandbox_work_dir
+from pydantic import BaseModel
+
 from app.dependencies import get_engine
 from app.models.project import ProjectModel
+from app.paths import resolve_deliverables_dir, resolve_sandbox_work_dir
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ async def _ensure_project_and_context(
         if "section" not in resolved_context:
             resolved_context["section"] = "workspace" if workspace_target != "No Repo" else "conversation"
 
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         resolved_context["last_user_view_time"] = now_utc.isoformat()
 
         session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
@@ -240,7 +240,7 @@ async def stream_query_bridge(
                 try:
                     event = await asyncio.wait_for(event_iter.__anext__(), timeout=15.0)
                     yield f"data: {event.model_dump_json()}\n\n"
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield ": heartbeat\n\n"
                 except StopAsyncIteration:
                     break
@@ -260,7 +260,7 @@ async def stream_query_bridge(
                     async def _shielded_view_sync():
                         cur_sess = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
                         if cur_sess:
-                            now_utc = datetime.now(timezone.utc)
+                            now_utc = datetime.now(UTC)
                             cur_sess.updated_at = now_utc
                             ctx = dict(cur_sess.context or {})
                             ctx["updated_at"] = now_utc.isoformat()

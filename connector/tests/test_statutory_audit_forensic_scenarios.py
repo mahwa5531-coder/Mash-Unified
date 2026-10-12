@@ -14,35 +14,26 @@ Testing 10 Mission-Critical Real-World Enterprise Audit Scenarios:
 10. Statutory Working Papers Immutability & Audit Deliverables Integrity
 """
 
-import os
-import sys
-import json
-import tempfile
 import datetime
+import sys
+import tempfile
 from pathlib import Path
-from decimal import Decimal
 
-import pytest
 import polars as pl
-import httpx
+import pytest
 
 # Ensure paths are set
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
-from app.main import app, lifespan
-from app.routers.chat import _ensure_project_and_context, resolve_deliverables_dir
+from app.routers.chat import _ensure_project_and_context
 from app.workspace import is_path_in_base_roots
 from nexau.archs.sandbox.local_sandbox import LocalSandbox
 from nexau.archs.tool.builtin import (
+    audit_skill_tool,
+    run_shell_command,
     view_file,
     write_file,
-    replace_file_content,
-    search_file_content,
-    glob,
-    list_directory,
-    run_shell_command,
-    audit_skill_tool,
 )
 from nexau.ingestion_pipeline.csv_to_md_parquet import parse_csv_to_markdown
 
@@ -213,7 +204,7 @@ def test_audit_scenario_3_isa_240_forensic_journal_entry_testing():
                 "amount": 1240.50 + (i * 15.20),
                 "memo": f"Routine vendor bill {i}",
             })
-        
+
         # Anomaly 1: Sunday Midnight Posting (Management Override)
         entries.append({
             "je_id": "JE-9901",
@@ -290,7 +281,7 @@ def test_audit_scenario_4_bank_reconciliation_and_stale_cheques():
         state = MockAgentState(sb)
         brs_file = tmp_path / "cheques_issued.csv"
 
-        today = datetime.date(2026, 3, 31)
+        datetime.date(2026, 3, 31)
         # Cheques issued during FY 2025-26
         cheques = [
             {"chq_no": "CHQ-801", "date": "2026-03-28", "party": "Dell Corp", "amount": 145000.0, "cleared": "NO"}, # Unpresented (valid)
@@ -444,7 +435,7 @@ def test_audit_scenario_8_large_general_ledger_10k_rows_anti_dump():
     """
     with tempfile.TemporaryDirectory(prefix="large_gl_") as tmp_dir:
         gl_path = Path(tmp_dir) / "gl_enterprise_10k.csv"
-        
+
         # Build 10,000 rows
         rows = []
         for i in range(10000):
@@ -478,7 +469,7 @@ async def test_audit_scenario_9_multi_client_workspace_isolation():
     """
     with tempfile.TemporaryDirectory(prefix="apex_holdings_") as apex_dir, \
          tempfile.TemporaryDirectory(prefix="zenith_global_") as zenith_dir:
-        
+
         apex_path = str(Path(apex_dir).resolve())
         zenith_path = str(Path(zenith_dir).resolve())
 
@@ -539,7 +530,7 @@ def test_audit_scenario_10_deliverables_working_paper_integrity():
         )
 
         awp_file = deliv_dir / "AWP_Accounts_Payable_FY26.md"
-        
+
         # 1. Create file using write_file
         res_write = write_file(TargetFile=str(awp_file), CodeContent=working_paper, overwrite=False, sandbox=sb, agent_state=state)
         assert awp_file.exists(), f"Working paper file should exist! Got: {res_write}"

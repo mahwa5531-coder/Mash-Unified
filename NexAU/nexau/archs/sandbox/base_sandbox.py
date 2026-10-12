@@ -169,9 +169,9 @@ E2B_DEFAULT_WORK_DIR = "/home/user"
 def _env_float(name: str, default: float) -> float:
     """Parse a float env var crash-safe: empty/invalid values fall back to *default*.
 
-    NAC#1312 CR: configurationdefaultvalue pydantic default_factory value, 
-    ``float(os.getenv(...))``,  Helm  env 
-    config  ValueError -- . 
+    NAC#1312 CR: configurationdefaultvalue pydantic default_factory value,
+    ``float(os.getenv(...))``,  Helm  env
+    config  ValueError -- .
     """
     raw = os.getenv(name)
     if raw is None or not raw.strip():
@@ -1260,7 +1260,7 @@ class BaseSandboxManager[TSandbox: "BaseSandbox"](ABC):
     def add_upload_assets(self, upload_assets: list[tuple[str, str]]) -> None:
         """Add upload assets to the sandbox, uploading immediately if already running.
 
-         upload assets ( teammate  spawn) 
+         upload assets ( teammate  spawn)
 
         Thread-safe: uses _start_lock to coordinate with start_sync().
         If sandbox is already running, uploads immediately.

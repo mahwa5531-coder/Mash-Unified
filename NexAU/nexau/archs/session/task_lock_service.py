@@ -11,7 +11,7 @@
 
 """Task lock service for team task operations.
 
-RFC-0002: 
+RFC-0002:
 
 Short-lived DB-backed TTL lock for task claim/release/update critical sections.
 Unlike AgentLockService, no heartbeat is needed (locks are held for < 5s).
@@ -49,7 +49,7 @@ class LockConflictError(Exception):
 class TaskLockService:
     """Short-lived DB-backed TTL lock for task operations.
 
-    RFC-0002: 
+    RFC-0002:
 
     Design:
     - TTL short-hold: default 5s, no heartbeat needed
@@ -147,7 +147,7 @@ class TaskLockService:
     ) -> AsyncGenerator[None, None]:
         """Acquire task lock for critical section.
 
-        RFC-0002: 
+        RFC-0002:
 
         Args:
             user_id: User identifier

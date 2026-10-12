@@ -11,7 +11,7 @@
 
 """Team message bus for intra-team communication.
 
-RFC-0002: 
+RFC-0002:
 
 Provides point-to-point and broadcast messaging between team agents,
 with persistent storage and delivery tracking.
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 class TeamMessageBus:
     """DB-backed message bus for team agent communication.
 
-    RFC-0002: 
+    RFC-0002:
 
     Messages are persisted to TeamMessageModel and delivered
     at iteration boundaries via TeamMessageMiddleware.
@@ -69,7 +69,7 @@ class TeamMessageBus:
     ) -> None:
         """Wire agent delivery so send/broadcast also enqueue messages.
 
-        RFC-0002: 
+        RFC-0002:
 
         Args:
             deliver_message: (to_agent_id, content, from_agent_id) -> None
@@ -100,7 +100,7 @@ class TeamMessageBus:
     ) -> TeamMessageModel:
         """Send a point-to-point message and deliver to target agent.
 
-        RFC-0002: 
+        RFC-0002:
 
         Persists the message to DB, then enqueues it to the target agent
         via the delivery callback (if wired).
@@ -132,7 +132,7 @@ class TeamMessageBus:
     ) -> TeamMessageModel:
         """Broadcast a message to all teammates and deliver immediately.
 
-        RFC-0002: 
+        RFC-0002:
 
         The broadcast message has to_agent_id=None.
         After persisting, enqueues the message to all teammates
@@ -162,7 +162,7 @@ class TeamMessageBus:
     async def drain(self, *, agent_id: str) -> list[TeamMessageModel]:
         """Fetch undelivered messages for agent, mark as delivered.
 
-        RFC-0002: 
+        RFC-0002:
 
         Returns messages targeted to this agent (direct + broadcast,
         excluding self-sent broadcasts).

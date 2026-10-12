@@ -11,10 +11,10 @@
 
 """Stop result data model.
 
-RFC-0001: Agent 
+RFC-0001: Agent
 
-StopResult  agent.stop() value, 
-package,  LLM . 
+StopResult  agent.stop() value,
+package,  LLM .
 """
 
 from dataclasses import dataclass, field
@@ -27,13 +27,13 @@ from nexau.core.messages import Message
 class StopResult:
     """Result returned by Agent.stop().
 
-    RFC-0001: Agent 
+    RFC-0001: Agent
 
     Attributes:
-        messages: 
-        stop_reason:  (USER_INTERRUPTED) 
-        interrupted_at_iteration: 
-        partial_response:  LLM  () 
+        messages:
+        stop_reason:  (USER_INTERRUPTED)
+        interrupted_at_iteration:
+        partial_response:  LLM  ()
     """
 
     messages: list[Message] = field(default_factory=lambda: list[Message]())

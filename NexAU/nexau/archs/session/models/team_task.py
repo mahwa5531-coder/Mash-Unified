@@ -11,14 +11,14 @@
 
 """Team task data models.
 
-RFC-0002: Agent Team 
+RFC-0002: Agent Team
 
 Stores team tasks with priority, dependencies, and assignment.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import JSON
 from sqlmodel import Column, Field, SQLModel
@@ -27,7 +27,7 @@ from sqlmodel import Column, Field, SQLModel
 class TeamTaskModel(SQLModel, table=True):
     """Team task model for tracking work items within a team.
 
-    RFC-0002: 
+    RFC-0002:
 
     Attributes:
         user_id: User identifier (primary key).
@@ -64,5 +64,5 @@ class TeamTaskModel(SQLModel, table=True):
     deliverable_path: str | None = Field(default=None)
     created_by: str = ""
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

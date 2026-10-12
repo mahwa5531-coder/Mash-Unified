@@ -13,9 +13,9 @@
 
 RFC-0006:  Structured Tool Definitions
 
- structured tool calling, Tool/SubAgent 
+ structured tool calling, Tool/SubAgent
 structured definition,  adapter  OpenAI / Anthropic /
-Gemini  provider schema. 
+Gemini  provider schema.
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ def build_structured_tool_definition(
     RFC-0006:  Structured Tool Definitions
 
      Tool  SubAgent  structured,  Agent /
-    Executor  vendor-specific schema. 
+    Executor  vendor-specific schema.
     """
 
     return {
@@ -105,8 +105,8 @@ def normalize_structured_tool_definition(
 
     RFC-0006:  Structured Tool Definitions
 
-     definition,  OpenAI / Anthropic, 
-    runtime  neutral structured definition. 
+     definition,  OpenAI / Anthropic,
+    runtime  neutral structured definition.
     """
 
     if tool_definition.get("type") == "function":
@@ -221,10 +221,10 @@ def structured_tool_definition_to_anthropic(
 ) -> ToolParam:
     """Convert a neutral or compatible tool definition into Anthropic schema.
 
-    RFC-0006: Provider 
+    RFC-0006: Provider
 
-    Anthropic tool schema  provider,  Agent / Executor 
-     neutral structured definition . 
+    Anthropic tool schema  provider,  Agent / Executor
+     neutral structured definition .
 
     Parameters
     ----------
@@ -454,7 +454,7 @@ class Tool:
 
         RFC-0017: formatter resolver
 
-        configuration builtin `markdown` formatter. 
+        configuration builtin `markdown` formatter.
         """
 
         if self._resolved_formatter is None:
@@ -473,8 +473,8 @@ class Tool:
 
         RFC-0017: tool output flattening
 
-         formatter,  after_tool middleware, 
-         llm-facing output. 
+         formatter,  after_tool middleware,
+         llm-facing output.
         """
 
         formatter_context = ToolFormatterContext(
@@ -576,10 +576,10 @@ class Tool:
     def has_native_async_execute(self) -> bool:
         """Whether this tool has a native async execute_async() override.
 
-        class ( MCPTool)  execute_async()  async, 
-         __init__  ``_has_native_async_execute = True``. 
-        executor  await execute_async() 
-        to_thread → sync execute . 
+        class ( MCPTool)  execute_async()  async,
+         __init__  ``_has_native_async_execute = True``.
+        executor  await execute_async()
+        to_thread → sync execute .
         """
         return self._has_native_async_execute
 
@@ -693,11 +693,11 @@ class Tool:
     async def execute_async(self, **params: Any) -> dict[str, Any]:
         """Execute the tool asynchronously.
 
-        P1 async/sync :  asyncio.run() 
+        P1 async/sync :  asyncio.run()
 
-         async tool  await ( asyncio.run()  event loop), 
-         sync tool  asyncio.to_thread()  ( event loop) . 
-         execute() method,  sync  ( ThreadPoolExecutor workers) . 
+         async tool  await ( asyncio.run()  event loop),
+         sync tool  asyncio.to_thread()  ( event loop) .
+         execute() method,  sync  ( ThreadPoolExecutor workers) .
         """
         if self.implementation is None:
             if self.implementation_import_path:
@@ -957,7 +957,7 @@ class Tool:
         RFC-0006:  Structured Tool Definitions
 
         structured, Tool  neutral definition; provider-specific
-        schema  LLM adapter  ``api_type`` . 
+        schema  LLM adapter  ``api_type`` .
         """
 
         return build_structured_tool_definition(
@@ -973,7 +973,7 @@ class Tool:
         RFC-0006: Provider package
 
         method,  neutral structured definition →
-        OpenAI adapter,  OpenAI schema  runtime . 
+        OpenAI adapter,  OpenAI schema  runtime .
         """
 
         return structured_tool_definition_to_openai(self.to_structured_definition())
@@ -984,7 +984,7 @@ class Tool:
         RFC-0006: Provider package
 
         method,  neutral structured definition →
-        Anthropic adapter,  Tool  Anthropic . 
+        Anthropic adapter,  Tool  Anthropic .
 
         Parameters
         ----------

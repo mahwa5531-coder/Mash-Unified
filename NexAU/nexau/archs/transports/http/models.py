@@ -50,7 +50,7 @@ class AgentResponse(BaseModel):
 class StopRequest(BaseModel):
     """Request model for /stop endpoint.
 
-    RFC-0001 Phase 4: Transport  stop 
+    RFC-0001 Phase 4: Transport  stop
     """
 
     user_id: str = "default-user"
@@ -63,7 +63,7 @@ class StopRequest(BaseModel):
 class StopResponse(BaseModel):
     """Response model for /stop endpoint.
 
-    RFC-0001 Phase 4: Transport  stop 
+    RFC-0001 Phase 4: Transport  stop
     """
 
     status: str  # "success" or "error"

@@ -217,12 +217,12 @@ class PromptBuilder:
         try:
             template = self._load_prompt_template("default_system_prompt")
             if template:
-                from nexau.archs.platform.path_helpers import get_session_brain_dir, get_nexau_home
+                from nexau.archs.platform.path_helpers import get_nexau_home, get_session_brain_dir
                 ctx = runtime_context or {}
                 s_id = ctx.get("session_id")
                 p_id = ctx.get("project_id")
                 def_brain = str(get_session_brain_dir(s_id if s_id != "None" else None, p_id if p_id != "None" else None))
-                
+
                 tools_list = []
                 subagents_list = []
                 skills_list = []

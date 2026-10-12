@@ -1,5 +1,5 @@
-import sqlite3
 import pathlib
+import sqlite3
 
 p = pathlib.Path.home() / ".nexau" / "nexau.db"
 conn = sqlite3.connect(p)

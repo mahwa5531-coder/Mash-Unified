@@ -7,30 +7,28 @@ Unit and integration tests for:
 """
 
 import json
-import os
 import sys
 import uuid
-import pytest
-import httpx
 from pathlib import Path
+
+import httpx
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
 from app.main import app, lifespan
 from app.paths import (
-    get_nexau_home,
     get_session_brain_dir,
-    get_database_path,
 )
 from nexau.archs.llm.llm_aggregators.events import (
-    ThinkingTextMessageStartEvent,
-    ThinkingTextMessageContentEvent,
-    ThinkingTextMessageEndEvent,
-    TextMessageStartEvent,
+    RunFinishedEvent,
     TextMessageContentEvent,
     TextMessageEndEvent,
-    RunFinishedEvent,
+    TextMessageStartEvent,
+    ThinkingTextMessageContentEvent,
+    ThinkingTextMessageEndEvent,
+    ThinkingTextMessageStartEvent,
 )
 
 

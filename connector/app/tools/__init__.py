@@ -3,10 +3,10 @@
 
 from nexau.archs.tool.builtin import (
     audit_skill_tool,
-    view_file,
+    duckduckgo_search,
     replace_file_content,
     search_file_content,
-    duckduckgo_search,
+    view_file,
 )
 
 __all__ = [

@@ -11,7 +11,7 @@
 
 """Teammate execution watchdog.
 
-RFC-0002: 
+RFC-0002:
 """
 
 from __future__ import annotations
@@ -38,15 +38,15 @@ class WatchdogConfig:
 class TeammateWatchdog:
     """Detects all-idle deadlock among teammates.
 
-    RFC-0002:  () 
+    RFC-0002:  ()
 
     Runs as a background asyncio.Task, periodically checking
     all agents for idle deadlock (all waiting with no messages).
 
-    「」strategy:  leader, 
-     leader  watchdog . 
-     (teammate /, ) 
-, . 
+    「」strategy:  leader,
+     leader  watchdog .
+     (teammate /, )
+, .
     """
 
     def __init__(
@@ -74,7 +74,7 @@ class TeammateWatchdog:
     def register(self, agent_id: str) -> None:
         """Register a teammate for idle monitoring.
 
-:  teammate . 
+:  teammate .
         """
         self._start_times[agent_id] = time.monotonic()
         self._idle_notified = False
@@ -82,7 +82,7 @@ class TeammateWatchdog:
     def unregister(self, agent_id: str) -> None:
         """Unregister a teammate from idle monitoring.
 
-: teammate . 
+: teammate .
         """
         self._start_times.pop(agent_id, None)
         self._idle_notified = False
@@ -90,22 +90,22 @@ class TeammateWatchdog:
     def reset_idle_notification(self) -> None:
         """Reset idle notification flag on meaningful state changes.
 
-        RFC-0002: 
+        RFC-0002:
 
-,  watchdog 
-         leader.: 
-        - teammate  ( watchdog ) 
-        - 
+,  watchdog
+         leader.:
+        - teammate  ( watchdog )
+        -
         """
         self._idle_notified = False
 
     async def run(self) -> None:
         """Watchdog loop - runs as background asyncio.Task.
 
-        RFC-0002: Watchdog  (strategy) 
+        RFC-0002: Watchdog  (strategy)
 
-        .  leader, 
-         reset_idle_notification() . 
+        .  leader,
+         reset_idle_notification() .
         """
         # , run
         self._stopped = False

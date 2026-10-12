@@ -2,7 +2,6 @@ from typing import Any, cast
 
 from nexau.core.messages import ImageBlock, Message, Role, TextBlock, ToolResultBlock
 from nexau.core.serializers.openai_chat import (
-    messages_from_legacy_openai_chat,
     serialize_ump_to_openai_chat_payload,
 )
 

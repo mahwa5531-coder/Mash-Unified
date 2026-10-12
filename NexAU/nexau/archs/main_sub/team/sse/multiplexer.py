@@ -47,10 +47,10 @@ class TeamSSEMultiplexer:
 
     RFC-0002:  Agent event aggregator
 
-     agent  create_event_handler, 
-     asyncio.Queue,  stream() . 
+     agent  create_event_handler,
+     asyncio.Queue,  stream() .
 
-     ``_put`` . 
+     ``_put`` .
     """
 
     def __init__(
@@ -75,8 +75,8 @@ class TeamSSEMultiplexer:
         """Thread-safe put into the async queue.
 
          ( ThreadPoolExecutor  tool
-         asyncio.run() ),  call_soon_threadsafe . 
-         owner loop,  put_nowait () . 
+         asyncio.run() ),  call_soon_threadsafe .
+         owner loop,  put_nowait () .
         """
         loop = self._loop
         if loop is None or loop.is_closed():
@@ -104,9 +104,9 @@ class TeamSSEMultiplexer:
     def create_event_handler(self, agent_id: str, role_name: str) -> Callable[[Event], None]:
         """Create an on_event callback for a specific agent.
 
-        RFC-0002:  agent 
+        RFC-0002:  agent
 
-        functionpackage TeamStreamEnvelope . 
+        functionpackage TeamStreamEnvelope .
         """
 
         def handler(event: Event) -> None:
@@ -125,7 +125,7 @@ class TeamSSEMultiplexer:
     def emit(self, agent_id: str, event: Event, *, role_name: str | None = None) -> None:
         """Emit a custom event to the SSE stream.
 
-        RFC-0002:  SSE  (, Agent ) 
+        RFC-0002:  SSE  (, Agent )
         """
         envelope = TeamStreamEnvelope(
             team_id=self._team_id,
@@ -140,9 +140,9 @@ class TeamSSEMultiplexer:
     async def stream(self) -> AsyncGenerator[TeamStreamEnvelope, None]:
         """Yield envelopes as they arrive from any agent.
 
-        RFC-0002:  agent 
+        RFC-0002:  agent
 
-         None value. 
+         None value.
         """
         while True:
             envelope = await self._queue.get()
@@ -153,9 +153,9 @@ class TeamSSEMultiplexer:
     def close(self) -> None:
         """Signal end of stream.
 
-        RFC-0002: 
+        RFC-0002:
 
-         None value,  stream() . 
-        close(),  put_nowait. 
+         None value,  stream() .
+        close(),  put_nowait.
         """
         self._put(None)

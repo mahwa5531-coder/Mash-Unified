@@ -17,22 +17,22 @@
 Handles local authentication state, DPAPI credential storage, and account switching.
 """
 
+import logging
 import os
 import time
-import logging
 from typing import Any
+
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-
-from nexau.archs.platform.crypto_vault import (
-    save_secure_vault,
-    load_secure_vault,
-    get_auth_metadata,
-    clear_vault,
-)
 from nexau.archs.platform.app_config import AppConfig
+from nexau.archs.platform.crypto_vault import (
+    clear_vault,
+    get_auth_metadata,
+    load_secure_vault,
+    save_secure_vault,
+)
+from pydantic import BaseModel
 
 from app.client import MAShClient
 
@@ -43,7 +43,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 async def ensure_valid_token(force_refresh: bool = False) -> str | None:
     """Ensures a valid access_token is available with sliding refresh token rotation.
-    
+
     1. If access_token is valid with >= 5 mins remaining before expires_at (and not force_refresh), returns it.
     2. If expired, expiring soon, or force_refresh=True, uses the 30-day refresh_token to contact the Cloud
        Gateway at /v1/auth/refresh, updating the vault with the newly issued access_token
@@ -84,7 +84,7 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
 
 async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | None:
     """Syncs authoritative user identity, plan, models, and rolling quotas from Cloud API /v1/me.
-    
+
     ponytail: Single entrypoint to sync cloud quota windows into local metadata.
     """
     if not token:
@@ -272,7 +272,7 @@ async def handle_browser_callback(code: str):
 @router.post("/callback")
 async def handle_login(payload: LoginPayload) -> dict[str, Any]:
     """Stores credentials securely in Windows DPAPI vault with multi-account support.
-    
+
     Supports:
     1. Direct local login (email, name, plan, tokens).
     2. Cloud desktop exchange handshake (code: mcode_<64hex> via loopback from web).

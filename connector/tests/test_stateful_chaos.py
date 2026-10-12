@@ -1,17 +1,20 @@
 import sys
 import tracemalloc
 from pathlib import Path
-import pytest
+
 import httpx
-from hypothesis import given, settings, HealthCheck, strategies as st
-from hypothesis.stateful import RuleBasedStateMachine, Bundle, rule, invariant
+import pytest
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 # Ensure roots are in sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
 from app.main import app, lifespan
-from nexau.archs.main_sub.execution.middleware.context_compaction.compact_stratigies.sliding_window import _HANDOFF_SUMMARY_PREFIX
+from nexau.archs.main_sub.execution.middleware.context_compaction.compact_stratigies.sliding_window import (
+    _HANDOFF_SUMMARY_PREFIX,
+)
 
 # ----------------------------------------------------------------------
 # Property-Based Fuzzing with Hypothesis: Sanitization & Boundaries
@@ -28,7 +31,7 @@ def test_hypothesis_sanitization_invariants(summary: str, user_prompt: str):
     """
     # Simulate legacy row concatenation
     dirty_text = f"{_HANDOFF_SUMMARY_PREFIX}{summary}\n\nThe user request for this round is:\n{user_prompt}"
-    
+
     parts = dirty_text.split("The user request for this round is:")
     extracted_summary = parts[0].replace(_HANDOFF_SUMMARY_PREFIX, "").strip()
     extracted_prompt = parts[1].strip()
@@ -58,7 +61,7 @@ async def test_hypothesis_stateful_desktop_chaos():
     async with lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=15.0) as client:
-            
+
             # 1. System sanity
             res = await client.get("/api/system/info")
             assert res.status_code == 200

@@ -66,7 +66,7 @@ def create_compaction_strategy(config: CompactionConfig) -> CompactionStrategy:
 def create_trigger_strategy(config: CompactionConfig) -> TriggerStrategy:
     """Builds the trigger strategy based on config.
 
-    micro-compact:  time_based  token_threshold 
+    micro-compact:  time_based  token_threshold
 
     Args:
         config: Validated configuration object

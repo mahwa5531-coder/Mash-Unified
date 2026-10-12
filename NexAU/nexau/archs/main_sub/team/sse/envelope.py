@@ -11,7 +11,7 @@
 
 """Team SSE stream envelope.
 
-RFC-0002:  Agent SSE 
+RFC-0002:  Agent SSE
 """
 
 from __future__ import annotations
@@ -24,9 +24,9 @@ from nexau.archs.llm.llm_aggregators.events import Event
 class TeamStreamEnvelope(BaseModel):
     """Envelope for multi-agent SSE events.
 
-    RFC-0002:  Agent 
+    RFC-0002:  Agent
 
-     SSE package agent,  agent_id . 
+     SSE package agent,  agent_id .
     """
 
     team_id: str

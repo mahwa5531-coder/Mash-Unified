@@ -14,14 +14,14 @@ from __future__ import annotations
 import json
 import warnings
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Any, Literal, TypedDict, cast
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 
-class Role(str, Enum):
+class Role(StrEnum):
     SYSTEM = "system"
     USER = "user"
     FRAMEWORK = "FRAMEWORK"  # Framework-injected user messages (treated as "user" when sent to LLM)

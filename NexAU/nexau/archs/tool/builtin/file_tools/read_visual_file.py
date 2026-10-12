@@ -417,7 +417,7 @@ def _downscale_image_content(
 ) -> bytes | None:
     """Downscale image bytes to their token bound via ffmpeg in the sandbox.
 
-    Incident fix (Rust counterpart nexau-rs#94): default token . 
+    Incident fix (Rust counterpart nexau-rs#94): default token .
 
     Returns the downscaled JPEG bytes, or ``None`` meaning "keep the original
     bytes/mime unchanged" - either because the image is already within bound

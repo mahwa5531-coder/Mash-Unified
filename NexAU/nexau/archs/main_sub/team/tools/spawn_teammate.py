@@ -37,9 +37,9 @@ async def spawn_teammate(
 
     RFC-0002:  candidates  teammate
 
-    Leader, configuration candidates 
+    Leader, configuration candidates
      teammate agent.  role  spawn
-     ( coder-1, coder-2) . 
+     ( coder-1, coder-2) .
     """
     ts = require_team_state(agent_state)
     if not ts.is_leader:

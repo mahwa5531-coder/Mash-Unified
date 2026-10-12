@@ -167,10 +167,10 @@ def replace_file_content(
                 "returnDisplay": f"Multiple occurrences ({occurrences}) in range",
                 "isError": True,
             }
-        
+
         count_to_replace = -1 if allow_mult else 1
         new_chunk = target_chunk.replace(search_str, replace_str, count_to_replace)
-        
+
         prefix = "".join(lines[:s_idx])
         suffix = "".join(lines[e_idx:])
         new_full_content = prefix + new_chunk + suffix
@@ -189,7 +189,7 @@ def replace_file_content(
             match_pos = normalized_file.find(search_str)
             match_start_line = normalized_file[:match_pos].count("\n") + 1
             match_end_line = match_start_line + search_str.count("\n")
-            
+
             new_normalized_file = normalized_file[:match_pos] + replace_str + normalized_file[match_pos + len(search_str):]
             new_full_content = new_normalized_file
             diff_original = search_str
@@ -204,19 +204,19 @@ def replace_file_content(
     if applied_tier is None:
         search_lines_stripped = [l.rstrip() for l in search_str.split("\n")]
         file_lines_stripped = [l.rstrip() for l in normalized_file.split("\n")]
-        
+
         match_line_indices = []
         L = len(search_lines_stripped)
         for i in range(len(file_lines_stripped) - L + 1):
             if file_lines_stripped[i : i + L] == search_lines_stripped:
                 match_line_indices.append(i)
-                
+
         if len(match_line_indices) == 1:
             matched_i = match_line_indices[0]
             orig_slice = lines[matched_i : matched_i + L]
             prefix = "".join(lines[:matched_i])
             suffix = "".join(lines[matched_i + L:])
-            
+
             new_lines_block = replace_str if replace_str.endswith("\n") else replace_str + "\n"
             new_full_content = prefix + new_lines_block + suffix
             diff_original = "".join(orig_slice)
@@ -231,7 +231,7 @@ def replace_file_content(
     if applied_tier is None:
         global_count = normalized_file.count(search_str)
         sample_chunk = "\n".join([f"  L{s_line + idx}: {l.rstrip()}" for idx, l in enumerate(lines[s_idx:min(e_idx, s_idx + 10)])])
-        
+
         if global_count > 1:
             hint = f"Note: TargetContent was found {global_count} times in other parts of the file. Please specify accurate StartLine and EndLine to disambiguate."
         else:

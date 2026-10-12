@@ -13,8 +13,6 @@ Directly composes:
 
 import base64
 import logging
-import os
-import mimetypes
 from pathlib import Path
 from typing import Any
 
@@ -22,8 +20,8 @@ from nexau.archs.main_sub.agent_state import AgentState
 from nexau.archs.sandbox import BaseSandbox, SandboxStatus
 from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 from nexau.archs.tool.builtin.file_tools.list_directory import list_directory
-from nexau.archs.tool.builtin.file_tools.read_visual_file import read_visual_file
 from nexau.archs.tool.builtin.file_tools.read_many_files import read_many_files
+from nexau.archs.tool.builtin.file_tools.read_visual_file import read_visual_file
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +213,7 @@ def view_file(
         content_parts: list[dict[str, Any]] = [{"type": "text", "text": header_text}]
 
         for p_idx in range(p_start - 1, p_end):
-            page_num = p_idx + 1
+            p_idx + 1
             page = doc[p_idx]
             # 150 DPI provides crystal-clear rendering for financial balance sheets and fine print
             pix = page.get_pixmap(dpi=150)
@@ -318,7 +316,7 @@ def view_file(
 
     # Format lines with 1-indexed numbers and SWE-agent spatial markers
     formatted_chunks = []
-    
+
     # Spatial marker above
     if req_start > 1:
         formatted_chunks.append(f"[({req_start - 1} lines above)]")

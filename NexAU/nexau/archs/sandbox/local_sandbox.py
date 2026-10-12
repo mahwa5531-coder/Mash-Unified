@@ -609,7 +609,7 @@ class LocalSandbox(BaseSandbox):
         """
         Get the status and output of a background task.
 
-         output_dir  stdout.txt / stderr.txt  ( OS ) . 
+         output_dir  stdout.txt / stderr.txt  ( OS ) .
 
         Args:
             pid: The process ID of the background task

@@ -72,9 +72,9 @@ _CONDITIONAL_BUILTIN_TOOL_BINDINGS: tuple[tuple[str, str, tuple[str, ...]], ...]
 
 
 def _conditional_builtin_bindings() -> tuple[tuple[str, str], ...]:
-    """. 
+    """.
 
-    RFC-0028: configuration. 
+    RFC-0028: configuration.
     """
     enabled: list[tuple[str, str]] = []
     for name, binding, env_keys in _CONDITIONAL_BUILTIN_TOOL_BINDINGS:
@@ -166,7 +166,7 @@ def _require_dict(value: object, *, context: str) -> dict[str, Any]:
 def _inject_builtin_tools(config: dict[str, Any]) -> None:
     """Inject conditional runtime built-in tools without replacing declared tools.
 
-     agent, runtime . 
+     agent, runtime .
     """
     tools_raw: object = config.get("tools")
     if tools_raw is None:
@@ -423,9 +423,9 @@ class AgentConfig(
     def _finalize(self):  # type: ignore[override]
         """Finalize configuration by normalizing fields and injecting skill tool.
 
-        RFC-0015:  Sub-agent  Agent 
+        RFC-0015:  Sub-agent  Agent
 
-         sub_agents  Agent, list. 
+         sub_agents  Agent, list.
         """
         if self._is_finalized:
             return self

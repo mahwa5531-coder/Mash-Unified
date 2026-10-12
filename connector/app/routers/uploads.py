@@ -1,11 +1,11 @@
 import os
-import shutil
-from fastapi import APIRouter, File, UploadFile, HTTPException
-from app.dependencies import DatabaseEngineDep
-from nexau.archs.session.models import SessionModel
-from nexau.archs.session.orm import ComparisonFilter
 from pathlib import Path
 
+from fastapi import APIRouter, HTTPException, UploadFile
+from nexau.archs.session.models import SessionModel
+from nexau.archs.session.orm import ComparisonFilter
+
+from app.dependencies import DatabaseEngineDep
 from app.paths import get_session_brain_dir
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
@@ -68,8 +68,8 @@ async def list_uploaded_files(session_id: str, engine: DatabaseEngineDep):
     if not brain_dir:
         project_id = (session.context or {}).get("project_id") if session else None
         brain_dir = str(get_session_brain_dir(session_id, project_id))
-    from pathlib import Path
     import datetime
+    from pathlib import Path
 
     candidate_upload_dirs = [
         Path(brain_dir) / ".user_uploaded",

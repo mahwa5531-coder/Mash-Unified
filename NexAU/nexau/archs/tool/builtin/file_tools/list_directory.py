@@ -155,7 +155,7 @@ def list_directory(
         formatted_entries: list[str] = []
         for d in directories[:MAX_ENTRIES]:
             formatted_entries.append(f"[DIR] {d}")
-        
+
         remaining_slots = MAX_ENTRIES - len(formatted_entries)
         if remaining_slots > 0:
             for f in files[:remaining_slots]:

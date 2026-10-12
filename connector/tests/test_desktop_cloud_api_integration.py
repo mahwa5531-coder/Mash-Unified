@@ -19,21 +19,26 @@ OpenAI routing, AG-UI envelope streaming, rate limiting, circuit breaking,
 and error handling between the Mash desktop connector and the Cloud API layer.
 """
 
+import json
 import os
 import time
-import json
-import pytest
-import httpx
-import respx
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
+import httpx
+import pytest
+import respx
 from app.main import _build_agent_config
-from app.routers.auth import ensure_valid_token, handle_login, LoginPayload, SwitchAccountPayload
+from app.routers.auth import (
+    LoginPayload,
+    SwitchAccountPayload,
+    ensure_valid_token,
+    handle_login,
+)
 from nexau.archs.platform.crypto_vault import (
-    save_secure_vault,
-    load_secure_vault,
-    get_auth_metadata,
     clear_vault,
+    get_auth_metadata,
+    load_secure_vault,
+    save_secure_vault,
 )
 
 
@@ -56,7 +61,7 @@ async def test_handshake_desktop_code_exchange_happy_path():
     Desktop exchanges mcode with Cloud API at /v1/auth/desktop/exchange and saves tokens."""
     cloud_url = "https://api.mash.ai"
     test_code = "mcode_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-    
+
     respx.post(f"{cloud_url}/v1/auth/desktop/exchange").mock(
         return_value=httpx.Response(
             200,
@@ -82,17 +87,17 @@ async def test_handshake_desktop_code_exchange_happy_path():
     with patch.dict(os.environ, {"CLOUD_GATEWAY_URL": cloud_url}):
         payload = LoginPayload(code=test_code)
         resp = await handle_login(payload)
-        
+
         assert resp["success"] is True
         assert resp["email"] == "lead.auditor@deloitte-audit.com"
-        
+
         # Verify credentials persisted into DPAPI vault
         vault = load_secure_vault()
         assert vault is not None
         assert vault["access_token"] == "jwt_access_token_lead_auditor"
         assert vault["refresh_token"] == "nxr_refresh_token_lead_auditor"
         assert vault["expires_at"] > int(time.time()) + 3000
-        
+
         # Verify metadata
         meta = get_auth_metadata()
         assert meta["authenticated"] is True
@@ -108,13 +113,13 @@ async def test_handshake_dual_channel_race_second_caller_recovers():
     Desktop gracefully recognizes other channel already authenticated."""
     cloud_url = "https://api.mash.ai"
     test_code = "mcode_duplicate_race_code"
-    
+
     # Pre-authenticate vault from winner
     save_secure_vault(
         {"access_token": "jwt_winner", "email": "auditor@firm.com"},
         {"authenticated": True, "email": "auditor@firm.com", "plan": "pro"}
     )
-    
+
     # Cloud returns 400 because Redis Lua GETDEL already deleted the key
     respx.post(f"{cloud_url}/v1/auth/desktop/exchange").mock(
         return_value=httpx.Response(
@@ -126,7 +131,7 @@ async def test_handshake_dual_channel_race_second_caller_recovers():
     with patch.dict(os.environ, {"CLOUD_GATEWAY_URL": cloud_url}):
         payload = LoginPayload(code=test_code)
         resp = await handle_login(payload)
-        
+
         # Desktop recognizes existing authenticated state and succeeds
         assert resp["success"] is True
         assert resp["authenticated"] is True
@@ -150,7 +155,7 @@ async def test_handshake_expired_or_tampered_code_fails():
         with pytest.raises(Exception) as exc_info:
             await handle_login(payload)
         assert "400" in str(exc_info.value)
-        
+
         # Vault must remain completely unauthenticated
         meta = get_auth_metadata()
         assert meta.get("authenticated") is not True
@@ -163,7 +168,7 @@ async def test_sliding_token_refresh_pre_expiry_rotates_atomically():
     ensure_valid_token automatically calls /v1/auth/refresh and updates vault."""
     cloud_url = "https://api.mash.ai"
     now = int(time.time())
-    
+
     # Store token expiring in 60 seconds (< 300s threshold)
     save_secure_vault(
         {
@@ -189,7 +194,7 @@ async def test_sliding_token_refresh_pre_expiry_rotates_atomically():
     with patch.dict(os.environ, {"CLOUD_GATEWAY_URL": cloud_url}):
         token = await ensure_valid_token()
         assert token == "jwt_fresh_rotated_token"
-        
+
         # Verify vault updated
         vault = load_secure_vault()
         assert vault["access_token"] == "jwt_fresh_rotated_token"
@@ -469,7 +474,7 @@ async def test_multi_account_vault_switching():
         credits_remaining=99999,
     )
     await handle_login(acc_a)
-    
+
     # 2. Login Account B
     acc_b = LoginPayload(
         email="associate@auditfirm.com",
@@ -528,7 +533,7 @@ def test_sse_split_tcp_packets_buffering():
     """Scenario 7.2: TCP packet boundary splits a single JSON event in half across chunks."""
     chunk1 = "data: {\"type\": \"TEXT_MESSAGE_CONTENT\", \"data\": {\"del"
     chunk2 = "ta\": \"Forensic Match\"}}\n\n"
-    
+
     buffer = ""
     events = []
     for chunk in [chunk1, chunk2]:
@@ -539,7 +544,7 @@ def test_sse_split_tcp_packets_buffering():
             trimmed = line.strip()
             if trimmed.startswith("data:"):
                 events.append(json.loads(trimmed[5:].strip()))
-                
+
     assert len(events) == 1
     assert events[0]["data"]["delta"] == "Forensic Match"
 
@@ -578,7 +583,7 @@ def test_sse_malformed_json_resilience():
                 tokens.append(ev["data"]["delta"])
             except Exception:
                 continue # resiliently skip malformed frames
-    
+
     assert tokens == ["Valid 1", "Valid 2"]
 
 
@@ -588,7 +593,7 @@ async def test_mid_stream_token_expiry_auto_refresh_retry():
     """Scenario 7.5: Mid-session LLM call encounters 401 token expiry; auto-refreshes and retries."""
     cloud_url = "https://api.mash.ai"
     now = int(time.time())
-    
+
     save_secure_vault(
         {"access_token": "expired_jwt", "refresh_token": "valid_refresh", "expires_at": now - 10},
         {"authenticated": True}
@@ -617,7 +622,7 @@ async def test_mid_stream_token_expiry_auto_refresh_retry():
         if resp.status_code == 401:
             token = await ensure_valid_token()
             resp = await client.post(f"{cloud_url}/v1/chat/completions", headers={"Authorization": f"Bearer {token}"})
-            
+
         assert resp.status_code == 200
         assert resp.json()["choices"][0]["message"]["content"] == "Retry Succeeded"
 
@@ -650,15 +655,15 @@ def test_large_tool_arguments_chunked_reassembly():
     """Scenario 7.7: Large 50KB JSON argument payload reassembles perfectly across chunks."""
     large_dict = {"entries": [{"id": i, "amount": i * 100.5} for i in range(500)]}
     full_json = json.dumps(large_dict)
-    
+
     # Split into 5KB chunks
     chunk_size = 5000
     chunks = [full_json[i:i+chunk_size] for i in range(0, len(full_json), chunk_size)]
-    
+
     buffer = ""
     for c in chunks:
         buffer += c
-        
+
     reassembled = json.loads(buffer)
     assert len(reassembled["entries"]) == 500
     assert reassembled["entries"][499]["amount"] == 499 * 100.5
@@ -688,7 +693,7 @@ def test_utf8_financial_currency_and_symbols_preservation():
     audit_summary = "Reconciliation: Bank balance ₹1,45,20,000.00 (€160,000.00 / $175,000.00 / £135,000.00) [✁EVERIFIED]"
     encoded = json.dumps({"type": "TEXT_MESSAGE_CONTENT", "data": {"delta": audit_summary}})
     decoded = json.loads(encoded)
-    
+
     assert "₹1,45,20,000.00" in decoded["data"]["delta"]
     assert "€160,000.00" in decoded["data"]["delta"]
     assert "✁EVERIFIED" in decoded["data"]["delta"]
@@ -800,7 +805,7 @@ async def test_idempotency_key_replay_header_preservation():
     """Scenario 7.14: Idempotency-Key header is preserved across duplicate execution attempts."""
     cloud_url = "https://api.mash.ai"
     idem_key = "idem_run_fixed_asset_reconcile_01"
-    
+
     route = respx.post(f"{cloud_url}/v1/chat/completions").mock(
         return_value=httpx.Response(200, json={"id": "run_01", "status": "completed"})
     )
@@ -882,8 +887,8 @@ async def test_mash_client_get_me_rolling_quotas():
 
 def test_bifrost_headers_include_request_id():
     """Scenario 8.2: _build_bifrost_headers injects X-Request-ID and X-Session-ID."""
-    from nexau.archs.main_sub.execution.llm_caller import _build_bifrost_headers
     from nexau.archs.llm.llm_config import LLMConfig
+    from nexau.archs.main_sub.execution.llm_caller import _build_bifrost_headers
     cfg = LLMConfig(session_id="sess_kpmg_test_123")
     headers = _build_bifrost_headers(cfg)
 

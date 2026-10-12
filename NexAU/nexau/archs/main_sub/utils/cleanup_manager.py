@@ -117,12 +117,12 @@ class CleanupManager:
     def _cleanup_sandbox(self) -> None:
         """Clean up active sandbox on process exit.
 
-        RFC-0140: configuration (env ``NEXAU_SANDBOX_ATEXIT_ACTION``), default ``stop``. 
-        - ``stop`` (default / value):  sandbox (, ) 
-        - ``pause``: best-effort  (``pause_no_wait``, ) 
-        - ``none``:  sandbox,  caller  (NAC value, #932 ) 
+        RFC-0140: configuration (env ``NEXAU_SANDBOX_ATEXIT_ACTION``), default ``stop``.
+        - ``stop`` (default / value):  sandbox (, )
+        - ``pause``: best-effort  (``pause_no_wait``, )
+        - ``none``:  sandbox,  caller  (NAC value, #932 )
 
-        ``atexit``  ``_signal_handler`` function, . 
+        ``atexit``  ``_signal_handler`` function, .
         """
         try:
             logger.info("🧹 Cleaning up active sandbox...")

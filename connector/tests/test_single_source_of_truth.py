@@ -1,13 +1,16 @@
 """Self-check verification for single source of truth in LLM config & context window propagation."""
 
-import os
 from pathlib import Path
-import pytest
 
-from nexau import AgentConfig, Agent
+from nexau.archs.main_sub.execution.middleware.context_compaction import (
+    ContextCompactionMiddleware,
+)
+from nexau.archs.main_sub.execution.middleware.round_and_token_reminder import (
+    RoundAndTokenReminderMiddleware,
+)
 from nexau.archs.main_sub.utils.common import load_yaml_text_with_vars
-from nexau.archs.main_sub.execution.middleware.context_compaction import ContextCompactionMiddleware
-from nexau.archs.main_sub.execution.middleware.round_and_token_reminder import RoundAndTokenReminderMiddleware
+
+from nexau import Agent, AgentConfig
 
 
 def test_yaml_env_fallback_resolution():
@@ -35,13 +38,13 @@ def test_main_agent_context_propagation():
     """Verify main_agent.yaml propagates single context window to all middlewares."""
     manifest_path = Path(__file__).resolve().parent.parent / "app" / "resources" / "main_agent.yaml"
     cfg = AgentConfig.from_yaml(manifest_path)
-    
+
     # Context limit is cleanly parsed
     assert cfg.max_context_tokens > 0
 
     # Instantiate Agent and verify middlewares dynamically inherit the limit
     agent = Agent(config=cfg)
-    
+
     compaction_mw = next(m for m in agent.executor.middleware_manager.middlewares if isinstance(m, ContextCompactionMiddleware))
     reminder_mw = next(m for m in agent.executor.middleware_manager.middlewares if isinstance(m, RoundAndTokenReminderMiddleware))
 

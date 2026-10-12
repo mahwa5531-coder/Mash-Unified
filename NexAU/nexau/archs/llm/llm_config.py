@@ -66,8 +66,8 @@ class LLMConfig:
             debug: Enable debug logging of LLM messages
             stream: Enable streaming responses when supported by backend
             api_type: API type
-            tokenizer_path: HuggingFace tokenizer,  "meta-llama/Llama-3.1-8B-Instruct". 
-                 api_type="generate_with_token",  AutoTokenizer.from_pretrained . 
+            tokenizer_path: HuggingFace tokenizer,  "meta-llama/Llama-3.1-8B-Instruct".
+                 api_type="generate_with_token",  AutoTokenizer.from_pretrained .
             stream_idle_timeout_ms: Per-chunk idle timeout in ms for streaming responses.
                 If no chunk arrives within this duration, the stream is aborted.
                 None → DEFAULT_STREAM_IDLE_TIMEOUT_MS (300_000ms = 5 min).
@@ -213,9 +213,9 @@ class LLMConfig:
     def to_client_kwargs(self) -> dict[str, Any]:
         """Convert to OpenAI/Anthropic client initialization kwargs.
 
-        stream_idle_timeout_ms → httpx read timeout, timeouttimeout. 
-        connect_timeout_ms → httpx connect timeout. 
-         httpx.Timeout  SDK. 
+        stream_idle_timeout_ms → httpx read timeout, timeouttimeout.
+        connect_timeout_ms → httpx connect timeout.
+         httpx.Timeout  SDK.
         """
         import httpx as _httpx
 
@@ -240,8 +240,8 @@ class LLMConfig:
 
         # Inject Bifrost / Cloud Gateway telemetry headers
         try:
-            from nexau.archs.platform.path_helpers import get_installation_id
             from nexau.archs.platform.crypto_vault import get_auth_metadata
+            from nexau.archs.platform.path_helpers import get_installation_id
 
             meta = get_auth_metadata()
             headers: dict[str, str] = {

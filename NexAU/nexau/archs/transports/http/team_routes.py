@@ -120,7 +120,7 @@ def create_team_router(
 ) -> APIRouter:
     """Create team router with registry dependency.
 
-    RFC-0002:  team  ( TeamRegistry) 
+    RFC-0002:  team  ( TeamRegistry)
 
     Args:
         registry: TeamRegistry instance for managing team lifecycle.
@@ -139,11 +139,11 @@ def create_team_router(
     async def team_stream(request: TeamRunRequest) -> StreamingResponse:
         """Run team with SSE streaming output.
 
-        RFC-0002: Team SSE 
+        RFC-0002: Team SSE
         RFC-0014: running
 
-         team,  enqueue  leader  subscribe 
-        SSE,  run()  leader lock . 
+         team,  enqueue  leader  subscribe
+        SSE,  run()  leader lock .
         """
         team = registry.get_or_create(request.user_id, request.session_id)
 
@@ -265,7 +265,7 @@ def create_team_router(
     async def team_query(request: TeamRunRequest) -> dict[str, str]:
         """Run team synchronously.
 
-        RFC-0002: Team 
+        RFC-0002: Team
         """
         team = registry.get_or_create(request.user_id, request.session_id)
         try:
@@ -300,7 +300,7 @@ def create_team_router(
 
         """List tasks on the shared task board.
 
-        RFC-0002: 
+        RFC-0002:
         """
         team = registry.get_or_create(user_id, session_id)
         try:
@@ -315,7 +315,7 @@ def create_team_router(
     async def create_task(request: CreateTaskRequest) -> dict[str, object]:
         """Create a new task.
 
-        RFC-0002: 
+        RFC-0002:
         """
         team = registry.get_or_create(request.user_id, request.session_id)
         await team.initialize()
@@ -333,7 +333,7 @@ def create_team_router(
     async def claim_task(request: ClaimTaskRequest) -> dict[str, object]:
         """Claim a task.
 
-        RFC-0002: 
+        RFC-0002:
         """
         team = registry.get_or_create(request.user_id, request.session_id)
         await team.initialize()
@@ -357,7 +357,7 @@ def create_team_router(
     ) -> dict[str, object]:
         """Update task status.
 
-        RFC-0002: 
+        RFC-0002:
         """
         team = registry.get_or_create(user_id, session_id)
         await team.initialize()
@@ -373,7 +373,7 @@ def create_team_router(
     async def send_message(request: SendMessageRequest) -> dict[str, str]:
         """Send an intra-team message.
 
-        RFC-0002: 
+        RFC-0002:
         """
         team = registry.get_or_create(request.user_id, request.session_id)
         await team.initialize()
@@ -396,10 +396,10 @@ def create_team_router(
     async def user_message(request: UserMessageRequest) -> dict[str, str]:
         """Enqueue a user message to an agent during streaming.
 
-        RFC-0002: 
+        RFC-0002:
 
-         stream,  agent  user, 
-         enqueue_message  agent  team_mode . 
+         stream,  agent  user,
+         enqueue_message  agent  team_mode .
         """
         team = registry.get(request.user_id, request.session_id)
         if team is None:
@@ -414,7 +414,7 @@ def create_team_router(
 
         RFC-0002:  Team
 
-         Stop,  leader  teammate . 
+         Stop,  leader  teammate .
         """
         team = registry.get(request.user_id, request.session_id)
         if team is None:
@@ -430,9 +430,9 @@ def create_team_router(
     ) -> dict[str, object]:
         """Check whether a team is currently running.
 
-        RFC-0002:  Team 
+        RFC-0002:  Team
 
-        interface SSE . 
+        interface SSE .
         """
         team = registry.get(user_id, session_id)
         return {
@@ -449,10 +449,10 @@ def create_team_router(
     ) -> StreamingResponse:
         """Subscribe to new team events from EventStore (for reconnection after refresh).
 
-        RFC-0002:  SSE 
+        RFC-0002:  SSE
 
-        interface EventStore, 
-        `after`  N . 
+        interface EventStore,
+        `after`  N .
         """
 
         async def event_generator() -> AsyncGenerator[str, None]:

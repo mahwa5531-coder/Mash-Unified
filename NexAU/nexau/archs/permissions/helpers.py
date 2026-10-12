@@ -158,12 +158,12 @@ def check_permission(
     permission_key: str,
     prompt: str,
 ) -> None:
-    """ () . 
+    """ () .
 
     RFC-0019:  tool  helper
 
-     permission_key  allow/deny rules: 
-     allow →,  deny → raise PermissionDenied,  → raise AskPermission. 
+     permission_key  allow/deny rules:
+     allow →,  deny → raise PermissionDenied,  → raise AskPermission.
     """
     # 1. "**" =
     if _WILDCARD in ctx.allow_rules:
@@ -185,9 +185,9 @@ def check_permission(
 
 
 def _path_to_dir_glob(path: str) -> str:
-    """ glob . 
+    """ glob .
 
-    CC: allow, . 
+    CC: allow, .
      /Users/pcj/project/foo.py → /Users/pcj/project/**
     """
     from pathlib import PurePosixPath
@@ -199,9 +199,9 @@ def _path_to_dir_glob(path: str) -> str:
 
 
 def _is_protected_path(path: str) -> bool:
-    """ CC . 
+    """ CC .
 
-    CC:  allow  ask. 
+    CC:  allow  ask.
     """
     from pathlib import PurePosixPath
 
@@ -219,14 +219,14 @@ def _is_protected_path(path: str) -> bool:
 
 
 def check_path_permission(ctx: FrameworkContext, path: str) -> None:
-    """. 
+    """.
 
     RFC-0019:  filesystem helper
 
-     pathspec  (gitignore ) . 
-    CC: permission_key  glob, allow . 
-    CC:  (.git, .bashrc )  allow  ask. 
-     write_file / replace / apply_patch / multiedit_tool . 
+     pathspec  (gitignore ) .
+    CC: permission_key  glob, allow .
+    CC:  (.git, .bashrc )  allow  ask.
+     write_file / replace / apply_patch / multiedit_tool .
     """
     # 1. "**" = ( ask)
     if _WILDCARD in ctx.allow_rules and not _is_protected_path(path):
@@ -262,9 +262,9 @@ def check_path_permission(ctx: FrameworkContext, path: str) -> None:
 
 
 def _split_shell_commands(command: str) -> list[str]:
-    """/, . 
+    """/, .
 
-    CC:  ``|``, ``&&``, ``||``, ``;`` . 
+    CC:  ``|``, ``&&``, ``||``, ``;`` .
     """
     parts: list[str] = []
     current: list[str] = []
@@ -337,10 +337,10 @@ def _is_numeric_arg(s: str) -> bool:
 
 
 def _strip_process_wrappers(tokens: list[str]) -> list[str]:
-    """package,  tokens. 
+    """package,  tokens.
 
-    CC: ``timeout 30 git push`` →  ``git push`` . 
-: timeout, time, nice, nohup, stdbuf,  xargs. 
+    CC: ``timeout 30 git push`` →  ``git push`` .
+: timeout, time, nice, nohup, stdbuf,  xargs.
     """
     i = 0
     while i < len(tokens):
@@ -423,10 +423,10 @@ _COMMANDS_WITH_SUBCOMMANDS: frozenset[str] = frozenset(
 
 
 def _command_permission_key(tokens: list[str]) -> str:
-    """ permission_key. 
+    """ permission_key.
 
-    CC:  "command subcommand"  ( "npm install"), 
-     ( "python") . 
+    CC:  "command subcommand"  ( "npm install"),
+     ( "python") .
     """
     head = tokens[0]
     if head in _COMMANDS_WITH_SUBCOMMANDS and len(tokens) > 1 and not tokens[1].startswith("-"):
@@ -435,10 +435,10 @@ def _command_permission_key(tokens: list[str]) -> str:
 
 
 def _has_output_redirect(tokens: list[str]) -> bool:
-    """ tokens package. 
+    """ tokens package.
 
-    CC: read-only,,  ask. 
-: ``>``, ``>>``, ``2>``, ``&>``, ``>&`` . 
+    CC: read-only,,  ask.
+: ``>``, ``>>``, ``2>``, ``&>``, ``>&`` .
     """
     for token in tokens[1:]:
         if token == "&>" or token.startswith(">&"):
@@ -452,9 +452,9 @@ def _check_shell_c_inner(
     ctx: FrameworkContext,
     inner_cmd: str,
 ) -> tuple[str | None, str]:
-    """ shell -c . 
+    """ shell -c .
 
-    CC: ``bash -c "git push"`` →  ``git push`` . 
+    CC: ``bash -c "git push"`` →  ``git push`` .
     """
     sub_commands = _split_shell_commands(inner_cmd)
     first_ask_key = ""
@@ -523,14 +523,14 @@ def _check_single_command(
 
 
 def check_shell_permission(ctx: FrameworkContext, command: str) -> None:
-    """. 
+    """.
 
     RFC-0019:  shell helper
 
-    CC:  ``|``, ``&&``, ``||``, ``;``, 
-     deny → read-only → allow → ask . 
-    deny,  ask  ask. 
-     run_shell_command . 
+    CC:  ``|``, ``&&``, ``||``, ``;``,
+     deny → read-only → allow → ask .
+    deny,  ask  ask.
+     run_shell_command .
     """
     if _WILDCARD in ctx.allow_rules:
         return
@@ -565,13 +565,13 @@ def check_shell_permission(ctx: FrameworkContext, command: str) -> None:
 
 
 def check_url_permission(ctx: FrameworkContext, url: str) -> None:
-    """. 
+    """.
 
-    CC : WebFetch 
+    CC : WebFetch
 
-     URL  hostname,  allow/deny . 
-    deny/allow  fnmatch  ( ``*.github.com``) . 
-     web_fetch . 
+     URL  hostname,  allow/deny .
+    deny/allow  fnmatch  ( ``*.github.com``) .
+     web_fetch .
     """
     # 1. "**" =
     if _WILDCARD in ctx.allow_rules:
@@ -601,14 +601,14 @@ def check_url_permission(ctx: FrameworkContext, url: str) -> None:
 
 
 def check_mcp_permission(ctx: FrameworkContext, server_name: str, tool_name: str) -> None:
-    """MCP permission check. 
+    """MCP permission check.
 
     RFC-0019:  MCP helper
 
-    CC: MCP default always-ask, key ``mcp__{server}__{tool}``. 
-     server  -- allow/deny ``mcp__{server}``  server . 
-     shell  head/subcommand . 
-     MCPTool . 
+    CC: MCP default always-ask, key ``mcp__{server}__{tool}``.
+     server  -- allow/deny ``mcp__{server}``  server .
+     shell  head/subcommand .
+     MCPTool .
     """
     # 1. "**" =
     if _WILDCARD in ctx.allow_rules:

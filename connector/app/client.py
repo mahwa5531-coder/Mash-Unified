@@ -25,7 +25,6 @@ import os
 from typing import Any
 
 import httpx
-
 from nexau.archs.platform.app_config import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 class MAShClient:
     """Centralized client for all desktop-to-cloud communications.
-    
+
     ponytail: Single source of truth for cloud network calls. Prevents scattered
     httpx/requests logic across the codebase.
     """

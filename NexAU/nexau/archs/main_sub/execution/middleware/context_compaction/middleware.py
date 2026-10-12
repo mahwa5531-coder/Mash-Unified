@@ -1011,7 +1011,7 @@ class ContextCompactionMiddleware(Middleware):
         """Update the compaction strategy's global_storage from agent_state.
 
         RFC-0009:  global_storage  compaction strategy,
-         LLMCaller  Langfuse . 
+         LLMCaller  Langfuse .
         """
         gs = self._global_storage
         if gs is None and agent_state is not None:
@@ -1062,10 +1062,10 @@ class ContextCompactionMiddleware(Middleware):
         trigger_reason: str,
         strategy_name: str,
     ) -> list[Message]:
-        """RFC-0021:  before/after,  sandbox . 
+        """RFC-0021:  before/after,  sandbox .
 
-        failure  --  exception. 
-        value:  messages_after. 
+        failure  --  exception.
+        value:  messages_after.
         """
         if not self.save_history or agent_state is None:
             return messages_after

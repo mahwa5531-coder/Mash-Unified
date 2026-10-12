@@ -11,7 +11,7 @@
 
 """broadcast tool - broadcast a message to all teammates.
 
-RFC-0002: 
+RFC-0002:
 """
 
 from __future__ import annotations
@@ -30,10 +30,10 @@ async def broadcast(
 ) -> MessageResult:
     """Broadcast a message to all teammates.
 
-    RFC-0002: 
+    RFC-0002:
 
-     message bus  enqueue_message  teammate. 
-    . 
+     message bus  enqueue_message  teammate.
+    .
     """
     ts = require_team_state(agent_state)
     msg = await ts.message_bus.broadcast(

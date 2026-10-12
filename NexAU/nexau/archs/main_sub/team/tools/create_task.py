@@ -11,7 +11,7 @@
 
 """create_task tool - create a new task on the shared task board.
 
-RFC-0002:  ( leader ) 
+RFC-0002:  ( leader )
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ async def create_task(
 ) -> CreateTaskResult | ToolError:
     """Create a new task on the shared task board.
 
-    RFC-0002:  ( leader ) 
+    RFC-0002:  ( leader )
     """
     ts = require_team_state(agent_state)
     if not ts.is_leader:

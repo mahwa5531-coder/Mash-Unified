@@ -20,8 +20,9 @@ context from Session A never leaks into Session B.
 
 from __future__ import annotations
 
-from unittest.mock import patch
 import asyncio
+from unittest.mock import patch
+
 import pytest
 
 from nexau.archs.llm.llm_config import LLMConfig

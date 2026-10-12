@@ -1,13 +1,15 @@
+import asyncio
+import json
 import os
 import sys
-import json
-import asyncio
 from pathlib import Path
+
 import httpx
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from nexau_ui_backend.main import app, lifespan
+
 
 @pytest.mark.anyio
 async def test_concurrent_multi_project_workflow_live():
@@ -22,11 +24,11 @@ async def test_concurrent_multi_project_workflow_live():
     async with lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=90.0) as client:
-            
+
             # 1. Create 2 Independent Projects
             res_a = await client.post("/api/projects", json={"user_id": user_id, "name": "Alpha Client Audit", "local_folder_path": project_a_dir})
             proj_a_id = res_a.json().get("id")
-            
+
             res_b = await client.post("/api/projects", json={"user_id": user_id, "name": "Beta Tax Analytics", "local_folder_path": project_b_dir})
             proj_b_id = res_b.json().get("id")
 

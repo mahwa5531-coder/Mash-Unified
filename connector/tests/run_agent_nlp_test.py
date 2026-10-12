@@ -1,9 +1,9 @@
 import json
-import sqlite3
 import pathlib
-import urllib.request
-import time
+import sqlite3
 import sys
+import time
+import urllib.request
 
 BASE_URL = "http://127.0.0.1:8000"
 DB_PATH = pathlib.Path.home() / ".nexau" / "database" / "nexau.db"
@@ -33,7 +33,7 @@ def inspect_database(tag="", session_id=None):
             for r in rows:
                 print(f"    [{t}] Row: {dict(zip(col_names[:5], r[:5]))}")
     conn.close()
-    
+
     # Also inspect transcript file if it exists
     if session_id:
         transcript_path = pathlib.Path.home() / ".nexau" / "brain" / session_id / ".system_generated" / "logs" / "transcript.jsonl"
@@ -79,7 +79,7 @@ def send_nlp_query(session_id: str, prompt: str):
                 try:
                     ev = json.loads(data_json)
                     ev_type = ev.get("type", "")
-                    
+
                     if "THINKING" in ev_type:
                         delta = ev.get("delta", "")
                         thinking_text += delta
@@ -100,7 +100,7 @@ def send_nlp_query(session_id: str, prompt: str):
                         sys.stdout.flush()
                     elif "RUN_FINISHED" in ev_type:
                         print("\n[RUN FINISHED]")
-                except Exception as e:
+                except Exception:
                     pass
 
     print("\n--- FINAL AGENT ANSWER ---")
@@ -115,7 +115,7 @@ def send_nlp_query(session_id: str, prompt: str):
 if __name__ == "__main__":
     session_id = f"test_nlp_{int(time.time())}"
     print(f"Starting Live NLP Agent Test on session: {session_id}")
-    
+
     inspect_database("BEFORE ANY RUN")
 
     # Turn 1: Pure NLP asking the agent to inspect the sandbox folder

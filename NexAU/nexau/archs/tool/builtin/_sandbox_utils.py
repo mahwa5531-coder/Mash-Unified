@@ -11,7 +11,6 @@ from pathlib import Path
 
 from nexau.archs.main_sub.agent_state import AgentState
 from nexau.archs.sandbox import BaseSandbox
-from nexau.archs.sandbox.base_sandbox import SandboxError
 
 
 def get_sandbox(agent_state: AgentState | None) -> BaseSandbox:

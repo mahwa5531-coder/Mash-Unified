@@ -15,14 +15,14 @@ This engine accepts Filter DSL filters and converts them to SQLAlchemy
 ColumnElement[bool] using to_sqlalchemy() before passing to where() clauses.
 
 Requirements implemented:
-- 5.4: THE SQLDatabaseEngine SHALL  to_sqlalchemy() method SQL 
+- 5.4: THE SQLDatabaseEngine SHALL  to_sqlalchemy() method SQL
 """
 
 from __future__ import annotations
 
 from typing import Any, TypeVar
 
-from sqlalchemy import func, text, event
+from sqlalchemy import event, func, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlmodel import SQLModel, select
 

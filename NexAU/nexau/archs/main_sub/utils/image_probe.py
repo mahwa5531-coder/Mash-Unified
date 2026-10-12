@@ -295,10 +295,10 @@ def area_capped_dimensions(width: int, height: int, max_pixels: int) -> tuple[in
 def _probe_dimensions_from_b64_prefix(b64_data: str) -> tuple[int, int] | None:
     """Probe ``(width, height)`` from only a bounded base64 *prefix*.
 
-     ``token_counter._probe_image_dimensions``: 
-    ``_PROBE_PREFIX_BASE64_CHARS``, 
-     MB . ``None``  header  (, 
-    / header)  -- . 
+     ``token_counter._probe_image_dimensions``:
+    ``_PROBE_PREFIX_BASE64_CHARS``,
+     MB . ``None``  header  (,
+    / header)  -- .
     """
     if not b64_data:
         return None
@@ -313,23 +313,23 @@ def _probe_dimensions_from_b64_prefix(b64_data: str) -> tuple[int, int] | None:
 
 
 def probe_b64_prefix_dimensions(b64_data: str) -> tuple[int, int] | None:
-    """Public prefix-probe: base64, ``None``. 
+    """Public prefix-probe: base64, ``None``.
 
-    (``history_list``) mime  ``base64`` 
-      --, omit/resize. 
+    (``history_list``) mime  ``base64``
+      --, omit/resize.
     """
     return _probe_dimensions_from_b64_prefix(b64_data)
 
 
 def _is_animated_image(img: Image.Image) -> bool:
-    """``img``  (animated GIF / WebP / APNG) . 
+    """``img``  (animated GIF / WebP / APNG) .
 
     class ``seek`` / ``EOFError``,  ``n_frames`` / ``is_animated``
     property:  plugin class (GifImageFile / WebPImageFile /
      acTL  PngImageFile), type ``Image.Image``  pyright strict
     propertyerror,  ``getattr`` . ``seek`` class
-    ``Image``  ( plugin  override ), type. 
-     seek  frame 0, . 
+    ``Image``  ( plugin  override ), type.
+     seek  frame 0, .
     """
     try:
         img.seek(1)
@@ -342,21 +342,21 @@ def _is_animated_image(img: Image.Image) -> bool:
 def image_exceeds_hard_limit(b64_data: str) -> bool:
     """Whether an image must be *omitted* wholesale rather than resized.
 
-     size  gate  --  completed,  decode  + 
-    payload: 
+     size  gate  --  completed,  decode  +
+    payload:
 
-    1. base64 string > ``MAX_IMAGE_BASE64_BYTES`` (20 MiB):  True, 
-       ``base64.b64decode``   --   decode,  history payload 
-       ; 
+    1. base64 string > ``MAX_IMAGE_BASE64_BYTES`` (20 MiB):  True,
+       ``base64.b64decode``   --   decode,  history payload
+       ;
     2.  ``_PROBE_PREFIX_BASE64_CHARS``  header prober,  >
-       ``_MAX_DECODE_PIXELS`` (60 MP): True,  ``Image.open→convert→resize`` 
-       ", " MB . 
+       ``_MAX_DECODE_PIXELS`` (60 MP): True,  ``Image.open→convert→resize``
+       ", " MB .
 
-    prober  (webp/tiff ),  base64 
-    gate,  ``resize_base64_image_if_oversized``  Pillow 
-    DecompressionBomb .  True, 
-    ``OVERSIZED_IMAGE_PLACEHOLDER`` ;  False, 
-    ``resize_base64_image_if_oversized`` . 
+    prober  (webp/tiff ),  base64
+    gate,  ``resize_base64_image_if_oversized``  Pillow
+    DecompressionBomb .  True,
+    ``OVERSIZED_IMAGE_PLACEHOLDER`` ;  False,
+    ``resize_base64_image_if_oversized`` .
     """
     if len(b64_data) > MAX_IMAGE_BASE64_BYTES:
         logger.warning(
@@ -390,7 +390,7 @@ def _pillow_header_dimensions_from_b64_prefix(b64_data: str) -> tuple[int, int] 
 
      ``_probe_dimensions_from_b64_prefix``  base64 ;
      Pillow  header  ``None``(,
-    ``resize_base64_image_if_oversized``  open ). 
+    ``resize_base64_image_if_oversized``  open ).
     """
     if not b64_data:
         return None
@@ -407,26 +407,26 @@ def _pillow_header_dimensions_from_b64_prefix(b64_data: str) -> tuple[int, int] 
 def resize_base64_image_if_oversized(b64_data: str, mime_type: str) -> tuple[str, str] | None:
     """Downscale an over-budget base64 image entirely in memory (Pillow).
 
-:  ``read_visual_file`` default  -- 
+:  ``read_visual_file`` default  --
      ``DEFAULT_IMAGE_MAX_PIXELS``,  ``area_capped_dimensions``
-      --   sandbox / ffmpeg /, 
+      --   sandbox / ffmpeg /,
     ``HistoryList``  (, /
-    MCP ) . 
+    MCP ) .
 
      ``image_exceeds_hard_limit``:  (base64 > 20 MiB  >
-    ``_MAX_DECODE_PIXELS``)  omit, function  --  function 60 MP, 
-     prober . 
+    ``_MAX_DECODE_PIXELS``)  omit, function  --  function 60 MP,
+     prober .
 
     Args:
-        b64_data:  base64 ( ``data:`` ) . 
-        mime_type:  MIME (; / Pillow ) . 
+        b64_data:  base64 ( ``data:`` ) .
+        mime_type:  MIME (; / Pillow ) .
 
     Returns:
-        ``(new_base64, "image/jpeg")``,, 
-        ``DEFAULT_IMAGE_MAX_PIXELS`` ;  ``None`` . 
-        ``None`` ( no-op / ): base64,, 
-         (, ), /failure  --, 
-         fail. 
+        ``(new_base64, "image/jpeg")``,,
+        ``DEFAULT_IMAGE_MAX_PIXELS`` ;  ``None`` .
+        ``None`` ( no-op / ): base64,,
+         (, ), /failure  --,
+         fail.
     """
     # 1.: base64 header prober (PNG/JPEG/GIF/
     # BMP, read_visual_file / token_counter ) .
@@ -487,17 +487,17 @@ class OversizedInboundImageError(ValueError):
     """User-supplied inbound image exceeds the hard limits - rejected at entry.
 
      fail-fast(#601):error, retry;
-    history  omit . 
+    history  omit .
     """
 
 
 def ensure_inbound_images_within_limits(messages: Sequence[object]) -> None:
     """Reject user-supplied messages whose inline images exceed the hard limits.
 
-     omit gate (``image_exceeds_hard_limit``:base64 
+     omit gate (``image_exceeds_hard_limit``:base64
     20MiB, header/Pillow  >60MP).:
-    ****,****.  USER   --  
-,. 
+    ****,****.  USER   --
+,.
     """
     from nexau.core.messages import ImageBlock, Message, Role
 

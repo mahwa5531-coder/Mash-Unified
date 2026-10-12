@@ -13,29 +13,29 @@
 
 RFC-0027: sensitive wordsmiddleware
 
-: ``before_model``, ``after_model`` . 
- ``input_action`` / ``output_action``, 
- ``ContentBlockedEvent``  ( ``RunErrorEvent`` ) . 
+: ``before_model``, ``after_model`` .
+ ``input_action`` / ``output_action``,
+ ``ContentBlockedEvent``  ( ``RunErrorEvent`` ) .
 
- (``OnHitAction``): 
+ (``OnHitAction``):
 
 - ``terminate``:  ``force_stop_reason=ERROR_OCCURRED``,  ``refusal_template``
   / assistant, executor  run error. RFC-0027
-,  (/). 
+,  (/).
 - ``mask`` (default):  ``mask_template`` (default ``***``),
   assistant, run .  fallback,
-  sensitive words. 
-  ``mask_template="[<{category}>]"``. 
+  sensitive words.
+  ``mask_template="[<{category}>]"``.
 - ``soft_reject``:  ``soft_refusal_template`` / assistant
-, force_stop_reason=``SUCCESS``. run completed (error), 
+, force_stop_reason=``SUCCESS``. run completed (error),
   ``terminal_reason``, . **input **
-   history sensitive words mask ,  user  history 
+   history sensitive words mask ,  user  history
    (: ). "
-   LLM ". 
+   LLM ".
 
-configuration: . 
+configuration: .
 
-package,  Aho-Corasick . 
+package,  Aho-Corasick .
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ import logging
 from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -64,10 +64,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class OnHitAction(str, Enum):
-    """RFC-0027 follow-up: sensitive words. 
+class OnHitAction(StrEnum):
+    """RFC-0027 follow-up: sensitive words.
 
-    module docstring . 
+    module docstring .
     """
 
     TERMINATE = "terminate"
@@ -120,7 +120,7 @@ def _empty_hit_list() -> list[SensitiveHit]:
 class SensitiveScanResult:
     """All hits for a scanned text payload.
 
-    RFC-0027: 
+    RFC-0027:
     """
 
     hits: list[SensitiveHit] = field(default_factory=_empty_hit_list)
@@ -164,10 +164,10 @@ class SensitiveContentBlockedError(RuntimeError):
 class _AhoCorasick:
     """Minimal Aho-Corasick automaton for multi-pattern Chinese/English matching.
 
-    RFC-0027: 
+    RFC-0027:
 
     -  dict  children,  Unicode
-    -  pattern  ``category``, 
+    -  pattern  ``category``,
     -  O(Σ|patterns|),  O(|text| + matches)
     """
 
@@ -261,14 +261,14 @@ class _AhoCorasick:
 def _casefold_lower(text: str) -> str:
     """Length-preserving lowercase for case-insensitive matching.
 
-    RFC-0027: ``str.lower()``  Unicode **** -- 
-     ``"İ"`` (U+0130) ``.lower()`` → ``"i̇"`` (``i`` + U+0307, 
+    RFC-0027: ``str.lower()``  Unicode **** --
+     ``"İ"`` (U+0130) ``.lower()`` → ``"i̇"`` (``i`` + U+0307,
     2 ) . sensitive words mask  lower  AC  offset ****, class
-, offset, mask  --  L  ``İ`` (L=) 
-     mask,  LLM  history. 
+, offset, mask  --  L  ``İ`` (L=)
+     mask,  LLM  history.
 
-     **1:1**:  ``ch.lower()``, 
-, AC offset . function, . 
+     **1:1**:  ``ch.lower()``,
+, AC offset . function, .
     """
     out: list[str] = []
     for ch in text:
@@ -358,28 +358,28 @@ class SensitiveWordMiddleware(Middleware):
         agent_config.middlewares.append(SensitiveWordMiddleware(lexicon_dir="/opt/nexau/sensitive_lexicon"))
 
     Args:
-        lexicon_dir:  ``.txt`` class, 
-            .  ``lexicon_file`` / ``lexicon_words`` configuration. 
-        lexicon_file: class. 
-        lexicon_words:  "explicit" class. 
-        extra_words: sensitive words,  "extra" class. 
-        case_sensitive: . ; sensitive words ``False``. 
-        block_input:  LLM  (``scan_roles``, default// + tool result) . 
-        block_output:  LLM . 
-        input_action:  (``OnHitAction``), default ``mask`` (). 
-             RFC-0027  ``"terminate"``. 
-        output_action: default ``mask`` (). 
+        lexicon_dir:  ``.txt`` class,
+            .  ``lexicon_file`` / ``lexicon_words`` configuration.
+        lexicon_file: class.
+        lexicon_words:  "explicit" class.
+        extra_words: sensitive words,  "extra" class.
+        case_sensitive: . ; sensitive words ``False``.
+        block_input:  LLM  (``scan_roles``, default// + tool result) .
+        block_output:  LLM .
+        input_action:  (``OnHitAction``), default ``mask`` ().
+             RFC-0027  ``"terminate"``.
+        output_action: default ``mask`` ().
         refusal_template: ``terminate``,  ``{source}`` /
-            ``{category}`` / ``{hits}`` . 
-        soft_refusal_template: ``soft_reject``, 
-            ``refusal_template``. 
+            ``{category}`` / ``{hits}`` .
+        soft_refusal_template: ``soft_reject``,
+            ``refusal_template``.
         mask_template: ``mask``,  ``{category}`` /
             ``{word}`` / ``{length}`` () . default ``"***"`` (
 , ). class,  ``"[<{category}>]"``;
-,  ``"*{length}*"`` class. 
-        scan_roles:  ``Role`` set; default USER/FRAMEWORK/SYSTEM/TOOL (tool result) . 
-        raise_on_block: True  ``SensitiveContentBlockedError``; 
-            default False, " action ". 
+,  ``"*{length}*"`` class.
+        scan_roles:  ``Role`` set; default USER/FRAMEWORK/SYSTEM/TOOL (tool result) .
+        raise_on_block: True  ``SensitiveContentBlockedError``;
+            default False, " action ".
     """
 
     source_id = "sensitive_word_middleware"
@@ -464,7 +464,7 @@ class SensitiveWordMiddleware(Middleware):
     def scan_text(self, text: str) -> SensitiveScanResult:
         """Scan a raw string and return all hits.
 
-        RFC-0027:  ( / ) 
+        RFC-0027:  ( / )
         """
         if not text or self._lexicon_size == 0:
             return SensitiveScanResult()
@@ -476,8 +476,8 @@ class SensitiveWordMiddleware(Middleware):
         """Extract scannable text from a message, including tool-result blocks.
 
         RFC-0027: ``Message.get_text_content()``  TextBlock; tool result
-        ``ToolResultBlock.content``  (str  TextBlock/ImageBlock list),, 
-         ``Role.TOOL`` . 
+        ``ToolResultBlock.content``  (str  TextBlock/ImageBlock list),,
+         ``Role.TOOL`` .
         """
         parts: list[str] = [msg.get_text_content()]
         for block in msg.content:
@@ -514,7 +514,7 @@ class SensitiveWordMiddleware(Middleware):
                         end=offset + hit.end,
                     )
                 )
-            offset += len(text) + 1  # +1 
+            offset += len(text) + 1  # +1
 
         return SensitiveScanResult(hits=aggregated_hits)
 
@@ -538,9 +538,9 @@ class SensitiveWordMiddleware(Middleware):
         """Scan ``text`` and return (masked_text, scan_result).
 
         AC  ``(start, end)``,  offset . case_sensitive=False
-         scan  haystack;:func:`_casefold_lower` (**** 1:1), 
-         offset,  text  ``[start:end]`` . 
-         (:  ``str.lower()`` -- ``"İ"``  offset,  mask. ) 
+         scan  haystack;:func:`_casefold_lower` (**** 1:1),
+         offset,  text  ``[start:end]`` .
+         (:  ``str.lower()`` -- ``"İ"``  offset,  mask. )
         """
         result = self.scan_text(text)
         if not result.matched:
@@ -641,12 +641,12 @@ class SensitiveWordMiddleware(Middleware):
     def before_model(self, hook_input: BeforeModelHookInput) -> HookResult:  # type: ignore[override]
         """Scan input messages before the LLM call; act per ``input_action`` on hit.
 
-        RFC-0027: 
+        RFC-0027:
 
-        terminate:  force_stop_reason=ERROR_OCCURRED + . 
-        mask: sensitive words messages, run . 
+        terminate:  force_stop_reason=ERROR_OCCURRED + .
+        mask: sensitive words messages, run .
         soft_reject:  + force_stop_reason=SUCCESS (completederror),
-             mask history . 
+             mask history .
         """
         if not self._block_input or self._lexicon_size == 0:
             return HookResult.no_changes()
@@ -683,12 +683,12 @@ class SensitiveWordMiddleware(Middleware):
     def after_model(self, hook_input: AfterModelHookInput) -> HookResult:  # type: ignore[override]
         """Scan visible model output after the LLM call; act per ``output_action`` on hit.
 
-        RFC-0027: 
+        RFC-0027:
 
-         (``original_response``),  reasoning. 
-        terminate:  assistant  + force_stop_reason=ERROR_OCCURRED. 
-        mask:  assistant  mask, run . 
-        soft_reject:  assistant  + force_stop_reason=SUCCESS. 
+         (``original_response``),  reasoning.
+        terminate:  assistant  + force_stop_reason=ERROR_OCCURRED.
+        mask:  assistant  mask, run .
+        soft_reject:  assistant  + force_stop_reason=SUCCESS.
         """
         if not self._block_output or self._lexicon_size == 0:
             return HookResult.no_changes()
@@ -772,8 +772,8 @@ class SensitiveWordMiddleware(Middleware):
     def set_event_emitter(self, emitter: Callable[[object], None]) -> None:
         """Receive the unified event emitter from the executor.
 
-        RFC-0027: executor  _wire_middleware_event_emitters 
-         ( on_event,  AgentEventsMiddleware) . 
+        RFC-0027: executor  _wire_middleware_event_emitters
+         ( on_event,  AgentEventsMiddleware) .
         """
         self._event_emitter = emitter
 
@@ -787,9 +787,9 @@ class SensitiveWordMiddleware(Middleware):
     ) -> None:
         """Emit a dedicated ContentBlockedEvent when content is blocked.
 
-        RFC-0027:  (/class/) . 
-         ``RunErrorEvent`` ;  ``ERROR_OCCURRED``. 
-         emitter (middleware) . 
+        RFC-0027:  (/class/) .
+         ``RunErrorEvent`` ;  ``ERROR_OCCURRED``.
+         emitter (middleware) .
         """
         if self._event_emitter is None:
             return

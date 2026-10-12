@@ -10,10 +10,8 @@ Tests:
 6. SQLite database inspection (~/.nexau/nexau.db) for session and action rows.
 """
 
-import os
-import sys
-import json
 import sqlite3
+import sys
 from pathlib import Path
 
 # Force UTF-8 output
@@ -23,9 +21,10 @@ sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from nexau_ui_backend.main import _build_agent_config
+
 from nexau.archs.main_sub.agent import Agent
 from nexau.archs.main_sub.prompt_builder import PromptBuilder
-from nexau.archs.platform.path_helpers import get_database_path, get_session_brain_dir
+from nexau.archs.platform.path_helpers import get_database_path
 
 print("="*90)
 print("             NEXAU COMPREHENSIVE END-TO-END MULTI-TURN DIAGNOSTIC PROBE")
@@ -100,26 +99,26 @@ print(f"Database Path: {db_path} (Exists: {db_path.exists()})")
 if db_path.exists():
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
-    
+
     # Check tables
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
     tables = [r[0] for r in cursor.fetchall()]
     print(f"Total SQLite Tables in nexau.db: {len(tables)} -> {tables}")
-    
+
     # Query sessions table
     cursor.execute("SELECT session_id, root_agent_id, updated_at FROM sessions ORDER BY updated_at DESC LIMIT 5")
     sessions = cursor.fetchall()
     print(f"\nRecent Sessions (Count: {len(sessions)}):")
     for s in sessions:
         print(f"  - Session ID: {s[0]} | Root Agent: {s[1]} | Updated: {s[2]}")
-        
+
     # Query agent_run_actions table
     cursor.execute("SELECT action_id, session_id, action_type, agent_name, created_at_ns FROM agent_run_actions ORDER BY action_id DESC LIMIT 10")
     actions = cursor.fetchall()
     print(f"\nRecent Agent Run Actions (Count: {len(actions)}):")
     for a in actions:
         print(f"  - Action ID: {a[0]} | Session: {a[1][:8]}... | Type: {a[2]} | Agent: {a[3]} | Timestamp (ns): {a[4]}")
-        
+
     conn.close()
 
 print("\n" + "="*90)
