@@ -81,7 +81,7 @@ from nexau.archs.tool.tool import (
 from nexau.archs.tool.tool_registry import ToolRegistry
 from nexau.archs.tracer.context import TraceContext
 from nexau.archs.tracer.core import BaseTracer, SpanType
-from nexau.core.adapters.legacy import messages_from_legacy_openai_chat
+from nexau.core.serializers.openai_chat import messages_from_legacy_openai_chat
 from nexau.core.messages import Message, Role, TextBlock, ToolResultBlock, coerce_tool_result_content
 
 if TYPE_CHECKING:

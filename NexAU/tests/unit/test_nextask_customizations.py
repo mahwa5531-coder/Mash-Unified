@@ -27,7 +27,7 @@ from nexau.archs.main_sub.execution.middleware.context_compaction.middleware imp
     ContextCompactionMiddleware,
 )
 from nexau.archs.main_sub.execution.model_response import ModelResponse
-from nexau.core.adapters.legacy import messages_from_legacy_openai_chat
+from nexau.core.serializers.openai_chat import messages_from_legacy_openai_chat
 from nexau.core.messages import (
     Message,
     ReasoningBlock,

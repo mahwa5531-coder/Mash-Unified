@@ -45,7 +45,7 @@ from nexau.archs.main_sub.execution.parse_structures import (
 )
 from nexau.archs.main_sub.execution.stop_reason import AgentStopReason
 from nexau.archs.sandbox.local_sandbox import LocalSandbox
-from nexau.core.adapters.legacy import messages_from_legacy_openai_chat
+from nexau.core.serializers.openai_chat import messages_from_legacy_openai_chat
 from nexau.core.messages import Message, Role, TextBlock
 
 

@@ -12,11 +12,6 @@ coverage:
       default:
         target: 80%      # New/changed lines should have ≥80% coverage
 
-  # Ignore paths that inflate/deflate coverage unfairly
-  ignore:
-    - "nexau/cli/**"             # CLI wrappers, hard to unit-test
-    - "nexau/archs/transports/grpc/**"  # Generated / low-priority
-    - "nexau/archs/transports/websocket/**"
 
 comment:
   layout: "header, diff, flags, components, files"

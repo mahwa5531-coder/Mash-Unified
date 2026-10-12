@@ -36,7 +36,7 @@ from nexau.archs.main_sub.execution.parse_structures import ParsedResponse
 from nexau.archs.main_sub.framework_context import FrameworkContext
 from nexau.archs.main_sub.history_list import HistoryList
 from nexau.archs.tool.tool_registry import ToolRegistry
-from nexau.core.adapters.legacy import messages_from_legacy_openai_chat
+from nexau.core.serializers.openai_chat import messages_from_legacy_openai_chat
 from nexau.core.messages import Message, Role, TextBlock, ToolResultBlock, ToolUseBlock
 from nexau.core.usage import TokenUsage
 

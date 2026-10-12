@@ -1,8 +1,10 @@
 from typing import Any, cast
 
-from nexau.core.adapters.legacy import messages_from_legacy_openai_chat
 from nexau.core.messages import ImageBlock, Message, Role, TextBlock, ToolResultBlock
-from nexau.core.serializers.openai_chat import serialize_ump_to_openai_chat_payload
+from nexau.core.serializers.openai_chat import (
+    messages_from_legacy_openai_chat,
+    serialize_ump_to_openai_chat_payload,
+)
 
 
 def test_chat_completions_tool_result_images_are_injected_as_user_message() -> None:

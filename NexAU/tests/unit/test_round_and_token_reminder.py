@@ -22,7 +22,7 @@ from nexau.archs.main_sub.execution.middleware.round_and_token_reminder import (
     RoundAndTokenReminderMiddleware,
 )
 from nexau.archs.main_sub.history_list import HistoryList
-from nexau.core.adapters.legacy import messages_from_legacy_openai_chat
+from nexau.core.serializers.openai_chat import messages_from_legacy_openai_chat
 from nexau.core.messages import Message, Role
 
 

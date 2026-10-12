@@ -3,9 +3,11 @@ from typing import Any
 
 from _pytest.logging import LogCaptureFixture
 
-from nexau.core.adapters.legacy import messages_from_legacy_openai_chat
 from nexau.core.messages import Message, Role, TextBlock, ToolResultBlock, ToolUseBlock
-from nexau.core.serializers.openai_chat import serialize_ump_to_openai_chat_payload
+from nexau.core.serializers.openai_chat import (
+    messages_from_legacy_openai_chat,
+    serialize_ump_to_openai_chat_payload,
+)
 
 
 def test_framework_role_survives_public_dict_history_round_trip() -> None:

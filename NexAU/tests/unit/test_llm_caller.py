@@ -38,9 +38,11 @@ from nexau.archs.main_sub.execution.hooks import MiddlewareManager, ModelCallPar
 from nexau.archs.main_sub.execution.llm_caller import LLMCaller
 from nexau.archs.main_sub.execution.model_response import ModelResponse
 from nexau.archs.main_sub.execution.stop_reason import AgentStopReason
-from nexau.core.adapters.legacy import messages_from_legacy_openai_chat
 from nexau.core.messages import ImageBlock, Message, ReasoningBlock, Role, TextBlock, ToolResultBlock
-from nexau.core.serializers.openai_chat import serialize_ump_to_openai_chat_payload
+from nexau.core.serializers.openai_chat import (
+    messages_from_legacy_openai_chat,
+    serialize_ump_to_openai_chat_payload,
+)
 # removed prepare_openai_responses_api_input
 from nexau.core.usage import TokenUsage
 
