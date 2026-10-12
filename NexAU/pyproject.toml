@@ -50,10 +50,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 version = "0.4.1"
 
-[project.scripts]
-# Public entry point exposed via `pip install nexau`.
-nexau-cli = "nexau.cli_wrapper:main"  # Keep for backward compatibility (Node.js CLI)
-nexau = "nexau.cli.main:main"         # NEW unified Python CLI entry point
 
 [project.optional-dependencies]
 # Async database drivers for SQLDatabaseEngine

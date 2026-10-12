@@ -203,11 +203,6 @@ jobs:
       run: |
         $targets = @(
           "tests/unit/archs/platform/"
-          "tests/unit/test_cli_entrypoint_checks.py"
-          "tests/unit/test_cli_commands_chat.py"
-          "tests/unit/test_cli_agent_runner_stdio.py"
-          "tests/unit/test_cli_run_agent.py"
-          "tests/unit/test_cli_wrapper.py"
           "tests/unit/test_platform_test_utils.py"
           "tests/unit/test_skill.py"
           "tests/unit/archs/sandbox/test_windows_local_sandbox_smoke.py"
@@ -269,54 +264,11 @@ jobs:
         '@
         $script | uv run python -
 
-    - name: Run RFC-0020 T4 entrypoint and backend link tests
+    - name: Run Windows platform backend link tests
       shell: pwsh
       run: |
-        $targets = @(
-          "tests/unit/test_cli_entrypoint_checks.py"
-          "tests/unit/test_cli_commands_chat.py"
-          "tests/unit/test_cli_run_agent.py"
-          "tests/unit/test_cli_wrapper.py"
-          "tests/unit/archs/platform/test_shell_backend.py"
-        )
-        uv run pytest $targets --timeout=120 -v --tb=short
+        uv run pytest tests/unit/archs/platform/test_shell_backend.py --timeout=120 -v --tb=short
 
-    - name: Smoke test nexau chat runtime path
-      shell: pwsh
-      run: |
-        $PSNativeCommandUseErrorActionPreference = $false
-        Remove-Item Env:LLM_MODEL, Env:LLM_BASE_URL, Env:LLM_API_KEY -ErrorAction SilentlyContinue
-        $output = uv run nexau chat examples/simple_research/main_agent.yaml --query "windows-smoke" 2>&1
-        $code = $LASTEXITCODE
-        $text = ($output | Out-String)
-        Write-Host $text
-        if ($code -eq 0) {
-          throw "Expected `nexau chat` smoke to fail after entering the runtime path, but it exited 0."
-        }
-        if ($text -notmatch "Environment variable 'LLM_MODEL' is not set") {
-          throw "Expected `nexau chat` smoke to reach post-default-shell config loading and fail on missing LLM_MODEL."
-        }
-        exit 0
-
-    - name: Smoke test nexau main entrypoint help
-      shell: pwsh
-      run: uv run nexau --help
-
-    - name: Smoke test run_agent module help
-      shell: pwsh
-      run: uv run python -m nexau.cli.run_agent --help
-
-    - name: Smoke test run-agent.cmd help
-      shell: pwsh
-      run: .\run-agent.cmd --help
-
-    - name: Smoke test npm agent wrapper help
-      shell: pwsh
-      run: npm run agent -- --help
-
-    - name: Smoke test nexau-cli shim help
-      shell: pwsh
-      run: uv run nexau-cli --help
 
   test-saas:
     runs-on: ubuntu-latest

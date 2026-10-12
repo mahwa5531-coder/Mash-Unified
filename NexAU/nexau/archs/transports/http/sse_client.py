@@ -2,8 +2,6 @@
 
 This module provides a programmatic client (SSEClient) for interacting
 with Nexau HTTP servers, supporting both synchronous and streaming queries.
-
-Note: CLI functionality has been moved to nexau.cli.commands.http.
 """
 
 from __future__ import annotations
