@@ -12,7 +12,7 @@ from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 
 from app.dependencies import DatabaseEngineDep
-from app.paths import get_session_brain_dir
+from app.paths import get_session_brain_dir, validate_safe_id
 from app.workspace import (
     APP_WORKSPACE_ROOT,
     get_allowed_file_roots,
@@ -53,6 +53,11 @@ async def list_artifacts(
     - If in a project workspace: parse ONLY <workspace>/Audit_Deliverables/
     - If in a standalone session (No Repo): parse ONLY <brain_dir>/working_papers/
     """
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
     session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id)) if eng else None
 
@@ -145,6 +150,11 @@ async def get_artifact(
     user_id: str = "default_user",
 ):
     """Serve an artifact file from the session brain directory or project workspace."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
     session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id)) if eng else None
     primary_brain_dir = get_brain_dir(session_id, session)
@@ -152,7 +162,6 @@ async def get_artifact(
     candidate_dirs = [
         Path(primary_brain_dir),
         Path.home() / ".nexau" / "brain" / session_id,
-        Path.home() / ".gemini" / "antigravity" / "brain" / session_id,
     ]
 
     for b_dir in candidate_dirs:
@@ -223,18 +232,21 @@ async def get_file_content(
         found = False
         candidates: list[Path] = []
         if session_id:
-            for b_base in [Path.home() / ".gemini" / "antigravity" / "brain", Path.home() / ".nexau" / "brain"]:
-                s_dir = b_base / session_id
-                if s_dir.is_dir():
-                    candidates.extend([
-                        s_dir / clean_path,
-                        s_dir / f"{clean_path}.md",
-                        s_dir / "working_papers" / clean_path,
-                        s_dir / "working_papers" / f"{clean_path}.md",
-                        s_dir / "scratch" / clean_path,
-                        s_dir / ".system_generated" / "tasks" / clean_path,
-                        s_dir / ".system_generated" / "logs" / clean_path,
-                    ])
+            try:
+                validate_safe_id(session_id, "session_id")
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            s_dir = (Path.home() / ".nexau" / "brain" / session_id).resolve()
+            if s_dir.is_dir():
+                candidates.extend([
+                    s_dir / clean_path,
+                    s_dir / f"{clean_path}.md",
+                    s_dir / "working_papers" / clean_path,
+                    s_dir / "working_papers" / f"{clean_path}.md",
+                    s_dir / "scratch" / clean_path,
+                    s_dir / ".system_generated" / "tasks" / clean_path,
+                    s_dir / ".system_generated" / "logs" / clean_path,
+                ])
             try:
                 ws = await resolve_session_workspace(eng, session_id)
                 if ws and ws.is_dir():

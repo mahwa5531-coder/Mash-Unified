@@ -419,23 +419,33 @@ async def open_system_file(request: OpenFileRequest):
     import subprocess
     import sys
     from urllib.parse import unquote
+    from app.workspace import is_path_in_base_roots
+    from app.paths import validate_safe_id
 
     clean_path = unquote(request.file_path).strip()
     clean_path = re.sub(r"^file:///?", "", clean_path, flags=re.IGNORECASE)
     clean_path = re.sub(r"^/([a-zA-Z]:)", r"\1", clean_path)
     clean_path = clean_path.split("#")[0].strip()
 
+    if request.session_id:
+        try:
+            validate_safe_id(request.session_id, "session_id")
+        except ValueError as e:
+            return {"status": "error", "message": str(e)}
+
     p = Path(clean_path).expanduser()
     if not p.exists() and request.session_id:
-        for b_base in [Path.home() / ".gemini" / "antigravity" / "brain", Path.home() / ".nexau" / "brain"]:
-            cand = b_base / request.session_id / clean_path
-            if cand.exists():
-                p = cand
-                break
+        cand = Path.home() / ".nexau" / "brain" / request.session_id / clean_path
+        if cand.exists():
+            p = cand
 
     p = p.resolve()
     if not p.exists():
         return {"status": "error", "message": f"Path '{clean_path}' does not exist on local disk."}
+
+    # ponytail: strictly confine opened files to allowed workspace or brain directories
+    if not is_path_in_base_roots(p):
+        return {"status": "error", "message": f"Access denied: Path '{clean_path}' is outside allowed application workspace roots."}
 
     try:
         if sys.platform == "win32":

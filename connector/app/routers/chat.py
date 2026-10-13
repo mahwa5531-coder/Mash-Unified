@@ -18,7 +18,11 @@ from pydantic import BaseModel
 
 from app.dependencies import get_engine
 from app.models.project import ProjectModel
-from app.paths import resolve_deliverables_dir, resolve_sandbox_work_dir
+from app.paths import (
+    resolve_deliverables_dir,
+    resolve_sandbox_work_dir,
+    validate_safe_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +173,10 @@ async def stream_query_bridge(
     server = get_sse_server()
     user_id = payload.user_id or "default_user"
     sid = path_session_id or payload.session_id or generate_session_id()
+    try:
+        validate_safe_id(sid, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     resolved_context = payload.context or {}
     workspace_target = resolved_context.get("workspace_uri", "No Repo")
@@ -338,6 +346,11 @@ async def stop_agent_bridge(
     """Stop a running agent. NexAU's handle_stop_request does the real work."""
     server = get_sse_server()
     sid = (payload.session_id if payload else None) or session_id or ""
+    if sid:
+        try:
+            validate_safe_id(sid, "session_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     uid = (payload.user_id if payload else "default_user")
     stop_reason = "stopped"
     try:
@@ -384,6 +397,11 @@ async def approve_plan_bridge(
     persist user rules into SQLite's permission_rules table.
     """
     sid = session_id or payload.session_id or ""
+    if sid:
+        try:
+            validate_safe_id(sid, "session_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     uid = payload.user_id or "default_user"
     raw_action = (payload.action or "proceed").lower()
 
@@ -445,6 +463,11 @@ async def approve_plan_bridge(
 @router.post("/sessions/{session_id}/permissions/mode")
 async def update_session_permission_mode(session_id: str, payload: PermissionModePayload):
     """Set the runtime tool permission mode for a session ('turbo', 'default', 'review')."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = get_engine()
     if not eng:
         raise HTTPException(status_code=500, detail="Database engine unavailable")
@@ -468,6 +491,11 @@ async def update_session_permission_mode(session_id: str, payload: PermissionMod
 @router.get("/sessions/{session_id}/permissions")
 async def get_session_permissions(session_id: str, user_id: str = "default_user"):
     """Retrieve active permission mode and any pending tool calls for a session."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = get_engine()
     session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id)) if eng else None
     ctx = session.context or {} if session else {}

@@ -2,7 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 router = APIRouter(tags=["tasks"])
@@ -75,10 +75,15 @@ async def kill_task(pid: int):
 
 
 def _normalize_task_id(raw_id: str) -> tuple[int | None, str]:
-    clean = raw_id.replace("\\", "/").split("/")[-1]
+    # ponytail: strictly reject path traversal, slashes, and null bytes
+    if not raw_id or any(c in raw_id for c in ("/", "\\", "\x00", "..")):
+        raise ValueError(f"Invalid task_id: {raw_id!r}")
+    clean = raw_id.strip()
     for prefix in ("task-", "task_", "pid-", "pid_"):
         if clean.lower().startswith(prefix):
             clean = clean[len(prefix):]
+    if not clean or any(c in clean for c in (".", "/", "\\", "\x00")):
+        raise ValueError(f"Invalid task_id: {raw_id!r}")
     pid = int(clean) if clean.isdigit() else None
     return pid, clean
 
@@ -87,7 +92,10 @@ def _normalize_task_id(raw_id: str) -> tuple[int | None, str]:
 @router.get("/api/tasks/{task_id:path}/log")
 async def get_task_log(task_id: str):
     """Return task execution log content for the UI viewer as JSON."""
-    pid, clean = _normalize_task_id(task_id)
+    try:
+        pid, clean = _normalize_task_id(task_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Check active sandbox directly first if task_id is an active PID
     try:
@@ -102,26 +110,26 @@ async def get_task_log(task_id: str):
     except Exception:
         pass
 
+    task_root = (Path.cwd() / ".system_generated" / "tasks").resolve()
     candidate_paths = [
-        Path.cwd() / ".system_generated" / "tasks" / f"task-{clean}.log",
-        Path.cwd() / ".system_generated" / "tasks" / f"{clean}.log",
-        Path.cwd() / ".system_generated" / "tasks" / f"task-{task_id}.log",
-        Path.cwd() / ".system_generated" / "tasks" / f"{task_id}.log",
+        task_root / f"task-{clean}.log",
+        task_root / f"{clean}.log",
     ]
     import glob
-    for base in [Path.home() / ".nexau" / "brain", Path.home() / ".gemini" / "antigravity" / "brain"]:
-        for p_str in glob.glob(str(base / "*" / ".system_generated" / "tasks" / f"task-{clean}.log")):
+    nexau_brain = (Path.home() / ".nexau" / "brain").resolve()
+    if nexau_brain.is_dir():
+        for p_str in glob.glob(str(nexau_brain / "*" / ".system_generated" / "tasks" / f"task-{clean}.log")):
             candidate_paths.append(Path(p_str))
-        for p_str in glob.glob(str(base / "*" / ".system_generated" / "tasks" / f"{clean}.log")):
+        for p_str in glob.glob(str(nexau_brain / "*" / ".system_generated" / "tasks" / f"{clean}.log")):
             candidate_paths.append(Path(p_str))
 
     for p in candidate_paths:
-        if p.exists():
+        if p.exists() and p.is_file():
             try:
                 return {"content": p.read_text(encoding="utf-8", errors="replace")}
             except Exception:
                 pass
-    return {"content": f"[INFO] Background task {task_id} completed or log not found."}
+    return {"content": f"[INFO] Background task {clean} completed or log not found."}
 
 
 @router.get("/tasks/{task_id:path}/stream")
@@ -229,17 +237,17 @@ async def stream_task_log(task_id: str, request: Request):
             return
 
         # 2. Not active or already completed: check disk logs
+        task_root = (Path.cwd() / ".system_generated" / "tasks").resolve()
         candidate_paths = [
-            Path.cwd() / ".system_generated" / "tasks" / f"task-{clean}.log",
-            Path.cwd() / ".system_generated" / "tasks" / f"{clean}.log",
-            Path.cwd() / ".system_generated" / "tasks" / f"task-{task_id}.log",
-            Path.cwd() / ".system_generated" / "tasks" / f"{task_id}.log",
+            task_root / f"task-{clean}.log",
+            task_root / f"{clean}.log",
         ]
         import glob
-        for base in [Path.home() / ".nexau" / "brain", Path.home() / ".gemini" / "antigravity" / "brain"]:
-            for p_str in glob.glob(str(base / "*" / ".system_generated" / "tasks" / f"task-{clean}.log")):
+        nexau_brain = (Path.home() / ".nexau" / "brain").resolve()
+        if nexau_brain.is_dir():
+            for p_str in glob.glob(str(nexau_brain / "*" / ".system_generated" / "tasks" / f"task-{clean}.log")):
                 candidate_paths.append(Path(p_str))
-            for p_str in glob.glob(str(base / "*" / ".system_generated" / "tasks" / f"{clean}.log")):
+            for p_str in glob.glob(str(nexau_brain / "*" / ".system_generated" / "tasks" / f"{clean}.log")):
                 candidate_paths.append(Path(p_str))
 
         target_file = next((p for p in candidate_paths if p.exists()), None)

@@ -34,6 +34,24 @@ export function useChatAttachments(
   const [hasInvalidMedia, setHasInvalidMedia] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createdBlobUrlsRef = useRef<Set<string>>(new Set());
+  const stagedSidRef = useRef<string | null>(null);
+
+  // ponytail: ensure pre-send uploads isolate to their own clean session ID instead of
+  // sharing a 'default_session' folder (Bug 12). When the user submits, this ID is adopted.
+  const getEffectiveSessionId = (): string => {
+    if (sessionId) {
+      stagedSidRef.current = null;
+      return sessionId;
+    }
+    if (!stagedSidRef.current) {
+      const randSuffix =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID().replace(/-/g, '').slice(0, 10)
+          : Math.random().toString(36).slice(2, 10);
+      stagedSidRef.current = `sess_${Date.now().toString(36)}_${randSuffix}`;
+    }
+    return stagedSidRef.current;
+  };
 
   // ponytail: revoke blob preview URLs only on unmount or explicit removal, not on attachment changes (M-04)
   useEffect(() => {
@@ -72,7 +90,7 @@ export function useChatAttachments(
     setIsUploading(true);
     setUploadError(null);
     const uploadedList: AttachedFile[] = [];
-    const sid = sessionId || 'default_session';
+    const sid = getEffectiveSessionId();
 
     try {
       for (const file of filesToUpload) {
@@ -148,6 +166,7 @@ export function useChatAttachments(
     attachedFiles,
     isUploading,
     uploadError,
+    stagedSessionId: stagedSidRef.current,
     hasInvalidMedia,
     setHasInvalidMedia,
     fileInputRef,

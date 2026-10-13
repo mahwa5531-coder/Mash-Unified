@@ -13,7 +13,7 @@ export interface ChatComposerProps {
   sessionId?: string | null;
   inputPrompt?: string;
   setInputPrompt?: (val: string) => void;
-  onSend: (text: string) => void;
+  onSend: (text: string, stagedSessionId?: string) => void;
   onStop: () => void;
   isStreaming: boolean;
   disabled?: boolean;
@@ -47,6 +47,7 @@ export default function ChatComposer({
     attachedFiles,
     isUploading,
     uploadError,
+    stagedSessionId,
     fileInputRef,
     handleFileChange,
     handlePaste,
@@ -93,7 +94,7 @@ export default function ChatComposer({
     isSubmittingRef.current = true;
     setLocalPrompt('');
     setInputPrompt?.('');
-    onSend(text);
+    onSend(text, !sessionId ? stagedSessionId || undefined : undefined);
     setTimeout(() => {
       isSubmittingRef.current = false;
     }, 300);

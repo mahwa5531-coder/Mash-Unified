@@ -6,7 +6,7 @@ from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 
 from app.dependencies import DatabaseEngineDep
-from app.paths import get_session_brain_dir
+from app.paths import get_session_brain_dir, validate_safe_id
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 
@@ -17,6 +17,11 @@ CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 @router.post("/{session_id}")
 async def upload_file(session_id: str, file: UploadFile, engine: DatabaseEngineDep):
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     session = await engine.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
     brain_dir = (session.context or {}).get("brain_directory") if session else None
     if not brain_dir:
@@ -63,6 +68,11 @@ async def upload_file(session_id: str, file: UploadFile, engine: DatabaseEngineD
 @router.get("/{session_id}")
 async def list_uploaded_files(session_id: str, engine: DatabaseEngineDep):
     """List all user-uploaded files for the given session."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     session = await engine.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
     brain_dir = (session.context or {}).get("brain_directory") if session else None
     if not brain_dir:
@@ -73,8 +83,6 @@ async def list_uploaded_files(session_id: str, engine: DatabaseEngineDep):
 
     candidate_upload_dirs = [
         Path(brain_dir) / ".user_uploaded",
-        Path.home() / ".nexau" / "brain" / session_id / ".user_uploaded",
-        Path.home() / ".gemini" / "antigravity" / "brain" / session_id / ".user_uploaded",
     ]
     seen_files = set()
     files_with_mtime = []

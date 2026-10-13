@@ -21,6 +21,8 @@ POSIX-style paths on Windows.
 
 from __future__ import annotations
 
+import re
+import shutil
 import sys
 import tempfile
 from datetime import UTC
@@ -30,6 +32,20 @@ _CLI_ROOT_DIR = "nexau"
 _BASH_TOOL_RESULTS_DIR = "nexau_bash_tool_results"
 _TOOL_OUTPUTS_DIR = "nexau_tool_outputs"
 _CLI_SESSIONS_DIR = "cli-sessions"
+
+# ponytail: Canonical identifier format: alphanumeric, dashes, underscores only.
+SAFE_ID_REGEX = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
+
+
+def validate_safe_id(val: str, name: str = "id") -> str:
+    """Validate that an identifier is strictly safe for filesystem operations.
+
+    ponytail: Strict whitelist rejecting path traversal (.., .), slashes,
+    backslashes, null bytes, non-printable characters, and oversized inputs.
+    """
+    if not val or not isinstance(val, str) or not SAFE_ID_REGEX.match(val) or val in (".", ".."):
+        raise ValueError(f"Invalid {name}: must match ^[a-zA-Z0-9_-]{{1,64}}$ (got {val!r})")
+    return val
 
 
 def is_windows_host() -> bool:
@@ -103,28 +119,60 @@ def get_session_brain_dir(session_id: str | None = None, project_id: str | None 
       ~/.nexau/standalone_sessions/<s_id>/ if legacy data exists.
     - If no session_id: ~/.nexau/brain
     """
+    brain_root = (get_nexau_home() / "brain").resolve()
     if session_id:
+        safe_sid = validate_safe_id(session_id, "session_id")
         if project_id:
-            legacy_proj = get_nexau_home() / "projects" / project_id / "sessions" / session_id
-            if legacy_proj.exists():
+            safe_pid = validate_safe_id(project_id, "project_id")
+            legacy_proj = (get_nexau_home() / "projects" / safe_pid / "sessions" / safe_sid).resolve()
+            if legacy_proj.exists() and legacy_proj.is_relative_to(get_nexau_home().resolve()):
                 return legacy_proj
-        legacy_standalone = get_nexau_home() / "standalone_sessions" / session_id
-        if legacy_standalone.exists():
+        legacy_standalone = (get_nexau_home() / "standalone_sessions" / safe_sid).resolve()
+        if legacy_standalone.exists() and legacy_standalone.is_relative_to(get_nexau_home().resolve()):
             return legacy_standalone
 
-        d = get_nexau_home() / "brain" / session_id
+        d = (brain_root / safe_sid).resolve()
+        # ponytail: verify strict containment inside ~/.nexau/brain/
+        if not d.is_relative_to(brain_root) or d == brain_root:
+            raise ValueError(f"Directory traversal detected for session_id: {session_id!r}")
         d.mkdir(parents=True, exist_ok=True)
         return d
-    d = get_nexau_home() / "brain"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    brain_root.mkdir(parents=True, exist_ok=True)
+    return brain_root
 
 
 def get_project_cache_dir(project_id: str) -> Path:
     """Return the session/project cache directory (~/.nexau/brain/<project_id>/cache/)."""
-    d = get_nexau_home() / "brain" / project_id / "cache"
+    safe_pid = validate_safe_id(project_id, "project_id")
+    brain_root = (get_nexau_home() / "brain").resolve()
+    d = (brain_root / safe_pid / "cache").resolve()
+    if not d.is_relative_to(brain_root) or d == brain_root:
+        raise ValueError(f"Directory traversal detected for project_id: {project_id!r}")
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def safe_rmtree_session_brain(session_id: str, brain_dir: str | Path | None = None) -> bool:
+    """Safely delete a session brain directory with strict confinement checks.
+
+    ponytail: Never deletes nexau_home, brain root, database, or anything outside ~/.nexau/brain/.
+    """
+    safe_sid = validate_safe_id(session_id, "session_id")
+    brain_root = (get_nexau_home() / "brain").resolve()
+    nexau_home = get_nexau_home().resolve()
+
+    target = Path(brain_dir).resolve() if brain_dir else (brain_root / safe_sid).resolve()
+
+    # Hard confinement invariants
+    if not target.is_relative_to(brain_root):
+        raise ValueError(f"Target directory {target} is outside brain root {brain_root}")
+    if target == brain_root or target == nexau_home:
+        raise ValueError(f"Target directory {target} is a protected root directory")
+
+    if target.exists():
+        shutil.rmtree(target, ignore_errors=True)
+        return True
+    return False
 
 
 def scaffold_nexau_system_storage() -> Path:

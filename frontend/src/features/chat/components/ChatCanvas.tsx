@@ -189,8 +189,8 @@ export default function ChatCanvas({
     scrollDomToBottom();
   }, [send, scrollDomToBottom]);
 
-  const handleSend = useCallback((text: string) => {
-    send(text);
+  const handleSend = useCallback((text: string, stagedSid?: string) => {
+    send(text, false, stagedSid);
     scrollDomToBottom();
   }, [send, scrollDomToBottom]);
 

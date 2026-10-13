@@ -21,7 +21,11 @@ from pydantic import BaseModel
 
 from app.dependencies import DatabaseEngineDep
 from app.models.project import ProjectModel
-from app.paths import get_session_brain_dir
+from app.paths import (
+    get_session_brain_dir,
+    safe_rmtree_session_brain,
+    validate_safe_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -278,9 +282,19 @@ async def create_session(
     request: CreateSessionRequest,
     engine: DatabaseEngineDep,
 ):
+    if request.session_id:
+        try:
+            validate_safe_id(request.session_id, "session_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
     project = None
     if request.project_id:
+        try:
+            validate_safe_id(request.project_id, "project_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         project = await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("id", request.project_id))
         if not project:
             project = await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("name", request.project_id))
@@ -361,7 +375,11 @@ async def get_transcript(
     offset: int = 0,
     shallow_tools: bool = False,
 ):
-    """Retrieve session transcript lines from agent_run_actions with cross-message tool correlation and pagination."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
     if not eng:
         return {"lines": [], "total": 0}
@@ -1016,21 +1034,27 @@ async def delete_session(
     engine: DatabaseEngineDep,
     user_id: str | None = None,
 ):
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
-    if eng:
-        try:
-            session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
-            brain_dir = (session.context or {}).get("brain_directory") if session else None
-            project_id = (session.context or {}).get("project_id") if session else None
+    if not eng:
+        raise HTTPException(status_code=500, detail="Database engine unavailable")
 
-            await eng.delete(AgentRunActionModel, filters=ComparisonFilter.eq("session_id", session_id))
-            await eng.delete(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
-            clear_steering_messages(session_id)
+    session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
-            if not brain_dir:
-                brain_dir = str(get_session_brain_dir(session_id, project_id))
-            if brain_dir and os.path.exists(brain_dir):
-                shutil.rmtree(brain_dir, ignore_errors=True)
-        except Exception as e:
-            logger.warning(f"Session delete error: {e}")
-    return {"status": "success"}
+    brain_dir = (session.context or {}).get("brain_directory")
+    await eng.delete(AgentRunActionModel, filters=ComparisonFilter.eq("session_id", session_id))
+    await eng.delete(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
+    clear_steering_messages(session_id)
+
+    try:
+        safe_rmtree_session_brain(session_id, brain_dir)
+    except Exception as e:
+        logger.warning(f"Session brain cleanup warning for {session_id}: {e}")
+
+    return {"status": "success", "session_id": session_id}
