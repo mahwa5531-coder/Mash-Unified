@@ -16,11 +16,34 @@ async def list_active_tasks(session_id: str | None = None):
     seen_commands = set()
 
     try:
+        from app.dependencies import get_engine
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
+        from nexau.archs.session.models import SessionModel
+        from nexau.archs.session.orm import ComparisonFilter
         from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
-        sandbox = get_sandbox(None)
+
+        session_work_dir = None
+        if session_id:
+            try:
+                eng = get_engine()
+                if eng:
+                    session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
+                    if session and session.context:
+                        session_work_dir = session.context.get("working_directory")
+            except Exception:
+                pass
+
+        sandbox = get_sandbox(session_work_dir)
         bg_tasks = sandbox.list_background_tasks()
         for pid, info in bg_tasks.items():
+            task_cwd = info.get("cwd", "")
+            if session_work_dir and task_cwd:
+                try:
+                    if Path(task_cwd).resolve() != Path(session_work_dir).resolve():
+                        continue
+                except Exception:
+                    pass
+
             cmd_result = sandbox.get_background_task_status(pid)
             status = "running"
             if cmd_result.status == SandboxStatus.SUCCESS:
@@ -34,7 +57,7 @@ async def list_active_tasks(session_id: str | None = None):
                 "command": cmd,
                 "status": status,
                 "duration_ms": cmd_result.duration_ms,
-                "cwd": info.get("cwd", ""),
+                "cwd": task_cwd,
             })
     except Exception:
         pass

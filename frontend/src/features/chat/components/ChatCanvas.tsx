@@ -190,7 +190,7 @@ export default function ChatCanvas({
   }, [send, scrollDomToBottom]);
 
   const handleSend = useCallback((text: string, stagedSid?: string) => {
-    send(text, false, stagedSid);
+    send(text, false, false, stagedSid);
     scrollDomToBottom();
   }, [send, scrollDomToBottom]);
 

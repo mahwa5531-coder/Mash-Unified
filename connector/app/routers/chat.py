@@ -39,7 +39,7 @@ def get_sse_server() -> SSETransportServer:
 
 class StreamQueryPayload(BaseModel):
     session_id: str | None = None
-    messages: str
+    messages: str = ""
     context: dict | None = None
     variables: dict | None = None
     user_id: str | None = "default_user"
@@ -246,17 +246,37 @@ async def stream_query_bridge(
             configured_tools.append(t_copy)
         effective_agent_config = effective_agent_config.model_copy(update={"tools": configured_tools})
 
-    # ponytail: NexAU's handle_streaming_request already handles:
-    # - Session creation (SessionManager._get_or_create_session)
-    # - Agent lifecycle (create, run, stop on disconnect)
-    # - Lock acquisition & release (TransportBase.finally: block)
-    # - Error events (SSETransportServer._stream_agent_response catches & yields TransportErrorEvent)
-    # We just yield events and sync last_user_view_time for the unread badge.
+    # Wire permission mode into SQLite permission_rules so NexAU's executor honors it (Chain 4)
+    sm = getattr(server, "_session_manager", None)
+    if sm and sid and configured_tools:
+        try:
+            if eng:
+                from nexau.archs.session.models.permission_rule import PermissionRuleModel
+                from nexau.archs.session.orm import AndFilter
+                await eng.delete_many(
+                    PermissionRuleModel,
+                    filters=AndFilter(filters=[
+                        ComparisonFilter.eq("user_id", user_id),
+                        ComparisonFilter.eq("session_id", sid),
+                        ComparisonFilter.eq("source", "config"),
+                    ]),
+                )
+            await sm.init_permission_rules_from_config(
+                user_id=user_id,
+                session_id=sid,
+                tools=configured_tools,
+            )
+        except Exception as perm_err:
+            logger.debug("Error initializing permission rules from config: %s", perm_err)
+
+    # When resuming on approval without new user text, pass message=[] (empty list)
+    # so NexAU does not append an empty user bubble to history (Chain 3)
+    effective_message: str | list = user_prompt if user_prompt.strip() else []
 
     async def sse_event_stream():
         # ponytail: 15s SSE heartbeat comment keeps wire alive during long tool runs (>60s)
         event_iter = server.handle_streaming_request(
-            message=user_prompt,
+            message=effective_message,
             user_id=user_id,
             agent_config=effective_agent_config,
             session_id=sid,
@@ -264,14 +284,20 @@ async def stream_query_bridge(
             variables=ContextValue(template={k: v if isinstance(v, str) else json.dumps(v) for k, v in resolved_context.items()}),
         ).__aiter__()
 
+        # ponytail: shield-and-re-await pattern prevents 15s SSE heartbeat timeout
+        # from cancelling the underlying NexAU generator during long model/tool runs (Blocker B-4)
+        anext_task = asyncio.ensure_future(event_iter.__anext__())
+
         try:
             while True:
                 if await request.is_disconnected():
+                    anext_task.cancel()
                     raise asyncio.CancelledError("Client disconnected")
 
                 try:
-                    event = await asyncio.wait_for(event_iter.__anext__(), timeout=15.0)
+                    event = await asyncio.wait_for(asyncio.shield(anext_task), timeout=15.0)
                     yield f"data: {event.model_dump_json()}\n\n"
+                    anext_task = asyncio.ensure_future(event_iter.__anext__())
                 except TimeoutError:
                     yield ": heartbeat\n\n"
                 except StopAsyncIteration:
@@ -295,6 +321,8 @@ async def stream_query_bridge(
                         logger.debug("Error checking pending tool calls: %s", pend_err)
                     break
         except (asyncio.CancelledError, GeneratorExit):
+            if not anext_task.done():
+                anext_task.cancel()
             # ponytail: Client disconnected mid-stream — terminate running agent immediately to prevent wasted execution/token burn
             logger.info("Client disconnected from stream for session %s. Terminating running agent immediately.", sid)
             try:
@@ -303,6 +331,8 @@ async def stream_query_bridge(
                 logger.warning("Error stopping agent on client disconnect: %s", stop_err)
             raise
         finally:
+            if not anext_task.done():
+                anext_task.cancel()
             # ponytail: only app-specific post-stream work — sync last_user_view_time
             # so the sidebar's "unread" blue dot doesn't false-fire. NexAU has no UI concept of "unread".
             try:
@@ -319,6 +349,13 @@ async def stream_query_bridge(
                     await asyncio.shield(_shielded_view_sync())
             except (asyncio.CancelledError, Exception) as ex:
                 logger.debug("Session update skipped or cancelled: %s", ex)
+
+            # ponytail: clear consumed mid-flight steering mailbox so stale instructions don't leak into NEXT run (Issue E-1)
+            try:
+                from nexau.archs.session.steering import clear_steering_messages
+                clear_steering_messages(sid)
+            except Exception:
+                pass
 
     return StreamingResponse(
         sse_event_stream(),
@@ -423,6 +460,13 @@ async def approve_plan_bridge(
                 target_tc_id = payload.tool_call_id
                 if not target_tc_id and len(pending) == 1:
                     target_tc_id = next(iter(pending.keys()))
+
+                # ponytail: match raw vs run_-prefixed tool_call_id (Blocker B-2)
+                if target_tc_id and target_tc_id not in pending:
+                    for pk in pending.keys():
+                        if target_tc_id.endswith(f"_{pk}") or pk.endswith(f"_{target_tc_id}") or pk == target_tc_id:
+                            target_tc_id = pk
+                            break
 
                 if target_tc_id and target_tc_id in pending:
                     entry = pending[target_tc_id]

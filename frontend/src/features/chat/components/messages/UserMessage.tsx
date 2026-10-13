@@ -127,6 +127,6 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
       </div>
     </div>
   );
-}, (prev, next) => prev.msg.content === next.msg.content && prev.msg.timestamp === next.msg.timestamp);
+}, (prev, next) => prev.msg.content === next.msg.content && prev.msg.timestamp === next.msg.timestamp && prev.onUndo === next.onUndo);
 
 export default UserMessage;

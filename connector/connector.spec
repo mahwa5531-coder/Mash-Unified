@@ -1,0 +1,88 @@
+# -*- mode: python ; coding: utf-8 -*-
+# PyInstaller specification for Mash Desktop Connector (Sidecar binary)
+# Target: Windows x86_64 standalone sidecar executable
+
+import sys
+from pathlib import Path
+
+block_cipher = None
+
+root_dir = Path(SPECPATH).parent.resolve()
+connector_dir = root_dir / 'connector'
+nexau_dir = root_dir / 'NexAU'
+
+datas = [
+    (str(connector_dir / 'app' / 'resources'), 'app/resources'),
+    (str(connector_dir / 'app' / 'prompts'), 'app/prompts'),
+    (str(nexau_dir / 'nexau' / 'agents'), 'nexau/agents'),
+    (str(nexau_dir / 'nexau' / 'archs' / 'tool' / 'builtin' / 'schemas'), 'nexau/archs/tool/builtin/schemas'),
+]
+
+hiddenimports = [
+    'uvicorn',
+    'uvicorn.logging',
+    'uvicorn.loops',
+    'uvicorn.loops.auto',
+    'uvicorn.protocols',
+    'uvicorn.protocols.http',
+    'uvicorn.protocols.http.auto',
+    'uvicorn.protocols.websockets',
+    'uvicorn.protocols.websockets.auto',
+    'uvicorn.lifespan',
+    'uvicorn.lifespan.on',
+    'aiosqlite',
+    'sqlalchemy.dialects.sqlite',
+    'pathspec',
+    'jinja2',
+    'pydantic',
+    'openai',
+    'httpx',
+    'duckduckgo_search',
+]
+
+a = Analysis(
+    ['run_server.py'],
+    pathex=[str(connector_dir), str(nexau_dir)],
+    binaries=[],
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=['tkinter', 'matplotlib', 'scipy'],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='connector',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='connector',
+)

@@ -285,6 +285,11 @@ export default function TaskWorkLogAccordion({
   const hasTools = (tools && tools.length > 0) || (steps && steps.some((s: any) => s.type === 'tool' || (s.tools && s.tools.length > 0)));
   const actionLabel = hasThoughts && !hasTools ? `Thought for ${formattedTime}` : `Worked for ${formattedTime}`;
 
+  // Find any active pending approval that is awaiting user decision
+  const pendingApprovalEntry = groupedTimeline.find(
+    (e) => e.type === 'approval' || (e.data?.tool && e.data.tool.status === 'pending_approval' && !e.data.tool.decision)
+  );
+
   return (
     <div className="w-full min-w-0 text-[13px] font-sans my-1 select-text">
       <button
@@ -296,6 +301,13 @@ export default function TaskWorkLogAccordion({
         <span className="font-sans">{actionLabel}</span>
         <ChevronRight size={11} className={cn("text-muted-foreground group-hover:text-foreground transition-transform", clusterOpen && "rotate-90")} />
       </button>
+
+      {/* If there's an active pending approval waiting for user decision, render it prominently so it is never buried inside a collapsed accordion (Chain 2) */}
+      {pendingApprovalEntry && !clusterOpen && (
+        <div className="my-1.5 animate-in fade-in-50 slide-in-from-top-1">
+          {renderTimelineRow(pendingApprovalEntry, false)}
+        </div>
+      )}
 
       {/* Chronological Timeline List revealed only when user expands */}
       {clusterOpen && (

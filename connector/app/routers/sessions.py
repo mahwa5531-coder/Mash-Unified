@@ -776,6 +776,11 @@ async def get_history(
     session_id: str,
     engine: DatabaseEngineDep,
 ):
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
     actions = await eng.find_many(
         AgentRunActionModel,
@@ -799,6 +804,11 @@ async def list_subagents(
     engine: DatabaseEngineDep,
 ):
     """List all sub-agents that ran in this session with status and run statistics."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
     actions = await eng.find_many(
         AgentRunActionModel,
@@ -836,6 +846,12 @@ async def get_subagent_transcript(
     engine: DatabaseEngineDep,
 ):
     """Get the full step-by-step execution transcript for a specific sub-agent."""
+    try:
+        validate_safe_id(session_id, "session_id")
+        validate_safe_id(sub_agent_id, "sub_agent_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
     actions = await eng.find_many(
         AgentRunActionModel,
@@ -868,6 +884,11 @@ async def mark_session_viewed(
     engine: DatabaseEngineDep,
 ):
     """Update the last_user_view_time timestamp when user views a session."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
     now_iso = datetime.now(UTC).isoformat()
     if eng:
@@ -896,6 +917,11 @@ async def rename_session(
     payload: RenameSessionPayload,
     engine: DatabaseEngineDep,
 ):
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
     title_val = payload.effective_title or "Untitled Session"
     if eng:
@@ -926,6 +952,11 @@ async def undo_session(
     engine: DatabaseEngineDep,
 ):
     """Event-sourced undo (RFC-0022): records an UNDO action to revert conversation state without deleting DB records."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     eng = _get_engine(engine)
     if not eng:
         return {"status": "success", "deleted": 0}
@@ -986,6 +1017,11 @@ async def undo_session(
 @router.post("/api/sessions/{session_id}/queue")
 async def queue_session_steering(session_id: str, payload: SteeringQueuePayload):
     """Queue a mid-flight steering message for an actively running session."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     msg = payload.message.strip()
     if not msg:
         return {"status": "error", "message": "Empty message"}
@@ -1002,6 +1038,11 @@ async def queue_session_steering(session_id: str, payload: SteeringQueuePayload)
 @router.get("/api/sessions/{session_id}/queue")
 async def get_session_queue(session_id: str):
     """Inspect currently queued steering messages for a session."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     queued = peek_steering_messages(session_id)
     return {"session_id": session_id, "queued": queued, "count": len(queued)}
 
@@ -1010,6 +1051,11 @@ async def get_session_queue(session_id: str):
 @router.delete("/api/sessions/{session_id}/queue")
 async def clear_session_queue(session_id: str, index: int | None = None):
     """Clear all queued steering messages for a session, or delete a single message by index."""
+    try:
+        validate_safe_id(session_id, "session_id")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     if index is not None:
         try:
             from nexau.archs.session.steering import remove_steering_message
@@ -1057,4 +1103,4 @@ async def delete_session(
     except Exception as e:
         logger.warning(f"Session brain cleanup warning for {session_id}: {e}")
 
-    return {"status": "success", "session_id": session_id}
+    return {"status": "success", "session_id": session_id}

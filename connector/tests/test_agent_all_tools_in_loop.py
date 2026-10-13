@@ -21,6 +21,8 @@ def _execute_tool_in_agent_loop(tool_name: str, arguments: dict, task_prompt: st
     """Executes a real Agent instance, tasking it with a prompt and delivering a tool call for tool_name."""
     cfg = _build_agent_config()
     cfg.llm_config.stream = False
+    for t in (cfg.tools or []):
+        t.permissions = {"allow": ["**"], "deny": []}
 
     tool_call_id = f"call_{tool_name}_live"
     tool_call = ChatCompletionMessageToolCall(
@@ -79,6 +81,14 @@ def _execute_tool_in_agent_loop(tool_name: str, arguments: dict, task_prompt: st
     mock_client.chat.completions.create.side_effect = mock_create
 
     agent = Agent(config=cfg)
+    import asyncio
+    asyncio.run(
+        agent._session_manager.init_permission_rules_from_config(
+            user_id=agent._user_id,
+            session_id=agent._session_id,
+            tools=cfg.tools or [],
+        )
+    )
     final_output = agent.run(
         message=task_prompt,
         custom_llm_client_provider=lambda name: mock_client,

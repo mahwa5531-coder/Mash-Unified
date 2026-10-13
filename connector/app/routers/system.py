@@ -1,4 +1,11 @@
+import asyncio
+import logging
+from pathlib import Path
+
 from fastapi import APIRouter
+from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -24,6 +31,20 @@ async def list_skills():
             {"name": "code_refactor", "description": "Surgical codebase refactoring without rewrite"},
         ]
     }
+
+
+@router.get("/models")
+async def list_models():
+    """List supported intelligence models."""
+    return {
+        "models": [
+            {"id": "mash/auto", "name": "MASh Intelligent Auto-Router", "provider": "mash"},
+            {"id": "anthropic/claude-3-7-sonnet", "name": "Claude 3.7 Sonnet", "provider": "anthropic"},
+            {"id": "openai/gpt-4o", "name": "GPT-4o", "provider": "openai"},
+            {"id": "google/gemini-2.5-pro", "name": "Gemini 2.5 Pro", "provider": "google"},
+        ]
+    }
+
 
 
 
@@ -58,22 +79,6 @@ async def get_system_info():
     }
 
 
-@router.get("/system/updates")
-@router.get("/api/system/updates")
-async def get_system_updates():
-    """Return current desktop update state."""
-    return {"status": "idle", "version": "1.0.0"}
-
-
-import asyncio
-import logging
-from pathlib import Path
-
-from pydantic import BaseModel
-
-logger = logging.getLogger(__name__)
-
-
 class UpdateStateRequest(BaseModel):
     status: str
     version: str | None = "1.2.0"
@@ -88,6 +93,7 @@ _desktop_update_state = {
 
 
 @router.get("/system/updates")
+@router.get("/api/system/updates")
 async def get_system_updates():
     """Returns background auto-update status."""
     return _desktop_update_state
@@ -461,4 +467,4 @@ async def open_system_file(request: OpenFileRequest):
             err_str = "No spreadsheet application found on this computer. Please download the file or install Excel."
         return {"status": "error", "message": err_str}
 
-
+

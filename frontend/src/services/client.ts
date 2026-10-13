@@ -29,13 +29,16 @@ export async function safeFetch(url: string, init?: RequestInit): Promise<Respon
     headers,
   };
 
+  // ponytail: relative paths starting with / must target connector BASE_URL (:8000), not Next.js (:3000) (Blocker B-1)
+  const targetUrl = url.startsWith('/') ? `${BASE_URL}${url}` : url;
+
   try {
-    return await fetch(url, effectiveInit);
+    return await fetch(targetUrl, effectiveInit);
   } catch {
     if (isIdempotent) {
       await new Promise((r) => setTimeout(r, 350));
       try {
-        return await fetch(url, effectiveInit);
+        return await fetch(targetUrl, effectiveInit);
       } catch {}
     }
     return new Response(JSON.stringify({ error: "Backend unavailable" }), {

@@ -35,6 +35,14 @@ async def test_file_viewers_endpoints(tmp_path):
     async with lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=30.0) as client:
+            # Register workspace folder as project
+            proj_res = await client.post("/api/projects", json={
+                "user_id": "test_viewer_user",
+                "name": "Viewer Test Project",
+                "local_folder_path": str(demo_dir)
+            })
+            assert proj_res.status_code == 200
+
             # 1. Python file contract
             res = await client.get("/files/content", params={"path": str(py_file).replace("\\", "/")})
             assert res.status_code == 200

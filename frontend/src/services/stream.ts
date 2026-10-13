@@ -51,7 +51,26 @@ export async function streamQuery(
   // Track raw argument buffers per tool_call_id
   const toolArgBuffers: Record<string, string> = {};
   const toolCallNames: Record<string, string> = {};
+  const completedToolIds = new Set<string>();
   let isStalled = false;
+
+  const finalizeRunningTools = (status: "completed" | "cancelled" = "completed") => {
+    if (!onToolCall) return;
+    for (const callId of Object.keys(toolCallNames)) {
+      if (!completedToolIds.has(callId)) {
+        let finalArgs: Record<string, any> = {};
+        try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
+        onToolCall({
+          id: callId,
+          name: toolCallNames[callId],
+          args: finalArgs,
+          output: status === "cancelled" ? "Execution interrupted." : "Done.",
+          status: status,
+        });
+        completedToolIds.add(callId);
+      }
+    }
+  };
 
   try {
     const token = getStoredAccessToken();
@@ -254,6 +273,7 @@ export async function streamQuery(
                 status: isFailed ? "failed" : "completed",
                 durationSeconds: event.duration_seconds ?? data.duration_seconds,
               });
+              completedToolIds.add(callId);
             }
           }
 
@@ -263,6 +283,7 @@ export async function streamQuery(
             const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
             const toolName = event.tool_name || data.tool_name || "action";
             const params = event.parameters || data.parameters || {};
+            completedToolIds.add(callId);
             if (onToolCall) {
               onToolCall({
                 id: callId,
@@ -277,11 +298,13 @@ export async function streamQuery(
 
           // 7. Run fully finished
           else if (eventType === "RUN_FINISHED") {
-            // stream is done, nothing to do — reader.done will handle it
+            // stream is done — finalize any in-flight running tools
+            finalizeRunningTools("completed");
           }
 
           // 8. Errors — clean normalization avoiding raw JSON envelope dumps in chat
           else if (eventType === "RUN_ERROR" || eventType === "TRANSPORT_ERROR") {
+            finalizeRunningTools("cancelled");
             const errStr = event.message || data.message || event.error_message || data.error_message || data.error || "Unknown error";
             const formatted = formatErrorMessage(errStr);
             const errId = event.run_id || data.run_id || event.error_id || data.error_id || event.id;
@@ -298,6 +321,7 @@ export async function streamQuery(
     }
   } finally {
     if (stallTimer !== null) clearTimeout(stallTimer);
+    finalizeRunningTools("cancelled");
   }
 
   if (isStalled) {

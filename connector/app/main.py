@@ -25,7 +25,6 @@ for _bd in _bin_dirs:
         if _p not in os.environ.get("PATH", ""):
             os.environ["PATH"] = _p + os.pathsep + os.environ.get("PATH", "")
 
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from nexau.archs.transports.http import HTTPConfig, SSETransportServer

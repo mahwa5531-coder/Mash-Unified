@@ -7,7 +7,7 @@ export function isToolRunning(tool?: ToolCallItem, isStreaming?: boolean): boole
     tool.status === 'completed' ||
     tool.status === 'failed' ||
     (tool.status as string) === 'cancelled' ||
-    tool.status === 'pending_approval' ||
+    (tool.status === 'pending_approval' && !tool.decision) ||
     tool.status === 'denied'
   ) return false;
   if (tool.status === 'running') return true;
@@ -43,7 +43,10 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     try { args = JSON.parse(args); } catch { args = {}; }
   }
 
-  if (t.status === 'pending_approval' || t.status === 'denied') {
+  // The interactive approval card is ONLY rendered while waiting for human permission.
+  // As soon as the user makes a decision (allow/deny) or status transitions, the card vanishes
+  // and the tool call renders as its normal canonical timeline item (command, file_view, etc.).
+  if (t.status === 'pending_approval' && !t.decision) {
     const rawCmd = args.CommandLine || args.command || args.cmd || '';
     const toolSummary = args.toolSummary || t.toolSummary || null;
     const toolAction = args.toolAction || t.toolAction || null;
@@ -58,8 +61,8 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
         toolAction,
         command: rawCmd ? String(rawCmd).replace(/^powershell\s+-Command\s+/i, '').trim() : undefined,
         args,
-        status: t.status === 'pending_approval' ? 'pending' : 'denied',
-        decision: t.decision,
+        status: 'pending',
+        decision: null,
       }
     };
   }

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.dependencies import DatabaseEngineDep
 from app.models.project import ProjectModel
+from app.workspace import invalidate_roots_cache
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -63,10 +64,12 @@ async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEng
             p.local_folder_path = normalized_path
             p.user_id = request.user_id
             await engine.update(p)
+            invalidate_roots_cache()
             return p
 
     project = ProjectModel(user_id=request.user_id, name=clean_name, local_folder_path=normalized_path)
     await engine.create(project)
+    invalidate_roots_cache()
     return project
 
 
@@ -86,10 +89,12 @@ async def create_project(request: CreateProjectRequest, engine: DatabaseEngineDe
             p.local_folder_path = normalized_path
             p.user_id = request.user_id
             await engine.update(p)
+            invalidate_roots_cache()
             return p
 
     project = ProjectModel(user_id=request.user_id, name=request.name, local_folder_path=normalized_path)
     await engine.create(project)
+    invalidate_roots_cache()
     return project
 
 
@@ -187,7 +192,7 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
 
     from nexau.archs.session.models import AgentRunActionModel, SessionModel
 
-    from app.paths import get_nexau_home, get_session_brain_dir
+    from app.paths import get_nexau_home, get_session_brain_dir, safe_rmtree_session_brain
 
     clean_id = unquote(project_id).strip()
 
@@ -230,10 +235,12 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
                 sid = s.session_id
                 # Delete actions/transcripts from DB
                 await engine.delete(AgentRunActionModel, filters=ComparisonFilter.eq("session_id", sid))
-                # Delete session brain directory from ~/.nexau
-                brain_dir = ctx.get("brain_directory") or str(get_session_brain_dir(sid, project.id))
-                if brain_dir and os.path.exists(brain_dir):
-                    shutil.rmtree(brain_dir, ignore_errors=True)
+                # Delete session brain directory safely via safe_rmtree_session_brain
+                brain_dir = ctx.get("brain_directory")
+                try:
+                    safe_rmtree_session_brain(sid, brain_dir)
+                except Exception:
+                    pass
                 # Delete session record from DB
                 await engine.delete(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
                 deleted_sessions_count += 1
@@ -241,10 +248,12 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
         pass
 
     # 2. Clean up project storage directory in .nexau (~/.nexau/projects/<project_id>/ and <name>/)
+    nexau_projects_root = (get_nexau_home() / "projects").resolve()
     for p_ident in [project.id, project.name]:
-        proj_dir = get_nexau_home() / "projects" / p_ident
-        if proj_dir.exists():
-            shutil.rmtree(proj_dir, ignore_errors=True)
+        if p_ident:
+            proj_dir = (nexau_projects_root / str(p_ident)).resolve()
+            if proj_dir.exists() and proj_dir.is_relative_to(nexau_projects_root) and proj_dir != nexau_projects_root:
+                shutil.rmtree(proj_dir, ignore_errors=True)
 
     # 3. Clean up .nexau directory inside the workspace folder if it exists (local code files preserved!)
     if project.local_folder_path and os.path.isdir(project.local_folder_path):
@@ -261,6 +270,7 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
             except Exception:
                 pass
 
+    invalidate_roots_cache()
     return {
         "status": "success",
         "message": f"Project '{project.name}' deleted successfully with {deleted_sessions_count} sessions removed from .nexau and database.",

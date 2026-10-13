@@ -232,3 +232,88 @@ async def test_transcript_returns_pending_approval_status():
             assert tool_item["status"] == "pending_approval"
             assert tool_item["toolSummary"] == "Purge temporary datasets"
             assert tool_item["toolAction"] == "Purges temporary dataset exports from the sandbox directory"
+
+
+@pytest.mark.anyio
+async def test_stream_resume_no_fake_user_turn_in_history():
+    """Verify that resolving tool approval and resuming stream with empty messages injects zero fake user turns."""
+    from datetime import datetime, timezone
+    from nexau.archs.session.models import AgentRunActionModel
+    from nexau.core.messages import Message, Role, TextBlock, ToolUseBlock
+
+    async with lifespan(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=30.0) as client:
+            test_id = uuid.uuid4().hex[:8]
+            sid = f"sess_resume_{test_id}"
+            user_id = "default_user"
+
+            # 1. Create session
+            res_create = await client.post("/api/sessions", json={
+                "session_id": sid,
+                "user_id": user_id,
+                "title": f"Resume Session {test_id}",
+            })
+            assert res_create.status_code == 200
+
+            # 2. Add an initial user message and assistant tool use
+            eng = get_engine()
+            tc_id = f"tc_resume_{test_id}"
+            user_act = AgentRunActionModel(
+                user_id=user_id,
+                session_id=sid,
+                agent_id="main_agent",
+                run_id=f"run_{test_id}",
+                root_run_id=f"run_{test_id}",
+                action_type="append",
+                append_messages=[
+                    Message(role=Role.USER, content=[TextBlock(text="Clean the build directory")]),
+                    Message(
+                        role=Role.ASSISTANT,
+                        content=[
+                            ToolUseBlock(
+                                id=tc_id,
+                                name="run_shell_command",
+                                input={"command": "rm -rf build"},
+                            )
+                        ],
+                    ),
+                ],
+                created_at=datetime.now(timezone.utc),
+            )
+            await eng.create(user_act)
+
+            # Set pending tool call on session
+            session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
+            session.pending_tool_calls = {
+                tc_id: {
+                    "tool_name": "run_shell_command",
+                    "permission_key": "rm -rf build",
+                    "parameters": {"command": "rm -rf build"},
+                    "decision": None,
+                }
+            }
+            await eng.update(session)
+
+            # 3. Approve the tool call
+            res_approve = await client.post(f"/api/chat/{sid}/approve", json={
+                "tool_call_id": tc_id,
+                "action": "allow_once",
+                "user_id": user_id,
+            })
+            assert res_approve.status_code == 200
+
+            # Verify pending tool call now has decision 'allow_once'
+            refreshed_sess = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
+            assert refreshed_sess.pending_tool_calls[tc_id]["decision"] == "allow_once"
+
+            # 4. Read transcript before resume: exactly 1 user turn, 1 assistant turn
+            res_trans_before = await client.get(f"/api/sessions/{sid}/transcript")
+            assert res_trans_before.status_code == 200
+            user_lines_before = [l for l in res_trans_before.json()["lines"] if l.get("role") == "user"]
+            assert len(user_lines_before) == 1
+            assert user_lines_before[0]["content"] == "Clean the build directory"
+
+            # 5. Verify that no fake 'Proceed with the approved action' message exists
+            fake_lines = [l for l in res_trans_before.json()["lines"] if "Proceed with the approved action" in str(l)]
+            assert len(fake_lines) == 0, "No fake user messages allowed in transcript"

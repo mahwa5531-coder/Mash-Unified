@@ -223,18 +223,19 @@ export function useChatStream({
     textToSend?: string,
     isRetry: boolean = false,
     isImmediate: boolean = false,
-    targetSessionId?: string
+    targetSessionId?: string,
+    isResume: boolean = false
   ) => {
     const rawText = textToSend !== undefined ? textToSend : inputPrompt;
-    if (!rawText.trim()) return;
+    if (!rawText.trim() && !isResume) return;
     const userText = rawText.trim();
     if (textToSend === undefined) {
       handleSetInputPrompt('');
     }
 
     let activeSid = targetSessionId || activeSessionIdRef.current || sessionId;
-    const isNewSession = !isRetry && !activeSid;
-    const title = generateCleanSessionTitle(userText, activeSid || '');
+    const isNewSession = !isRetry && !isResume && !activeSid;
+    const title = generateCleanSessionTitle(userText || 'Resumed Turn', activeSid || '');
 
     if (isNewSession) {
       const randSuffix =
@@ -250,7 +251,7 @@ export function useChatStream({
     if (!activeSid) return;
     const targetSession = getOrCreateSessionState(activeSid);
 
-    if (targetSession.isStreaming && !isRetry && !isImmediate) {
+    if (targetSession.isStreaming && !isRetry && !isImmediate && !isResume) {
       targetSession.queuedMessages = [...(targetSession.queuedMessages || []), userText];
       targetSession.queuedMessage = targetSession.queuedMessages[0] || null;
       if (activeSid === activeSessionIdRef.current) {
@@ -274,17 +275,31 @@ export function useChatStream({
     }
 
     const currentStamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const currentTurnId = `turn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    targetSession.activeTurnId = currentTurnId;
+    let currentTurnId: string = targetSession.activeTurnId || `turn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    if (!isResume) {
+      currentTurnId = `turn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      targetSession.activeTurnId = currentTurnId;
 
-    targetSession.chatMessages = targetSession.chatMessages.map((m) => {
-      if (m.role === 'assistant' && m.status === 'running') {
-        return { ...m, status: 'completed' as const };
+      targetSession.chatMessages = targetSession.chatMessages.map((m) => {
+        if (m.role === 'assistant' && m.status === 'running') {
+          return { ...m, status: 'completed' as const };
+        }
+        return m;
+      });
+    }
+
+    if (isResume) {
+      const targetIdx = findTargetAssistantIdx(targetSession.chatMessages, targetSession.activeTurnId);
+      if (targetIdx >= 0) {
+        const next = [...targetSession.chatMessages];
+        targetSession.activeTurnId = next[targetIdx].turnId || targetSession.activeTurnId;
+        next[targetIdx] = {
+          ...next[targetIdx],
+          status: 'running',
+        };
+        targetSession.chatMessages = next;
       }
-      return m;
-    });
-
-    if (isRetry) {
+    } else if (isRetry) {
       const targetIdx = findTargetAssistantIdx(targetSession.chatMessages);
       if (targetIdx >= 0) {
         const next = [...targetSession.chatMessages];
@@ -380,7 +395,7 @@ export function useChatStream({
     try {
       await streamQuery(
         activeSid,
-        userText,
+        isResume ? "" : userText,
         {
           onToken: (token) => {
             const s = sessionStore.get(activeSid);
@@ -567,10 +582,12 @@ export function useChatStream({
           }
         }
         const wasAborted = s.wasUserAborted;
-        s.wasUserAborted = false;
+        const hasPendingApproval = s.chatMessages.some(
+          (m) => m.tools && m.tools.some((t) => t.status === 'pending_approval' && !t.decision)
+        );
 
-        // Auto-send next queued message if user had one waiting
-        if (!wasAborted && s.queuedMessages && s.queuedMessages.length > 0) {
+        // Auto-send next queued message if user had one waiting and not awaiting approval (Issue E-2)
+        if (!wasAborted && !hasPendingApproval && s.queuedMessages && s.queuedMessages.length > 0) {
           nextQueuedMsg = s.queuedMessages.shift() || null;
           s.queuedMessage = s.queuedMessages[0] || null;
           if (activeSid === activeSessionIdRef.current) {
@@ -734,32 +751,44 @@ export function useChatStream({
       const curSid = activeSessionIdRef.current || sessionId;
       if (!curSid) return;
 
+      // Strip any run_id prefix so backend finds raw SQLite key (Blocker B-2)
+      const rawTcId = toolCallId.includes('_') && !toolCallId.startsWith('call_') && !toolCallId.startsWith('tc_')
+        ? toolCallId.split('_').slice(1).join('_')
+        : toolCallId;
+
       try {
-        await safeFetch(`/api/chat/${curSid}/approve`, {
+        const res = await safeFetch(`${BASE_URL}/api/chat/${curSid}/approve`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            tool_call_id: toolCallId,
+            tool_call_id: rawTcId,
             action,
             feedback,
             user_id: 'default_user',
           }),
         });
+        if (!res.ok) {
+          console.error(`Approval failed with HTTP ${res.status}`);
+          return;
+        }
       } catch (err) {
         console.warn('Failed to submit tool approval:', err);
+        return;
       }
 
       // Optimistically update tool status in memory
+      // The approval card vanishes immediately because decision is set;
+      // the real tool call renders in running state if allowed, or failed state if denied.
       const s = sessionStore.get(curSid);
       if (s) {
         const next = s.chatMessages.map((m) => {
           if (!m.tools || m.tools.length === 0) return m;
           const updatedTools = m.tools.map((t) => {
-            const matches = t.id === toolCallId || String(t.id).endsWith(`_${toolCallId}`);
+            const matches = t.id === toolCallId || t.id === rawTcId || String(t.id).endsWith(`_${toolCallId}`) || toolCallId.endsWith(`_${t.id}`);
             if (matches) {
               return {
                 ...t,
-                status: action === 'deny' ? ('failed' as const) : ('completed' as const),
+                status: action === 'deny' ? ('failed' as const) : ('running' as const),
                 decision: action,
               };
             }
@@ -774,10 +803,8 @@ export function useChatStream({
         notifyStoreListeners();
       }
 
-      // Resume execution on allow / allow_once
-      if (action !== 'deny') {
-        dispatchSendMessage("Proceed with the approved action", false, true, curSid);
-      }
+      // Lively resume agent execution on the existing turn without injecting fake user messages
+      dispatchSendMessage('', false, true, curSid, true);
     },
     [sessionId, dispatchSendMessage]
   );

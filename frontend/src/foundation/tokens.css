@@ -40,7 +40,7 @@
 .dark {
   /* Surface & Canvas (Dark Theme) */
   --m-bg-app: #101010;
-  --m-bg-sidebar: #0D0D0F;
+  --m-bg-sidebar: #09090b;
   --m-bg-surface: #141416;
   --m-bg-surface-hover: rgba(255, 255, 255, 0.05);
   --m-bg-surface-active: rgba(255, 255, 255, 0.09);

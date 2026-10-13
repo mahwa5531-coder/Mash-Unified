@@ -39,16 +39,16 @@ export function WorkspaceFolderRow({
       {/* Ghost Project Folder Row: Clean neutral text, outlined folder, right-aligned hover actions */}
       <div 
         onClick={onToggle}
-        className="group/folder h-[30px] mx-1 px-2.5 rounded-lg cursor-pointer flex items-center justify-between text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors"
+        className="group/folder h-[30px] mx-1 px-2.5 rounded-lg cursor-pointer flex items-center justify-between text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors"
       >
         {/* Left: Folder Icon (toggles between Folder and FolderOpen) + Project Name */}
         <div className="flex items-center min-w-0 flex-1 overflow-hidden">
           {isOpen ? (
-            <FolderOpen size={14} className="mr-2 text-zinc-300 shrink-0 transition-colors" />
+            <FolderOpen size={14} className="mr-2 text-zinc-700 dark:text-zinc-300 shrink-0 transition-colors" />
           ) : (
-            <Folder size={14} className="mr-2 text-zinc-400 group-hover/folder:text-zinc-300 shrink-0 transition-colors" />
+            <Folder size={14} className="mr-2 text-zinc-500 dark:text-zinc-400 group-hover/folder:text-zinc-800 dark:group-hover/folder:text-zinc-300 shrink-0 transition-colors" />
           )}
-          <span className="text-[13px] truncate font-medium tracking-normal text-zinc-300 group-hover/folder:text-white transition-colors">
+          <span className="text-[13px] truncate font-medium tracking-normal text-zinc-800 dark:text-zinc-300 group-hover/folder:text-zinc-950 dark:group-hover/folder:text-white transition-colors">
             {repoName}
           </span>
           {repoSessions.length > 0 && (
@@ -67,7 +67,7 @@ export function WorkspaceFolderRow({
           <button
             type="button"
             onClick={() => onNewSession(repoName, projectMatch?.local_folder_path)}
-            className="p-1 text-zinc-400 hover:text-white rounded hover:bg-white/[0.08] transition-colors cursor-pointer outline-none"
+            className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer outline-none"
             title="New conversation in project"
             aria-label="New conversation in project"
           >
@@ -79,7 +79,7 @@ export function WorkspaceFolderRow({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="p-1 text-zinc-400 hover:text-white rounded hover:bg-white/[0.08] transition-colors cursor-pointer outline-none"
+                className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer outline-none"
                 title="Project options"
                 aria-label="Project options"
               >

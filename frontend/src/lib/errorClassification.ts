@@ -146,6 +146,7 @@ export function classifyError(
     lower.includes("unauthorized") ||
     lower.includes("401") ||
     lower.includes("authentication required") ||
+    lower.includes("authentication failed") ||
     lower.includes("invalid bearer token") ||
     lower.includes("token expired");
 

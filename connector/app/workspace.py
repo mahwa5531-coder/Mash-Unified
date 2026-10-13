@@ -73,6 +73,12 @@ async def resolve_session_workspace(engine: Any, session_id: str | None) -> Path
     return APP_WORKSPACE_ROOT
 
 
+def invalidate_roots_cache() -> None:
+    """Invalidate dynamic workspace roots cache upon project/session changes."""
+    global _DYNAMIC_ROOTS_CACHE
+    _DYNAMIC_ROOTS_CACHE = None
+
+
 async def get_allowed_file_roots(engine: Any | None) -> list[Path]:
     """Retrieve all authorized workspace and brain roots with a 30s TTL cache."""
     global _DYNAMIC_ROOTS_CACHE

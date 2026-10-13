@@ -91,7 +91,7 @@ export function buildTurns(chatMessages: Message[]): Turn[] {
           const oldContent = existing.content.trim();
           if (!oldContent) {
             existing.content = newContent;
-          } else if (newContent.startsWith(oldContent) || newContent.length >= oldContent.length) {
+          } else if (newContent.startsWith(oldContent)) {
             existing.content = newContent;
           } else if (!oldContent.includes(newContent)) {
             existing.content = (oldContent + '\n\n' + newContent).trim();

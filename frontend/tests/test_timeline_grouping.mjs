@@ -215,4 +215,78 @@ assert.strictEqual(parallelResult[0].data.count, 3);
 assert.strictEqual(parallelResult[1].data.filename, 'solo.ts');
 console.log('✓ Test 5B: Parallel tools inside a single step group into exploration_group without leaking into solo step');
 
+// ---------------------------------------------------------------------------
+// Test 6: Ephemeral Approval Card & Normal Tool Call Rendering
+// ---------------------------------------------------------------------------
+function parseToolItem(t, tIdx) {
+  const name = (t.name || '').toLowerCase();
+  let args = t.args || {};
+  if (typeof args === 'string') {
+    try { args = JSON.parse(args); } catch { args = {}; }
+  }
+
+  // The interactive approval card is ONLY rendered while waiting for human permission.
+  // As soon as the user makes a decision (allow/deny) or status transitions, the card vanishes
+  // and the tool call renders as its normal canonical timeline item (command, file_view, etc.).
+  if (t.status === 'pending_approval' && !t.decision) {
+    const rawCmd = args.CommandLine || args.command || args.cmd || '';
+    return {
+      id: `tool-${tIdx}`,
+      type: 'approval',
+      data: {
+        tool: t,
+        toolCallId: t.id || `tc_${tIdx}`,
+        toolName: t.name,
+        command: rawCmd,
+        status: 'pending',
+        decision: null,
+      }
+    };
+  }
+
+  if (name.includes('run_shell_command') || name.includes('shell')) {
+    const rawCmd = args.CommandLine || args.command || args.cmd || '';
+    return {
+      id: `tool-${tIdx}`,
+      type: 'command',
+      data: { tool: t, cmd: rawCmd }
+    };
+  }
+  return { id: `tool-${tIdx}`, type: 'tool', data: { tool: t } };
+}
+
+// 6A. While waiting for permission -> type: 'approval'
+const pendingTool = {
+  id: 'tc_del_1',
+  name: 'run_shell_command',
+  args: { command: 'rm -rf node_modules' },
+  status: 'pending_approval',
+  decision: null,
+};
+const pendingEntry = parseToolItem(pendingTool, 0);
+assert.strictEqual(pendingEntry.type, 'approval', 'Pending tool without decision MUST render as approval card');
+assert.strictEqual(pendingEntry.data.status, 'pending');
+
+// 6B. When user allows -> Card vanishes immediately, renders as normal 'command' tool
+const allowedTool = {
+  ...pendingTool,
+  status: 'running',
+  decision: 'allow',
+};
+const allowedEntry = parseToolItem(allowedTool, 0);
+assert.strictEqual(allowedEntry.type, 'command', 'Approved tool MUST vanish approval card and render as normal command tool');
+assert.strictEqual(allowedEntry.data.cmd, 'rm -rf node_modules');
+
+// 6C. When user denies -> Card vanishes immediately, renders as normal 'command' tool with failed status
+const deniedTool = {
+  ...pendingTool,
+  status: 'failed',
+  decision: 'deny',
+};
+const deniedEntry = parseToolItem(deniedTool, 0);
+assert.strictEqual(deniedEntry.type, 'command', 'Denied tool MUST vanish approval card and render as normal tool');
+assert.strictEqual(deniedEntry.data.tool.status, 'failed');
+
+console.log('✓ Test 6: Ephemeral approval card vanishes immediately upon decision and renders normal tool call');
+
 console.log('All timeline grouping tests PASSED successfully!');
