@@ -130,6 +130,7 @@ async def _ensure_project_and_context(
                     "project_id": resolved_context.get("project_id"),
                     "brain_directory": resolved_context["brain_directory"],
                     "scratch_directory": resolved_context["scratch_directory"],
+                    "permission_mode": resolved_context.get("permission_mode", "default"),
                     "updated_at": now_utc.isoformat(),
                     "last_user_view_time": now_utc.isoformat(),
                 },
@@ -142,6 +143,10 @@ async def _ensure_project_and_context(
             if not ctx.get("title"):
                 ctx["title"] = title_val
                 ctx["custom_title"] = title_val
+            if resolved_context.get("permission_mode"):
+                ctx["permission_mode"] = resolved_context["permission_mode"]
+            elif not ctx.get("permission_mode"):
+                ctx["permission_mode"] = "default"
             session.context = ctx
             await eng.update(session)
             # Merge stored keys we don't already have
@@ -214,6 +219,25 @@ async def stream_query_bridge(
     new_sb = cur_sb.model_copy(update={"work_dir": target_work_dir}) if cur_sb else LocalSandboxConfig(work_dir=target_work_dir)
     effective_agent_config = effective_agent_config.model_copy(update={"sandbox_config": new_sb})
 
+    # Configure tool permissions according to session permission_mode
+    perm_mode = str(resolved_context.get("permission_mode") or "default").lower()
+    if effective_agent_config and effective_agent_config.tools:
+        configured_tools = []
+        for t in effective_agent_config.tools:
+            t_copy = copy.copy(t)
+            if perm_mode == "turbo":
+                t_copy.permissions = {"allow": ["**"], "deny": []}
+            elif perm_mode == "review":
+                t_copy.permissions = {"allow": [], "deny": []}
+            else:
+                # "default": sensitive operations ask for approval; read-only tools run automatically
+                if t.name in ("run_shell_command", "write_file", "replace_file_content", "web_fetch"):
+                    t_copy.permissions = {"allow": [], "deny": []}
+                else:
+                    t_copy.permissions = {"allow": ["**"], "deny": []}
+            configured_tools.append(t_copy)
+        effective_agent_config = effective_agent_config.model_copy(update={"tools": configured_tools})
+
     # ponytail: NexAU's handle_streaming_request already handles:
     # - Session creation (SessionManager._get_or_create_session)
     # - Agent lifecycle (create, run, stop on disconnect)
@@ -243,6 +267,24 @@ async def stream_query_bridge(
                 except TimeoutError:
                     yield ": heartbeat\n\n"
                 except StopAsyncIteration:
+                    try:
+                        sm = getattr(server, "_session_manager", None)
+                        if sm and sid:
+                            pending = await sm.get_pending_tool_calls(user_id=user_id, session_id=sid)
+                            if pending:
+                                for ptc_id, ptc_val in pending.items():
+                                    if not ptc_val.get("decision"):
+                                        pending_event = {
+                                            "type": "TOOL_CALL_PENDING_APPROVAL",
+                                            "tool_call_id": ptc_id,
+                                            "tool_name": ptc_val.get("tool_name", "action"),
+                                            "prompt": ptc_val.get("prompt", ""),
+                                            "permission_key": ptc_val.get("permission_key", ""),
+                                            "parameters": ptc_val.get("parameters", {}),
+                                        }
+                                        yield f"data: {json.dumps(pending_event)}\n\n"
+                    except Exception as pend_err:
+                        logger.debug("Error checking pending tool calls: %s", pend_err)
                     break
         except (asyncio.CancelledError, GeneratorExit):
             # ponytail: Client disconnected mid-stream — terminate running agent immediately to prevent wasted execution/token burn
@@ -318,8 +360,14 @@ async def stop_agent_bridge(
 
 class PlanApprovalPayload(BaseModel):
     session_id: str | None = None
-    action: str
+    action: str  # "proceed", "reject", "allow", "allow_once", "deny"
+    tool_call_id: str | None = None
     feedback: str | None = None
+    user_id: str | None = "default_user"
+
+
+class PermissionModePayload(BaseModel):
+    mode: str  # "turbo" | "default" | "review"
 
 
 @router.post("/approve")
@@ -330,4 +378,105 @@ async def approve_plan_bridge(
     payload: PlanApprovalPayload,
     session_id: str | None = None,
 ):
-    return {"status": "success", "MANUAL_APPROVAL": True, "execution_mode": payload.action}
+    """Bridge for tool permission resolution and manual plan approval.
+    
+    Wires directly to NexAU's SessionManager to update pending tool calls and
+    persist user rules into SQLite's permission_rules table.
+    """
+    sid = session_id or payload.session_id or ""
+    uid = payload.user_id or "default_user"
+    raw_action = (payload.action or "proceed").lower()
+
+    # Map frontend / test actions to NexAU permission decisions
+    if raw_action in ("allow", "always_allow"):
+        decision = "allow"
+    elif raw_action in ("deny", "reject"):
+        decision = "deny"
+    else:
+        decision = "allow_once"
+
+    # Wire to NexAU SessionManager when session ID is provided
+    try:
+        server = get_sse_server()
+        sm = getattr(server, "_session_manager", None)
+        if sm and sid:
+            pending = await sm.get_pending_tool_calls(user_id=uid, session_id=sid)
+            if pending:
+                target_tc_id = payload.tool_call_id
+                if not target_tc_id and len(pending) == 1:
+                    target_tc_id = next(iter(pending.keys()))
+
+                if target_tc_id and target_tc_id in pending:
+                    entry = pending[target_tc_id]
+                    entry["decision"] = decision
+                    if payload.feedback:
+                        entry["feedback"] = payload.feedback
+
+                    # "allow" persists permanently to SQLite permission_rules table
+                    if decision == "allow":
+                        await sm.save_permission_rule(
+                            user_id=uid,
+                            session_id=sid,
+                            tool_name=entry.get("tool_name", ""),
+                            rule_content=entry.get("permission_key", ""),
+                            behavior="allow",
+                            source="user",
+                        )
+
+                    await sm.update_pending_tool_calls(
+                        user_id=uid,
+                        session_id=sid,
+                        pending_tool_calls=pending,
+                    )
+    except Exception as ex:
+        logger.warning("Error resolving permission for session %s: %s", sid, ex)
+
+    # Return structure preserves MANUAL_APPROVAL and execution_mode for existing tests
+    return {
+        "status": "success",
+        "MANUAL_APPROVAL": True,
+        "action": payload.action,
+        "execution_mode": payload.action,
+        "tool_call_id": payload.tool_call_id,
+    }
+
+
+@router.post("/api/sessions/{session_id}/permissions/mode")
+@router.post("/sessions/{session_id}/permissions/mode")
+async def update_session_permission_mode(session_id: str, payload: PermissionModePayload):
+    """Set the runtime tool permission mode for a session ('turbo', 'default', 'review')."""
+    eng = get_engine()
+    if not eng:
+        raise HTTPException(status_code=500, detail="Database engine unavailable")
+
+    session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    clean_mode = payload.mode.lower()
+    if clean_mode not in ("turbo", "default", "review"):
+        raise HTTPException(status_code=400, detail="Mode must be 'turbo', 'default', or 'review'")
+
+    ctx = dict(session.context or {})
+    ctx["permission_mode"] = clean_mode
+    session.context = ctx
+    await eng.update(session)
+    return {"status": "success", "session_id": session_id, "permission_mode": clean_mode}
+
+
+@router.get("/api/sessions/{session_id}/permissions")
+@router.get("/sessions/{session_id}/permissions")
+async def get_session_permissions(session_id: str, user_id: str = "default_user"):
+    """Retrieve active permission mode and any pending tool calls for a session."""
+    eng = get_engine()
+    session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id)) if eng else None
+    ctx = session.context or {} if session else {}
+    server = get_sse_server()
+    sm = getattr(server, "_session_manager", None)
+    pending = await sm.get_pending_tool_calls(user_id=user_id, session_id=session_id) if sm else {}
+
+    return {
+        "session_id": session_id,
+        "permission_mode": ctx.get("permission_mode", "default"),
+        "pending_tool_calls": pending or {},
+    }

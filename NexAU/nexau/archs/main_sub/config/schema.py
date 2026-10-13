@@ -35,6 +35,7 @@ class ToolConfigEntry(BaseModel):
     defer_loading: bool = False
     extra_kwargs: dict[str, Any] = Field(default_factory=dict)
     source_id: str | None = None
+    permissions: dict[str, list[str]] | None = None
 
 
 class SkillConfigEntry(BaseModel):

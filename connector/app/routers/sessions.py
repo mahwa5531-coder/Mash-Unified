@@ -366,6 +366,9 @@ async def get_transcript(
     if not eng:
         return {"lines": [], "total": 0}
     try:
+        session_obj = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
+        pending_map = (getattr(session_obj, "pending_tool_calls", None) or {}) if session_obj else {}
+
         actions = await eng.find_many(
             AgentRunActionModel,
             filters=ComparisonFilter.eq("session_id", session_id),
@@ -516,12 +519,19 @@ async def get_transcript(
                             t_id = str(getattr(block, "id", None) or (block.get("id") if isinstance(block, dict) else ""))
                             t_args = getattr(block, "input", None) or (block.get("input") if isinstance(block, dict) else {})
                             tool_action = get_tool_action_type(str(t_name))
+                            parsed_t_args = t_args if isinstance(t_args, dict) else {}
+                            is_pending = bool(pending_map and t_id in pending_map and not pending_map[t_id].get("decision"))
+                            decision_val = pending_map.get(t_id, {}).get("decision") if pending_map else None
+                            tool_status = "pending_approval" if is_pending else ("denied" if decision_val == "deny" else "completed")
                             tool_obj = {
                                 "id": t_id,
                                 "name": str(t_name),
-                                "args": t_args if isinstance(t_args, dict) else {},
+                                "args": parsed_t_args,
                                 "output": "",
-                                "status": "completed",
+                                "status": tool_status,
+                                "decision": decision_val,
+                                "toolSummary": parsed_t_args.get("toolSummary") or (pending_map.get(t_id, {}).get("prompt") if pending_map else None),
+                                "toolAction": parsed_t_args.get("toolAction"),
                                 "action_type": tool_action,
                             }
                             tools.append(tool_obj)
@@ -581,12 +591,18 @@ async def get_transcript(
                                 parsed_args = {}
                         else:
                             parsed_args = raw_args if isinstance(raw_args, dict) else {}
+                        is_pending = bool(pending_map and tc_id in pending_map and not pending_map[tc_id].get("decision"))
+                        decision_val = pending_map.get(tc_id, {}).get("decision") if pending_map else None
+                        tool_status = "pending_approval" if is_pending else ("denied" if decision_val == "deny" else "completed")
                         tool_obj = {
                             "id": tc_id,
                             "name": str(tc_name),
                             "args": parsed_args,
                             "output": "",
-                            "status": "completed",
+                            "status": tool_status,
+                            "decision": decision_val,
+                            "toolSummary": parsed_args.get("toolSummary") or (pending_map.get(tc_id, {}).get("prompt") if pending_map else None),
+                            "toolAction": parsed_args.get("toolAction"),
                         }
                         tools.append(tool_obj)
                         if tc_id:

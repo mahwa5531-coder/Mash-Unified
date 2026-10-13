@@ -4,8 +4,11 @@ export interface ToolCallItem {
   name: string;
   args?: Record<string, any>;
   output?: string;
-  status?: 'running' | 'completed' | 'failed';
+  status?: 'running' | 'completed' | 'failed' | 'cancelled' | 'pending_approval' | 'denied';
   durationSeconds?: number;
+  toolSummary?: string;
+  toolAction?: string;
+  decision?: 'allow' | 'allow_once' | 'deny' | null;
 }
 
 export interface ExecutionStep {
@@ -16,7 +19,7 @@ export interface ExecutionStep {
   name?: string;
   args?: Record<string, any>;
   output?: string;
-  status?: 'running' | 'completed' | 'failed' | 'cancelled';
+  status?: 'running' | 'completed' | 'failed' | 'cancelled' | 'pending_approval' | 'denied';
   action_type?: string;
   tool_call_id?: string;
   durationMs?: number;
@@ -29,7 +32,7 @@ export interface ExecutionStep {
 
 export interface TimelineEntry {
   id: string;
-  type: 'thought' | 'text' | 'file_read' | 'folder_view' | 'search' | 'web_search' | 'web_fetch' | 'code_search' | 'task' | 'subagent' | 'edit' | 'command' | 'other' | 'command_group' | 'exploration_group' | 'edit_group';
+  type: 'thought' | 'text' | 'file_read' | 'folder_view' | 'search' | 'web_search' | 'web_fetch' | 'code_search' | 'task' | 'subagent' | 'edit' | 'command' | 'approval' | 'other' | 'command_group' | 'exploration_group' | 'edit_group';
   data: any;
   items?: TimelineEntry[];
 }

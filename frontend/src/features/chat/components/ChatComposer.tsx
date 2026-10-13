@@ -5,6 +5,7 @@ import type { KeyboardEvent, DragEvent } from 'react';
 import { useChatAttachments, type AttachedFile } from '@/features/chat/hooks/useChatAttachments';
 import { AttachedFilesList } from './composer/AttachedFilesList';
 import { ComposerActions } from './composer/ComposerActions';
+import type { PermissionMode } from './composer/PermissionModeSelector';
 
 export type { AttachedFile };
 
@@ -19,6 +20,8 @@ export interface ChatComposerProps {
   sessionRepo?: string;
   onInvalidMedia?: (show: boolean, reason?: string) => void;
   initialAttachedFiles?: AttachedFile[];
+  permissionMode?: PermissionMode;
+  onPermissionModeChange?: (mode: PermissionMode) => void;
 }
 
 export default function ChatComposer({
@@ -32,6 +35,8 @@ export default function ChatComposer({
   sessionRepo,
   onInvalidMedia,
   initialAttachedFiles,
+  permissionMode,
+  onPermissionModeChange,
 }: ChatComposerProps) {
   const [localPrompt, setLocalPrompt] = useState<string>(inputPrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -187,6 +192,8 @@ export default function ChatComposer({
         fileInputRef={fileInputRef}
         onSend={handleSendClick}
         onStop={onStop}
+        permissionMode={permissionMode}
+        onPermissionModeChange={onPermissionModeChange}
       />
     </div>
   );

@@ -257,6 +257,24 @@ export async function streamQuery(
             }
           }
 
+          // 6b. Tool Call Pending Approval (RFC-0019 permissions)
+          else if (eventType === "TOOL_CALL_PENDING_APPROVAL") {
+            const rawId = String(event.tool_call_id || data.tool_call_id || data.id || `tc_${Date.now()}`);
+            const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
+            const toolName = event.tool_name || data.tool_name || "action";
+            const params = event.parameters || data.parameters || {};
+            if (onToolCall) {
+              onToolCall({
+                id: callId,
+                name: toolName,
+                args: params,
+                status: "pending_approval",
+                toolSummary: params.toolSummary || event.prompt || data.prompt,
+                toolAction: params.toolAction,
+              });
+            }
+          }
+
           // 7. Run fully finished
           else if (eventType === "RUN_FINISHED") {
             // stream is done, nothing to do — reader.done will handle it

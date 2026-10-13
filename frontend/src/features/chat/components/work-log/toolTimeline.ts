@@ -3,7 +3,13 @@ import type { ToolCallItem, TimelineEntry } from './types';
 
 export function isToolRunning(tool?: ToolCallItem, isStreaming?: boolean): boolean {
   if (!tool) return false;
-  if (tool.status === 'completed' || tool.status === 'failed' || (tool.status as string) === 'cancelled') return false;
+  if (
+    tool.status === 'completed' ||
+    tool.status === 'failed' ||
+    (tool.status as string) === 'cancelled' ||
+    tool.status === 'pending_approval' ||
+    tool.status === 'denied'
+  ) return false;
   if (tool.status === 'running') return true;
   return !!(isStreaming && tool.output === undefined);
 }
@@ -35,6 +41,27 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
   let args = t.args || {};
   if (typeof args === 'string') {
     try { args = JSON.parse(args); } catch { args = {}; }
+  }
+
+  if (t.status === 'pending_approval' || t.status === 'denied') {
+    const rawCmd = args.CommandLine || args.command || args.cmd || '';
+    const toolSummary = args.toolSummary || t.toolSummary || null;
+    const toolAction = args.toolAction || t.toolAction || null;
+    return {
+      id: `tool-${tIdx}`,
+      type: 'approval',
+      data: {
+        tool: t,
+        toolCallId: t.id || `tc_${tIdx}`,
+        toolName: t.name,
+        toolSummary,
+        toolAction,
+        command: rawCmd ? String(rawCmd).replace(/^powershell\s+-Command\s+/i, '').trim() : undefined,
+        args,
+        status: t.status === 'pending_approval' ? 'pending' : 'denied',
+        decision: t.decision,
+      }
+    };
   }
 
   if (
@@ -216,6 +243,13 @@ export function groupTimelineEntries(entries: TimelineEntry[]): TimelineEntry[] 
 
   while (i < entries.length) {
     const current = entries[i];
+
+    // Preserved standalone: Approval Cards must never be bundled into a collapsible group
+    if (current.type === 'approval') {
+      result.push(current);
+      i++;
+      continue;
+    }
 
     // 1. Group consecutive commands (>= 2)
     if (current.type === 'command') {

@@ -14,6 +14,8 @@ import { useScrollToBottom } from '@/features/chat/hooks/useScrollToBottom';
 import { ChatHeroView } from './ChatHeroView';
 import { SteeringQueueBanner } from './SteeringQueueBanner';
 import { ChatHistoryLoadState } from './ChatHistoryLoadState';
+import { safeFetch } from '@/services/client';
+import type { PermissionMode } from './composer/PermissionModeSelector';
 
 interface ChatCanvasProps {
   sessionId: string | null;
@@ -39,6 +41,34 @@ export default function ChatCanvas({
   onOpenSettings,
 }: ChatCanvasProps) {
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
+
+  // Sync permissionMode from backend when viewing a session
+  useEffect(() => {
+    if (!sessionId) {
+      setPermissionMode('default');
+      return;
+    }
+    safeFetch(`/api/sessions/${sessionId}/permissions`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: any) => {
+        if (data?.permission_mode) {
+          setPermissionMode(data.permission_mode);
+        }
+      })
+      .catch(() => {});
+  }, [sessionId]);
+
+  const handlePermissionModeChange = useCallback((newMode: PermissionMode) => {
+    setPermissionMode(newMode);
+    if (sessionId) {
+      safeFetch(`/api/sessions/${sessionId}/permissions/mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: newMode }),
+      }).catch(() => {});
+    }
+  }, [sessionId]);
 
   const {
     chatMessages,
@@ -56,6 +86,7 @@ export default function ChatCanvas({
     stop,
     retry,
     undo,
+    approveToolCall,
     injectQueued,
     discardQueued,
     hasEarlierTurns,
@@ -68,6 +99,7 @@ export default function ChatCanvas({
     pendingWorkspacePath, 
     onSessionCreated,
     scrollContainerRef: chatScrollContainerRef,
+    permissionMode,
   });
 
   const [isQueueExpanded, setIsQueueExpanded] = useState<boolean>(true);
@@ -255,6 +287,7 @@ export default function ChatCanvas({
                               onProceed={handleProceed}
                               onContinue={handleContinue}
                               onRetry={() => retry(turn.userMsg.content, turn.userMsg.sessionId)}
+                              onApproveTool={approveToolCall}
                             />
                           </ErrorBoundary>
                         );
@@ -345,6 +378,8 @@ export default function ChatCanvas({
               if (reason) setInvalidMediaReason(reason);
               else setInvalidMediaReason("Maximum number of attachments reached");
             }}
+            permissionMode={permissionMode}
+            onPermissionModeChange={handlePermissionModeChange}
           />
         </div>
       </div>

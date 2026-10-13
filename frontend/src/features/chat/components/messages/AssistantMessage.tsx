@@ -22,6 +22,7 @@ interface AssistantMessageProps {
   onProceed?: (path: string) => void;
   onRetry?: () => void;
   onContinue?: () => void;
+  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<void> | void;
 }
 
 function formatTurnTimestamp(ts?: string): string {
@@ -50,6 +51,7 @@ const AssistantMessage = memo(function AssistantMessage({
   onProceed,
   onRetry,
   onContinue,
+  onApproveTool,
 }: AssistantMessageProps) {
   const [lightboxImage, setLightboxImage] = useState<LightboxImageData | null>(null);
 
@@ -101,6 +103,7 @@ const AssistantMessage = memo(function AssistantMessage({
               totalDurationSeconds={msg.totalDurationSeconds}
               turnStartTime={msg.turnStartTime}
               onOpenFile={onOpenFile}
+              onApproveTool={onApproveTool}
             />
           );
         }

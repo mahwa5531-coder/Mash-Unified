@@ -21,6 +21,7 @@ interface TaskWorkLogAccordionProps {
   hasAssistantContent?: boolean;
   totalDurationSeconds?: number;
   onOpenFile?: (path: string) => void;
+  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<void> | void;
   isLast?: boolean;
   turnStartTime?: number;
 }
@@ -34,6 +35,7 @@ export default function TaskWorkLogAccordion({
   hasAssistantContent = false,
   totalDurationSeconds,
   onOpenFile,
+  onApproveTool,
   isLast = false,
   turnStartTime,
 }: TaskWorkLogAccordionProps) {
@@ -230,6 +232,7 @@ export default function TaskWorkLogAccordion({
       isStreaming={isStreaming}
       thinkingDurationSeconds={thinkingDurationSeconds}
       onOpenFile={onOpenFile}
+      onApproveTool={onApproveTool}
       liveThinkingSeconds={liveThinkingSeconds}
       latchedThinkingSeconds={latchedThinkingSeconds}
       expandedThoughts={expandedThoughts}

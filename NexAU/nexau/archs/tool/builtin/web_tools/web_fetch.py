@@ -59,6 +59,9 @@ def web_fetch(
     timeout: int = 100,
     use_html_parser: bool = True,
     ctx: FrameworkContext | None = None,
+    toolAction: str | None = None,
+    toolSummary: str | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """
     Fetch content using web_tool.web_read (HtmlParser + direct HTTP).

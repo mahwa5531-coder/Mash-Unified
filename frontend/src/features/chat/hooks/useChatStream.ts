@@ -20,6 +20,7 @@ import { extractArtifacts, getArtifactCanonicalGroup } from '@/features/artifact
 import { useSessionHistory } from './useSessionHistory';
 import { useChatSteering } from './useChatSteering';
 import { useSseBufferFlusher } from './useSseBufferFlusher';
+import type { PermissionMode } from '../components/composer/PermissionModeSelector';
 
 const messageArtifactCache = new WeakMap<Message, ArtifactItem[]>();
 
@@ -39,6 +40,7 @@ interface UseChatStreamOptions {
   pendingWorkspacePath?: string | null;
   onSessionCreated: (newSessionId: string, title?: string, repoName?: string) => void;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  permissionMode?: PermissionMode;
 }
 
 export function useChatStream({
@@ -47,6 +49,7 @@ export function useChatStream({
   pendingWorkspacePath,
   onSessionCreated,
   scrollContainerRef,
+  permissionMode = 'default',
 }: UseChatStreamOptions) {
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [inputPrompt, setInputPrompt] = useState<string>('');
@@ -521,6 +524,7 @@ export function useChatStream({
           section: (pendingWorkspacePath || (sessionRepo && sessionRepo !== 'No Repo')) ? 'workspace' : 'conversation',
           ...(isNewSession ? { title, custom_title: title } : {}),
           thinking_effort: thinkingBudget,
+          permission_mode: permissionMode || 'default',
         },
         targetSession.abortController?.signal
       );
@@ -725,6 +729,59 @@ export function useChatStream({
     });
   }, [steering]);
 
+  const approveToolCall = useCallback(
+    async (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => {
+      const curSid = activeSessionIdRef.current || sessionId;
+      if (!curSid) return;
+
+      try {
+        await safeFetch(`/api/chat/${curSid}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tool_call_id: toolCallId,
+            action,
+            feedback,
+            user_id: 'default_user',
+          }),
+        });
+      } catch (err) {
+        console.warn('Failed to submit tool approval:', err);
+      }
+
+      // Optimistically update tool status in memory
+      const s = sessionStore.get(curSid);
+      if (s) {
+        const next = s.chatMessages.map((m) => {
+          if (!m.tools || m.tools.length === 0) return m;
+          const updatedTools = m.tools.map((t) => {
+            const matches = t.id === toolCallId || String(t.id).endsWith(`_${toolCallId}`);
+            if (matches) {
+              return {
+                ...t,
+                status: action === 'deny' ? ('failed' as const) : ('completed' as const),
+                decision: action,
+              };
+            }
+            return t;
+          });
+          return { ...m, tools: updatedTools };
+        });
+        s.chatMessages = next;
+        if (curSid === activeSessionIdRef.current) {
+          setChatMessages(next);
+        }
+        notifyStoreListeners();
+      }
+
+      // Resume execution on allow / allow_once
+      if (action !== 'deny') {
+        dispatchSendMessage("Proceed with the approved action", false, true, curSid);
+      }
+    },
+    [sessionId, dispatchSendMessage]
+  );
+
   return {
     chatMessages,
     inputPrompt,
@@ -741,6 +798,7 @@ export function useChatStream({
     stop: handleStopStreaming,
     retry: handleRetry,
     undo: handleUndo,
+    approveToolCall,
     injectQueued: steering.injectQueued,
     discardQueued: steering.discardQueued,
     hasEarlierTurns: history.hasEarlierTurns,

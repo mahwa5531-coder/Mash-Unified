@@ -3,11 +3,13 @@
 // One timeline row (thought card / tool row / command console / group card).
 // Prop names mirror TaskWorkLogAccordion identifiers (container/view split).
 import React from 'react';
+import { cn } from '@/lib/utils';
 import type { TimelineEntry } from './types';
 import { ThoughtTimelineRow } from './ThoughtTimelineRow';
 import { GroupTimelineRow } from './GroupTimelineRow';
 import { CommandTimelineRow } from './CommandTimelineRow';
 import { ToolTimelineRow } from './ToolTimelineRow';
+import { ApprovalCard } from '../approval/ApprovalCard';
 
 interface TimelineRowProps {
   entry: TimelineEntry;
@@ -15,6 +17,7 @@ interface TimelineRowProps {
   isStreaming?: boolean;
   thinkingDurationSeconds?: number;
   onOpenFile?: (path: string) => void;
+  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<void> | void;
   liveThinkingSeconds: number;
   latchedThinkingSeconds: number | null;
   expandedThoughts: Record<string, boolean>;
@@ -82,7 +85,31 @@ export function TimelineRow(props: TimelineRowProps) {
     );
   }
 
-  // 4. Other Tools & Actions
+  // 4. Approval Card (Sensitive operations / Permission checks)
+  if (entry.type === 'approval') {
+    const toolCallId = String(entry.data?.toolCallId || entry.data?.tool?.id || entry.id);
+    return (
+      <div className={cn("my-1.5 w-full", isChild ? "pl-2" : "")}>
+        <ApprovalCard
+          toolCallId={toolCallId}
+          toolName={entry.data?.toolName || entry.data?.tool?.name || 'action'}
+          toolSummary={entry.data?.toolSummary}
+          toolAction={entry.data?.toolAction}
+          command={entry.data?.command}
+          args={entry.data?.args}
+          status={entry.data?.status || 'pending'}
+          decision={entry.data?.decision}
+          onApprove={(action, feedback) => {
+            if (props.onApproveTool) {
+              return props.onApproveTool(toolCallId, action, feedback);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // 5. Other Tools & Actions
   return (
     <ToolTimelineRow
       entry={entry}

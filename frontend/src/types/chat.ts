@@ -9,8 +9,11 @@ export interface ToolCall {
   name: string;
   args?: Record<string, any>;
   output?: string;
-  status?: 'running' | 'completed' | 'failed';
+  status?: 'running' | 'completed' | 'failed' | 'cancelled' | 'pending_approval' | 'denied';
   durationSeconds?: number;
+  toolSummary?: string;
+  toolAction?: string;
+  decision?: 'allow' | 'allow_once' | 'deny' | null;
 }
 
 export interface SubTask {

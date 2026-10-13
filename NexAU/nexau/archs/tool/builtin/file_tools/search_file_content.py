@@ -190,6 +190,108 @@ def _rg_grep(
     return matches
 
 
+def _python_grep(
+    pattern: str,
+    search_path: str,
+    include: str | None,
+    max_matches: int,
+    excludes: list[str],
+    sandbox: BaseSandbox,
+) -> list[dict[str, Any]]:
+    """Pure Python grep implementation as fallback when rg is not available."""
+    import fnmatch
+    import os
+    matches: list[dict[str, Any]] = []
+
+    try:
+        regex = re.compile(pattern, re.IGNORECASE)
+    except re.error:
+        return matches
+
+    def should_exclude(path_str: str) -> bool:
+        parts = Path(path_str).parts
+        for part in parts:
+            for exclude in excludes:
+                if fnmatch.fnmatch(part, exclude):
+                    return True
+        return False
+
+    def matches_include(filename: str) -> bool:
+        if not include:
+            return True
+        return fnmatch.fnmatch(filename, include)
+
+    # ponytail: if sandbox provides list_files, use sandbox API (supports test mocks & remote sandboxes)
+    if hasattr(sandbox, "list_files"):
+        try:
+            file_infos = sandbox.list_files(search_path, recursive=True)
+        except TypeError:
+            file_infos = sandbox.list_files(search_path)
+        for fi in file_infos:
+            if getattr(fi, "is_directory", False):
+                continue
+            fpath = getattr(fi, "path", str(fi))
+            fname = Path(fpath).name
+            ext = Path(fname).suffix.lower()
+            if ext in BINARY_EXTENSIONS or should_exclude(fpath):
+                continue
+            if not matches_include(fname):
+                continue
+            try:
+                res = sandbox.read_file(fpath)
+                content = res.content if hasattr(res, "content") else str(res)
+                if content:
+                    for line_num, line in enumerate(content.splitlines(), 1):
+                        if regex.search(line):
+                            try:
+                                rel_path = Path(fpath).relative_to(search_path).as_posix()
+                            except Exception:
+                                rel_path = Path(fpath).name
+                            matches.append({
+                                "filePath": rel_path,
+                                "lineNumber": line_num,
+                                "line": line.rstrip("\r\n"),
+                                "lineContent": line.rstrip("\r\n"),
+                            })
+                            if len(matches) >= max_matches:
+                                return matches
+            except Exception:
+                continue
+        return matches
+
+    for root, dirnames, filenames in os.walk(search_path):
+        dirnames[:] = [d for d in dirnames if not any(fnmatch.fnmatch(d, ex) for ex in excludes)]
+        for fname in filenames:
+            ext = Path(fname).suffix.lower()
+            if ext in BINARY_EXTENSIONS:
+                continue
+            if include and not matches_include(fname):
+                continue
+            full_path = os.path.join(root, fname)
+            try:
+                rel_path = os.path.relpath(full_path, search_path)
+            except Exception:
+                rel_path = full_path
+            if should_exclude(rel_path):
+                continue
+            try:
+                with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line_num, line in enumerate(f, 1):
+                        if regex.search(line):
+                            matches.append({
+                                "filePath": rel_path.replace("\\", "/"),
+                                "lineNumber": line_num,
+                                "line": line.rstrip("\r\n"),
+                                "lineContent": line.rstrip("\r\n"),
+                            })
+                            if len(matches) >= max_matches:
+                                return matches
+            except Exception:
+                continue
+
+    return matches
+
+
 def _format_results(
     matches: list[dict[str, Any]],
     pattern: str,
@@ -356,28 +458,39 @@ def search_file_content(
 
         search_dir_display = dir_path or "."
 
-        # Execute ripgrep (bundled or system)
+        # Execute ripgrep (bundled or system), with pure Python fallback
         max_matches = DEFAULT_TOTAL_MAX_MATCHES
-        if not _rg_available(sandbox):
-            error_msg = "ripgrep (rg) binary is required for search_file_content and could not be executed."
-            return {
-                "content": f"Error: {error_msg}",
-                "returnDisplay": "Error: ripgrep unavailable",
-                "error": {
-                    "message": error_msg,
-                    "type": "RIPGREP_UNAVAILABLE",
-                },
-            }
-
-        matches = _rg_grep(
-            pattern=pattern,
-            search_path=search_path,
-            include=include,
-            max_matches=max_matches,
-            excludes=DEFAULT_EXCLUDES,
-            sandbox=sandbox,
-        )
-        strategy_used = "ripgrep"
+        if _rg_available(sandbox):
+            try:
+                matches = _rg_grep(
+                    pattern=pattern,
+                    search_path=search_path,
+                    include=include,
+                    max_matches=max_matches,
+                    excludes=DEFAULT_EXCLUDES,
+                    sandbox=sandbox,
+                )
+                strategy_used = "ripgrep"
+            except Exception:
+                matches = _python_grep(
+                    pattern=pattern,
+                    search_path=search_path,
+                    include=include,
+                    max_matches=max_matches,
+                    excludes=DEFAULT_EXCLUDES,
+                    sandbox=sandbox,
+                )
+                strategy_used = "python fallback"
+        else:
+            matches = _python_grep(
+                pattern=pattern,
+                search_path=search_path,
+                include=include,
+                max_matches=max_matches,
+                excludes=DEFAULT_EXCLUDES,
+                sandbox=sandbox,
+            )
+            strategy_used = "python fallback"
 
         # Build location description
         search_location = f'in path "{search_dir_display}"'

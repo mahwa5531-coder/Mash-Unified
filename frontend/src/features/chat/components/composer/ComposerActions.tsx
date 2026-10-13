@@ -3,6 +3,7 @@
 import React from 'react';
 import { Send, Square, Plus, ArrowUp, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { PermissionModeSelector, type PermissionMode } from './PermissionModeSelector';
 
 interface ComposerActionsProps {
   isStreaming: boolean;
@@ -13,6 +14,8 @@ interface ComposerActionsProps {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onSend: () => void;
   onStop: () => void;
+  permissionMode?: PermissionMode;
+  onPermissionModeChange?: (mode: PermissionMode) => void;
 }
 
 export function ComposerActions({
@@ -24,6 +27,8 @@ export function ComposerActions({
   fileInputRef,
   onSend,
   onStop,
+  permissionMode = 'default',
+  onPermissionModeChange,
 }: ComposerActionsProps) {
   return (
     <TooltipProvider delayDuration={150}>
@@ -52,6 +57,13 @@ export function ComposerActions({
         </div>
 
         <div className="flex items-center gap-2">
+          {onPermissionModeChange && (
+            <PermissionModeSelector
+              mode={permissionMode}
+              onModeChange={onPermissionModeChange}
+              disabled={disabled}
+            />
+          )}
           {isStreaming ? (
             localPrompt.trim() ? (
               <Tooltip>

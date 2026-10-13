@@ -41,6 +41,12 @@ input_schema:
     domain:
       type: string
       description: "Optional domain filter for action='list_skills' (e.g. '01-engagement-and-planning', '12-taxation')."
+    toolAction:
+      type: string
+      description: "Brief 2-5 word phrase in -ing form describing the specific action. Capitalize like a sentence. Some examples: 'Analyzing directory', 'Searching the web', 'Checking git status', 'Running tests', 'Searching code'."
+    toolSummary:
+      type: string
+      description: "Brief 2-5 word noun phrase describing the specific task. Capitalize like a sentence. Some examples: 'Directory analysis', 'Web search', 'Git status check', 'Test execution', 'Code search'."
   required:
     - action
   additionalProperties: false

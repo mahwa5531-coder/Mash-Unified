@@ -54,6 +54,9 @@ def audit_skill_tool(
     query: str | None = None,
     agent_state: AgentState | None = None,
     ctx: FrameworkContext | None = None,
+    toolAction: str | None = None,
+    toolSummary: str | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Execute statutory audit skill lookup, retrieval, or searching."""
     if not action or not action.strip():
