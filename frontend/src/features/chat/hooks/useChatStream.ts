@@ -34,6 +34,14 @@ function getCachedArtifacts(msg: Message, isStreamingMsg: boolean): ArtifactItem
   return cached;
 }
 
+function isSameToolId(idA?: string, idB?: string): boolean {
+  if (!idA || !idB) return false;
+  if (idA === idB) return true;
+  const cleanA = idA.replace(/^run_[^_]+_/, '').replace(/^run_/, '');
+  const cleanB = idB.replace(/^run_[^_]+_/, '').replace(/^run_/, '');
+  return cleanA === cleanB || idA.endsWith(`_${idB}`) || idB.endsWith(`_${idA}`);
+}
+
 interface UseChatStreamOptions {
   sessionId: string | null;
   sessionRepo?: string;
@@ -446,7 +454,7 @@ export function useChatStream({
             const idx = findTargetAssistantIdx(next, s.activeTurnId);
             if (idx >= 0) {
               const existingTools = [...next[idx].tools];
-              const matchIdx = existingTools.findIndex((t) => t.id && t.id === toolCall.id);
+              const matchIdx = existingTools.findIndex((t) => isSameToolId(t.id, toolCall.id));
               if (matchIdx >= 0) {
                 existingTools[matchIdx] = { ...existingTools[matchIdx], ...toolCall };
               } else {
@@ -471,7 +479,7 @@ export function useChatStream({
                 }
               }
               const sMatchIdx = currentSteps.findIndex((st) => 
-                st.tool_call_id === toolCall.id || (st.type === 'tool' && st.id === toolCall.id)
+                isSameToolId(st.tool_call_id, toolCall.id) || (st.type === 'tool' && isSameToolId(st.id, toolCall.id))
               );
               if (sMatchIdx >= 0) {
                 currentSteps[sMatchIdx] = {
@@ -782,19 +790,39 @@ export function useChatStream({
       const s = sessionStore.get(curSid);
       if (s) {
         const next = s.chatMessages.map((m) => {
-          if (!m.tools || m.tools.length === 0) return m;
-          const updatedTools = m.tools.map((t) => {
-            const matches = t.id === toolCallId || t.id === rawTcId || String(t.id).endsWith(`_${toolCallId}`) || toolCallId.endsWith(`_${t.id}`);
-            if (matches) {
-              return {
-                ...t,
-                status: action === 'deny' ? ('failed' as const) : ('running' as const),
-                decision: action,
-              };
-            }
-            return t;
-          });
-          return { ...m, tools: updatedTools };
+          let updatedTools = m.tools;
+          if (m.tools && m.tools.length > 0) {
+            updatedTools = m.tools.map((t) => {
+              const matches = isSameToolId(t.id, toolCallId) || isSameToolId(t.id, rawTcId);
+              if (matches) {
+                return {
+                  ...t,
+                  status: action === 'deny' ? ('failed' as const) : ('running' as const),
+                  decision: action,
+                };
+              }
+              return t;
+            });
+          }
+
+          let updatedSteps = m.steps;
+          if (m.steps && m.steps.length > 0) {
+            updatedSteps = m.steps.map((st: any) => {
+              const matches = isSameToolId(st.tool_call_id, toolCallId) ||
+                              isSameToolId(st.tool_call_id, rawTcId) ||
+                              (st.type === 'tool' && (isSameToolId(st.id, toolCallId) || isSameToolId(st.id, rawTcId)));
+              if (matches) {
+                return {
+                  ...st,
+                  status: action === 'deny' ? 'failed' : 'running',
+                  decision: action,
+                };
+              }
+              return st;
+            });
+          }
+
+          return { ...m, tools: updatedTools, steps: updatedSteps };
         });
         s.chatMessages = next;
         if (curSid === activeSessionIdRef.current) {

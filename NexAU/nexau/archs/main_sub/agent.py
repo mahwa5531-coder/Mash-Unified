@@ -1665,6 +1665,7 @@ class Agent:
         - deny →  denial ToolResult
          pending_tool_calls.
         """
+        from nexau.archs.main_sub.execution.hooks import AfterToolHookInput
         from nexau.archs.main_sub.framework_context import FrameworkContext
         from nexau.core.messages import ToolResultBlock, coerce_tool_result_content
 
@@ -1676,6 +1677,23 @@ class Agent:
             tool_name = entry["tool_name"]
             parameters = entry.get("parameters", {})
 
+            def _emit_after_tool(tc_output: Any, tc_llm_output: Any) -> None:
+                if hasattr(self, "executor") and getattr(self.executor, "middleware_manager", None):
+                    try:
+                        sbox = agent_state.get_sandbox() if hasattr(agent_state, "get_sandbox") else None
+                        hook_in = AfterToolHookInput(
+                            agent_state=agent_state,
+                            sandbox=sbox,
+                            tool_name=tool_name,
+                            tool_call_id=tool_call_id,
+                            tool_input=parameters,
+                            tool_output=tc_output,
+                            llm_tool_output=tc_llm_output,
+                        )
+                        self.executor.middleware_manager.run_after_tool(hook_in, tc_output, tc_llm_output)
+                    except Exception as mw_err:
+                        logger.warning("Error running after_tool middleware on resume for '%s': %s", tool_name, mw_err)
+
             if decision == "deny":
                 # denial ToolResult
                 denial_content = f"Permission denied by user for {tool_name}"
@@ -1685,6 +1703,7 @@ class Agent:
                     is_error=True,
                 )
                 self.history.append(Message(role=Role.TOOL, content=[tool_result_block]))
+                _emit_after_tool({"status": "denied", "error": denial_content}, denial_content)
             elif decision in ("allow", "allow_once"):
                 # tool
                 tool_obj = self.executor.tool_registry.get_tool(tool_name)
@@ -1696,6 +1715,7 @@ class Agent:
                         is_error=True,
                     )
                     self.history.append(Message(role=Role.TOOL, content=[tool_result_block]))
+                    _emit_after_tool({"status": "error", "error": error_content}, error_content)
                 else:
                     # per-tool-call context: allow_once permission_key
                     permission_key = entry.get("permission_key", "")
@@ -1732,6 +1752,10 @@ class Agent:
                             is_error=False,
                         )
                         self.history.append(Message(role=Role.TOOL, content=[tool_result_block]))
+                        _emit_after_tool(
+                            result if isinstance(result, (dict, list)) else {"result": content_str},
+                            content_str,
+                        )
                     except Exception as e:
                         error_content = f"Tool '{tool_name}' failed during resume: {e}"
                         tool_result_block = ToolResultBlock(
@@ -1740,6 +1764,7 @@ class Agent:
                             is_error=True,
                         )
                         self.history.append(Message(role=Role.TOOL, content=[tool_result_block]))
+                        _emit_after_tool({"status": "error", "error": error_content}, error_content)
 
             entry["consumed"] = True
             # RFC-0019: tool consumed

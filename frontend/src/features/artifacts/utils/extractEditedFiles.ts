@@ -17,21 +17,19 @@ export function extractEditedFiles(msg: Message): {
 
   if (msg.tools && msg.tools.length > 0) {
     for (const t of msg.tools) {
-      if (t.status === 'failed') continue;
-      if (t.output) {
-        const out = String(t.output).trim().toLowerCase();
-        if (
-          out.startsWith('error:') ||
-          out.startsWith('validationerror:') ||
-          out.startsWith('exception:') ||
-          out.startsWith('failed:') ||
-          out.includes('validation error') ||
-          out.includes('schema validation failed') ||
-          out.includes('failed to write') ||
-          out.includes('permission denied')
-        ) {
-          continue;
-        }
+      if (t.status === 'failed' || t.status === 'pending_approval' || (t.status as string) === 'running' || !t.output) continue;
+      const out = String(t.output).trim().toLowerCase();
+      if (
+        out.startsWith('error:') ||
+        out.startsWith('validationerror:') ||
+        out.startsWith('exception:') ||
+        out.startsWith('failed:') ||
+        out.includes('validation error') ||
+        out.includes('schema validation failed') ||
+        out.includes('failed to write') ||
+        out.includes('permission denied')
+      ) {
+        continue;
       }
 
       const name = (t.name || '').toLowerCase();

@@ -317,3 +317,125 @@ async def test_stream_resume_no_fake_user_turn_in_history():
             # 5. Verify that no fake 'Proceed with the approved action' message exists
             fake_lines = [l for l in res_trans_before.json()["lines"] if "Proceed with the approved action" in str(l)]
             assert len(fake_lines) == 0, "No fake user messages allowed in transcript"
+
+
+@pytest.mark.anyio
+async def test_turbo_mode_rule_initialization_no_delete_many_error():
+    """Verify Bug 1 fix: Turbo mode config rules initialize in SQLite via eng.delete (no delete_many AttributeError)."""
+    from types import SimpleNamespace
+    from nexau.archs.session.models.permission_rule import PermissionRuleModel
+    from nexau.archs.session.orm import AndFilter
+
+    async with lifespan(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=30.0) as client:
+            test_id = uuid.uuid4().hex[:8]
+            sid = f"sess_turbo_{test_id}"
+            user_id = "default_user"
+
+            # 1. Create session
+            res_create = await client.post("/api/sessions", json={
+                "session_id": sid,
+                "user_id": user_id,
+                "title": f"Turbo Session {test_id}",
+            })
+            assert res_create.status_code == 200
+
+            # 2. Replicate chat.py lines 245-285 directly
+            eng = get_engine()
+            from app.dependencies import get_session_manager
+            sm = get_session_manager()
+
+            configured_tools = [
+                SimpleNamespace(name="run_shell_command", permissions={"allow": ["**"], "deny": []}),
+                SimpleNamespace(name="read_file", permissions={"allow": ["**"], "deny": []}),
+            ]
+
+            # This must NOT throw AttributeError: 'LoopSafeDatabaseEngine' object has no attribute 'delete_many'
+            await eng.delete(
+                PermissionRuleModel,
+                filters=AndFilter(filters=[
+                    ComparisonFilter.eq("user_id", user_id),
+                    ComparisonFilter.eq("session_id", sid),
+                    ComparisonFilter.eq("source", "config"),
+                ]),
+            )
+            await sm.init_permission_rules_from_config(
+                user_id=user_id,
+                session_id=sid,
+                tools=configured_tools,
+            )
+
+            # 3. Assert permission rules actually exist in SQLite (was 0 before fix!)
+            rules = await eng.find_many(
+                PermissionRuleModel,
+                filters=AndFilter(filters=[
+                    ComparisonFilter.eq("user_id", user_id),
+                    ComparisonFilter.eq("session_id", sid),
+                    ComparisonFilter.eq("source", "config"),
+                ]),
+            )
+            assert len(rules) >= 2, f"Expected at least 2 config rules in SQLite, got {len(rules)}"
+            assert all(r.behavior == "allow" for r in rules)
+
+
+@pytest.mark.anyio
+async def test_resume_emits_after_tool_middleware_event():
+    """Verify Bug 5 fix: Resumed tool execution invokes middleware after_tool so SSE events are emitted."""
+    from unittest.mock import AsyncMock, MagicMock
+    from nexau.archs.main_sub.agent import Agent
+    from nexau.archs.tool import ToolRegistry
+    from nexau.archs.main_sub.history_list import HistoryList
+    from nexau.core.messages import Role
+
+    test_id = uuid.uuid4().hex[:8]
+    sid = f"sess_resumemw_{test_id}"
+    user_id = "default_user"
+
+    mock_tool = MagicMock()
+    mock_tool.execute.return_value = "Successfully executed test command"
+    mock_tool._has_native_async_execute = False
+
+    tool_reg = MagicMock()
+    tool_reg.get_tool.return_value = mock_tool
+
+    mock_mw_manager = MagicMock()
+
+    agent = Agent.__new__(Agent)
+    agent._session_manager = AsyncMock()
+    agent._user_id = user_id
+    agent._session_id = sid
+    agent._history = HistoryList([])
+    agent.executor = MagicMock()
+    agent.executor.tool_registry = tool_reg
+    agent.executor.middleware_manager = mock_mw_manager
+
+    agent_state = MagicMock()
+    agent_state.get_sandbox.return_value = None
+    ctx = MagicMock()
+    ctx.for_tool_call.return_value = MagicMock()
+
+    pending = {
+        "tc_res_1": {
+            "tool_name": "custom_test_tool",
+            "decision": "allow_once",
+            "permission_key": "custom_test_tool",
+            "parameters": {"arg1": "val1"},
+            "consumed": False,
+        }
+    }
+
+    await agent._resume_pending_tool_calls(pending, agent_state, ctx)
+
+    # 1. Assert history has tool result
+    assert len(agent.history) == 1
+    assert agent.history[0].role == Role.TOOL
+    assert "Successfully executed test command" in str(agent.history[0].content[0].content)
+
+    # 2. Assert middleware manager run_after_tool was invoked (was NOT called before fix!)
+    assert mock_mw_manager.run_after_tool.called
+    call_args = mock_mw_manager.run_after_tool.call_args[0]
+    hook_input = call_args[0]
+    assert hook_input.tool_call_id == "tc_res_1"
+    assert hook_input.tool_name == "custom_test_tool"
+

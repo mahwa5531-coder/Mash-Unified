@@ -52,6 +52,7 @@ export async function streamQuery(
   const toolArgBuffers: Record<string, string> = {};
   const toolCallNames: Record<string, string> = {};
   const completedToolIds = new Set<string>();
+  let currentRunId = "";
   let isStalled = false;
 
   const finalizeRunningTools = (status: "completed" | "cancelled" = "completed") => {
@@ -171,6 +172,9 @@ export async function streamQuery(
           const event = JSON.parse(jsonStr);
           const eventType = String(event.type || "").toUpperCase();
           const data = event.data && typeof event.data === "object" ? event.data : {};
+          if (event.run_id || data.run_id) {
+            currentRunId = String(event.run_id || data.run_id);
+          }
 
           // 1. Text token delta (the main assistant output)
           if (eventType === "TEXT_MESSAGE_CONTENT" || eventType === "TEXT_MESSAGE_CHUNK") {
@@ -207,7 +211,7 @@ export async function streamQuery(
           // 3. Tool Call Started — name + id become available here
           else if (eventType === "TOOL_CALL_START") {
             const rawId = String(event.tool_call_id || data.tool_call_id || data.id || `tc_${Date.now()}`);
-            const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
+            const callId = `${event.run_id || data.run_id || currentRunId || 'run'}_${rawId}`;
             const toolName = event.tool_call_name || data.tool_call_name || event.name || data.name || "action";
             toolArgBuffers[callId] = "";
             toolCallNames[callId] = toolName;
@@ -219,7 +223,7 @@ export async function streamQuery(
           // 4. Tool Call Args — streamed JSON chunks for the arguments
           else if (eventType === "TOOL_CALL_ARGS") {
             const rawId = String(event.tool_call_id || data.tool_call_id || data.id || "");
-            const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
+            const callId = `${event.run_id || data.run_id || currentRunId || 'run'}_${rawId}`;
             const deltaArg = event.delta ?? data.delta ?? event.arguments ?? data.arguments ?? "";
             if (callId && deltaArg) {
               toolArgBuffers[callId] = (toolArgBuffers[callId] || "") + deltaArg;
@@ -235,7 +239,7 @@ export async function streamQuery(
           // 5. Tool Call End — args fully streamed, finalize
           else if (eventType === "TOOL_CALL_END") {
             const rawId = String(event.tool_call_id || data.tool_call_id || data.id || "");
-            const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
+            const callId = `${event.run_id || data.run_id || currentRunId || 'run'}_${rawId}`;
             if (callId && onToolCall) {
               let finalArgs: Record<string, any> = {};
               try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
@@ -247,7 +251,7 @@ export async function streamQuery(
           // 6. Tool Call Result — the output/response from the tool execution
           else if (eventType === "TOOL_CALL_RESULT") {
             const rawId = String(event.tool_call_id || data.tool_call_id || data.id || "");
-            const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
+            const callId = `${event.run_id || data.run_id || currentRunId || 'run'}_${rawId}`;
             // Backend field is `content` (not `output`)
             const rawOutput = event.content ?? data.content ?? event.output ?? data.output ?? event.result ?? data.result ?? "";
             const outputStr = typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput, null, 2);
@@ -280,7 +284,7 @@ export async function streamQuery(
           // 6b. Tool Call Pending Approval (RFC-0019 permissions)
           else if (eventType === "TOOL_CALL_PENDING_APPROVAL") {
             const rawId = String(event.tool_call_id || data.tool_call_id || data.id || `tc_${Date.now()}`);
-            const callId = `${event.run_id || data.run_id || 'run'}_${rawId}`;
+            const callId = `${event.run_id || data.run_id || currentRunId || 'run'}_${rawId}`;
             const toolName = event.tool_name || data.tool_name || "action";
             const params = event.parameters || data.parameters || {};
             completedToolIds.add(callId);

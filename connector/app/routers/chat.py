@@ -267,7 +267,7 @@ async def stream_query_bridge(
             if eng:
                 from nexau.archs.session.models.permission_rule import PermissionRuleModel
                 from nexau.archs.session.orm import AndFilter
-                await eng.delete_many(
+                await eng.delete(
                     PermissionRuleModel,
                     filters=AndFilter(filters=[
                         ComparisonFilter.eq("user_id", user_id),
@@ -281,7 +281,7 @@ async def stream_query_bridge(
                 tools=configured_tools,
             )
         except Exception as perm_err:
-            logger.debug("Error initializing permission rules from config: %s", perm_err)
+            logger.warning("Error initializing permission rules from config: %s", perm_err, exc_info=True)
 
     # When resuming on approval without new user text, pass message=[] (empty list)
     # so NexAU does not append an empty user bubble to history (Chain 3)
@@ -301,6 +301,7 @@ async def stream_query_bridge(
         # ponytail: shield-and-re-await pattern prevents 15s SSE heartbeat timeout
         # from cancelling the underlying NexAU generator during long model/tool runs (Blocker B-4)
         anext_task = asyncio.ensure_future(event_iter.__anext__())
+        last_run_id = None
 
         try:
             while True:
@@ -310,6 +311,8 @@ async def stream_query_bridge(
 
                 try:
                     event = await asyncio.wait_for(asyncio.shield(anext_task), timeout=15.0)
+                    if hasattr(event, "run_id") and event.run_id:
+                        last_run_id = event.run_id
                     yield f"data: {event.model_dump_json()}\n\n"
                     anext_task = asyncio.ensure_future(event_iter.__anext__())
                 except TimeoutError:
@@ -325,6 +328,7 @@ async def stream_query_bridge(
                                         pending_event = {
                                             "type": "TOOL_CALL_PENDING_APPROVAL",
                                             "tool_call_id": ptc_id,
+                                            "run_id": ptc_val.get("run_id") or last_run_id or "run",
                                             "tool_name": ptc_val.get("tool_name", "action"),
                                             "prompt": ptc_val.get("prompt", ""),
                                             "permission_key": ptc_val.get("permission_key", ""),
@@ -332,7 +336,7 @@ async def stream_query_bridge(
                                         }
                                         yield f"data: {json.dumps(pending_event)}\n\n"
                     except Exception as pend_err:
-                        logger.debug("Error checking pending tool calls: %s", pend_err)
+                        logger.warning("Error checking pending tool calls: %s", pend_err, exc_info=True)
                     break
         except (asyncio.CancelledError, GeneratorExit):
             if not anext_task.done():

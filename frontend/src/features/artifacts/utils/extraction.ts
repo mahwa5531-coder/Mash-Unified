@@ -31,22 +31,20 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
   // 1. Check tools for created artifacts (plans, walkthroughs, spreadsheets, visual charts)
   if (msg.tools && msg.tools.length > 0) {
     for (const t of msg.tools) {
-      // Guard against phantom cards: never create deliverable cards for failed tools or schema errors
-      if (t.status === 'failed') continue;
-      if (t.output) {
-        const out = String(t.output).trim().toLowerCase();
-        if (
-          out.startsWith('error:') ||
-          out.startsWith('validationerror:') ||
-          out.startsWith('exception:') ||
-          out.startsWith('failed:') ||
-          out.includes('validation error') ||
-          out.includes('schema validation failed') ||
-          out.includes('failed to write') ||
-          out.includes('permission denied')
-        ) {
-          continue;
-        }
+      // Guard against phantom cards: never create deliverable cards for unexecuted, pending, or failed tools
+      if (t.status === 'failed' || t.status === 'pending_approval' || (t.status as string) === 'running' || !t.output) continue;
+      const out = String(t.output).trim().toLowerCase();
+      if (
+        out.startsWith('error:') ||
+        out.startsWith('validationerror:') ||
+        out.startsWith('exception:') ||
+        out.startsWith('failed:') ||
+        out.includes('validation error') ||
+        out.includes('schema validation failed') ||
+        out.includes('failed to write') ||
+        out.includes('permission denied')
+      ) {
+        continue;
       }
 
       let args = t.args || {};
