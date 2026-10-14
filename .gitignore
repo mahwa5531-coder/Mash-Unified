@@ -28,6 +28,7 @@ scratch/
 *.db
 .openclaw*
 *.csv
+!desktop_agent_full_qa_package_v2/*.csv
 analyze_churn*.py
 check_gemini.py
 copy_csv.py

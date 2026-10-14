@@ -1,0 +1,62 @@
+# Desktop application QA execution prompt — feature-aware version
+
+Read and execute the scenario catalogues and mandatory feature coverage gate:
+- desktop_agent_scenario_catalog.md
+- desktop_agent_branch_expansion.md
+- desktop_agent_feature_coverage_gate.md
+- desktop_agent_master_test_matrix.csv
+
+The combined catalogue contains 387 initial scenario IDs. This is a starting baseline, NOT proof of exhaustive coverage. Do not treat static test IDs as sufficient or claim that every feature is covered.
+
+## Mission
+Inspect the actual repository and the actual running desktop UI. Identify all implemented frontend controls, projects, sessions, modes, agent/runtime states, tools, cards, event types, supported viewers, file operations, persistence effects, API/network paths, configuration, shortcuts, and packaging behavior. Execute the mapped tests, add repository-specific tests for every discovered behavior, diagnose failures, and report evidence-based release readiness.
+
+## Hard requirement: coverage must grow with the code
+Before testing, establish or update the living feature inventory, feature-to-test map, state-transition inventory, and test matrix. On every new feature, bug fix, or material refactor, inspect the Git diff, trace affected paths, generate/update test branches, write executable tests, run them, and run impacted regression suites. Read and follow `desktop_agent_feature_coverage_gate.md`.
+
+For every new/changed component, operation, card action, tool, agent state/mode, event, file format, API path, persisted field, or setting, explicitly test applicable normal, validation, boundary, repeat/duplicate, failure, timeout, cancellation, concurrency, persistence, recovery, security, performance, and regression paths. Mark a dimension N/A only with implementation evidence and rationale. A missing test mapping must be a CI failure or a reviewed, time-limited waiver.
+
+## Execution constraints
+- Preserve existing developer changes. Never reset or clean the working tree.
+- Use an isolated test profile, synthetic files, disposable workspace/database, deterministic LLM/tool fixtures, and a local or authorized test API.
+- Do not use production credentials, production customer data, or production payment actions.
+- Do not claim that a test passed unless it ran and assertions succeeded.
+- Separate product failures, harness failures, environmental blockers, and flaky results.
+- Keep first-failure evidence; a pass on retry does not erase a flaky result.
+- Do not let agents share and mutate the same desktop window, database, port, or workspace at the same time.
+
+## Required execution
+1. Record the existing test/build baseline.
+2. Inventory the repository and running UI.
+3. Map every baseline scenario to actual features; add any scenarios missing from the catalogues.
+4. Establish deterministic fixtures and compatible desktop automation.
+5. Execute UI/control, sessions/projects, composer, cards, frontend rendering, agent runtime, each actual tool, streaming, networking, file viewers/artifacts, undo/revert, storage, concurrency, accessibility/performance, and packaged-build suites as applicable.
+6. For every failed branch, test recovery after preserving diagnostic evidence.
+7. Verify that each user-visible card/button has its own action assertions and that actual runtime/storage/filesystem effects match the visible result.
+8. Run impacted regression tests and the final critical-journey suite.
+9. Update feature inventories and coverage map; ensure all current features map to tests.
+
+## Parallel workstreams
+Delegate independent investigations and isolated suites for: (A) frontend/navigation/sessions/projects, (B) chat/input/renderers/cards, (C) runtime/events/tools/streaming, (D) files/viewers/artifacts, (E) persistence/races/connectivity/recovery, (F) packaged app/accessibility/performance. The orchestrator owns feature discovery, shared fixtures, non-overlapping file ownership, integration, shared-desktop coordination, final regression, and consolidated reporting. If subagents are unavailable, execute the same workstreams sequentially.
+
+## Evidence and release report
+Maintain scenario IDs and record PASS, FAIL, FLAKY, BLOCKED, NOT RUN, or N/A separately. For each scenario capture steps, expected/actual UI, runtime/API/tool event, storage/filesystem effects, negative assertions, logs/screenshots/traces, and defect ID. Redact secrets.
+
+Produce/update:
+- SYSTEM_INVENTORY.md
+- TEST_STRATEGY.md
+- TEST_MATRIX.csv
+- CONTROL_COVERAGE.csv
+- FEATURE_INVENTORY.yaml (or existing equivalent)
+- FEATURE_TEST_MAP.csv (or existing equivalent)
+- STATE_TRANSITIONS.md (or existing equivalent)
+- FEATURE_CHANGE_IMPACT.md
+- BUGS.md
+- TEST_RUN_REPORT.md
+- machine-readable test results and sanitized failure evidence
+
+The final report must quantify discovered and mapped controls/features, scenarios planned and executed, pass/fail/flaky/blocked/not-run/N/A counts, coverage by subsystem, critical journeys, tools, runtime states/events, file renderers, packaged tests, uncovered high-risk areas, and release recommendation.
+
+Release status must be READY FOR RELEASE, NOT READY FOR RELEASE, or INSUFFICIENTLY VERIFIED. No P0, no unresolved P1 blocking core flows, critical journeys must pass, no known data-integrity or cross-session contamination bug, and no hidden high-risk test gaps. A large number of tests or a green run does not compensate for untracked features.
+
+Begin now: inspect the real repository and actual desktop app, run the baseline, build the inventory, and execute the campaign. Do not respond with a plan alone. If an environment/tool is missing, report the blocker and continue with the runnable work.
