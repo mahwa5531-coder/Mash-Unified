@@ -159,4 +159,17 @@ func TestIdentityCanRun(t *testing.T) {
 	if id.CanRun() != "" {
 		t.Fatalf("past_due should be effective: %q", id.CanRun())
 	}
+	// Free plan is always effective (perpetual free tier, Cursor/Antigravity standard).
+	id = base()
+	id.Plan.Code = "free"
+	id.SubscriptionStatus = "none"
+	if id.CanRun() != "" {
+		t.Fatalf("free plan fallback should be effective: %q", id.CanRun())
+	}
+	id = base()
+	id.Plan.Code = "free"
+	id.SubscriptionStatus = "active"
+	if id.CanRun() != "" {
+		t.Fatalf("active free plan should be effective: %q", id.CanRun())
+	}
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { BookOpen, Check, FileSpreadsheet, Image as ImageIcon, Download } from 'lucide-react';
+import React from 'react';
+import { BookOpen, FileSpreadsheet, Image as ImageIcon, Download } from 'lucide-react';
 import { ArtifactItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
 import { WorkingPaperCard } from '@/primitives/WorkingPaperCard';
@@ -12,7 +12,6 @@ interface ArtifactCardProps {
   artifact: ArtifactItem;
   sessionId?: string;
   onOpen: (path: string) => void;
-  onProceed?: (path: string) => void;
   isLast?: boolean;
   isStreaming?: boolean;
 }
@@ -21,11 +20,9 @@ export default function ArtifactCard({
   artifact, 
   sessionId,
   onOpen, 
-  onProceed, 
   isLast = true, 
   isStreaming = false 
 }: ArtifactCardProps) {
-  const [hasProceeded, setHasProceeded] = useState(false);
   const lowerPath = artifact.filePath.toLowerCase();
   const lowerTitle = artifact.title.toLowerCase();
 
@@ -38,36 +35,6 @@ export default function ArtifactCard({
     lowerPath.includes('plan.md') ||
     lowerTitle.includes('implementation plan')
   );
-
-  const isExplicitFeedbackRequested = Boolean(artifact.requestFeedback);
-  const shouldShowProceed = isPlan && isLast && !isStreaming && isExplicitFeedbackRequested && !hasProceeded;
-  const isPlanImplemented = isPlan && (hasProceeded || !isExplicitFeedbackRequested);
-
-  const handleProceedClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (hasProceeded || isStreaming) return;
-    setHasProceeded(true);
-    onProceed?.(artifact.filePath);
-  };
-
-  // ponytail: Ctrl+Enter shortcut triggers Proceed when active on latest turn
-  useEffect(() => {
-    if (!shouldShowProceed || !onProceed) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        const activeTag = (document.activeElement?.tagName || '').toLowerCase();
-        const activeValue = (document.activeElement as HTMLTextAreaElement | HTMLInputElement)?.value || '';
-        if (activeTag === 'textarea' && activeValue.trim().length > 0) {
-          return;
-        }
-        e.preventDefault();
-        setHasProceeded(true);
-        onProceed(artifact.filePath);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [shouldShowProceed, onProceed, artifact.filePath]);
 
   // Dynamic icon and badge styling
   const renderIcon = () => {
@@ -123,28 +90,6 @@ export default function ArtifactCard({
 
   // For Markdown deliverables, Memos, Plans, and Walkthroughs: render sleek WorkingPaperCard (<> Title)
   if (!isExcel && !isChart) {
-    const actionSlot = isPlan ? (
-      <div>
-        {shouldShowProceed ? (
-          <button
-            type="button"
-            onClick={handleProceedClick}
-            disabled={isStreaming}
-            className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1a73e8] hover:bg-[#1557b0] active:bg-[#174ea6] text-white text-xs font-medium rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50 select-none"
-            title="Proceed with the implementation plan (Ctrl+Enter)"
-          >
-            <span>Proceed</span>
-            <span className="text-[10px] text-blue-100/80 font-mono tracking-tight ml-0.5">Ctrl+↵</span>
-          </button>
-        ) : isPlanImplemented ? (
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-md text-[11px] font-medium select-none">
-            <Check size={11} className="shrink-0" />
-            <span>Implemented</span>
-          </div>
-        ) : null}
-      </div>
-    ) : undefined;
-
     return (
       <WorkingPaperCard
         filePath={artifact.filePath}
@@ -152,7 +97,6 @@ export default function ArtifactCard({
         summary={artifact.summary}
         type={artifact.type}
         onOpen={onOpen}
-        action={actionSlot}
       />
     );
   }

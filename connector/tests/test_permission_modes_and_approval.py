@@ -439,3 +439,73 @@ async def test_resume_emits_after_tool_middleware_event():
     assert hook_input.tool_call_id == "tc_res_1"
     assert hook_input.tool_name == "custom_test_tool"
 
+
+@pytest.mark.anyio
+async def test_preemptive_steer_auto_denies_pending_calls():
+    """Verify that submitting a new user prompt when a tool is awaiting approval auto-denies the tool (Fix 1)."""
+    async with lifespan(app):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=30.0) as client:
+            test_id = uuid.uuid4().hex[:8]
+            sid = f"sess_steer_{test_id}"
+            user_id = "default_user"
+
+            # 1. Create session
+            res_create = await client.post("/api/sessions", json={
+                "session_id": sid,
+                "user_id": user_id,
+                "title": f"Steer Session {test_id}",
+            })
+            assert res_create.status_code == 200
+
+            # 2. Inject an undecided pending tool call
+            eng = get_engine()
+            session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
+            assert session is not None
+
+            tc_id = f"call_purge_{test_id}"
+            session.pending_tool_calls = {
+                tc_id: {
+                    "tool_name": "run_shell_command",
+                    "prompt": "Delete production artifacts?",
+                    "permission_key": "rm -rf artifacts",
+                    "parameters": {"command": "rm -rf artifacts"},
+                    "decision": None,
+                }
+            }
+            await eng.update(session)
+
+            # 3. User types a new message in chat instead of clicking the card
+            # The preemptive steer check in chat.py should mark the pending call as denied
+            from app.routers.chat import get_sse_server
+            server = get_sse_server()
+            sm = getattr(server, "_session_manager", None)
+            assert sm is not None
+
+            # Verify pending is currently None decision
+            before = await sm.get_pending_tool_calls(user_id=user_id, session_id=sid)
+            assert before[tc_id]["decision"] is None
+
+            # Invoke chat stream with a steer prompt
+            steer_prompt = "Stop, do NOT delete anything! Inspect git status instead."
+            async with client.stream(
+                "POST",
+                "/api/chat",
+                json={
+                    "session_id": sid,
+                    "message": steer_prompt,
+                    "user_id": user_id,
+                },
+            ) as stream_res:
+                # Read at least one chunk to trigger stream generator initialization
+                async for _ in stream_res.aiter_lines():
+                    break
+
+            # 4. Verify that pending tool call was auto-denied with steer feedback
+            updated_pending = await sm.get_pending_tool_calls(user_id=user_id, session_id=sid)
+            # Either consumed and cleared, or decision marked as 'deny'
+            if updated_pending and tc_id in updated_pending:
+                assert updated_pending[tc_id]["decision"] == "deny"
+                assert "Superseded by user message" in updated_pending[tc_id]["feedback"]
+
+

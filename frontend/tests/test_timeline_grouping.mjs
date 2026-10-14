@@ -13,6 +13,23 @@ function groupTimelineEntries(entries) {
   while (i < entries.length) {
     const current = entries[i];
 
+    // Preserved standalone: Approval Cards must never be bundled into a collapsible group.
+    // Deduplicate by raw toolCallId / command so stream retries never stack duplicate cards (Fix 3)
+    if (current.type === 'approval') {
+      const tcId = String(current.data?.toolCallId || current.data?.tool?.id || current.id);
+      const cleanId = tcId.replace(/^run_[^_]+_/, '').replace(/^run_/, '');
+      const isDuplicate = result.some((r) => {
+        if (r.type !== 'approval') return false;
+        const rId = String(r.data?.toolCallId || r.data?.tool?.id || r.id).replace(/^run_[^_]+_/, '').replace(/^run_/, '');
+        return rId === cleanId || (current.data?.command && r.data?.command === current.data?.command);
+      });
+      if (!isDuplicate) {
+        result.push(current);
+      }
+      i++;
+      continue;
+    }
+
     // 1. Group consecutive commands (>= 2)
     if (current.type === 'command') {
       const group = [current];
@@ -288,5 +305,37 @@ assert.strictEqual(deniedEntry.type, 'command', 'Denied tool MUST vanish approva
 assert.strictEqual(deniedEntry.data.tool.status, 'failed');
 
 console.log('✓ Test 6: Ephemeral approval card vanishes immediately upon decision and renders normal tool call');
+
+// ---------------------------------------------------------------------------
+// Test 7: Duplicate Approval Card Deduplication (Fix 3)
+// ---------------------------------------------------------------------------
+// When stream reconnects or retries, two pending approval events for the exact
+// same underlying command / tool_call_id MUST be collapsed to exactly ONE card.
+const dupApproval1 = {
+  id: 'tool-0',
+  type: 'approval',
+  data: {
+    toolCallId: 'run_123_call_delete_abc',
+    toolName: 'run_shell_command',
+    command: 'rm -rf build_cache',
+    status: 'pending',
+    decision: null,
+  }
+};
+const dupApproval2 = {
+  id: 'tool-1',
+  type: 'approval',
+  data: {
+    toolCallId: 'run_456_call_delete_abc',
+    toolName: 'run_shell_command',
+    command: 'rm -rf build_cache',
+    status: 'pending',
+    decision: null,
+  }
+};
+const dedupedTimeline = groupTimelineEntries([dupApproval1, dupApproval2]);
+assert.strictEqual(dedupedTimeline.length, 1, 'Duplicate approval events MUST collapse into exactly ONE card');
+assert.strictEqual(dedupedTimeline[0].data.command, 'rm -rf build_cache');
+console.log('✓ Test 7: Duplicate approval cards from stream retries cleanly deduplicated');
 
 console.log('All timeline grouping tests PASSED successfully!');

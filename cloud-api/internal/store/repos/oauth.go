@@ -121,7 +121,7 @@ func (r *OAuthUsersRepo) FindOrCreateGoogleUser(ctx context.Context, sub, email,
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO subscriptions (id, tenant_id, plan_id, status, current_period_start, current_period_end)
-		SELECT $1, $2, id, 'trialing', now(), now() + interval '30 days'
+		SELECT $1, $2, id, 'active', now(), NULL
 		FROM plans WHERE id = 'pln_free'`,
 		"sub_"+shortRand(20), tenantID); err != nil {
 		return nil, err

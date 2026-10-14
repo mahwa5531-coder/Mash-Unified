@@ -86,8 +86,22 @@ func run() error {
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
 
-	// 3. PostgreSQL (authoritative store) + migrations.
-	pg, err := store.NewPostgres(rootCtx, cfg.DatabaseURL, cfg.DBMaxConns, cfg.DBMinConns, cfg.DBMaxConnLifetime, cfg.DBHealthTimeout)
+	// 3. PostgreSQL (authoritative store) + migrations (with retry for cold-boot resilience).
+	var pg *store.Postgres
+	for attempt := 1; attempt <= 5; attempt++ {
+		pg, err = store.NewPostgres(rootCtx, cfg.DatabaseURL, cfg.DBMaxConns, cfg.DBMinConns, cfg.DBMaxConnLifetime, cfg.DBHealthTimeout)
+		if err == nil {
+			break
+		}
+		if attempt < 5 {
+			logger.Warn("postgres connection failed; retrying", "attempt", attempt, "error", err)
+			select {
+			case <-rootCtx.Done():
+				return rootCtx.Err()
+			case <-time.After(time.Duration(attempt) * time.Second):
+			}
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -97,8 +111,22 @@ func run() error {
 	}
 	logger.Info("postgres ready", "max_conns", cfg.DBMaxConns)
 
-	// 4. Redis (distributed fast state).
-	rd, err := store.NewRedis(rootCtx, cfg.RedisURL, cfg.RedisPoolSize, cfg.RedisTimeout)
+	// 4. Redis (distributed fast state with retry for cold-boot resilience).
+	var rd *store.Redis
+	for attempt := 1; attempt <= 5; attempt++ {
+		rd, err = store.NewRedis(rootCtx, cfg.RedisURL, cfg.RedisPoolSize, cfg.RedisTimeout)
+		if err == nil {
+			break
+		}
+		if attempt < 5 {
+			logger.Warn("redis connection failed; retrying", "attempt", attempt, "error", err)
+			select {
+			case <-rootCtx.Done():
+				return rootCtx.Err()
+			case <-time.After(time.Duration(attempt) * time.Second):
+			}
+		}
+	}
 	if err != nil {
 		return err
 	}

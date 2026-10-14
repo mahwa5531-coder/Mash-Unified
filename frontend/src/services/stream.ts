@@ -53,7 +53,6 @@ export async function streamQuery(
   const toolCallNames: Record<string, string> = {};
   const completedToolIds = new Set<string>();
   let currentRunId = "";
-  let isStalled = false;
 
   const finalizeRunningTools = (status: "completed" | "cancelled" = "completed") => {
     if (!onToolCall) return;
@@ -129,28 +128,9 @@ export async function streamQuery(
     const decoder = new TextDecoder("utf-8");
     let buffer = "";
 
-    // ponytail: 5-minute stall watchdog — this IS the safety net for dead links.
-    // The server does not emit SSE keepalive comments; absence of any data for 5 min
-    // means the connection is truly dead. The long window tolerates quiet tool
-    // commands (builds/tests) that legitimately produce no SSE traffic.
-    const STREAM_IDLE_TIMEOUT_MS = 300000;
-    let stallTimer: ReturnType<typeof setTimeout> | null = null;
-    isStalled = false;
-
-    const resetStallWatchdog = () => {
-      if (stallTimer !== null) clearTimeout(stallTimer);
-      stallTimer = setTimeout(() => {
-        isStalled = true;
-        try { reader.cancel(); } catch {}
-      }, STREAM_IDLE_TIMEOUT_MS);
-    };
-
-    resetStallWatchdog();
-
     try {
       while (true) {
         const { done, value } = await reader.read();
-        resetStallWatchdog();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
 
@@ -324,12 +304,7 @@ export async function streamQuery(
       }
     }
   } finally {
-    if (stallTimer !== null) clearTimeout(stallTimer);
     finalizeRunningTools("cancelled");
-  }
-
-  if (isStalled) {
-    throw new Error("Stream connection timed out: no data received from server. Network link may have been interrupted.");
   }
 } catch (err: any) {
     if (signal?.aborted) return; // User stopped the stream intentionally
@@ -347,8 +322,6 @@ export async function streamQuery(
       formatted = "Network connection lost (WiFi disconnected). Reconnection timed out. Agent execution terminated.";
     } else if (isFetchErr) {
       formatted = "Network connection interrupted or backend server unreachable. Could not reconnect within time. Agent execution terminated.";
-    } else if (isStalled) {
-      formatted = "Stream connection timed out: no response from server within timeout. Agent execution terminated.";
     } else {
       formatted = formatErrorMessage(err?.message || String(err));
     }

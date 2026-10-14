@@ -1,5 +1,6 @@
 type: tool
 name: write_file
+disable_parallel: true
 description: >-
   Use this tool to create new files or overwrite existing files.
   The file and any parent directories will be created for you if they do not already exist.

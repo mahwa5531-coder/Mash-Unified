@@ -121,7 +121,7 @@ func (r *IdentityResolver) load(ctx context.Context, userID, tenantID string) (*
 		planLimits = sub.Plan.Limits
 		planModels = sub.Plan.Models
 	} else if fp, ferr := r.Subs.PlanByCode(ctx, "free"); ferr == nil && fp != nil {
-		id.SubscriptionStatus = "none"
+		id.SubscriptionStatus = "active" // ponytail: perpetual free fallback is active, matching /v1/me and auditlive specs
 		planInfo = PlanInfo{ID: fp.ID, Code: fp.Code, Name: fp.Name}
 		planLimits = fp.Limits
 		planModels = fp.Models

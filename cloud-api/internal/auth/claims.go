@@ -100,6 +100,10 @@ func (id *Identity) CanRun() string {
 }
 
 func (id *Identity) SubscriptionEffective() bool {
+	// Free plan default is perpetual (Cursor/Antigravity standard: never expires by time).
+	if id.Plan.Code == "free" {
+		return true
+	}
 	switch id.SubscriptionStatus {
 	case "trialing", "active", "past_due":
 		return true

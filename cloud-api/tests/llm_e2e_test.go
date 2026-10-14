@@ -542,6 +542,31 @@ func TestSubscriptionInactiveBlocks(t *testing.T) {
 	}
 }
 
+func TestFreePlanAllowsPermittedModelsAndBlocksProModels(t *testing.T) {
+	env := newEnv(t)
+	idn := testIdentity()
+	idn.Plan = auth.PlanInfo{ID: "pln_free", Code: "free", Name: "Free"}
+	idn.SubscriptionStatus = "none" // no paid subscription (Cursor/Antigravity perpetual free fallback)
+	idn.Restricted = true
+	idn.Models = []string{"openai/gpt-6-luna", "google/gemini-3.8-flash*"}
+
+	// 1. Allowed Free model succeeds without error
+	env.fb.setScript(chunk(`{"id":"c","object":"chat.completion.chunk","model":"openai/gpt-6-luna","choices":[]}`))
+	reqAllowed := sampleRequest(true)
+	reqAllowed.Model = "openai/gpt-6-luna"
+	if derr := env.proxy.Stream(context.Background(), idn, reqAllowed, &captureSink{}); derr != nil {
+		t.Fatalf("free model on free plan must succeed, got %v", derr)
+	}
+
+	// 2. Pro frontier model returns MODEL_NOT_ENTITLED (prompting upgrade)
+	reqPro := sampleRequest(true)
+	reqPro.Model = "anthropic/claude-sonnet-5.5"
+	derr := env.proxy.Stream(context.Background(), idn, reqPro, &captureSink{})
+	if derr == nil || derr.Code != "MODEL_NOT_ENTITLED" {
+		t.Fatalf("pro model on free plan must be MODEL_NOT_ENTITLED, got %v", derr)
+	}
+}
+
 func TestRPMLimitBlocksBeforeUpstream(t *testing.T) {
 	env := newEnv(t)
 	idn := testIdentity()

@@ -289,10 +289,25 @@ export function useChatStream({
       targetSession.activeTurnId = currentTurnId;
 
       targetSession.chatMessages = targetSession.chatMessages.map((m) => {
+        let updated = m;
         if (m.role === 'assistant' && m.status === 'running') {
-          return { ...m, status: 'completed' as const };
+          updated = { ...updated, status: 'completed' as const };
         }
-        return m;
+        // ponytail: Clear error card on prior turn so it vanishes when user continues execution
+        if (m.role === 'assistant' && m.error) {
+          updated = { ...updated, error: undefined, status: 'completed' as const };
+        }
+        if (m.tools && m.tools.some((t) => t.status === 'pending_approval' && !t.decision)) {
+          updated = {
+            ...updated,
+            tools: m.tools.map((t) =>
+              t.status === 'pending_approval' && !t.decision
+                ? { ...t, status: 'failed' as const, decision: 'deny' as const }
+                : t
+            ),
+          };
+        }
+        return updated;
       });
     }
 

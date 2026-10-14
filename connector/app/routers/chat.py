@@ -40,6 +40,7 @@ def get_sse_server() -> SSETransportServer:
 class StreamQueryPayload(BaseModel):
     session_id: str | None = None
     messages: str = ""
+    message: str | None = None
     context: dict | None = None
     variables: dict | None = None
     user_id: str | None = "default_user"
@@ -176,6 +177,8 @@ async def _ensure_project_and_context(
 
 
 @router.post("/stream")
+@router.post("/chat")
+@router.post("/api/chat")
 @router.post("/api/chat/stream")
 @router.post("/api/chat/{path_session_id}/stream")
 async def stream_query_bridge(
@@ -213,7 +216,7 @@ async def stream_query_bridge(
     resolved_context.pop("_raw_message", None)
 
     # Clean user prompt: keep raw message unmutated. Editor context is handled natively via Jinja system prompt.
-    user_prompt = payload.messages
+    user_prompt = payload.messages or payload.message or ""
 
     effective_agent_config = server._default_agent_config
 
@@ -282,6 +285,25 @@ async def stream_query_bridge(
             )
         except Exception as perm_err:
             logger.warning("Error initializing permission rules from config: %s", perm_err, exc_info=True)
+
+    # Preemptive Steer: If user sends a new message while a tool is awaiting approval,
+    # auto-deny the pending tool call so it does not crash with PendingPermissionsError (Fix 1 / Issue W2)
+    if sm and sid and user_prompt.strip():
+        try:
+            pending_check = await sm.get_pending_tool_calls(user_id=user_id, session_id=sid)
+            if pending_check and any(v.get("decision") is None for v in pending_check.values()):
+                for ptc in pending_check.values():
+                    if ptc.get("decision") is None:
+                        ptc["decision"] = "deny"
+                        ptc["feedback"] = f"Superseded by user message: {user_prompt.strip()}"
+                await sm.update_pending_tool_calls(
+                    user_id=user_id,
+                    session_id=sid,
+                    pending_tool_calls=pending_check,
+                )
+                logger.info("Auto-denied pending tool calls in session %s due to user steer prompt.", sid)
+        except Exception as steer_err:
+            logger.warning("Error resolving preemptive steer for session %s: %s", sid, steer_err)
 
     # When resuming on approval without new user text, pass message=[] (empty list)
     # so NexAU does not append an empty user bubble to history (Chain 3)

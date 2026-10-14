@@ -88,6 +88,24 @@ class TestSSEServerErrorHandling:
                 assert len(events) >= 1
                 assert "TRANSPORT_ERROR" in events[-1] or "Stream error" in events[-1]
 
+    @pytest.mark.anyio
+    async def test_handle_streaming_request_agent_crash_emits_run_error(self, server):
+        """Defect 2: If agent.run_async raises unhandled exception, RUN_ERROR is emitted to stream."""
+        mock_agent = AsyncMock()
+        mock_agent.run_async.side_effect = RuntimeError("Fatal unhandled agent failure")
+        mock_agent.agent_id = "agent_crash_test"
+        mock_agent.run_id = "run_crash_test"
+        mock_agent.stop = AsyncMock()
+
+        with patch("nexau.archs.main_sub.agent.Agent.create", new=AsyncMock(return_value=mock_agent)):
+            events = []
+            async for ev in server.handle_streaming_request(message="hello", user_id="test_user", session_id="sess_crash"):
+                events.append(ev)
+
+            assert len(events) == 1
+            assert events[0].type == "RUN_ERROR"
+            assert "Fatal unhandled agent failure" in events[0].message
+
 
 class TestSSEServerRequestValidation:
     """Unit tests for request validation."""

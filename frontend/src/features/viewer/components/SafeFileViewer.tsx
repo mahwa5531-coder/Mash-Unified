@@ -119,7 +119,7 @@ export default function SafeFileViewer({
   );
 
   if (isFileNotFound) {
-    return <FileViewerNotice message="File not found" />;
+    return <FileViewerNotice message="File not found" filename={filename} path={path} />;
   }
 
   if (isBinaryExcel) {
@@ -134,7 +134,7 @@ export default function SafeFileViewer({
   }
 
   if (isUnsupported) {
-    return <FileViewerNotice message="File format not supported" />;
+    return <FileViewerNotice message="File format not supported" filename={filename} path={path} />;
   }
 
   if (isImage) {

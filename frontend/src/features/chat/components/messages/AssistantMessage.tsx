@@ -19,7 +19,6 @@ interface AssistantMessageProps {
   isLast: boolean;
   isStreaming: boolean;
   onOpenFile?: (path: string) => void;
-  onProceed?: (path: string) => void;
   onRetry?: () => void;
   onContinue?: () => void;
   onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<void> | void;
@@ -48,7 +47,6 @@ const AssistantMessage = memo(function AssistantMessage({
   isLast,
   isStreaming,
   onOpenFile,
-  onProceed,
   onRetry,
   onContinue,
   onApproveTool,
@@ -138,7 +136,6 @@ const AssistantMessage = memo(function AssistantMessage({
               key={art.id} 
               artifact={art} 
               onOpen={(p) => onOpenFile?.(p)} 
-              onProceed={onProceed}
               isLast={isLast}
               isStreaming={isStreaming}
             />

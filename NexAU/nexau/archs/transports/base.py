@@ -290,7 +290,20 @@ class TransportBase[TTransportConfig](ABC):
             self._running_agents[agent_key] = agent
 
         async def run_agent() -> str:
-            return cast(str, await agent.run_async(message=message, context=context, variables=variables))
+            try:
+                return cast(str, await agent.run_async(message=message, context=context, variables=variables))
+            except Exception as exc:
+                # ponytail: Defect 2 - emit RunErrorEvent to event_queue so SSE delivers it to client instead of hanging
+                logger.error("Unhandled exception in agent run (session_id: %s): %s", session_id, exc, exc_info=True)
+                from nexau.archs.llm.llm_aggregators.events import RunErrorEvent
+
+                event_queue.put_nowait(
+                    RunErrorEvent(
+                        run_id=getattr(agent, "run_id", None) or f"run_err_{session_id[:8]}",
+                        message=str(exc),
+                    )
+                )
+                raise
 
         agent_task = asyncio.create_task(run_agent())
 
@@ -320,6 +333,11 @@ class TransportBase[TTransportConfig](ABC):
                     await agent_task
                 except (asyncio.CancelledError, Exception):
                     pass
+            elif not agent_task.cancelled():
+                # ponytail: Defect 2 - retrieve task exception so asyncio never treats it as unretrieved defect
+                exc = agent_task.exception()
+                if exc:
+                    logger.debug("Retrieved completed agent_task exception: %s", exc)
 
             # RFC-0001 Phase 4: cleanup running agent tracking
             async with self._running_agents_lock:

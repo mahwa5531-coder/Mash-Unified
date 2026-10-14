@@ -178,10 +178,6 @@ export default function ChatCanvas({
     }
   }, [lastAiMsg?.error]);
 
-  const handleProceed = useCallback(() => {
-    send("Proceed with the implementation plan");
-  }, [send]);
-
   const handleContinue = useCallback(() => {
     send(
       "Continue from where you were interrupted. Please pick up right where the previous step stopped without re-doing completed work."
@@ -284,7 +280,6 @@ export default function ChatCanvas({
                               isLast={isLastMsg}
                               isStreaming={isLastMsg && isStreaming}
                               onOpenFile={onOpenFile}
-                              onProceed={handleProceed}
                               onContinue={handleContinue}
                               onRetry={() => retry(turn.userMsg.content, turn.userMsg.sessionId)}
                               onApproveTool={approveToolCall}

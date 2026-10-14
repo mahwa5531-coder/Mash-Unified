@@ -1,5 +1,6 @@
 type: tool
 name: replace_file_content
+disable_parallel: true
 description: |
   Use this tool to edit an existing file. Follow these rules:
   1. Use this tool ONLY when you are making a SINGLE CONTIGUOUS block of edits to the same file (i.e. replacing a single contiguous block of text).

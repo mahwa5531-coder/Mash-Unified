@@ -247,9 +247,19 @@ export function groupTimelineEntries(entries: TimelineEntry[]): TimelineEntry[] 
   while (i < entries.length) {
     const current = entries[i];
 
-    // Preserved standalone: Approval Cards must never be bundled into a collapsible group
+    // Preserved standalone: Approval Cards must never be bundled into a collapsible group.
+    // Deduplicate by raw toolCallId / command so stream retries never stack duplicate cards (Fix 3)
     if (current.type === 'approval') {
-      result.push(current);
+      const tcId = String(current.data?.toolCallId || current.data?.tool?.id || current.id);
+      const cleanId = tcId.replace(/^run_[^_]+_/, '').replace(/^run_/, '');
+      const isDuplicate = result.some((r) => {
+        if (r.type !== 'approval') return false;
+        const rId = String(r.data?.toolCallId || r.data?.tool?.id || r.id).replace(/^run_[^_]+_/, '').replace(/^run_/, '');
+        return rId === cleanId || (current.data?.command && r.data?.command === current.data?.command);
+      });
+      if (!isDuplicate) {
+        result.push(current);
+      }
       i++;
       continue;
     }
