@@ -27,6 +27,7 @@ for _bd in _bin_dirs:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from nexau import AgentConfig, LLMConfig
 from nexau.archs.transports.http import HTTPConfig, SSETransportServer
 
 from app.dependencies import init_engine
@@ -50,7 +51,6 @@ from app.routers import (
     tasks,
     uploads,
 )
-from nexau import AgentConfig, LLMConfig
 
 _DB_DIR = get_nexau_home()
 _DB_PATH = get_database_path()
@@ -63,11 +63,10 @@ _DB_SYNC_URL  = f"sqlite:///{_DB_PATH}"
 
 
 def _build_agent_config() -> AgentConfig:
+    import nexau
     from nexau.archs.main_sub.config import AgentConfig
     from nexau.archs.platform.app_config import AppConfig
     from nexau.archs.platform.crypto_vault import load_secure_vault
-
-    import nexau
 
     # Load canonical agent configuration (local Mash manifest preferred)
     local_manifest = Path(__file__).resolve().parent / "resources" / "main_agent.yaml"
