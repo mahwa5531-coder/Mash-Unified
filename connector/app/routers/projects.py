@@ -192,7 +192,7 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
 
     from nexau.archs.session.models import AgentRunActionModel, SessionModel
 
-    from app.paths import get_nexau_home, get_session_brain_dir, safe_rmtree_session_brain
+    from app.paths import get_nexau_home, safe_rmtree_session_brain
 
     clean_id = unquote(project_id).strip()
 

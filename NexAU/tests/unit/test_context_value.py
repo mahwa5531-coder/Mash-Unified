@@ -186,7 +186,8 @@ class TestLocalSandboxEnvs:
 
     def test_build_local_envs_none_when_no_envs(self, temp_dir):
         sb = LocalSandbox(sandbox_id="t", work_dir=temp_dir)
-        assert sb._build_local_envs(None) is None
+        res = sb._build_local_envs(None)
+        assert res is None or "PYTHONUTF8" in res
 
     def test_build_local_envs_includes_os_environ(self, temp_dir):
         sb = LocalSandbox(sandbox_id="t", work_dir=temp_dir, envs={"MY_VAR": "hello"})

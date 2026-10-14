@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, MoreVertical, Archive, ArchiveRestore, Trash2, FileText } from 'lucide-react';
+import { Search, Archive, ArchiveRestore, Trash2, FileText } from 'lucide-react';
 import { SessionItem } from '@/services/sessions';
 import { formatRelativeTime } from '@/utils/formatting';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';

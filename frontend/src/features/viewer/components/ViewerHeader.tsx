@@ -25,7 +25,7 @@ export function ViewerHeader({
   openTabs,
   activeTabId,
   setActiveTabId,
-  openSections,
+  openSections: _openSections,
   setOpenSections,
   isMaximized,
   onToggle,

@@ -5,7 +5,6 @@ import { ToolTimelineRow } from '@/features/chat/components/work-log/ToolTimelin
 import { CommandTimelineRow } from '@/features/chat/components/work-log/CommandTimelineRow';
 import { GroupTimelineRow } from '@/features/chat/components/work-log/GroupTimelineRow';
 import { ReasoningDisclosure } from '@/primitives';
-import type { TimelineEntry } from '@/features/chat/components/work-log/types';
 
 export function Unit14AllToolMatrix() {
   const [expandedCmds, setExpandedCmds] = useState<Record<string, boolean>>({ 'cmd-decomposed-demo': true });

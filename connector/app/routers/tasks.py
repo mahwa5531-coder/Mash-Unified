@@ -16,11 +16,12 @@ async def list_active_tasks(session_id: str | None = None):
     seen_commands = set()
 
     try:
-        from app.dependencies import get_engine
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
         from nexau.archs.session.models import SessionModel
         from nexau.archs.session.orm import ComparisonFilter
         from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
+
+        from app.dependencies import get_engine
 
         session_work_dir = None
         if session_id:

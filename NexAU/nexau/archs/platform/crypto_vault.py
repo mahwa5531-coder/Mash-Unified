@@ -35,7 +35,7 @@ VAULT_FILE = get_nexau_home() / "auth.vault"
 _IN_MEMORY_AUTH_META: dict[str, Any] = {}
 
 
-class DATA_BLOB(ctypes.Structure):
+class DATA_BLOB(ctypes.Structure):  # noqa: N801
     _fields_ = [
         ("cbData", ctypes.wintypes.DWORD),
         ("pbData", ctypes.POINTER(ctypes.c_char)),

@@ -4,11 +4,7 @@ import React from 'react';
 import { 
   FileCode, 
   FileText, 
-  Settings, 
-  Archive, 
-  Image as ImageIcon, 
-  File,
-  FileSearch
+  Settings 
 } from 'lucide-react';
 import {
   FluentExcelLogo,
@@ -59,7 +55,7 @@ export function FileIcon({
   className = "shrink-0", 
   size = 14, 
   isFolder = false, 
-  isOpen = false 
+  isOpen: _isOpen = false 
 }: FileIconProps) {
   const iconStyle = { width: `${size}px`, height: `${size}px` };
 

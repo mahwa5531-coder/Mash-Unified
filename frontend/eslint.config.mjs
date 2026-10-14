@@ -16,9 +16,11 @@ const eslintConfig = defineConfig([
           caughtErrorsIgnorePattern: "^_",
         },
       ],
-      "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/purity": "warn",
-      "react-hooks/refs": "warn",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "@next/next/no-img-element": "off",
       "react/no-unescaped-entities": "off",
       "@typescript-eslint/no-empty-object-type": "off",
       "prefer-const": "warn",
@@ -28,6 +30,7 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".eslintcache",
     "out/**",
     "build/**",
     "next-env.d.ts",

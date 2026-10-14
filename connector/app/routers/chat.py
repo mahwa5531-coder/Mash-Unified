@@ -123,23 +123,37 @@ async def _ensure_project_and_context(
 
         session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
         if not session:
-            session = SessionModel(
-                session_id=sid, user_id=user_id,
-                created_at=now_utc, updated_at=now_utc,
-                context={
-                    "title": title_val, "custom_title": title_val,
-                    "workspace_uri": resolved_context.get("workspace_uri", workspace_target),
-                    "working_directory": resolved_context["working_directory"],
-                    "section": resolved_context.get("section"),
-                    "project_id": resolved_context.get("project_id"),
-                    "brain_directory": resolved_context["brain_directory"],
-                    "scratch_directory": resolved_context["scratch_directory"],
-                    "permission_mode": resolved_context.get("permission_mode", "default"),
-                    "updated_at": now_utc.isoformat(),
-                    "last_user_view_time": now_utc.isoformat(),
-                },
-            )
-            await eng.create(session)
+            init_context = {
+                "title": title_val, "custom_title": title_val,
+                "workspace_uri": resolved_context.get("workspace_uri", workspace_target),
+                "working_directory": resolved_context["working_directory"],
+                "section": resolved_context.get("section"),
+                "project_id": resolved_context.get("project_id"),
+                "brain_directory": resolved_context["brain_directory"],
+                "scratch_directory": resolved_context["scratch_directory"],
+                "permission_mode": resolved_context.get("permission_mode", "default"),
+                "updated_at": now_utc.isoformat(),
+                "last_user_view_time": now_utc.isoformat(),
+            }
+            sm = getattr(_sse_server, "_session_manager", None) if _sse_server else None
+            if sm:
+                agent_id, session = await sm.register_agent(
+                    user_id=user_id,
+                    session_id=sid,
+                    agent_name="nexau_main_auditor",
+                    is_root=True,
+                )
+                session.created_at = now_utc
+                session.updated_at = now_utc
+                session.context = init_context
+                await sm._update_session(session)
+            else:
+                session = SessionModel(
+                    session_id=sid, user_id=user_id,
+                    created_at=now_utc, updated_at=now_utc,
+                    context=init_context,
+                )
+                await eng.create(session)
         else:
             session.updated_at = now_utc
             ctx = dict(session.context or {})
@@ -429,7 +443,7 @@ async def approve_plan_bridge(
     session_id: str | None = None,
 ):
     """Bridge for tool permission resolution and manual plan approval.
-    
+
     Wires directly to NexAU's SessionManager to update pending tool calls and
     persist user rules into SQLite's permission_rules table.
     """

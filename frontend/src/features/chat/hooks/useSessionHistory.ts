@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { fetchTranscript } from '@/services/sessions';
 import { parseSessionHistory } from '@/features/chat/utils/turns';
 import { sessionStore, type SessionRuntimeState } from '../state/sessionStore';
@@ -17,7 +17,7 @@ export function useSessionHistory({
   sessionId,
   activeSessionIdRef,
   scrollContainerRef,
-  onHistoryLoaded,
+  onHistoryLoaded: _onHistoryLoaded,
 }: UseSessionHistoryOptions) {
   const [isHistoryLoaded, setIsHistoryLoaded] = useState<boolean>(
     () => !sessionId || (sessionStore.get(sessionId)?.isHistoryLoaded ?? false)

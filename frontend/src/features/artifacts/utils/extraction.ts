@@ -1,8 +1,7 @@
 import { Message } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
-import { BASE_URL } from '@/services/client';
 import { normalizePath } from '@/utils/normalizePath';
-import { isArtifactPath, shouldExcludePath, getArtifactCanonicalGroup } from './paths';
+import { isArtifactPath, shouldExcludePath } from './paths';
 
 export { isArtifactPath, shouldExcludePath, getArtifactCanonicalGroup } from './paths';
 export { extractEditedFiles } from './extractEditedFiles';
@@ -61,7 +60,6 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
         if (isArtifact && !shouldExcludePath(pathStr) && !seenPaths.has(pathStr)) {
           seenPaths.add(pathStr);
           const rawFilename = pathStr.split(/[/\\]/).pop() || '';
-          const rawExt = rawFilename.split('.').pop() || '';
           const rawTitle = rawFilename.replace(/\.[^/.]+$/, '') || 'Artifact';
           const friendlyTitle = rawTitle.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
           const meta = args.ArtifactMetadata || args.artifact_metadata;
@@ -99,13 +97,12 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
     let match;
     while ((match = linkRegex.exec(msg.content)) !== null) {
       const linkText = match[1];
-      let linkPath = normalizePath(match[2]);
+      const linkPath = normalizePath(match[2]);
 
       const { isArtifact, type } = classifyArtifact(linkPath);
       if (isArtifact && !seenPaths.has(linkPath)) {
         seenPaths.add(linkPath);
         const rawFilename = linkPath.split(/[/\\]/).pop() || '';
-        const rawExt = rawFilename.split('.').pop() || '';
         const rawTitle = rawFilename.replace(/\.[^/.]+$/, '') || linkText;
         const friendlyTitle = rawTitle.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
         const beforeText = msg.content.slice(0, match.index).trim();

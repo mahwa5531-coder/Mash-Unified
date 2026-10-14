@@ -6,7 +6,6 @@ import {
   WifiOff, 
   Clock, 
   AlertCircle, 
-  AlertTriangle, 
   Lock, 
   Wrench, 
   Play, 

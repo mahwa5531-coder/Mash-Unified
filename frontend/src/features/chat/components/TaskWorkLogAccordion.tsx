@@ -36,7 +36,7 @@ export default function TaskWorkLogAccordion({
   totalDurationSeconds,
   onOpenFile,
   onApproveTool,
-  isLast = false,
+  isLast: _isLast = false,
   turnStartTime,
 }: TaskWorkLogAccordionProps) {
   // Starts collapsed by default so finished turns display "Worked for {time} >" summary
@@ -183,23 +183,9 @@ export default function TaskWorkLogAccordion({
     1,
     (thinkingDurationSeconds || 0) + tools.length * 2
   );
-  const blockSecs = useMemo(() => {
-    if (steps && steps.length > 0) {
-      let totalMs = 0;
-      for (const s of steps) {
-        if (s.durationMs) totalMs += s.durationMs;
-        else if (s.durationSeconds) totalMs += s.durationSeconds * 1000;
-        else if (s.thinkingDurationSeconds) totalMs += s.thinkingDurationSeconds * 1000;
-      }
-      if (totalMs > 0) return Math.max(1, Math.round(totalMs / 1000));
-      return Math.max(1, steps.length * 2);
-    }
-    return totalDurationSeconds || fallbackSecs;
-  }, [steps, totalDurationSeconds, fallbackSecs]);
 
   const finalSecs = totalDurationSeconds || (turnStartTime ? Math.max(1, Math.round((Date.now() - turnStartTime) / 1000)) : fallbackSecs);
   const formattedTime = formatDurationDisplay(finalSecs);
-  const blockFormattedTime = formatDurationDisplay(blockSecs);
 
   const hasDuration = Boolean(totalDurationSeconds || thinkingDurationSeconds || turnStartTime);
   if (!hasWork && !isStreaming && !hasDuration) return null;

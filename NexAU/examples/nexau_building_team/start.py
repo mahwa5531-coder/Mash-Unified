@@ -69,7 +69,7 @@ async def main(message: str) -> None:
     2.  AgentTeam 
     3.  run_streaming() 
     """
-    # 1.  agent 
+    # 1.  agent
     leader_config = AgentConfig.from_yaml(SCRIPT_DIR / "leader_agent.yaml")
     rfc_writer_config = AgentConfig.from_yaml(SCRIPT_DIR / "rfc_writer_agent.yaml")
     builder_config = AgentConfig.from_yaml(SCRIPT_DIR / "builder_agent.yaml")
@@ -90,7 +90,7 @@ async def main(message: str) -> None:
         session_id="local_session",
     )
 
-    # 3. 
+    # 3.
     logger.info("Starting team run (streaming)...")
     current_agent: str | None = None
 
@@ -99,7 +99,7 @@ async def main(message: str) -> None:
         role = envelope.role_name or "unknown"
         color = COLORS.get(role, "")
 
-        #  agent 
+        #  agent
         if envelope.agent_id != current_agent:
             current_agent = envelope.agent_id
             print(f"\n{color}[{role}:{current_agent}]{RESET}", end=" ", flush=True)

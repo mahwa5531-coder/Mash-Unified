@@ -46,7 +46,7 @@ def main():
         if sandbox is None:
             print("✗ Sandbox failed to start")
             return False
-        print("✓ Sandbox constructed successfully: {}".format(sandbox.sandbox_id))
+        print(f"✓ Sandbox constructed successfully: {sandbox.sandbox_id}")
 
         print("\nTesting Code Agent...")
         user_messages = [

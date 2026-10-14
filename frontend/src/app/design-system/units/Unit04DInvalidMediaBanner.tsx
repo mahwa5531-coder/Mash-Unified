@@ -44,7 +44,7 @@ export function Unit04DInvalidMediaBanner({
 }: Unit04DInvalidMediaBannerProps) {
   const [bannerOpen, setBannerOpen] = useState(true);
   const [demoFiles, setDemoFiles] = useState<AttachedFile[]>(DEFAULT_FIVE_ATTACHMENTS);
-  const [attemptedOverflow, setAttemptedOverflow] = useState(false);
+  const [_attemptedOverflow, setAttemptedOverflow] = useState(false);
 
   const handleAttemptAdd6thFile = () => {
     // Attempting to attach more than 5 files triggers the banner and rejects addition

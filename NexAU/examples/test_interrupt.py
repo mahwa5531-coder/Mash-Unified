@@ -1,23 +1,23 @@
-# RFC-0001 : Agent 
+# RFC-0001 : Agent
 #
 # ：
 #   1.  sleep_tool  Agent（）
-#   2.  sleep_tool 20 
+#   2.  sleep_tool 20
 #   3.  5  stop
 #   4. ，
 #
 # ：
 #   uv run python examples/test_interrupt.py          #  agent.stop()
-#   uv run python examples/test_interrupt.py direct    # 
+#   uv run python examples/test_interrupt.py direct    #
 #   uv run python examples/test_interrupt.py http      #  HTTP transport POST /stop
 
 import asyncio
 import json
 import logging
-from typing import Any
 import sys
 import threading
 import time
+from typing import Any
 
 import httpx
 
@@ -124,7 +124,7 @@ async def main_direct() -> None:
 
     agent = Agent(config=config)
 
-    # 2. ： sleep_tool 20 
+    # 2. ： sleep_tool 20
     print("\n📤 :  sleep_tool 20 ， 1 ")
     print("-" * 60)
 
@@ -134,7 +134,7 @@ async def main_direct() -> None:
 
     agent_task = asyncio.create_task(run_agent())
 
-    #  5 
+    #  5
     while not interrupt_triggered.is_set():
         await asyncio.sleep(0.2)
     await asyncio.sleep(0.5)
@@ -142,16 +142,16 @@ async def main_direct() -> None:
     # 3.  stop
     print("\n🛑  stop(force=True) ...")
     result = await agent.stop(force=True)
-    print(f"  ✅ stop ")
+    print("  ✅ stop ")
     print(f"  📊 stop_reason = {result.stop_reason.name}")
     print(f"  📊  = {len(result.messages)}")
     print(f"  📊  = {tool_call_count}")
 
-    #  agent_task 
+    #  agent_task
     try:
         response = await asyncio.wait_for(agent_task, timeout=5.0)
         print(f"\n📥 : {response[:200]}...")
-    except (asyncio.TimeoutError, asyncio.CancelledError, Exception) as e:
+    except (TimeoutError, asyncio.CancelledError, Exception) as e:
         print(f"\n📥 : {type(e).__name__}")
 
     # 4. ：
@@ -163,7 +163,7 @@ async def main_direct() -> None:
     response2 = response2_raw if isinstance(response2_raw, str) else response2_raw[0]
     print(f"\n📥 :\n{response2}")
 
-    # 5. 
+    # 5.
     _print_summary(tool_call_count, tool_result_count, len(result.messages), response2)
 
     await agent.stop(force=True)
@@ -201,7 +201,7 @@ async def main_http() -> None:
         default_agent_config=agent_config,
     )
 
-    # 2.  uvicorn 
+    # 2.  uvicorn
     import uvicorn
 
     server_thread = threading.Thread(
@@ -250,7 +250,7 @@ async def main_http() -> None:
                             tool_result_count += 1
                             print(f"  📩 [SSE]  {tool_result_count} ")
             except httpx.RemoteProtocolError:
-                #  stop 
+                #  stop
                 pass
             except Exception as e:
                 print(f"  ⚠️ : {type(e).__name__}: {e}")
@@ -259,7 +259,7 @@ async def main_http() -> None:
 
         stream_task = asyncio.create_task(consume_stream())
 
-        #  5 
+        #  5
         print("\n📤  (via POST /stream):  sleep_tool 20 ")
         print("-" * 60)
 
@@ -267,10 +267,10 @@ async def main_http() -> None:
             await asyncio.sleep(0.2)
 
         if tool_result_count >= 5:
-            await asyncio.sleep(0.5)  #  5 
+            await asyncio.sleep(0.5)  #  5
 
             # 4.  POST /stop
-            print(f"\n🛑  POST /stop (force=True) ...")
+            print("\n🛑  POST /stop (force=True) ...")
             stop_resp = await client.post(
                 "/stop",
                 json={
@@ -287,7 +287,7 @@ async def main_http() -> None:
 
         await asyncio.wait_for(stream_task, timeout=10.0)
 
-        # 5. ： POST /query 
+        # 5. ： POST /query
         print("\n" + "=" * 60)
         print("📤  (via POST /query):  sleep_tool？")
         print("-" * 60)
@@ -304,7 +304,7 @@ async def main_http() -> None:
         response2 = query_data.get("response", "")
         print(f"\n📥 :\n{response2}")
 
-    # 6. 
+    # 6.
     message_count = int(stop_result_data.get("message_count", 0)) if stop_result_data else 0
     _print_summary(tool_call_count, tool_result_count, message_count, response2)
 

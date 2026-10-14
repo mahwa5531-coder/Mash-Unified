@@ -92,11 +92,7 @@ def main() -> bool:
         claude_code_agent = Agent(config=config)
         print("✓ Agent loaded successfully from YAML")
         print(
-            "✓ E2B sandbox configured: template={}, work_dir={}, timeout={}s".format(
-                config.sandbox_config.template,
-                config.sandbox_config.work_dir,
-                config.sandbox_config.timeout,
-            )
+            f"✓ E2B sandbox configured: template={config.sandbox_config.template}, work_dir={config.sandbox_config.work_dir}, timeout={config.sandbox_config.timeout}s"
         )
 
         sandbox = claude_code_agent.sandbox_manager.instance
@@ -104,7 +100,7 @@ def main() -> bool:
             print("✗ Sandbox failed to start")
             return False
 
-        print("✓ E2B sandbox started successfully: {}".format(sandbox.sandbox_id))
+        print(f"✓ E2B sandbox started successfully: {sandbox.sandbox_id}")
 
         print("\nTesting Code Agent...")
         user_message = input("Enter your task: ")

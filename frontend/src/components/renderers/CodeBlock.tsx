@@ -52,7 +52,7 @@ function highlightCodeSnippet(rawCode: string, language: string, isDark: boolean
   let match: RegExpExecArray | null;
 
   while ((match = tokenRegex.exec(rawCode)) !== null) {
-    const [full, comment, str, num, word, other] = match;
+    const [, comment, str, num, word, other] = match;
 
     if (comment) {
       const cls = isDark ? 'text-zinc-500 italic' : 'text-zinc-400 italic';

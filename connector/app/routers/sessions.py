@@ -1,14 +1,11 @@
-import json
 import logging
 import os
 import re
-import shutil
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from nexau.archs.session import AgentRunActionKey, AgentRunActionService
-from nexau.archs.session.agent_run_action_service import reduce_actions_stream
 from nexau.archs.session.id_generator import generate_run_id, generate_session_id
 from nexau.archs.session.models import AgentRunActionModel, SessionModel
 from nexau.archs.session.orm import ComparisonFilter
@@ -17,12 +14,12 @@ from nexau.archs.session.steering import (
     peek_steering_messages,
     queue_steering_message,
 )
+from nexau.core.messages import Message, TextBlock, ToolResultBlock, ToolUseBlock
 from pydantic import BaseModel
 
 from app.dependencies import DatabaseEngineDep
 from app.models.project import ProjectModel
 from app.paths import (
-    get_session_brain_dir,
     safe_rmtree_session_brain,
     validate_safe_id,
 )
@@ -82,7 +79,11 @@ def generate_clean_session_title(raw_text: str, sid: str = "") -> str:
             t = parts[-1].strip("\"'` \t\n\r,:;-")
 
     # Strip conversational filler prefixes
-    t = re.sub(r'^(?:please\s+|can you\s+|could you\s+|kindly\s+|help me\s+(?:to\s+)?|i want to\s+|i need to\s+|tell me about\s+|what is\s+|how to\s+)+', '', t, flags=re.IGNORECASE).strip()
+    filler_re = (
+        r'^(?:please\s+|can you\s+|could you\s+|kindly\s+|help me\s+(?:to\s+)?|'
+        r'i want to\s+|i need to\s+|tell me about\s+|what is\s+|how to\s+)+'
+    )
+    t = re.sub(filler_re, '', t, flags=re.IGNORECASE).strip()
     t = re.sub(r'[?!.:;]+$', '', t).strip()
     if not t:
         return f"Session {sid[:8]}" if sid else "New Session"
@@ -98,7 +99,11 @@ def clean_user_steering_envelope(text: str) -> str:
     if not text or not isinstance(text, str):
         return text or ""
     if "<USER_STEERING>" in text or "[USER MID-FLIGHT INSTRUCTION]:" in text or "</USER_STEERING>" in text:
-        m = re.search(r'<USER_STEERING>\s*(?:\[USER MID-FLIGHT INSTRUCTION\]:)?\s*([\s\S]*?)(?:\s*Adapt your current plan and respond to this instruction immediately\.?)?\s*</USER_STEERING>', text, re.IGNORECASE)
+        steering_pat = (
+            r'<USER_STEERING>\s*(?:\[USER MID-FLIGHT INSTRUCTION\]:)?\s*([\s\S]*?)'
+            r'(?:\s*Adapt your current plan and respond to this instruction immediately\.?)?\s*</USER_STEERING>'
+        )
+        m = re.search(steering_pat, text, re.IGNORECASE)
         if m and m.group(1).strip():
             return m.group(1).strip()
         cleaned = re.sub(r'</?USER_STEERING>', '', text, flags=re.IGNORECASE)
@@ -112,7 +117,8 @@ def clean_protocol_sentinels(text: str) -> str:
     """ponytail: strip [DONE]/[END] protocol sentinels, prompt tags, and heading wrappers."""
     if not text or not isinstance(text, str):
         return text or ""
-    cleaned = re.sub(r'</?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity)>\s*', '', text, flags=re.IGNORECASE)
+    sentinel_pat = r'</?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity)>\s*'
+    cleaned = re.sub(sentinel_pat, '', text, flags=re.IGNORECASE)
     cleaned = re.sub(r'^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*$', '', cleaned, flags=re.IGNORECASE | re.MULTILINE)
     cleaned = re.sub(r'(?:^|\n)\s*\[(?:DONE|END|done|end)\]\s*(?=\n|$)', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'(\s*\[(?:DONE|END|done|end)\]\s*)+$', '', cleaned, flags=re.IGNORECASE)
@@ -191,7 +197,8 @@ async def list_sessions(
             if async_engine:
                 from sqlalchemy import text
                 async with async_engine.connect() as conn:
-                    q_res = await conn.execute(text("SELECT session_id, count(*), max(created_at_ns) FROM agent_run_actions GROUP BY session_id"))
+                    query = text("SELECT session_id, count(*), max(created_at_ns) FROM agent_run_actions GROUP BY session_id")
+                    q_res = await conn.execute(query)
                     for row in q_res.fetchall():
                         session_stats[row[0]] = {"count": row[1], "last_action_time": row[2]}
         except Exception:
@@ -305,7 +312,8 @@ async def create_session(
     from app.paths import scaffold_session_storage
     brain_path = scaffold_session_storage(session_id, project.id if project else request.project_id)
 
-    section = request.section or ("workspace" if request.workspace_uri not in ("No Repo", "", None) or project or request.project_id else "conversation")
+    has_workspace = request.workspace_uri not in ("No Repo", "", None) or project or request.project_id
+    section = request.section or ("workspace" if has_workspace else "conversation")
     workspace_uri = request.workspace_uri or (project.name if project else "No Repo")
     working_directory = project.local_folder_path if project else (workspace_uri if workspace_uri != "No Repo" else None)
 
@@ -319,21 +327,43 @@ async def create_session(
         except Exception:
             pass
 
-    session = SessionModel(
-        user_id=request.user_id,
-        session_id=session_id,
-        context={
-            "project_id": project.id if project else request.project_id,
-            "title": request.title,
-            "custom_title": request.title,
-            "workspace_uri": workspace_uri,
-            "working_directory": working_directory,
-            "section": section,
-            "brain_directory": str(brain_path),
-            "scratch_directory": str(brain_path / "scratch"),
-        },
-    )
-    await eng.create(session)
+    context_data = {
+        "project_id": project.id if project else request.project_id,
+        "title": request.title,
+        "custom_title": request.title,
+        "workspace_uri": workspace_uri,
+        "working_directory": working_directory,
+        "section": section,
+        "brain_directory": str(brain_path),
+        "scratch_directory": str(brain_path / "scratch"),
+    }
+
+    # Step 2: Use native SessionManager.register_agent() to guarantee AgentModel
+    # and root_agent_id are tracked atomically in SQLite
+    from app.routers.chat import get_sse_server
+    sm = None
+    try:
+        server = get_sse_server()
+        sm = getattr(server, "_session_manager", None)
+    except Exception:
+        pass
+
+    if sm:
+        _agent_id, session = await sm.register_agent(
+            user_id=request.user_id,
+            session_id=session_id,
+            agent_name="nexau_main_auditor",
+            is_root=True,
+        )
+        session.context = context_data
+        await sm._update_session(session)
+    else:
+        session = SessionModel(
+            user_id=request.user_id,
+            session_id=session_id,
+            context=context_data,
+        )
+        await eng.create(session)
     return {"status": "success", "session_id": session_id}
 
 
@@ -366,6 +396,141 @@ async def list_sessions_by_project(
 # ──────────────────────────────────────────────
 # Transcript & History (Both /sessions and /api/sessions)
 # ──────────────────────────────────────────────
+def get_tool_action_type(t_name: str) -> str:
+    t_lower = t_name.lower()
+    if any(k in t_lower for k in ("view", "read", "list", "fetch", "cat")):
+        return "read"
+    if any(k in t_lower for k in ("write", "replace", "edit", "patch")):
+        return "edit"
+    if any(k in t_lower for k in ("search", "find", "grep", "glob")):
+        return "search"
+    if any(k in t_lower for k in ("shell", "command", "bash", "terminal", "run")):
+        return "command"
+    return "action"
+
+
+def messages_to_transcript_lines(
+    messages: list[Message],
+    pending_map: dict | None = None,
+    shallow_tools: bool = False,
+) -> list[dict]:
+    # 1. Index all tool results by tool_use_id
+    tool_results: dict[str, str] = {}
+    for m in messages:
+        for b in m.content:
+            if isinstance(b, ToolResultBlock):
+                content_str = b.content if isinstance(b.content, str) else str(b.content)
+                if shallow_tools and len(content_str) > 3000:
+                    content_str = content_str[:3000] + f"\n... [Truncated for rapid UI loading; {len(content_str)} total characters]"
+                tool_results[str(b.tool_use_id)] = content_str
+
+    lines = []
+    for msg in messages:
+        role_str = msg.role.value if hasattr(msg.role, "value") else str(msg.role).lower()
+        if role_str in ("system", "tool"):
+            # Tool results are merged directly into the assistant tool call below
+            continue
+
+        text_parts = []
+        thoughts = []
+        tools = []
+        steps = []
+        step_idx = 0
+
+        for b in msg.content:
+            if isinstance(b, TextBlock):
+                text_parts.append(b.text)
+                steps.append({
+                    "id": f"step_{step_idx}",
+                    "step_index": step_idx,
+                    "type": "text",
+                    "content": b.text,
+                    "status": "completed",
+                })
+                step_idx += 1
+            elif hasattr(b, "thinking") and b.thinking:
+                th = b.thinking
+                thoughts.append(th)
+                steps.append({
+                    "id": f"step_{step_idx}",
+                    "step_index": step_idx,
+                    "type": "thinking",
+                    "content": th,
+                    "status": "completed",
+                })
+                step_idx += 1
+            elif getattr(b, "type", "") in ("thinking", "reasoning"):
+                t_text = getattr(b, "text", "") or getattr(b, "thinking", "")
+                if t_text:
+                    thoughts.append(t_text)
+                    steps.append({
+                        "id": f"step_{step_idx}",
+                        "step_index": step_idx,
+                        "type": "thinking",
+                        "content": t_text,
+                        "status": "completed",
+                    })
+                    step_idx += 1
+            elif isinstance(b, ToolUseBlock):
+                tc_id = str(b.id)
+                tc_name = str(b.name)
+                t_args = b.input if isinstance(b.input, dict) else {}
+                tool_action = get_tool_action_type(tc_name)
+
+                is_pending = bool(pending_map and tc_id in pending_map and not pending_map[tc_id].get("decision"))
+                decision_val = pending_map.get(tc_id, {}).get("decision") if pending_map else None
+                tool_status = "pending_approval" if is_pending else ("denied" if decision_val == "deny" else "completed")
+                output_val = tool_results.get(tc_id, "")
+
+                tool_obj = {
+                    "id": tc_id,
+                    "name": tc_name,
+                    "args": t_args,
+                    "output": output_val,
+                    "status": tool_status,
+                    "decision": decision_val,
+                    "toolSummary": t_args.get("toolSummary") or (pending_map.get(tc_id, {}).get("prompt") if pending_map else None),
+                    "toolAction": t_args.get("toolAction"),
+                    "action_type": tool_action,
+                }
+                tools.append(tool_obj)
+                steps.append({
+                    "id": tc_id or f"step_{step_idx}",
+                    "step_index": step_idx,
+                    "type": "tool",
+                    "tool_call_id": tc_id,
+                    "name": tc_name,
+                    "args": t_args,
+                    "output": output_val,
+                    "status": tool_status,
+                    "action_type": tool_action,
+                })
+                step_idx += 1
+
+        combined_text = "\n\n".join(text_parts).strip()
+        if not combined_text and not tools and not thoughts:
+            continue
+
+        ts_str = getattr(msg, "created_at", None)
+        if isinstance(ts_str, datetime):
+            ts_str = ts_str.isoformat()
+        elif not ts_str:
+            ts_str = datetime.now(UTC).isoformat()
+        else:
+            ts_str = str(ts_str)
+
+        lines.append({
+            "role": role_str,
+            "content": combined_text,
+            "thoughts": thoughts,
+            "tools": tools,
+            "steps": steps,
+            "created_at": ts_str,
+            "timestamp": ts_str,
+        })
+    return lines
+
+
 @router.get("/sessions/{session_id}/transcript")
 @router.get("/api/sessions/{session_id}/transcript")
 async def get_transcript(
@@ -386,373 +551,13 @@ async def get_transcript(
     try:
         session_obj = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
         pending_map = (getattr(session_obj, "pending_tool_calls", None) or {}) if session_obj else {}
+        user_id = session_obj.user_id if (session_obj and session_obj.user_id) else "default_user"
 
-        actions = await eng.find_many(
-            AgentRunActionModel,
-            filters=ComparisonFilter.eq("session_id", session_id),
-        )
+        agent_run_service = AgentRunActionService(engine=eng)
+        key = AgentRunActionKey(user_id=user_id, session_id=session_id, agent_id="")
+        messages = await agent_run_service.load_messages(key=key)
 
-        actions_to_process = reduce_actions_stream(actions)
-
-        # Compute accurate run durations from agent_run_actions database timestamps
-        run_starts: dict[str, int] = {}
-        run_ends: dict[str, int] = {}
-        for a in actions_to_process:
-            a_type = getattr(a, "action_type", "")
-            a_type_str = a_type.value if hasattr(a_type, "value") else str(a_type)
-            rid = getattr(a, "run_id", "")
-            ns = getattr(a, "created_at_ns", 0) or 0
-            if not ns and getattr(a, "created_at", None):
-                try:
-                    ns = int(a.created_at.timestamp() * 1e9)
-                except Exception:
-                    pass
-            if not rid or not ns:
-                continue
-            if a_type_str == "run_start":
-                if rid not in run_starts or ns < run_starts[rid]:
-                    run_starts[rid] = ns
-            elif a_type_str == "run_end":
-                if rid not in run_ends or ns > run_ends[rid]:
-                    run_ends[rid] = ns
-            elif a_type_str == "append":
-                if rid not in run_starts:
-                    run_starts[rid] = ns
-                if rid not in run_ends or ns > run_ends[rid]:
-                    run_ends[rid] = ns
-
-        run_durations: dict[str, int] = {}
-        for rid, s_ns in run_starts.items():
-            e_ns = run_ends.get(rid, s_ns)
-            if e_ns >= s_ns:
-                run_durations[rid] = max(1, round((e_ns - s_ns) / 1e9))
-
-        last_marker_ns_by_run: dict[str, int] = {}
-        lines = []
-        all_tools_by_id: dict[str, dict] = {}
-        all_tool_steps_by_id: dict[str, dict] = {}
-
-        for action in actions_to_process:
-            act_type = getattr(action, "action_type", "")
-            is_replace = act_type == "replace" or getattr(act_type, "value", "") == "replace"
-            rid = getattr(action, "run_id", "")
-            current_ns = getattr(action, "created_at_ns", 0) or 0
-            if not current_ns and getattr(action, "created_at", None):
-                try:
-                    current_ns = int(action.created_at.timestamp() * 1e9)
-                except Exception:
-                    pass
-
-            prev_marker_ns = last_marker_ns_by_run.get(rid, run_starts.get(rid, current_ns))
-            step_duration_s = max(1, round((current_ns - prev_marker_ns) / 1e9)) if (current_ns and prev_marker_ns and current_ns > prev_marker_ns) else None
-            if current_ns:
-                last_marker_ns_by_run[rid] = current_ns
-
-            if is_replace:
-                extra = getattr(action, "extra", {}) or {}
-                stats = extra.get("stats") if isinstance(extra, dict) else {}
-                lines.append({
-                    "role": "system",
-                    "type": "compaction_boundary",
-                    "isCompacted": True,
-                    "content": "The server cleared a prefix of the conversation as it grew too large.",
-                    "summary": "",
-                    "stats": stats,
-                })
-                msgs = getattr(action, "replace_messages", None) or []
-            else:
-                msgs = getattr(action, "append_messages", None) or []
-
-            for msg in msgs:
-                role = getattr(msg, "role", None) or (msg.get("role") if isinstance(msg, dict) else "assistant")
-                if hasattr(role, "value"):
-                    role = role.value
-                role_str = str(role).lower()
-
-                raw_content = getattr(msg, "content", None) or (msg.get("content") if isinstance(msg, dict) else "")
-
-                text_parts = []
-                thoughts = []
-                tools = []
-                steps = []
-                step_idx = 0
-
-                def get_tool_action_type(t_name: str) -> str:
-                    t_lower = t_name.lower()
-                    if any(k in t_lower for k in ("view", "read", "list", "fetch", "cat")):
-                        return "read"
-                    if any(k in t_lower for k in ("write", "replace", "edit", "patch")):
-                        return "edit"
-                    if any(k in t_lower for k in ("search", "find", "grep", "glob")):
-                        return "search"
-                    if any(k in t_lower for k in ("shell", "command", "bash", "terminal", "run")):
-                        return "command"
-                    return "action"
-
-                if isinstance(raw_content, str):
-                    if raw_content:
-                        text_parts.append(raw_content)
-                        steps.append({
-                            "id": f"step_{step_idx}",
-                            "step_index": step_idx,
-                            "type": "text",
-                            "content": raw_content,
-                            "status": "completed",
-                        })
-                        step_idx += 1
-                elif isinstance(raw_content, list):
-                    for block in raw_content:
-                        b_type = getattr(block, "type", None) or (block.get("type") if isinstance(block, dict) else "")
-                        if b_type == "text":
-                            t_val = getattr(block, "text", None) or (block.get("text") if isinstance(block, dict) else "")
-                            if t_val:
-                                text_parts.append(str(t_val))
-                                steps.append({
-                                    "id": f"step_{step_idx}",
-                                    "step_index": step_idx,
-                                    "type": "text",
-                                    "content": str(t_val),
-                                    "status": "completed",
-                                })
-                                step_idx += 1
-                        elif b_type in ("reasoning", "thinking"):
-                            th_val = (
-                                getattr(block, "text", None)
-                                or getattr(block, "thinking", None)
-                                or (block.get("text") if isinstance(block, dict) else "")
-                                or (block.get("thinking") if isinstance(block, dict) else "")
-                            )
-                            if th_val:
-                                thoughts.append(str(th_val))
-                                steps.append({
-                                    "id": f"step_{step_idx}",
-                                    "step_index": step_idx,
-                                    "type": "thinking",
-                                    "content": str(th_val),
-                                    "status": "completed",
-                                })
-                                step_idx += 1
-                        elif b_type in ("tool_use", "tool_call"):
-                            t_name = getattr(block, "name", None) or (block.get("name") if isinstance(block, dict) else "action")
-                            t_id = str(getattr(block, "id", None) or (block.get("id") if isinstance(block, dict) else ""))
-                            t_args = getattr(block, "input", None) or (block.get("input") if isinstance(block, dict) else {})
-                            tool_action = get_tool_action_type(str(t_name))
-                            parsed_t_args = t_args if isinstance(t_args, dict) else {}
-                            is_pending = bool(pending_map and t_id in pending_map and not pending_map[t_id].get("decision"))
-                            decision_val = pending_map.get(t_id, {}).get("decision") if pending_map else None
-                            tool_status = "pending_approval" if is_pending else ("denied" if decision_val == "deny" else "completed")
-                            tool_obj = {
-                                "id": t_id,
-                                "name": str(t_name),
-                                "args": parsed_t_args,
-                                "output": "",
-                                "status": tool_status,
-                                "decision": decision_val,
-                                "toolSummary": parsed_t_args.get("toolSummary") or (pending_map.get(t_id, {}).get("prompt") if pending_map else None),
-                                "toolAction": parsed_t_args.get("toolAction"),
-                                "action_type": tool_action,
-                            }
-                            tools.append(tool_obj)
-                            if t_id:
-                                all_tools_by_id[t_id] = tool_obj
-                            step_tool = {
-                                "id": t_id or f"step_{step_idx}",
-                                "step_index": step_idx,
-                                "type": "tool",
-                                "tool_call_id": t_id,
-                                "name": str(t_name),
-                                "args": t_args if isinstance(t_args, dict) else {},
-                                "output": "",
-                                "status": "completed",
-                                "action_type": tool_action,
-                            }
-                            steps.append(step_tool)
-                            if t_id:
-                                all_tool_steps_by_id[t_id] = step_tool
-                            step_idx += 1
-                        elif b_type in ("tool_result",):
-                            r_id = str(getattr(block, "tool_use_id", None) or (block.get("tool_use_id") if isinstance(block, dict) else ""))
-                            r_content = str(getattr(block, "content", None) or (block.get("content") if isinstance(block, dict) else ""))
-                            if shallow_tools and len(r_content) > 3000:
-                                r_content = r_content[:3000] + f"\n... [Truncated for rapid UI loading; {len(r_content)} total characters]"
-                            if r_id and r_id in all_tools_by_id:
-                                all_tools_by_id[r_id]["output"] = r_content
-                                all_tools_by_id[r_id]["status"] = "completed"
-                            if r_id and r_id in all_tool_steps_by_id:
-                                all_tool_steps_by_id[r_id]["output"] = r_content
-                                all_tool_steps_by_id[r_id]["status"] = "completed"
-                            else:
-                                tools.append({
-                                    "id": r_id,
-                                    "name": "action",
-                                    "output": r_content,
-                                    "status": "completed",
-                                    "action_type": "action",
-                                })
-                            for s in steps:
-                                if s.get("tool_call_id") == r_id:
-                                    s["output"] = r_content
-                                    s["status"] = "completed"
-
-                # Support standard OpenAI Chat Completion top-level tool_calls
-                openai_tool_calls = getattr(msg, "tool_calls", None) or (msg.get("tool_calls") if isinstance(msg, dict) else None)
-                if isinstance(openai_tool_calls, list):
-                    for tc in openai_tool_calls:
-                        tc_id = str(tc.get("id") or "")
-                        tc_func = tc.get("function") or {}
-                        tc_name = tc_func.get("name") or tc.get("name") or "action"
-                        raw_args = tc_func.get("arguments") or tc.get("args") or {}
-                        if isinstance(raw_args, str):
-                            try:
-                                parsed_args = json.loads(raw_args)
-                            except Exception:
-                                parsed_args = {}
-                        else:
-                            parsed_args = raw_args if isinstance(raw_args, dict) else {}
-                        is_pending = bool(pending_map and tc_id in pending_map and not pending_map[tc_id].get("decision"))
-                        decision_val = pending_map.get(tc_id, {}).get("decision") if pending_map else None
-                        tool_status = "pending_approval" if is_pending else ("denied" if decision_val == "deny" else "completed")
-                        tool_obj = {
-                            "id": tc_id,
-                            "name": str(tc_name),
-                            "args": parsed_args,
-                            "output": "",
-                            "status": tool_status,
-                            "decision": decision_val,
-                            "toolSummary": parsed_args.get("toolSummary") or (pending_map.get(tc_id, {}).get("prompt") if pending_map else None),
-                            "toolAction": parsed_args.get("toolAction"),
-                        }
-                        tools.append(tool_obj)
-                        if tc_id:
-                            all_tools_by_id[tc_id] = tool_obj
-
-                # Support standard OpenAI Chat Completion reasoning_content / thoughts
-                reasoning = (
-                    getattr(msg, "reasoning_content", None)
-                    or getattr(msg, "reasoning", None)
-                    or (msg.get("reasoning_content") if isinstance(msg, dict) else None)
-                    or (msg.get("reasoning") if isinstance(msg, dict) else None)
-                )
-                if reasoning and isinstance(reasoning, str):
-                    thoughts.append(reasoning)
-
-                combined_text = "\n".join(text_parts).strip()
-
-                # Support standard OpenAI Chat Completion role == 'tool'
-                if role_str == "tool":
-                    tc_id = str(getattr(msg, "tool_call_id", None) or (msg.get("tool_call_id") if isinstance(msg, dict) else ""))
-                    if tc_id:
-                        tool_content = raw_content if isinstance(raw_content, str) else combined_text
-                        if shallow_tools and len(tool_content) > 3000:
-                            tool_content = tool_content[:3000] + f"\n... [Truncated for rapid UI loading; {len(tool_content)} total characters]"
-                        if tc_id in all_tools_by_id:
-                            all_tools_by_id[tc_id]["output"] = tool_content
-                            all_tools_by_id[tc_id]["status"] = "completed"
-                        if tc_id in all_tool_steps_by_id:
-                            all_tool_steps_by_id[tc_id]["output"] = tool_content
-                            all_tool_steps_by_id[tc_id]["status"] = "completed"
-                        else:
-                            tools.append({
-                                "id": tc_id,
-                                "name": "action",
-                                "output": tool_content,
-                                "status": "completed",
-                            })
-                    if not combined_text and not tools:
-                        continue
-
-                # Defensively isolate compaction continuation summaries from user chat bubbles
-                if role_str == "framework" or (isinstance(msg, dict) and msg.get("metadata", {}).get("isSummary")):
-                    # Attach summary payload to preceding boundary banner or emit boundary
-                    if lines and lines[-1].get("type") == "compaction_boundary":
-                        lines[-1]["summary"] = combined_text
-                    else:
-                        lines.append({
-                            "role": "system",
-                            "type": "compaction_boundary",
-                            "isCompacted": True,
-                            "content": "The server cleared a prefix of the conversation as it grew too large.",
-                            "summary": combined_text,
-                        })
-                    continue
-
-                # Defensively filter out internal system notices from user chat bubbles
-                if role_str == "user" and combined_text.strip().startswith("[SYSTEM NOTICE:"):
-                    continue
-
-                # Sanitize legacy corrupted user messages that have _HANDOFF_SUMMARY_PREFIX prepended
-                if role_str == "user" and "The user request for this round is:" in combined_text:
-                    parts = combined_text.split("The user request for this round is:", 1)
-                    summary_clean = parts[0].strip()
-                    user_clean = parts[1].strip()
-                    if lines and lines[-1].get("type") == "compaction_boundary":
-                        lines[-1]["summary"] = summary_clean
-                    else:
-                        lines.append({
-                            "role": "system",
-                            "type": "compaction_boundary",
-                            "isCompacted": True,
-                            "content": "The server cleared a prefix of the conversation as it grew too large.",
-                            "summary": summary_clean,
-                        })
-                    combined_text = user_clean
-
-                elif role_str == "user" and "Another language model started to solve this problem" in combined_text:
-                    # Pure summary message legacy
-                    if lines and lines[-1].get("type") == "compaction_boundary":
-                        lines[-1]["summary"] = combined_text
-                    else:
-                        lines.append({
-                            "role": "system",
-                            "type": "compaction_boundary",
-                            "isCompacted": True,
-                            "content": "The server cleared a prefix of the conversation as it grew too large.",
-                            "summary": combined_text,
-                        })
-                    continue
-
-                # Defensively strip protocol envelopes and sentinels
-                if role_str == "user":
-                    combined_text = clean_protocol_sentinels(clean_user_steering_envelope(combined_text))
-                    for s in steps:
-                        if s.get("type") == "text" and isinstance(s.get("content"), str):
-                            s["content"] = clean_protocol_sentinels(clean_user_steering_envelope(s["content"]))
-                elif role_str == "assistant":
-                    combined_text = clean_protocol_sentinels(combined_text)
-                    for s in steps:
-                        if s.get("type") == "text" and isinstance(s.get("content"), str):
-                            s["content"] = clean_protocol_sentinels(s["content"])
-
-                if combined_text or thoughts or tools:
-                    created_at_val = getattr(action, "created_at", None)
-                    if isinstance(created_at_val, datetime):
-                        ts_str = created_at_val.isoformat()
-                    elif created_at_val:
-                        ts_str = str(created_at_val)
-                    elif getattr(action, "created_at_ns", 0):
-                        try:
-                            ts_str = datetime.fromtimestamp(action.created_at_ns / 1e9).isoformat()
-                        except Exception:
-                            ts_str = datetime.now().isoformat()
-                    else:
-                        ts_str = datetime.now().isoformat()
-
-                    line_item = {
-                        "role": role_str,
-                        "content": combined_text,
-                        "thoughts": thoughts,
-                        "tools": tools,
-                        "steps": steps,
-                        "created_at": ts_str,
-                        "timestamp": ts_str,
-                    }
-                    if role_str == "assistant":
-                        if rid in run_durations:
-                            line_item["total_duration_seconds"] = run_durations[rid]
-                        if step_duration_s and (thoughts or not tools):
-                            line_item["thinking_duration_seconds"] = step_duration_s
-                    lines.append(line_item)
-
+        lines = messages_to_transcript_lines(messages, pending_map=pending_map, shallow_tools=shallow_tools)
         total_lines = len(lines)
         if limit is not None and limit > 0:
             start_idx = max(0, total_lines - limit - offset)
@@ -782,15 +587,9 @@ async def get_history(
         raise HTTPException(status_code=400, detail=str(e))
 
     eng = _get_engine(engine)
-    actions = await eng.find_many(
-        AgentRunActionModel,
-        filters=ComparisonFilter.eq("session_id", session_id),
-    )
-    reduced = reduce_actions_stream(actions)
-    messages = []
-    for a in reduced:
-        if a.append_messages:
-            messages.extend(a.append_messages)
+    agent_run_service = AgentRunActionService(engine=eng)
+    key = AgentRunActionKey(user_id=user_id, session_id=session_id, agent_id="")
+    messages = await agent_run_service.load_messages(key=key)
     return {"messages": messages}
 
 

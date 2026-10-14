@@ -797,7 +797,8 @@ class Tool:
                 params["command"] = cmd_val
 
         # File path aliases: AbsolutePath / file_path / TargetFile / target_file / path
-        path_val = params.get("AbsolutePath") or params.get("file_path") or params.get("TargetFile") or params.get("target_file") or params.get("path")
+        path_aliases = ("AbsolutePath", "file_path", "TargetFile", "target_file", "path")
+        path_val = next((params[k] for k in path_aliases if params.get(k) is not None), None)
         if path_val is not None:
             if "AbsolutePath" in props:
                 params["AbsolutePath"] = path_val

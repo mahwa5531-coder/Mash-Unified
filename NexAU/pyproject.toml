@@ -112,6 +112,7 @@ nexau = [
 # Keep ruff aligned with formatter + lint outputs used in CI.
 extend-exclude = [
   "examples/",
+  "NexAU/examples/",
 ]
 line-length = 140
 output-format = "grouped"
@@ -136,19 +137,24 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = [
+"**/__init__.py" = [
   "F401", # namespace packages commonly re-export symbols
+  "F403", # allow star-imports inside package initializers
 ]
-"tests/**/__init__.py" = [
+"**/tests/**" = [
   "F401", # re-export fixtures to simplify imports
   "F403", # allow star-imports inside test package initializers
-]
-"tests/scripts/**" = [
   "E402", # sys.path manipulation before imports
-]
-"tests/**/*.py" = [
+  "E722", # test-level fallback handling
+  "E501", # line lengths in integration tests
   "N802", # fixtures often use CamelCase/mixedCase names
   "N803", # fixture parameters commonly violate pep8 naming
+]
+"**/archs/tool/builtin/**" = [
+  "N803", # tool parameter schemas follow JSON-RPC Antigravity specification (TargetFile, CodeContent, etc.)
+  "N806",
+  "E741",
+  "E501",
 ]
 
 [tool.ruff.lint.isort]

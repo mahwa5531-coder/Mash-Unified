@@ -425,8 +425,9 @@ async def open_system_file(request: OpenFileRequest):
     import subprocess
     import sys
     from urllib.parse import unquote
-    from app.workspace import is_path_in_base_roots
+
     from app.paths import validate_safe_id
+    from app.workspace import is_path_in_base_roots
 
     clean_path = unquote(request.file_path).strip()
     clean_path = re.sub(r"^file:///?", "", clean_path, flags=re.IGNORECASE)

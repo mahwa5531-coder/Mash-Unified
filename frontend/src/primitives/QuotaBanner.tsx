@@ -40,7 +40,7 @@ export function QuotaBanner({
   const formattedRefreshTime = useMemo(() => {
     if (!refreshDate) {
       // Default dynamic fallback: computes upcoming rolling refresh
-      // eslint-disable-next-line react-hooks/purity
+       
       const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
       return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}, ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`;
     }

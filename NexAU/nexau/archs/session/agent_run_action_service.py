@@ -236,14 +236,15 @@ class AgentRunActionService:
         whose timestamp is >= X's first action's timestamp. Returns None if
         the target run has no actions (silent no-op for the UNDO).
         """
-        action_filter = AndFilter(
-            filters=[
-                ComparisonFilter.eq("user_id", key.user_id),
-                ComparisonFilter.eq("session_id", key.session_id),
-                ComparisonFilter.eq("agent_id", key.agent_id),
-                ComparisonFilter.eq("run_id", run_id),
-            ]
-        )
+        filters = [
+            ComparisonFilter.eq("session_id", key.session_id),
+            ComparisonFilter.eq("run_id", run_id),
+        ]
+        if key.user_id:
+            filters.append(ComparisonFilter.eq("user_id", key.user_id))
+        if key.agent_id:
+            filters.append(ComparisonFilter.eq("agent_id", key.agent_id))
+        action_filter = AndFilter(filters=filters)
         rows = await self._engine.find_many(
             AgentRunActionModel,
             filters=action_filter,
@@ -377,7 +378,10 @@ class AgentRunActionService:
                                 role_attr = getattr(msg, "role", None)
                                 role_val = role_attr.value if hasattr(role_attr, "value") else str(role_attr) if role_attr else None
                                 cnt_attr = getattr(msg, "content", None)
-                                content_val = [b.model_dump() if hasattr(b, "model_dump") else str(b) for b in cnt_attr] if isinstance(cnt_attr, list) else str(cnt_attr or "")
+                                if isinstance(cnt_attr, list):
+                                    content_val = [b.model_dump() if hasattr(b, "model_dump") else str(b) for b in cnt_attr]
+                                else:
+                                    content_val = str(cnt_attr or "")
                                 tc_val = getattr(msg, "tool_calls", None)
 
                             step_obj = {
@@ -636,10 +640,12 @@ class AgentRunActionService:
         cursor: int | None,
     ) -> list[AgentRunActionModel]:
         filters = [
-            ComparisonFilter.eq("user_id", key.user_id),
             ComparisonFilter.eq("session_id", key.session_id),
-            ComparisonFilter.eq("agent_id", key.agent_id),
         ]
+        if key.user_id:
+            filters.append(ComparisonFilter.eq("user_id", key.user_id))
+        if key.agent_id:
+            filters.append(ComparisonFilter.eq("agent_id", key.agent_id))
         if cursor is not None:
             filters.append(ComparisonFilter.lt("created_at_ns", cursor))
 

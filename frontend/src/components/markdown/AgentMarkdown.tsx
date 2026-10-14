@@ -39,17 +39,21 @@ function LatexBlock({ code: source, isIncomplete }: { code: string; isIncomplete
       </div>
     );
   }
+  let html: string | null = null;
   try {
-    const html = katex.renderToString(source, { displayMode: true, throwOnError: false, strict: false });
-    return (
-      <div
-        className="my-2.5 overflow-x-auto select-text custom-scrollbar py-2 text-center"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    );
+    html = katex.renderToString(source, { displayMode: true, throwOnError: false, strict: false });
   } catch {
+    html = null;
+  }
+  if (!html) {
     return <div className="font-mono text-xs text-rose-400 my-2">{source}</div>;
   }
+  return (
+    <div
+      className="my-2.5 overflow-x-auto select-text custom-scrollbar py-2 text-center"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }
 
 function StreamdownMermaidBlock({ code: chart, isIncomplete }: { code: string; isIncomplete?: boolean }) {
@@ -188,11 +192,11 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   className,
 }: AgentMarkdownProps) {
   const components = useAgentMarkdownComponents({ mode, sessionId, onOpenFile, onImageClick });
+  const blocks = React.useMemo(() => (content ? splitMarkdownBlocks(content, 35) : []), [content]);
 
   if (!content) return null;
 
   const isChat = mode === 'chat';
-  const blocks = React.useMemo(() => splitMarkdownBlocks(content, 35), [content]);
   const isLargeDoc = blocks.length > 40;
 
   return (

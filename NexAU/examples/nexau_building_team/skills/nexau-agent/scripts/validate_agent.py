@@ -31,7 +31,6 @@ from nexau.archs.main_sub.config.schema import (
 )
 from nexau.archs.tool.tool import ToolYamlSchema
 
-
 # -------------------------------------------------------------------
 # Data structures
 # -------------------------------------------------------------------
@@ -89,7 +88,7 @@ def _has_env_var(value: str) -> bool:
 def _validate_schema(yaml_path: str, issues: list[Issue]) -> None:
     """Use the framework's own Pydantic validation."""
     try:
-        # from_yaml  traceback.print_exc()， stderr 
+        # from_yaml  traceback.print_exc()， stderr
         with redirect_stderr(StringIO()):
             AgentConfigSchema.from_yaml(yaml_path)
     except ConfigError as exc:
@@ -204,7 +203,7 @@ def _check_tool_yaml_content(
             )
         return None
 
-    # input_schema 
+    # input_schema
     props = schema.input_schema.get("properties", {})
     if isinstance(props, dict):
         props_dict = cast(dict[str, Any], props)
@@ -274,10 +273,10 @@ def _check_tools(
             )
             continue
 
-        #  tool YAML 
+        #  tool YAML
         tool_binding = _check_tool_yaml_content(resolved, idx, issues)
 
-        # binding 
+        # binding
         agent_binding = entry_dict.get("binding")
         if not agent_binding and not tool_binding:
             label = f" ({name})" if name else ""

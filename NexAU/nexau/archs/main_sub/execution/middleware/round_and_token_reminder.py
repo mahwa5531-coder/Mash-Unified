@@ -102,7 +102,11 @@ class RoundAndTokenReminderMiddleware(Middleware):
                             mbox_msgs.clear()
                             break
             if steering_messages:
-                logger.info("[RoundAndTokenReminderMiddleware] Injected %d mid-flight steering message(s) for session %s", len(steering_messages), sess_id)
+                logger.info(
+                    "[RoundAndTokenReminderMiddleware] Injected %d mid-flight steering message(s) for session %s",
+                    len(steering_messages),
+                    sess_id,
+                )
         except Exception as e:
             logger.debug("[RoundAndTokenReminderMiddleware] Steering check error: %s", e)
 
@@ -114,7 +118,14 @@ class RoundAndTokenReminderMiddleware(Middleware):
         steering_blocks = [
             Message(
                 role=Role.USER,
-                content=[TextBlock(text=f"<USER_STEERING>\n[USER MID-FLIGHT INSTRUCTION]: {s_msg}\nAdapt your current plan and respond to this instruction immediately.\n</USER_STEERING>")],
+                content=[
+                    TextBlock(
+                        text=(
+                            f"<USER_STEERING>\n[USER MID-FLIGHT INSTRUCTION]: {s_msg}\n"
+                            f"Adapt your current plan and respond to this instruction immediately.\n</USER_STEERING>"
+                        )
+                    )
+                ],
                 metadata={"is_steering": True, "raw_user_message": s_msg}
             )
             for s_msg in steering_messages
@@ -126,7 +137,8 @@ class RoundAndTokenReminderMiddleware(Middleware):
         remaining_iterations = hook_input.max_iterations - hook_input.current_iteration
         current_tokens = self._count_tokens(hook_input)
         remaining_tokens = max((self.max_context_tokens or 0) - current_tokens, 0)
-        warning_threshold = min(3 * self.desired_max_tokens, max(1, int((self.max_context_tokens or 0) * 0.20))) if (self.max_context_tokens or 0) > 0 else 3 * self.desired_max_tokens
+        max_ctx = self.max_context_tokens or 0
+        warning_threshold = min(3 * self.desired_max_tokens, max(1, int(max_ctx * 0.20))) if max_ctx > 0 else 3 * self.desired_max_tokens
 
         is_urgent = (remaining_iterations <= 1) or (remaining_tokens < warning_threshold)
 

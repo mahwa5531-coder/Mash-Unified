@@ -510,7 +510,9 @@ class PromptBuilder:
                     except Exception as e:
                         logger.warning("⚠️ Failed to read rule file %s: %s", rule_file, e)
             if rules_content:
-                rules_block = "<user_rules>\nThe following are user-defined rules that you MUST ALWAYS FOLLOW WITHOUT ANY EXCEPTION:\n" + "\n".join(rules_content) + "\n</user_rules>"
+                rules_inner = "\n".join(rules_content)
+                rules_hdr = "<user_rules>\nThe following are user-defined rules that you MUST ALWAYS FOLLOW WITHOUT ANY EXCEPTION:\n"
+                rules_block = f"{rules_hdr}{rules_inner}\n</user_rules>"
                 context_blocks.append(rules_block)
 
         # Load skills context
@@ -523,7 +525,8 @@ class PromptBuilder:
                     if skill_md.is_file():
                         skills_content.append(f"- {skill_folder.name} ({skill_md.absolute()}): Extended capabilities.")
             if skills_content:
-                skills_block = "<skills>\nYou can use specialized 'skills' to help you with complex tasks:\n" + "\n".join(skills_content) + "\n</skills>"
+                skills_inner = "\n".join(skills_content)
+                skills_block = f"<skills>\nYou can use specialized 'skills' to help you with complex tasks:\n{skills_inner}\n</skills>"
                 context_blocks.append(skills_block)
 
         return "\n\n".join(context_blocks) if context_blocks else ""

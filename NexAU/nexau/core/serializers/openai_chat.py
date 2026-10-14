@@ -43,12 +43,10 @@ def serialize_ump_to_openai_chat_payload(
 
     output: list[dict[str, Any]] = []
     coalesced = coalesce_user_shaped_messages(messages or [])
-    total_msgs = len(coalesced)
-    for msg_idx, msg in enumerate(coalesced):
+    for msg in coalesced:
         role = msg.role.value
         if use_developer_role and role == Role.SYSTEM.value:
             role = "developer"
-        (msg_idx < total_msgs - 2)
 
         def _image_part_to_image_parts(img: ImageBlock) -> list[dict[str, Any]]:
             if img.mime_type == "application/pdf" and img.base64:
@@ -67,9 +65,10 @@ def serialize_ump_to_openai_chat_payload(
                         p = doc.load_page(i)
                         pix = p.get_pixmap(dpi=150)
                         jpg_b64 = b64_mod.b64encode(pix.tobytes("jpeg")).decode("utf-8")
+                        detail_val = img.detail if img.detail != "auto" else "auto"
                         rendered.append({
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{jpg_b64}", "detail": img.detail if img.detail != "auto" else "auto"},
+                            "image_url": {"url": f"data:image/jpeg;base64,{jpg_b64}", "detail": detail_val},
                         })
                     if rendered:
                         return rendered
@@ -229,7 +228,7 @@ def _maybe_parse_json(value: Any) -> dict[str, Any]:
 
 
 def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Message]:
-    """Convert OpenAI-style chat dicts into UMP messages.
+    """Convert legacy OpenAI-style chat dicts into UMP messages.
 
     Supported shapes:
     - {"role": "...", "content": "..."}
@@ -283,9 +282,6 @@ def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Mes
                     if detail not in {"low", "high", "auto"}:
                         detail = "auto"
                     try:
-                        # If the image is provided as an OpenAI-style data URL, normalize it into
-                        # the UMP ImageBlock(base64=...) form so vendor adapters (e.g. Anthropic)
-                        # can send raw base64 without a "data:" prefix.
                         if isinstance(url, str) and url.strip().startswith("data:"):
                             parsed = parse_base64_data_url(url)
                             if parsed:
@@ -311,7 +307,6 @@ def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Mes
                             ),
                         )
                     except Exception:
-                        # Best-effort: drop invalid image blocks
                         pass
                 elif part_type == "tool_use":
                     content_blocks.append(
@@ -324,7 +319,6 @@ def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Mes
                     )
                 elif part_type == "tool_result":
                     raw_content: Any = part_dict.get("content")
-                    # Best-effort: preserve multimodal tool results embedded in legacy structured content.
                     coerced = coerce_tool_result_content(raw_content, fallback_text=_coerce_str(raw_content))
                     content_blocks.append(
                         ToolResultBlock(
@@ -346,7 +340,6 @@ def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Mes
                             )
                         )
                 else:
-                    # Unknown structured part; store as text so we don't drop user-visible info
                     text = _coerce_str(part_dict.get("text") or part_dict.get("content"))
                     if text:
                         content_blocks.append(TextBlock(text=text))  # pyright: ignore[reportCallIssue]
@@ -355,9 +348,6 @@ def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Mes
             if text:
                 content_blocks.append(TextBlock(text=text))  # pyright: ignore[reportCallIssue]
 
-        # Undo historical Chat Completions image workaround:
-        # {"role":"user","content":[{"type":"text","text":"Images returned by tool call X:"},{"type":"image_url",...},...]}
-        # When we see that pattern, merge the images back into the preceding tool result block and drop this user message.
         if role == Role.USER and isinstance(content, list):
             first_text = next((b.text for b in content_blocks if isinstance(b, TextBlock) and b.text), None)
             if first_text:
@@ -398,17 +388,14 @@ def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Mes
         if "reasoning" in raw:
             metadata["reasoning"] = raw.get("reasoning")
         if "reasoning_details" in raw:
-            # OpenRouter wire format - preserved verbatim for unmodified echo-back.
             metadata["reasoning_details"] = raw.get("reasoning_details")
         if "thought_signature" in raw:
             metadata["thought_signature"] = raw.get("thought_signature")
 
-        # Prefer explicit reasoning_content into a dedicated block (store-only)
         reasoning_content = raw.get("reasoning_content")
         reasoning_signature = raw.get("reasoning_signature")
         reasoning_redacted_data = raw.get("reasoning_redacted_data")
         if ("reasoning_content" in raw and isinstance(reasoning_content, str)) or reasoning_redacted_data:
-            # Thinking blocks MUST come before text/tool blocks for Anthropic compliance.
             content_blocks.insert(
                 0,
                 ReasoningBlock(
@@ -418,7 +405,6 @@ def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Mes
                 ),
             )
 
-        # Assistant tool calls (OpenAI Chat Completions style)
         tool_calls_raw = raw.get("tool_calls")
         if isinstance(tool_calls_raw, list):
             for call_any in cast(list[Any], tool_calls_raw):
@@ -447,13 +433,11 @@ def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Mes
                     ),
                 )
 
-        # Tool result messages (OpenAI tool role)
         if role == Role.TOOL:
             tool_call_id = _coerce_str(raw.get("tool_call_id"))
             tool_name = _coerce_str(raw.get("name"))
             if tool_name:
                 metadata["tool_name"] = tool_name
-            # Replace content blocks with an explicit tool_result block (preserve images if present).
             has_images = any(isinstance(b, ImageBlock) for b in content_blocks)
             if has_images:
                 parts: list[TextBlock | ImageBlock] = [b for b in content_blocks if isinstance(b, (TextBlock, ImageBlock))]
@@ -463,7 +447,4 @@ def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Mes
                 content_blocks = [ToolResultBlock(tool_use_id=tool_call_id, content=tool_text)]
 
         result.append(Message(role=role, content=content_blocks, metadata=metadata))
-    return result
-
-
-deserialize_openai_chat_payload = messages_from_legacy_openai_chat
+    return result

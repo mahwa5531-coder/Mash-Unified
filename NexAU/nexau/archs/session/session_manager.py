@@ -261,22 +261,26 @@ class SessionManager:
         user_id: str,
         session_id: str,
         context: dict[str, Any],
+        merge: bool = False,
     ) -> SessionModel:
-        """Update session context (non-destructive merge).
+        """Update session context.
 
         Args:
             user_id: User identifier
             session_id: Session identifier
-            context: Context data to store (merged with existing context)
+            context: Context data to store
+            merge: If True, non-destructive merge with existing context; otherwise replace.
 
         Returns:
             Updated SessionModel
         """
         session = await self._get_or_create_session(user_id=user_id, session_id=session_id)
-        # ponytail: non-destructive merge so UI metadata (title, custom_title, workspace_uri) is preserved
-        merged_context = dict(session.context or {})
-        merged_context.update(context)
-        session.context = merged_context
+        if merge:
+            merged_context = dict(session.context or {})
+            merged_context.update(context)
+            session.context = merged_context
+        else:
+            session.context = context
         session.updated_at = datetime.now(UTC)
         return await self._update_session(session)
 

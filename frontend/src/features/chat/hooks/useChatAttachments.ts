@@ -115,7 +115,7 @@ export function useChatAttachments(
       if (uploadedList.length > 0) {
         setAttachedFiles((prev) => [...prev, ...uploadedList]);
       }
-    } catch (err) {
+    } catch (_err) {
       setUploadError("An error occurred during file upload.");
     } finally {
       setIsUploading(false);

@@ -275,7 +275,7 @@ def _python_grep(
             if should_exclude(rel_path):
                 continue
             try:
-                with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(full_path, encoding="utf-8", errors="ignore") as f:
                     for line_num, line in enumerate(f, 1):
                         if regex.search(line):
                             matches.append({

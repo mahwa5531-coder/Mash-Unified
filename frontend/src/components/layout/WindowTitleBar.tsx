@@ -21,7 +21,7 @@ interface WindowTitleBarProps {
  */
 export function WindowTitleBar({
   onToggleFullscreen,
-  title = "Mash — Autonomous Financial Forensic Auditor",
+  title: _title = "Mash — Autonomous Financial Forensic Auditor",
 }: WindowTitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
 

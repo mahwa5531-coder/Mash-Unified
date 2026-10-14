@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Message } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
 import { BASE_URL, safeFetch } from '@/services/client';
-import { fetchTranscript, renameSession, markSessionViewed, queueSteeringMessage, fetchSessionQueue, removeSessionQueueItem } from '@/services/sessions';
+import { fetchTranscript, renameSession, markSessionViewed, fetchSessionQueue, removeSessionQueueItem } from '@/services/sessions';
 import { streamQuery } from '@/services/stream';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
 import { parseSessionHistory, buildTurns } from '@/features/chat/utils/turns';

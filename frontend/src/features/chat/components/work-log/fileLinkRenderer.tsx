@@ -2,7 +2,7 @@
 
 // Re-export canonical FilePill primitive from @/primitives
 import React from 'react';
-import { FilePill as PrimitiveFilePill, FilePillProps } from '@/primitives';
+import { FilePill as PrimitiveFilePill } from '@/primitives';
 import { normalizePath } from '@/utils/normalizePath';
 
 /**

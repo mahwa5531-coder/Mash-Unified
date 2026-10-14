@@ -289,7 +289,7 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
           }
         }
       }
-    } catch (err) {}
+    } catch (_err) {}
   }
   return parsedMsgs;
 }

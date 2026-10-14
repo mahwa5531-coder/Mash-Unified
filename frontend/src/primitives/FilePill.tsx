@@ -46,7 +46,6 @@ export function FilePill({
   }
 
   // A file pill displays an authentic logo whenever it has a valid filename/path (and not a pure wildcard query)
-  const hasSlash = cleanPath.includes('/') || cleanPath.includes('\\');
   const hasWildcard = cleanPath.includes('*') || cleanPath.includes('?');
   const showIcon = !hasWildcard && Boolean(filePathOnly.trim());
   const isClickable = Boolean(!hasWildcard && (onOpenFile || onClick));

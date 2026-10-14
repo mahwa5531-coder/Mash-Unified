@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Terminal, FileEdit, Globe, Trash2, ShieldAlert, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Terminal, FileEdit, Globe, Trash2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface ApprovalCardProps {
@@ -62,7 +62,7 @@ function getToolHeaderInfo(toolName: string, command?: string, args?: Record<str
 }
 
 export function ApprovalCard({
-  toolCallId,
+  toolCallId: _toolCallId,
   toolName,
   toolSummary,
   toolAction,

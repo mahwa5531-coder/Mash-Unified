@@ -92,12 +92,12 @@ export function ReasoningDisclosure({
     }
   }, [text, isStreaming, isExpanded, userScrolledUp, scrollRef]);
 
-  const handleScroll = useCallback(() => {
+  const handleScroll = () => {
     if (!scrollRef.current) return;
     const el = scrollRef.current;
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
     setUserScrolledUp(!isNearBottom);
-  }, [scrollRef]);
+  };
 
   const effectiveSecs = durationSeconds || liveSeconds || 1;
   const formattedDuration = formatReasoningDuration(effectiveSecs);

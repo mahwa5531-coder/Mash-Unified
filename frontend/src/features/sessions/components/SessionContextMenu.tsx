@@ -2,7 +2,7 @@
 
 // Right-click session menu (viewport-clamped fixed position):
 // Pin / Rename / Copy ID / Archive / Delete.
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Pin, Edit2, Copy, Archive, Trash2 } from 'lucide-react';
 import type { SessionItem } from '@/services/sessions';
 

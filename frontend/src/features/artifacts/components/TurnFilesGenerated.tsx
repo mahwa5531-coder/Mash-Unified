@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, FileText } from 'lucide-react';
 import { FilePill } from '@/primitives/FilePill';
-import { PathPill } from '@/primitives/PathPill';
 import { cn } from '@/lib/utils';
 import { EditedFileItem } from '@/types/artifacts';
 
@@ -26,10 +25,10 @@ interface TurnFilesGeneratedProps {
  */
 export function TurnFilesGenerated({
   files,
-  totalAdded = 0,
-  totalDeleted = 0,
+  totalAdded: _totalAdded = 0,
+  totalDeleted: _totalDeleted = 0,
   onOpenFile,
-  sessionId,
+  sessionId: _sessionId,
 }: TurnFilesGeneratedProps) {
   const [isOpen, setIsOpen] = useState(true);
 

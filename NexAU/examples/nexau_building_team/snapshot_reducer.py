@@ -57,7 +57,7 @@ def apply_envelope(state: SnapshotState, envelope: dict[str, Any]) -> SnapshotSt
 
     effective_role = role_name if (role_name and role_name != "user") else None
 
-    # 1.  agent 
+    # 1.  agent
     if agent_id not in state:
         state[agent_id] = {
             "agentId": agent_id,

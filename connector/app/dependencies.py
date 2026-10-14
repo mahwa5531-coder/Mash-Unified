@@ -1,15 +1,13 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from nexau.archs.session.orm import LoopSafeDatabaseEngine, SQLDatabaseEngine
 from nexau.archs.session.session_manager import SessionManager
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine
 
 _engine: LoopSafeDatabaseEngine | None = None
 _session_manager: SessionManager | None = None
-
-
-from sqlalchemy import event
 
 
 def init_engine(db_url: str) -> LoopSafeDatabaseEngine:
@@ -35,9 +33,6 @@ def init_engine(db_url: str) -> LoopSafeDatabaseEngine:
     sql_engine = SQLDatabaseEngine(async_engine)
     _engine = LoopSafeDatabaseEngine(sql_engine)
     return _engine
-
-
-from fastapi import Depends, Request
 
 
 def get_engine(request: Request = None) -> LoopSafeDatabaseEngine:

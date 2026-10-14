@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --cache",
     "test:chat": "node tests/test_chat_scenarios.mjs",
     "test:sidebar": "node test_right_sidebar_logic.cjs",
     "test:fuzz": "npx tsx --tsconfig tsconfig.json tests/fuzz_session_store.ts",

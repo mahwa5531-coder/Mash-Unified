@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { BookOpen, FileText, Check, FileSpreadsheet, Image as ImageIcon, ArrowUpRight, Download } from 'lucide-react';
+import { BookOpen, Check, FileSpreadsheet, Image as ImageIcon, Download } from 'lucide-react';
 import { ArtifactItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
 import { WorkingPaperCard } from '@/primitives/WorkingPaperCard';

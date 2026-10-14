@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Any
 
 from nexau.archs.main_sub.agent_state import AgentState
+from nexau.archs.main_sub.framework_context import FrameworkContext
+from nexau.archs.permissions.helpers import check_path_permission
 from nexau.archs.sandbox import BaseSandbox, SandboxStatus
 from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 
@@ -46,6 +48,9 @@ def replace_file_content(
     toolSummary: str | None = None,
     agent_state: AgentState | None = None,
     sandbox: BaseSandbox | None = None,
+    *,
+    ctx: FrameworkContext | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Surgically edits a file with strict line-bounding and global uniqueness safety."""
 
@@ -57,6 +62,10 @@ def replace_file_content(
             "returnDisplay": "Error: Missing TargetFile",
             "isError": True,
         }
+
+    # RFC-0019: permission check
+    if ctx is not None:
+        check_path_permission(ctx, target_file)
 
     s_line = StartLine if StartLine is not None else start_line
     e_line = EndLine if EndLine is not None else end_line

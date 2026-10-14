@@ -801,6 +801,7 @@ class TestContainsHeredoc:
     def test_rejects_non_heredoc(self, command: str) -> None:
         assert contains_heredoc(command) is False
 
+    @pytest.mark.skip(reason="e2b_sandbox deleted")
     def test_pattern_is_same_as_e2b_sandbox(self) -> None:
         """Ensure the canonical HEREDOC_PATTERN is the one E2BSandbox uses."""
         from nexau.archs.sandbox.e2b_sandbox import E2BSandbox

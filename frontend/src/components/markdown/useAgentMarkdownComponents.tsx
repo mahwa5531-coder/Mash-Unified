@@ -5,7 +5,6 @@ import {
   FilePill,
   PathPill,
   ExtensionBadge,
-  AuditCallout,
   WebLink
 } from '@/primitives';
 import TableContainer from '@/components/renderers/TableContainer';
@@ -235,7 +234,7 @@ export function useAgentMarkdownComponents({
           title={caption ? `Click to inspect: ${caption}` : 'Click to inspect image'}
         >
           <span className="relative block overflow-hidden rounded-lg bg-black/[0.02] dark:bg-white/[0.02] flex items-center justify-center min-h-[120px] max-h-[500px]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            { }
             <img
               src={resolvedSrc}
               alt={caption || 'Chart'}

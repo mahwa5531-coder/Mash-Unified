@@ -17,7 +17,7 @@ export async function fetchBackgroundTasks(sessionId?: string): Promise<Backgrou
     if (!res.ok) return [];
     const data = await res.json();
     return data.tasks || [];
-  } catch (err) {
+  } catch (_err) {
     return [];
   }
 }
@@ -28,7 +28,7 @@ export async function killBackgroundTask(pid: number): Promise<boolean> {
       method: 'POST'
     });
     return res.ok;
-  } catch (err) {
+  } catch (_err) {
     return false;
   }
 }

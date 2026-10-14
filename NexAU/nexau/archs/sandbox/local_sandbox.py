@@ -421,9 +421,11 @@ class LocalSandbox(BaseSandbox):
                         info["finished"] = True
                         if info.get("task_log_path") and info.get("std_output_dir"):
                             try:
-                                od = info["std_output_dir"]
-                                s_out = Path(f"{od}/stdout.txt").read_text(encoding="utf-8", errors="replace") if Path(f"{od}/stdout.txt").exists() else ""
-                                s_err = Path(f"{od}/stderr.txt").read_text(encoding="utf-8", errors="replace") if Path(f"{od}/stderr.txt").exists() else ""
+                                od = Path(info["std_output_dir"])
+                                out_p = od / "stdout.txt"
+                                err_p = od / "stderr.txt"
+                                s_out = out_p.read_text(encoding="utf-8", errors="replace") if out_p.exists() else ""
+                                s_err = err_p.read_text(encoding="utf-8", errors="replace") if err_p.exists() else ""
                                 combined = s_out + ("\n" + s_err if s_err else "")
                                 Path(info["task_log_path"]).write_text(combined, encoding="utf-8", errors="replace")
                             except Exception:

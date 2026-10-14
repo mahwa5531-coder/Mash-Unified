@@ -2,8 +2,8 @@
 
 import React, { useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { Download, AlertTriangle, Loader2, ExternalLink } from 'lucide-react';
-import { BASE_URL, safeFetch } from '@/services/client';
+import { Download, AlertTriangle, Loader2 } from 'lucide-react';
+import { BASE_URL } from '@/services/client';
 import { useIsDarkMode } from '@/hooks/useIsDarkMode';
 import { ImageViewer } from './renderers/ImageViewer';
 import { PdfViewer } from './renderers/PdfViewer';
@@ -76,7 +76,6 @@ export default function SafeFileViewer({
   const cleanName = (path || filename || '').toLowerCase();
   const isImage = /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/.test(cleanName);
   const isMarkdown = /\.md$/i.test(cleanName);
-  const isCsv = /\.csv$/i.test(cleanName);
   const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods)$/i.test(cleanName);
   const isPdf = /\.pdf$/i.test(cleanName);
   const isUnsupported = /\.(docx|doc|pptx|ppt|zip|tar|gz|7z|rar|exe|bin|iso|dmg|dll|so|dylib)$/i.test(cleanName);

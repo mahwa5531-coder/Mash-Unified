@@ -45,13 +45,12 @@ _READONLY_COMMANDS: frozenset[str] = frozenset(
         "pwd",
         "echo",
         "printf",
-        "env",
-        "printenv",
         "date",
         "uname",
         "hostname",
         "id",
         "uptime",
+        "env",
         "basename",
         "dirname",
         "realpath",
@@ -101,10 +100,6 @@ _READONLY_GIT_SUBCOMMANDS: frozenset[str] = frozenset(
         "status",
         "diff",
         "show",
-        "branch",
-        "tag",
-        "remote",
-        "config",
         "describe",
         "rev-parse",
         "rev-list",
@@ -123,6 +118,7 @@ _READONLY_GIT_SUBCOMMANDS: frozenset[str] = frozenset(
         "verify-commit",
         "verify-tag",
         "whatchanged",
+        "branch",
     }
 )
 
@@ -510,6 +506,11 @@ def _check_single_command(
             reason=f" {perm_key} ",
             permission_key=perm_key,
         )
+    # Check for command substitution: $(...), `...`, <(...)
+    # Command substitution cannot be assumed read-only -> require approval
+    if any("$(" in t or "`" in t or "<(" in t for t in tokens):
+        return "ask", perm_key
+
     # read-only (CC: read-only)
     if head in _READONLY_COMMANDS and not _has_output_redirect(tokens):
         return None, perm_key
@@ -534,6 +535,13 @@ def check_shell_permission(ctx: FrameworkContext, command: str) -> None:
     """
     if _WILDCARD in ctx.allow_rules:
         return
+
+    # Prohibit unapproved subshell command substitution
+    if any(token in command for token in ("$(", "`", "<(")):
+        raise AskPermission(
+            prompt=f"Command '{command}' uses subshell execution. Approve execution?",
+            permission_key=_command_permission_key(command.strip().split() if command.strip() else ["sh"]),
+        )
 
     sub_commands = _split_shell_commands(command)
 

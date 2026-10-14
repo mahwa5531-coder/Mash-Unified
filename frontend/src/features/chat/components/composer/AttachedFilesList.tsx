@@ -26,7 +26,7 @@ export function AttachedFilesList({ attachedFiles, onRemove }: AttachedFilesList
               title={f.name}
             >
               {f.previewUrl ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
+                 
                 <img src={f.previewUrl} alt={f.name} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-zinc-200 dark:bg-zinc-800 text-zinc-400">

@@ -34,7 +34,7 @@ export function WorkingPaperCard({
   filePath,
   title,
   summary,
-  type,
+  type: _type,
   status = 'ready_for_review',
   onOpen,
   action,

@@ -29,13 +29,12 @@ import logging
 import os
 from pathlib import Path
 
+from event_store import EventStore
 from fastapi import APIRouter, HTTPException, Query
 
 from nexau.archs.main_sub.config import AgentConfig
 from nexau.archs.session.orm import InMemoryDatabaseEngine
 from nexau.archs.transports.http import HTTPConfig, SSETransportServer
-
-from event_store import EventStore
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("nexau.archs.main_sub.execution.llm_caller").setLevel(logging.INFO)
@@ -55,7 +54,7 @@ def main() -> None:
     3.  team （leader + 2 candidate roles）
     4. 
     """
-    # 1.  agent 
+    # 1.  agent
     leader_config = AgentConfig.from_yaml(SCRIPT_DIR / "leader_agent.yaml")
     rfc_writer_config = AgentConfig.from_yaml(SCRIPT_DIR / "rfc_writer_agent.yaml")
     builder_config = AgentConfig.from_yaml(SCRIPT_DIR / "builder_agent.yaml")
@@ -72,7 +71,7 @@ def main() -> None:
         count_events=event_store.count,
     )
 
-    # 3.  team 
+    # 3.  team
     registry = server.team_registry
     if registry is not None:
         registry.register_config(
@@ -99,14 +98,14 @@ def main() -> None:
 
         ，、。
         """
-        # 1. 
+        # 1.
         target = (sandbox_work_dir / path).resolve()
         if not str(target).startswith(str(sandbox_work_dir)):
             raise HTTPException(status_code=403, detail="Path outside sandbox")
         if not target.is_dir():
             raise HTTPException(status_code=404, detail="Directory not found")
 
-        # 2. 
+        # 2.
         entries: list[dict[str, object]] = []
         for item in target.iterdir():
             entries.append(
@@ -131,14 +130,14 @@ def main() -> None:
 
         、（）。
         """
-        # 1. 
+        # 1.
         target = (sandbox_work_dir / path).resolve()
         if not str(target).startswith(str(sandbox_work_dir)):
             raise HTTPException(status_code=403, detail="Path outside sandbox")
         if not target.is_file():
             raise HTTPException(status_code=404, detail="File not found")
 
-        # 2. 
+        # 2.
         ext_to_lang: dict[str, str] = {
             ".py": "python",
             ".js": "javascript",
@@ -232,7 +231,7 @@ def main() -> None:
 
     server.app.include_router(history_router)
 
-    # 6. 
+    # 6.
     logger.info("Starting NexAU Building Team SSE server on http://0.0.0.0:8000")
     logger.info("Sandbox work dir: %s", sandbox_work_dir)
     logger.info("Team endpoints: /team/stream, /team/query, /team/tasks, /team/teammates, /team/history, /team/sessions")

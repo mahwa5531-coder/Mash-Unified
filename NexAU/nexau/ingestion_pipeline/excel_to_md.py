@@ -167,7 +167,9 @@ def parse_excel_to_markdown(
             # Handle Excel's 31-character truncation or substring match
             matched = [
                 (name, grid) for name, grid in sheets_data
-                if req_norm.startswith(name.strip().lower()) or name.strip().lower().startswith(req_norm) or name.strip().lower() in req_norm
+                if req_norm.startswith(name.strip().lower())
+                or name.strip().lower().startswith(req_norm)
+                or name.strip().lower() in req_norm
             ]
         if not matched:
             available = ", ".join(f"'{s}'" for s in sheet_names)
@@ -184,7 +186,7 @@ def parse_excel_to_markdown(
         ]
 
     # Cap multi-sheet workbooks to protect LLM context window
-    MAX_FULL_SHEETS = 2
+    max_full_sheets = 2
     is_multi_sheet = len(sheets_data) > 3 and not sheet_name
     index_rows = []
 
@@ -199,10 +201,14 @@ def parse_excel_to_markdown(
         for r_idx, row in enumerate(raw_grid):
             for c_idx, val in enumerate(row):
                 if _clean_val(val):
-                    if r_idx < min_r: min_r = r_idx
-                    if r_idx > max_r: max_r = r_idx
-                    if c_idx < min_c: min_c = c_idx
-                    if c_idx > max_c: max_c = c_idx
+                    if r_idx < min_r:
+                        min_r = r_idx
+                    if r_idx > max_r:
+                        max_r = r_idx
+                    if c_idx < min_c:
+                        min_c = c_idx
+                    if c_idx > max_c:
+                        max_c = c_idx
 
         if max_r == -1:
             output_parts.append(f"## Sheet {s_idx}: {sheet_name} (Empty)")
@@ -220,7 +226,7 @@ def parse_excel_to_markdown(
         # Partition or classify the grid
         block_type = _detect_block_type(bounded_grid)
 
-        if is_multi_sheet and s_idx > MAX_FULL_SHEETS:
+        if is_multi_sheet and s_idx > max_full_sheets:
             index_rows.append(f"| {s_idx} | `{sheet_name}` | {total_rows} rows, {total_cols} cols | `{block_type}` |")
             continue
 
@@ -276,7 +282,7 @@ def parse_excel_to_markdown(
         output_parts.append("\n---\n")
 
     if index_rows:
-        output_parts.append(f"## Workbook Sheet Index (Sheets {MAX_FULL_SHEETS + 1} to {len(sheets_data)})\n")
+        output_parts.append(f"## Workbook Sheet Index (Sheets {max_full_sheets + 1} to {len(sheets_data)})\n")
         output_parts.append("| # | Sheet Name | Dimensions | Type |")
         output_parts.append("|---|---|---|---|")
         output_parts.extend(index_rows)

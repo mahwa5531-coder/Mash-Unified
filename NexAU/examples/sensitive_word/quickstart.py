@@ -34,8 +34,8 @@ from nexau import Agent, AgentConfig
 _CONFIG = Path(__file__).resolve().parent / "sensitive_word_agent.yaml"
 
 _CASES = [
-    "",       # （:）→ 
-    "",     #  → 
+    "",       # （:）→
+    "",     #  →
 ]
 
 
