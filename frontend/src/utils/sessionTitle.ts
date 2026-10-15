@@ -75,12 +75,13 @@ export function generateCleanSessionTitle(rawText: string, fallbackId = ''): str
     attachedFallback = last.replace(/[\]"')]+$/, '').trim();
   }
   t = t.replace(/\[Attached (?:file|files)[^\]]*\]/gi, '').trim();
-  if (t === 'Please inspect and analyze the attached audit documents:' || t === 'Please inspect and analyze the attached audit documents') {
-    t = '';
-  }
+  t = t.replace(/^Please inspect and analyze the attached (?:audit )?documents?:?\s*/i, '').trim();
 
-  // Strip protocol sentinels
-  t = t.replace(/^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*|\[(?:VERIFIED|DONE|END|empty)\]|<\/?(?:user[\s_]+message|assistant[\s_]+message|identity|user_rules|system_prompt)>/gi, '').trim();
+  // Strip protocol sentinels, prompt section tags, and tokens
+  t = t
+    .replace(/\[(?:sub_agent_id|SYSTEM NOTICE):[^\]]*\]\s*/gi, '')
+    .replace(/^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*|\[(?:VERIFIED|DONE|END|empty)\]|<\/?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity|system_prompt|session_mode|file_storage_and_discipline|tool_execution_discipline|ui_presentation_format|runtime_context|skills|Skill[A-Za-z0-9_-]+|scratchpad|thought|thinking|tool_use|tool_result|tool_name|tool_output|use_parallel_tool_calls|parallel_tool|summary_data_json|empty)>\s*/gi, '')
+    .trim();
 
   // If user only sent an attachment, use the attached filename
   if (!t && attachedFallback) {

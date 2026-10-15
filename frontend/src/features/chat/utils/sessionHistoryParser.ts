@@ -1,5 +1,8 @@
 import { Message } from '@/types/chat';
 
+const PROTOCOL_TAGS_REGEX = /<\/?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity|system_prompt|session_mode|file_storage_and_discipline|tool_execution_discipline|ui_presentation_format|runtime_context|skills|Skill[A-Za-z0-9_-]+|scratchpad|thought|thinking|tool_use|tool_result|tool_name|tool_output|use_parallel_tool_calls|parallel_tool|summary_data_json|empty)>\s*/gi;
+const PROTOCOL_BRACKETS_REGEX = /\[(?:sub_agent_id|SYSTEM NOTICE):[^\]]*\]\s*/gi;
+
 // ponytail: strip NexAU reasoning-only [empty] sentinel, [VERIFIED] marker, [DONE]/[END] protocol sentinels,
 // and prompt/protocol tag leakage (<user message>, <user_message>, etc.)
 export function cleanAssistantContent(raw?: string): string {
@@ -8,7 +11,8 @@ export function cleanAssistantContent(raw?: string): string {
   if (trimmed === '[empty]' || /^\[?(DONE|END|done|end)\]?$/i.test(trimmed)) return '';
   return trimmed
     .replace(/\[VERIFIED\]\s*/gi, '')
-    .replace(/<\/?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity|system_prompt|scratchpad|thought|thinking)>\s*/gi, '')
+    .replace(PROTOCOL_BRACKETS_REGEX, '')
+    .replace(PROTOCOL_TAGS_REGEX, '')
     .replace(/^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*$/gim, '')
     .replace(/(?:^|\n)\s*\[(DONE|END|done|end)\]\s*(?=\n|$)/gi, '')
     .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '')
@@ -33,11 +37,20 @@ export function cleanUserSteeringEnvelope(text?: string): string {
   }
 
   return cleaned
-    .replace(/<\/?(?:user[\s_]+message|user_rules|user_information|identity|system_prompt|scratchpad|thought|thinking)>\s*/gi, '')
+    .replace(PROTOCOL_BRACKETS_REGEX, '')
+    .replace(PROTOCOL_TAGS_REGEX, '')
     .replace(/^(?:#+\s*)?User\s+Message\s*:\s*$/gim, '')
     .replace(/(?:^|\n)\s*\[(DONE|END|done|end)\]\s*(?=\n|$)/gi, '')
     .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '')
     .trim();
+}
+
+// ponytail: strip internal protocol envelopes, attachments, and boilerplate for composer textarea
+export function cleanUserPromptForComposer(text?: string): string {
+  if (!text || typeof text !== 'string') return '';
+  let cleaned = text.replace(/\[Attached (?:file|files)[^\]]*\]/gi, '').trim();
+  cleaned = cleaned.replace(/^Please inspect and analyze the attached (?:audit )?documents?:?\s*/i, '').trim();
+  return cleanUserSteeringEnvelope(cleaned);
 }
 
 // ponytail: transforms raw NexAU DB action records into structured chat Message[] for rendering

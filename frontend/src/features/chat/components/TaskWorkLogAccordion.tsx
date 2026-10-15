@@ -112,7 +112,7 @@ export default function TaskWorkLogAccordion({
       steps.forEach((step: any, sIdx) => {
         // 1. Unitised 'thinking' step or legacy step.thoughts
         if (step.type === 'thinking' || (step.thoughts && step.thoughts.length > 0)) {
-          const thText = (step.content || (step.thoughts ? step.thoughts.join('\n\n') : '')).replace(/\[VERIFIED\]\s*/gi, '').trim();
+          const thText = (step.content || (step.thoughts ? step.thoughts.join('\n\n') : '')).replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
           if (thText) {
             const computedSecs = step.thinkingDurationSeconds 
               || Math.max(1, Math.min(60, Math.round(thText.length / 120)));
@@ -158,7 +158,7 @@ export default function TaskWorkLogAccordion({
     const groupedTools = groupTimelineEntries(rawToolEntries);
 
     if (thoughts.length > 0) {
-      const combinedThoughtText = thoughts.join('\n\n').trim();
+      const combinedThoughtText = thoughts.join('\n\n').replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
       if (combinedThoughtText) {
         const computedSecs = thinkingDurationSeconds 
           || Math.max(1, Math.min(60, Math.round(combinedThoughtText.length / 120)));

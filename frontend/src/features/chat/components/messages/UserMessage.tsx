@@ -50,9 +50,7 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
     }
   }
   rawText = rawText.replace(fileTagRegex, '').trim();
-  if (rawText === 'Please inspect and analyze the attached audit documents:' || rawText === 'Please inspect and analyze the attached audit documents') {
-    rawText = '';
-  }
+  rawText = rawText.replace(/^Please inspect and analyze the attached (?:audit )?documents?:?\s*/i, '').trim();
 
   const cleanText = cleanUserSteeringEnvelope(rawText);
   const imgSrc = imgMatch ? imgMatch[2] : null;

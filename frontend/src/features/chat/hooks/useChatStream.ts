@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { Message } from '@/types/chat';
 import { buildTurns } from '@/features/chat/utils/turns';
+import { cleanUserPromptForComposer } from '../utils/sessionHistoryParser';
 import { sessionStore, getOrCreateSessionState, setViewingSession, subscribeToSessionStore, notifyStoreListeners } from '../state/sessionStore';
 import { useSessionHistory } from './useSessionHistory';
 import { useChatSteering } from './useChatSteering';
@@ -189,7 +190,7 @@ export function useChatStream({
     const msgs = executeSessionUndo(activeSid, flatIdx, turnIdx);
     if (msgs) setChatMessages(msgs);
     setIsStreaming(false);
-    if (userText) handleSetInputPrompt(userText);
+    if (userText) handleSetInputPrompt(cleanUserPromptForComposer(userText));
   }, [sessionId, handleSetInputPrompt]);
 
   const turns = useMemo(() => buildTurns(chatMessages), [chatMessages]);

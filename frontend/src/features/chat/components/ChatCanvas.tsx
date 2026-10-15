@@ -14,6 +14,7 @@ import { useScrollToBottom } from '@/features/chat/hooks/useScrollToBottom';
 import { ChatHeroView } from './ChatHeroView';
 import { SteeringQueueBanner } from './SteeringQueueBanner';
 import { ChatHistoryLoadState } from './ChatHistoryLoadState';
+import { cleanUserPromptForComposer } from '@/features/chat/utils/sessionHistoryParser';
 import { safeFetch } from '@/services/client';
 import type { PermissionMode } from './composer/PermissionModeSelector';
 
@@ -197,7 +198,7 @@ export default function ChatCanvas({
   const handleEditQueued = (index = 0) => {
     const msg = queuedMessages?.[index] || queuedMessage;
     if (msg) {
-      setInputPrompt(msg);
+      setInputPrompt(cleanUserPromptForComposer(msg));
       discardQueued(index);
     }
   };

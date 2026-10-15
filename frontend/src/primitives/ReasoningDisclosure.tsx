@@ -106,6 +106,9 @@ export function ReasoningDisclosure({
     ? 'Thinking...'
     : `Thought for ${formattedDuration}`;
 
+  // ponytail: strip XML thought/thinking tags if raw reasoning text is enclosed in them
+  const cleanReasoningText = text ? text.replace(/<\/?(?:thought|thinking)>/gi, '').trim() : '';
+
   return (
     <div className={cn("my-1 select-none font-sans", className)}>
       {/* Trigger: Pure text + chevron, NO brain button or icons */}
@@ -145,7 +148,7 @@ export function ReasoningDisclosure({
               "text-[12.5px] leading-relaxed font-sans text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap break-words"
             )}
           >
-            {text || (
+            {cleanReasoningText || (
               <span className="text-zinc-400 dark:text-zinc-500">
                 {isStreaming ? 'Thinking...' : 'No reasoning trace recorded.'}
               </span>

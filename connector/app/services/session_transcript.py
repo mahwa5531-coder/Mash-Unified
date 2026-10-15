@@ -42,11 +42,17 @@ def clean_user_steering_envelope(text: str) -> str:
 
 
 def clean_protocol_sentinels(text: str) -> str:
-    """ponytail: strip [DONE]/[END]/[VERIFIED]/[empty] protocol sentinels, prompt tags, and heading wrappers."""
+    """ponytail: strip protocol sentinels, prompt tags, and section wrappers."""
     if not text or not isinstance(text, str):
         return text or ""
-    sentinel_pat = r"</?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity|system_prompt)>\s*"
-    cleaned = re.sub(sentinel_pat, "", text, flags=re.IGNORECASE)
+    tag_pat = (
+        r"</?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|"
+        r"identity|system_prompt|session_mode|file_storage_and_discipline|tool_execution_discipline|"
+        r"ui_presentation_format|runtime_context|skills|Skill[A-Za-z0-9_-]+|scratchpad|thought|thinking|"
+        r"tool_use|tool_result|tool_name|tool_output|use_parallel_tool_calls|parallel_tool|summary_data_json|empty)>\s*"
+    )
+    cleaned = re.sub(tag_pat, "", text, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\[(?:sub_agent_id|SYSTEM NOTICE):[^\]]*\]\s*", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*$", "", cleaned, flags=re.IGNORECASE | re.MULTILINE)
     cleaned = re.sub(r"\[(?:VERIFIED|empty)\]\s*", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"(?:^|\n)\s*\[(?:DONE|END|done|end)\]\s*(?=\n|$)", "", cleaned, flags=re.IGNORECASE)
@@ -77,36 +83,30 @@ def generate_clean_session_title(raw_text: str, sid: str = "") -> str:
 
 
 def _parse_epoch_seconds(val: Any) -> float:
-    """Parse any datetime, ISO string, timestamp (ns, ms, sec) into unix epoch float seconds (UTC)."""
     if not val:
         return 0.0
     now = datetime.now(UTC).timestamp()
-    if isinstance(val, (int, float)):
-        p = float(val) / (1e9 if val > 1e16 else (1e6 if val > 1e13 else (1e3 if val > 1e10 else 1.0))) if val > 1e8 else 0.0
-    elif isinstance(val, datetime):
-        p = val.timestamp() if val.tzinfo else val.astimezone(UTC).timestamp()
-    else:
-        try:
+    try:
+        if isinstance(val, (int, float)):
+            p = float(val) / (1e9 if val > 1e16 else (1e6 if val > 1e13 else (1e3 if val > 1e10 else 1.0))) if val > 1e8 else 0.0
+        elif isinstance(val, datetime):
+            p = val.timestamp() if val.tzinfo else val.astimezone(UTC).timestamp()
+        else:
             dt = datetime.fromisoformat(str(val).strip().replace(" ", "T"))
             p = dt.timestamp() if dt.tzinfo else dt.astimezone(UTC).timestamp()
+        return now if p > (now + 60.0) else p
+    except Exception:
+        try:
+            return _parse_epoch_seconds(float(val))
         except Exception:
-            try:
-                return _parse_epoch_seconds(float(val))
-            except Exception:
-                return 0.0
-    return now if p > (now + 60.0) else p
+            return 0.0
 
 
 def get_tool_action_type(t_name: str) -> str:
-    t_lower = t_name.lower()
-    if any(k in t_lower for k in ("view", "read", "list", "fetch", "cat")):
-        return "read"
-    if any(k in t_lower for k in ("write", "replace", "edit", "patch")):
-        return "edit"
-    if any(k in t_lower for k in ("search", "find", "grep", "glob")):
-        return "search"
-    if any(k in t_lower for k in ("shell", "command", "bash", "terminal", "run")):
-        return "command"
+    t = t_name.lower()
+    for cat, keys in (("read", ("view", "read", "list", "fetch", "cat")), ("edit", ("write", "replace", "edit", "patch")), ("search", ("search", "find", "grep", "glob")), ("command", ("shell", "command", "bash", "terminal", "run"))):
+        if any(k in t for k in keys):
+            return cat
     return "action"
 
 
@@ -136,19 +136,21 @@ def messages_to_transcript_lines(
 
         for b in msg.content:
             if isinstance(b, TextBlock):
-                text_parts.append(b.text)
-                steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "text", "content": b.text, "status": "completed"})
+                c_text = clean_protocol_sentinels(clean_user_steering_envelope(b.text) if role_str == "user" else b.text)
+                text_parts.append(c_text)
+                steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "text", "content": c_text, "status": "completed"})
                 step_idx += 1
             elif hasattr(b, "thinking") and b.thinking:
-                th = b.thinking
+                th = re.sub(r"</?(?:thought|thinking)>", "", str(b.thinking), flags=re.I).strip()
                 thoughts.append(th)
                 steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "thinking", "content": th, "status": "completed"})
                 step_idx += 1
             elif getattr(b, "type", "") in ("thinking", "reasoning"):
                 t_text = getattr(b, "text", "") or getattr(b, "thinking", "")
                 if t_text:
-                    thoughts.append(t_text)
-                    steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "thinking", "content": t_text, "status": "completed"})
+                    th = re.sub(r"</?(?:thought|thinking)>", "", str(t_text), flags=re.I).strip()
+                    thoughts.append(th)
+                    steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "thinking", "content": th, "status": "completed"})
                     step_idx += 1
             elif isinstance(b, ToolUseBlock):
                 tc_id, tc_name = str(b.id), str(b.name)
@@ -177,13 +179,8 @@ def messages_to_transcript_lines(
         if not combined_text and not tools and not thoughts:
             continue
 
-        ts_str = getattr(msg, "created_at", None)
-        if isinstance(ts_str, datetime):
-            ts_str = ts_str.isoformat()
-        elif not ts_str:
-            ts_str = datetime.now(UTC).isoformat()
-        else:
-            ts_str = str(ts_str)
+        ts = getattr(msg, "created_at", None)
+        ts_str = ts.isoformat() if isinstance(ts, datetime) else (datetime.now(UTC).isoformat() if not ts else str(ts))
 
         lines.append({
             "role": role_str, "content": combined_text, "thoughts": thoughts,

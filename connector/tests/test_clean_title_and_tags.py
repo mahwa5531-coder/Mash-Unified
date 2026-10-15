@@ -33,7 +33,11 @@ def test_generate_clean_session_title_scenarios():
     # 7. Protocol sentinels should return fallback
     assert generate_clean_session_title("[DONE]", sid="sess_12345678") == "Session sess_123"
     assert generate_clean_session_title("[VERIFIED]", sid="") == "New Session"
-    assert generate_clean_session_title("[empty]", sid="") == "New Session"
+    # 8. Section tags & protocol tokens
+    t8 = generate_clean_session_title("<session_mode>Audit fixed assets</session_mode>")
+    assert t8 == "Audit fixed assets", f"Expected 'Audit fixed assets', got {t8!r}"
+    t9 = generate_clean_session_title("[sub_agent_id: agent_42] Inspect inventory")
+    assert t9 == "Inspect inventory", f"Expected 'Inspect inventory', got {t9!r}"
 
 def test_clean_user_steering_envelope():
     raw = "<USER_STEERING>[USER MID-FLIGHT INSTRUCTION]: Stop current tool and plot histogram</USER_STEERING>"
@@ -44,3 +48,13 @@ def test_clean_protocol_sentinels():
     raw = "<user_message>Hello world</user_message>\n[DONE]"
     cleaned = clean_protocol_sentinels(raw)
     assert cleaned == "Hello world"
+
+    raw_sections = "<session_mode>audit</session_mode><skills><SkillDetails>inspect</SkillDetails></skills>Ready."
+    assert clean_protocol_sentinels(raw_sections) == "auditinspectReady."
+
+    raw_sub = "[sub_agent_id: sub_99] Done with calculation."
+    assert clean_protocol_sentinels(raw_sub) == "Done with calculation."
+
+    raw_notice = "[SYSTEM NOTICE: Tool error] Fallback text."
+    assert clean_protocol_sentinels(raw_notice) == "Fallback text."
+

@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { generateCleanSessionTitle } from '../src/utils/sessionTitle';
-import { cleanAssistantContent, cleanUserSteeringEnvelope } from '../src/features/chat/utils/sessionHistoryParser';
+import { cleanAssistantContent, cleanUserSteeringEnvelope, cleanUserPromptForComposer } from '../src/features/chat/utils/sessionHistoryParser';
 
 console.log('======================================================================');
 console.log('STARTING SESSION TITLE & PROTOCOL TAG LEAKAGE AUDIT TESTS');
@@ -43,7 +43,13 @@ assert.strictEqual(t8, 'New Session', `Expected 'New Session', got ${t8}`);
 const t9 = generateCleanSessionTitle('[empty]', '');
 assert.strictEqual(t9, 'New Session', `Expected 'New Session', got ${t9}`);
 
-console.log('  -> PASSED: All 9 session title matrix cases verified without tag or bracket leakage');
+const t10 = generateCleanSessionTitle('<session_mode>Audit fixed assets</session_mode>', '');
+assert.strictEqual(t10, 'Audit Fixed Assets', `Expected 'Audit Fixed Assets', got ${t10}`);
+
+const t11 = generateCleanSessionTitle('[sub_agent_id: agent_42] Inspect inventory', '');
+assert.strictEqual(t11, 'Inspect Inventory', `Expected 'Inspect Inventory', got ${t11}`);
+
+console.log('  -> PASSED: All 11 session title matrix cases verified without tag or bracket leakage');
 
 // 2. Assistant Content Tag Sanitization
 console.log('\n[Test 2] Assistant Content Tag Sanitization...');
@@ -54,11 +60,13 @@ assert.strictEqual(cleanAssistantContent('[END]'), '');
 assert.strictEqual(cleanAssistantContent('Here is the plan [VERIFIED] ready to proceed'), 'Here is the plan ready to proceed');
 assert.strictEqual(cleanAssistantContent('<user_message>hello</user_message>'), 'hello');
 assert.strictEqual(cleanAssistantContent('<assistant_message>response</assistant_message>'), 'response');
-assert.strictEqual(cleanAssistantContent('<thinking>internal thoughts</thinking>Clean output'), 'internal thoughtsClean output');
-assert.strictEqual(cleanAssistantContent('<scratchpad>draft</scratchpad>Final text'), 'draftFinal text');
-assert.strictEqual(cleanAssistantContent('<system_prompt>system rules</system_prompt>Visible reply'), 'system rulesVisible reply');
+assert.strictEqual(cleanAssistantContent('<session_mode>audit</session_mode>Report prepared.'), 'auditReport prepared.');
+assert.strictEqual(cleanAssistantContent('<skills><SkillDetails>file_inspect</SkillDetails></skills>Done.'), 'file_inspectDone.');
+assert.strictEqual(cleanAssistantContent('<tool_use>run</tool_use><tool_result>ok</tool_result>Finished.'), 'runokFinished.');
+assert.strictEqual(cleanAssistantContent('[sub_agent_id: ag_1] Subagent completed task.'), 'Subagent completed task.');
+assert.strictEqual(cleanAssistantContent('[SYSTEM NOTICE: Tool timed out] Retrying now.'), 'Retrying now.');
 
-console.log('  -> PASSED: All internal protocol tags stripped cleanly from assistant messages');
+console.log('  -> PASSED: All internal protocol tags and section wrappers stripped cleanly from assistant messages');
 
 // 3. User Steering Tag Sanitization
 console.log('\n[Test 3] User Steering Tag Sanitization...');
@@ -71,6 +79,32 @@ assert.strictEqual(cleanUserSteeringEnvelope(simpleSteer), 'Please switch to dar
 
 console.log('  -> PASSED: User mid-flight steering envelope stripped cleanly to authentic user intent');
 
+// 4. Composer Textarea Sanitization (Undo & Edit Queued)
+console.log('\n[Test 4] Composer Textarea Sanitization (cleanUserPromptForComposer)...');
+
+assert.strictEqual(
+  cleanUserPromptForComposer('Review depreciation schedule\n\n[Attached file: C:\\Users\\FAR_2025.xlsx]'),
+  'Review depreciation schedule'
+);
+
+assert.strictEqual(
+  cleanUserPromptForComposer('Please inspect and analyze the attached audit documents:\n[Attached file: C:\\FAR.xlsx]'),
+  ''
+);
+
+assert.strictEqual(
+  cleanUserPromptForComposer('<USER_STEERING>[USER MID-FLIGHT INSTRUCTION]: Change chart color to navy</USER_STEERING>'),
+  'Change chart color to navy'
+);
+
+assert.strictEqual(
+  cleanUserPromptForComposer('[sub_agent_id: sub_1] Continue execution'),
+  'Continue execution'
+);
+
+console.log('  -> PASSED: cleanUserPromptForComposer sanitizes undo and queued prompts without leaking attachments or tags');
+
 console.log('\n======================================================================');
 console.log('ALL SESSION TITLE & PROTOCOL TAG LEAKAGE TESTS PASSED');
 console.log('======================================================================\n');
+

@@ -27,8 +27,10 @@ export function isHeartbeatComment(line: string): boolean {
 
 export function stripSentinels(rawToken: string): string {
   if (typeof rawToken !== 'string' || !rawToken) return '';
-  if (/^\[?(DONE|END)\]?$/i.test(rawToken.trim())) return '';
-  return rawToken.replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '');
+  if (/^\[?(DONE|END|done|end|empty)\]?$/i.test(rawToken.trim())) return '';
+  return rawToken
+    .replace(/\[VERIFIED\]\s*/gi, '')
+    .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '');
 }
 
 export function extractTokenDelta(event: StreamWireEvent): string {
