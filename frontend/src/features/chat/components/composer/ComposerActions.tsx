@@ -107,7 +107,9 @@ export function ComposerActions({
                   <Send size={12} className="ml-0.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Send prompt</TooltipContent>
+              <TooltipContent side="top">
+                {isUploading ? "Uploading files..." : "Send prompt"}
+              </TooltipContent>
             </Tooltip>
           )}
         </div>
