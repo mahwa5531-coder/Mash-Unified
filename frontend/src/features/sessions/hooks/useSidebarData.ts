@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { fetchSessions, SessionItem } from '@/services/sessions';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { fetchSessions, deletedSessionIds, SessionItem } from '@/services/sessions';
 import { fetchProjects, ProjectItem } from '@/services/projects';
 import { subscribeToSessionStore } from '@/features/chat';
 
@@ -13,6 +13,14 @@ interface UseSidebarDataProps {
   externalOnToggleArchive?: (sessionId: string) => void;
 }
 
+function loadCache<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const v = localStorage.getItem(key);
+    return v ? JSON.parse(v) : fallback;
+  } catch { return fallback; }
+}
+
 export function useSidebarData({
   selectedSessionId,
   selectedSessionTitle,
@@ -20,44 +28,36 @@ export function useSidebarData({
   externalArchivedSessionIds,
   externalOnToggleArchive,
 }: UseSidebarDataProps) {
-  const [sessions, setSessions] = useState<SessionItem[]>([]);
-  const [registeredProjects, setRegisteredProjects] = useState<ProjectItem[]>([]);
+  // ponytail: Synchronous lazy initializers eliminate cold boot empty-to-loaded layout jump
+  const [sessions, setSessions] = useState<SessionItem[]>(() => loadCache('nexau_cached_sessions', []));
+  const [registeredProjects, setRegisteredProjects] = useState<ProjectItem[]>(() => loadCache('nexau_cached_projects', []));
+  const [pinnedSessionIds, setPinnedSessionIds] = useState<Set<string>>(() => new Set(loadCache('nexau_pinned_sessions', [])));
   const [loading, setLoading] = useState<boolean>(true);
   const [, setStoreTick] = useState(0);
 
-  // Restore client-side cache after hydration completes
+  // Stable references prevent refreshData useCallback from churning polling intervals
+  const selectedSessionIdRef = useRef(selectedSessionId);
+  selectedSessionIdRef.current = selectedSessionId;
+  const selectedSessionTitleRef = useRef(selectedSessionTitle);
+  selectedSessionTitleRef.current = selectedSessionTitle;
+
+  // Hydration fallback sync
   useEffect(() => {
     try {
-      const s = localStorage.getItem('nexau_cached_sessions');
-      if (s) setSessions(JSON.parse(s));
-      const p = localStorage.getItem('nexau_cached_projects');
-      if (p) setRegisteredProjects(JSON.parse(p));
-    } catch {}
-  }, []);
-
-  // Pinned Sessions State
-  const [pinnedSessionIds, setPinnedSessionIds] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('nexau_pinned_sessions');
-      if (saved) {
-        setPinnedSessionIds(new Set(JSON.parse(saved)));
-      }
+      const s = loadCache<SessionItem[]>('nexau_cached_sessions', []);
+      if (s.length > 0 && sessions.length === 0) setSessions(s);
+      const p = loadCache<ProjectItem[]>('nexau_cached_projects', []);
+      if (p.length > 0 && registeredProjects.length === 0) setRegisteredProjects(p);
+      const saved = loadCache<string[]>('nexau_pinned_sessions', []);
+      if (saved.length > 0 && pinnedSessionIds.size === 0) setPinnedSessionIds(new Set(saved));
     } catch {}
   }, []);
 
   const togglePin = (sessionId: string) => {
     setPinnedSessionIds(prev => {
       const next = new Set(prev);
-      if (next.has(sessionId)) {
-        next.delete(sessionId);
-      } else {
-        next.add(sessionId);
-      }
-      try {
-        localStorage.setItem('nexau_pinned_sessions', JSON.stringify(Array.from(next)));
-      } catch {}
+      if (!next.delete(sessionId)) next.add(sessionId);
+      try { localStorage.setItem('nexau_pinned_sessions', JSON.stringify(Array.from(next))); } catch {}
       return next;
     });
   };
@@ -72,8 +72,7 @@ export function useSidebarData({
     } else {
       setInternalArchivedIds(prev => {
         const next = new Set(prev);
-        if (next.has(sessionId)) next.delete(sessionId);
-        else next.add(sessionId);
+        if (!next.delete(sessionId)) next.add(sessionId);
         return next;
       });
     }
@@ -81,18 +80,11 @@ export function useSidebarData({
 
   // Folders expansion state
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
-
   const toggleFolder = (folderName: string) => {
-    setOpenFolders(prev => {
-      const isCurrentlyOpen = prev[folderName] ?? true;
-      return {
-        ...prev,
-        [folderName]: !isCurrentlyOpen,
-      };
-    });
+    setOpenFolders(prev => ({ ...prev, [folderName]: !(prev[folderName] ?? true) }));
   };
 
-  // Data fetching
+  // ponytail: Reconcile localStorage cached state with SQLite response without re-sorting jitter
   const refreshData = useCallback(async () => {
     try {
       const [fetchedSessions, fetchedProjects] = await Promise.all([
@@ -100,18 +92,48 @@ export function useSidebarData({
         fetchProjects().catch(() => [] as ProjectItem[])
       ]);
 
-      if (fetchedSessions) {
-        setSessions(fetchedSessions);
-        try {
-          localStorage.setItem('nexau_cached_sessions', JSON.stringify(fetchedSessions));
-        } catch {}
+      if (fetchedSessions && fetchedSessions.length > 0) {
+        setSessions(prev => {
+          if (!prev || prev.length === 0) {
+            try { localStorage.setItem('nexau_cached_sessions', JSON.stringify(fetchedSessions)); } catch {}
+            return fetchedSessions;
+          }
+
+          const fetchedMap = new Map<string, SessionItem>(fetchedSessions.map(s => [s.session_id, s]));
+          const curId = selectedSessionIdRef.current;
+          const curTitle = selectedSessionTitleRef.current;
+          const seen = new Set<string>();
+          const reconciled: SessionItem[] = [];
+
+          // 1. Maintain stable order of already-cached sessions to eliminate re-sorting jitter
+          for (const old of prev) {
+            if (deletedSessionIds.has(old.session_id)) continue;
+            const fresh = fetchedMap.get(old.session_id);
+            if (fresh) {
+              reconciled.push({
+                ...old,
+                ...fresh,
+                title: (curId === old.session_id && curTitle) ? curTitle : (fresh.custom_title || fresh.title || old.title),
+                has_unread: curId === old.session_id ? false : fresh.has_unread,
+              });
+            } else if (old.session_id === curId || old.message_count === 0) {
+              reconciled.push(old);
+            }
+            seen.add(old.session_id);
+          }
+
+          // 2. Prepend any new sessions from backend not in cache
+          const newSessions = fetchedSessions.filter(s => !seen.has(s.session_id) && !deletedSessionIds.has(s.session_id));
+          const finalSessions = newSessions.length > 0 ? [...newSessions, ...reconciled] : reconciled;
+
+          try { localStorage.setItem('nexau_cached_sessions', JSON.stringify(finalSessions)); } catch {}
+          return finalSessions;
+        });
       }
 
-      if (fetchedProjects) {
+      if (fetchedProjects && fetchedProjects.length > 0) {
         setRegisteredProjects(fetchedProjects);
-        try {
-          localStorage.setItem('nexau_cached_projects', JSON.stringify(fetchedProjects));
-        } catch {}
+        try { localStorage.setItem('nexau_cached_projects', JSON.stringify(fetchedProjects)); } catch {}
       }
     } catch (err) {
       console.error('Failed to load sidebar data:', err);
@@ -123,9 +145,7 @@ export function useSidebarData({
   useEffect(() => {
     refreshData();
     const interval = setInterval(refreshData, 10000);
-    const onProjectsUpdated = () => {
-      refreshData();
-    };
+    const onProjectsUpdated = () => refreshData();
     window.addEventListener('nexau:projects-updated', onProjectsUpdated);
     return () => {
       clearInterval(interval);
@@ -135,9 +155,7 @@ export function useSidebarData({
 
   // Subscribe to live sessionStore
   useEffect(() => {
-    return subscribeToSessionStore(() => {
-      setStoreTick(t => t + 1);
-    });
+    return subscribeToSessionStore(() => { setStoreTick(t => t + 1); });
   }, []);
 
   // Sync selected session locally
@@ -146,128 +164,78 @@ export function useSidebarData({
     const timer = setTimeout(() => {
       setSessions(prev => {
         const exists = prev.some(s => s.session_id === selectedSessionId);
+        let updated: SessionItem[];
         if (exists) {
-          return prev.map(s => {
-            if (s.session_id === selectedSessionId) {
-              return {
-                ...s,
-                title: selectedSessionTitle || s.title,
-              };
-            }
-            return s;
-          });
+          updated = prev.map(s => (s.session_id === selectedSessionId ? { ...s, title: selectedSessionTitle || s.title } : s));
+        } else {
+          const newSession: SessionItem = {
+            session_id: selectedSessionId,
+            title: selectedSessionTitle || 'New Session',
+            custom_title: '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            message_count: 0,
+            total_tokens: 0,
+            last_user_view_time: new Date().toISOString(),
+            has_unread: false,
+            workspace_uri: selectedSessionRepo || 'No Repo',
+            section: selectedSessionRepo && selectedSessionRepo !== 'No Repo' ? 'workspace' : 'conversation',
+          };
+          const seen = new Set<string>();
+          updated = [newSession, ...prev].filter(s => !seen.has(s.session_id) && seen.add(s.session_id));
         }
-        const newSession: SessionItem = {
-          session_id: selectedSessionId,
-          title: selectedSessionTitle || 'New Session',
-          custom_title: '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          message_count: 0,
-          total_tokens: 0,
-          last_user_view_time: new Date().toISOString(),
-          has_unread: false,
-          workspace_uri: selectedSessionRepo || 'No Repo',
-          section: selectedSessionRepo && selectedSessionRepo !== 'No Repo' ? 'workspace' : 'conversation',
-        };
-        const combined = [newSession, ...prev];
-        const seen = new Set<string>();
-        return combined.filter((s) => {
-          if (seen.has(s.session_id)) return false;
-          seen.add(s.session_id);
-          return true;
-        });
+        try { localStorage.setItem('nexau_cached_sessions', JSON.stringify(updated)); } catch {}
+        return updated;
       });
     }, 0);
     return () => clearTimeout(timer);
   }, [selectedSessionId, selectedSessionTitle, selectedSessionRepo]);
 
-  // ponytail: Memoized O(S + P) workspace grouping with pre-indexed project lookup map
+  // Memoized O(S + P) workspace grouping with pre-indexed project lookup map
   const { pinnedSessions, workspaceSessions, directConversations } = useMemo(() => {
     const projectPathMap = new Map<string, ProjectItem>();
     const projectNameMap = new Map<string, ProjectItem>();
     const workspaceMap: Record<string, SessionItem[]> = {};
 
-    for (let i = 0; i < registeredProjects.length; i++) {
-      const p = registeredProjects[i];
+    for (const p of registeredProjects) {
       workspaceMap[p.name] = [];
       projectNameMap.set(p.name.toLowerCase(), p);
       if (p.local_folder_path) {
-        const norm = p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-        projectPathMap.set(norm, p);
+        projectPathMap.set(p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase(), p);
       }
     }
 
     const pinned: SessionItem[] = [];
     const direct: SessionItem[] = [];
 
-    for (let i = 0; i < sessions.length; i++) {
-      const s = sessions[i];
+    for (const s of sessions) {
       if (archivedIds.has(s.session_id)) continue;
-
-      if (pinnedSessionIds.has(s.session_id)) {
-        pinned.push(s);
-        continue;
-      }
-
+      if (pinnedSessionIds.has(s.session_id)) { pinned.push(s); continue; }
       const uri = s.workspace_uri;
-      if (!uri || uri === 'No Repo') {
-        direct.push(s);
-        continue;
-      }
-
+      if (!uri || uri === 'No Repo') { direct.push(s); continue; }
       const normUri = uri.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
       let matched = projectPathMap.get(normUri) || projectNameMap.get(normUri);
-
       if (!matched) {
-        for (let j = 0; j < registeredProjects.length; j++) {
-          const p = registeredProjects[j];
-          const pNameLower = p.name.toLowerCase();
+        for (const p of registeredProjects) {
           const normPath = p.local_folder_path ? p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() : '';
-          if (
-            (normPath && normPath.endsWith('/' + normUri)) ||
-            (normPath && normUri.endsWith('/' + pNameLower))
-          ) {
+          if (normPath && (normPath.endsWith('/' + normUri) || normUri.endsWith('/' + p.name.toLowerCase()))) {
             matched = p;
             break;
           }
         }
       }
-
-      const targetGroupName = matched ? matched.name : (
-        uri.includes('/') || uri.includes('\\')
-          ? uri.split(/[/\\]/).filter(Boolean).pop() || uri
-          : uri
-      );
-
-      if (!workspaceMap[targetGroupName]) {
-        workspaceMap[targetGroupName] = [];
-      }
+      const targetGroupName = matched ? matched.name : (uri.includes('/') || uri.includes('\\') ? uri.split(/[/\\]/).filter(Boolean).pop() || uri : uri);
+      if (!workspaceMap[targetGroupName]) workspaceMap[targetGroupName] = [];
       workspaceMap[targetGroupName].push(s);
     }
 
-    return {
-      pinnedSessions: pinned,
-      workspaceSessions: workspaceMap,
-      directConversations: direct,
-    };
+    return { pinnedSessions: pinned, workspaceSessions: workspaceMap, directConversations: direct };
   }, [sessions, registeredProjects, pinnedSessionIds, archivedIds]);
 
   return {
-    sessions,
-    setSessions,
-    registeredProjects,
-    loading,
-    refreshData,
-    pinnedSessionIds,
-    togglePin,
-    archivedIds,
-    handleArchive,
-    openFolders,
-    setOpenFolders,
-    toggleFolder,
-    pinnedSessions,
-    workspaceSessions,
-    directConversations,
+    sessions, setSessions, registeredProjects, loading, refreshData,
+    pinnedSessionIds, togglePin, archivedIds, handleArchive,
+    openFolders, setOpenFolders, toggleFolder,
+    pinnedSessions, workspaceSessions, directConversations,
   };
 }

@@ -5,6 +5,7 @@ import { Check, Copy, Undo2 } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import { cleanUserSteeringEnvelope } from '@/features/chat/utils/sessionHistoryParser';
+import { FilePill } from '@/primitives';
 
 function formatUserTimestamp(ts?: string): string {
   if (!ts) return '';
@@ -36,7 +37,22 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
 
   // Check if content has an image markdown link or path
   const imgMatch = msg.content ? msg.content.match(/!\[([^\]]*)\]\(([^)]+)\)/) : null;
-  const rawText = imgMatch ? msg.content.replace(imgMatch[0], '').trim() : msg.content;
+  let rawText = imgMatch ? msg.content.replace(imgMatch[0], '').trim() : (msg.content || '');
+
+  // Extract attached files: [Attached file: <path>]
+  const attachedFilePaths: string[] = [];
+  const fileTagRegex = /\[Attached file:\s*([^\]]+)\]/gi;
+  let fileMatch: RegExpExecArray | null;
+  while ((fileMatch = fileTagRegex.exec(rawText)) !== null) {
+    if (fileMatch[1]?.trim()) {
+      attachedFilePaths.push(fileMatch[1].trim());
+    }
+  }
+  rawText = rawText.replace(fileTagRegex, '').trim();
+  if (rawText === 'Please inspect and analyze the attached audit documents:') {
+    rawText = '';
+  }
+
   const cleanText = cleanUserSteeringEnvelope(rawText);
   const imgSrc = imgMatch ? imgMatch[2] : null;
 
@@ -84,15 +100,26 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
 
         {/* Content Body */}
         <div className="flex-1 min-w-0 pr-28 pb-0.5">
-          <div 
-            ref={textRef}
-            className={cn(
-              "whitespace-pre-wrap font-sans text-[13.5px] leading-[22px] text-zinc-900 dark:text-zinc-200 break-words select-text transition-all",
-              !isExpanded && isOverflowing && "line-clamp-3 overflow-hidden"
-            )}
-          >
-            {cleanText}
-          </div>
+          {/* Attached Files Chips */}
+          {attachedFilePaths.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mb-1.5 select-none">
+              {attachedFilePaths.map((filePath, idx) => (
+                <FilePill key={`${filePath}_${idx}`} path={filePath} />
+              ))}
+            </div>
+          )}
+
+          {cleanText ? (
+            <div 
+              ref={textRef}
+              className={cn(
+                "whitespace-pre-wrap font-sans text-[13.5px] leading-[22px] text-zinc-900 dark:text-zinc-200 break-words select-text transition-all",
+                !isExpanded && isOverflowing && "line-clamp-3 overflow-hidden"
+              )}
+            >
+              {cleanText}
+            </div>
+          ) : null}
         </div>
 
         {/* Bottom-Right Actions Bar (Timestamp, Copy, Undo) */}

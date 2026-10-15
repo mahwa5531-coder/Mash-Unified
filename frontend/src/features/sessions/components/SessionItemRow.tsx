@@ -2,7 +2,7 @@
 
 // One session row in the sidebar list: title (or rename input), streaming
 // spinner / unread dot / relative time, hover vertical 3-dots button.
-import React, { MouseEvent as ReactMouseEvent } from 'react';
+import React, { useState, useEffect, MouseEvent as ReactMouseEvent } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { sessionStore, isSessionStreaming } from '@/features/chat';
 import { formatRelativeTime } from '@/utils/formatting';
@@ -20,6 +20,7 @@ interface SessionItemRowProps {
   onOpenMenu: (e: ReactMouseEvent, sessionId: string) => void;
   onRenameSubmit: (sessionId: string) => void;
   onCancelRename?: () => void;
+  isSelectionResolved?: boolean;
 }
 
 export function SessionItemRow({
@@ -33,9 +34,21 @@ export function SessionItemRow({
   onOpenMenu,
   onRenameSubmit,
   onCancelRename,
+  isSelectionResolved,
 }: SessionItemRowProps) {
+  // ponytail: Suppress unread blue dot blinking during cold boot until initial session selection resolves
+  const [localResolved, setLocalResolved] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLocalResolved(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const resolved = isSelectionResolved ?? localResolved;
   const storeState = sessionStore.get(s.session_id);
-  const showUnread = !isSelected && (s.has_unread || Boolean(storeState?.hasUnread));
+  const showUnread = Boolean(resolved && !isSelected && (s.has_unread || Boolean(storeState?.hasUnread)));
   const isStreaming = isSessionStreaming(s.session_id);
 
   return (
