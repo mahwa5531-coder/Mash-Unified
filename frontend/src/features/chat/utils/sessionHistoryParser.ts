@@ -8,7 +8,7 @@ export function cleanAssistantContent(raw?: string): string {
   if (trimmed === '[empty]' || /^\[?(DONE|END|done|end)\]?$/i.test(trimmed)) return '';
   return trimmed
     .replace(/\[VERIFIED\]\s*/gi, '')
-    .replace(/<\/?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity)>\s*/gi, '')
+    .replace(/<\/?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity|system_prompt|scratchpad|thought|thinking)>\s*/gi, '')
     .replace(/^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*$/gim, '')
     .replace(/(?:^|\n)\s*\[(DONE|END|done|end)\]\s*(?=\n|$)/gi, '')
     .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '')
@@ -33,7 +33,7 @@ export function cleanUserSteeringEnvelope(text?: string): string {
   }
 
   return cleaned
-    .replace(/<\/?(?:user[\s_]+message|user_rules|user_information|identity)>\s*/gi, '')
+    .replace(/<\/?(?:user[\s_]+message|user_rules|user_information|identity|system_prompt|scratchpad|thought|thinking)>\s*/gi, '')
     .replace(/^(?:#+\s*)?User\s+Message\s*:\s*$/gim, '')
     .replace(/(?:^|\n)\s*\[(DONE|END|done|end)\]\s*(?=\n|$)/gi, '')
     .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '')

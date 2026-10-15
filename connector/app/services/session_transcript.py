@@ -23,19 +23,53 @@ def _get_engine(engine: Any = None) -> Any:
     return global_eng
 
 
+def clean_user_steering_envelope(text: str) -> str:
+    """ponytail: Strip internal mid-flight steering protocol envelope from user prompt text."""
+    if not text or not isinstance(text, str):
+        return text or ""
+    if "<USER_STEERING>" in text or "[USER MID-FLIGHT INSTRUCTION]:" in text or "</USER_STEERING>" in text:
+        steering_pat = (
+            r"<USER_STEERING>\s*(?:\[USER MID-FLIGHT INSTRUCTION\]:)?\s*([\s\S]*?)"
+            r"(?:\s*Adapt your current plan and respond to this instruction immediately\.?)?\s*</USER_STEERING>"
+        )
+        m = re.search(steering_pat, text, re.IGNORECASE)
+        if m and m.group(1).strip():
+            return m.group(1).strip()
+        cleaned = re.sub(r"</?USER_STEERING>", "", text, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\[USER MID-FLIGHT INSTRUCTION\]:\s*", "", cleaned, flags=re.IGNORECASE)
+        return re.sub(r"Adapt your current plan and respond to this instruction immediately\.?", "", cleaned, flags=re.IGNORECASE).strip()
+    return text
+
+
+def clean_protocol_sentinels(text: str) -> str:
+    """ponytail: strip [DONE]/[END]/[VERIFIED]/[empty] protocol sentinels, prompt tags, and heading wrappers."""
+    if not text or not isinstance(text, str):
+        return text or ""
+    sentinel_pat = r"</?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity|system_prompt)>\s*"
+    cleaned = re.sub(sentinel_pat, "", text, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*$", "", cleaned, flags=re.IGNORECASE | re.MULTILINE)
+    cleaned = re.sub(r"\[(?:VERIFIED|empty)\]\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"(?:^|\n)\s*\[(?:DONE|END|done|end)\]\s*(?=\n|$)", "", cleaned, flags=re.IGNORECASE)
+    return re.sub(r"(\s*\[(?:DONE|END|done|end)\]\s*)+$", "", cleaned, flags=re.IGNORECASE).strip()
+
+
 def generate_clean_session_title(raw_text: str, sid: str = "") -> str:
-    """ponytail: concise session title generator without over-engineered regex soup."""
+    """ponytail: concise session title generator without tag or bracket leakage."""
     fallback = f"Session {sid[:8]}" if sid else "New Session"
     if not raw_text or not isinstance(raw_text, str) or not raw_text.strip():
         return fallback
-    t = raw_text.strip().strip("\"'` \t\n\r")
-    if re.match(r"^([a-zA-Z]:[\\/]|/)", t) or "\\" in t:
-        parts = [p for p in re.split(r"[\\/]", t) if p]
-        t = parts[-1].strip("\"'` \t\n\r,:;-") if parts else t
-    filler = r"^(?:please\s+|can you\s+|could you\s+|kindly\s+|help me\s+(?:to\s+)?|i want to\s+|i need to\s+|tell me about\s+|what is\s+|how to\s+)+"
-    t = re.sub(r"[?!.:;]+$", "", re.sub(filler, "", t, flags=re.IGNORECASE).strip()).strip()
+    t = clean_protocol_sentinels(clean_user_steering_envelope(raw_text.strip().strip("\"'` \t\n\r")))
+    att_m = re.search(r"\[Attached (?:file|files):\s*([^\]]+)\]", t, re.I)
+    att_base = [p for p in re.split(r"[\\/]", att_m.group(1).strip()) if p][-1].strip("\"'` \t\n\r,:;-\\]") if att_m else ""
+    t = re.sub(r"\[Attached (?:file|files)[^\]]*\]", "", t, flags=re.I).strip()
+    filler = r"^(?:please\s+|can you\s+|could you\s+|kindly\s+|help me\s+(?:to\s+)?|i want to\s+|i need to\s+|tell me about\s+|what is\s+|how to\s+|inspect and analyze the attached audit documents:?)+"
+    t = re.sub(r"[?!.:;\-\]\)]+$", "", re.sub(filler, "", t.split("\n")[0].strip(), flags=re.I).strip()).strip()
+    t = t or att_base
     if not t:
         return fallback
+    if re.match(r"^([a-zA-Z]:[\\/]|/)", t) or ("\\" in t and " " not in t):
+        parts = [p for p in re.split(r"[\\/]", t) if p]
+        t = parts[-1].strip("\"'` \t\n\r,:;-\\]") if parts else t
     if len(t) > 34:
         sp = t[:34].rfind(" ")
         t = (t[:sp] if sp > 12 else t[:34]).rstrip() + "..."
@@ -61,37 +95,6 @@ def _parse_epoch_seconds(val: Any) -> float:
             except Exception:
                 return 0.0
     return now if p > (now + 60.0) else p
-
-
-def clean_user_steering_envelope(text: str) -> str:
-    """ponytail: Strip internal mid-flight steering protocol envelope from user prompt text."""
-    if not text or not isinstance(text, str):
-        return text or ""
-    if "<USER_STEERING>" in text or "[USER MID-FLIGHT INSTRUCTION]:" in text or "</USER_STEERING>" in text:
-        steering_pat = (
-            r"<USER_STEERING>\s*(?:\[USER MID-FLIGHT INSTRUCTION\]:)?\s*([\s\S]*?)"
-            r"(?:\s*Adapt your current plan and respond to this instruction immediately\.?)?\s*</USER_STEERING>"
-        )
-        m = re.search(steering_pat, text, re.IGNORECASE)
-        if m and m.group(1).strip():
-            return m.group(1).strip()
-        cleaned = re.sub(r"</?USER_STEERING>", "", text, flags=re.IGNORECASE)
-        cleaned = re.sub(r"\[USER MID-FLIGHT INSTRUCTION\]:\s*", "", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r"Adapt your current plan and respond to this instruction immediately\.?", "", cleaned, flags=re.IGNORECASE)
-        return cleaned.strip()
-    return text
-
-
-def clean_protocol_sentinels(text: str) -> str:
-    """ponytail: strip [DONE]/[END] protocol sentinels, prompt tags, and heading wrappers."""
-    if not text or not isinstance(text, str):
-        return text or ""
-    sentinel_pat = r"</?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity)>\s*"
-    cleaned = re.sub(sentinel_pat, "", text, flags=re.IGNORECASE)
-    cleaned = re.sub(r"^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*$", "", cleaned, flags=re.IGNORECASE | re.MULTILINE)
-    cleaned = re.sub(r"(?:^|\n)\s*\[(?:DONE|END|done|end)\]\s*(?=\n|$)", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"(\s*\[(?:DONE|END|done|end)\]\s*)+$", "", cleaned, flags=re.IGNORECASE)
-    return cleaned.strip()
 
 
 def get_tool_action_type(t_name: str) -> str:

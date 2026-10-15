@@ -39,17 +39,18 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
   const imgMatch = msg.content ? msg.content.match(/!\[([^\]]*)\]\(([^)]+)\)/) : null;
   let rawText = imgMatch ? msg.content.replace(imgMatch[0], '').trim() : (msg.content || '');
 
-  // Extract attached files: [Attached file: <path>]
+  // Extract attached files: [Attached file: <path>] or [Attached files: <path>]
   const attachedFilePaths: string[] = [];
-  const fileTagRegex = /\[Attached file:\s*([^\]]+)\]/gi;
+  const fileTagRegex = /\[Attached (?:file|files):\s*([^\]]+)\]/gi;
   let fileMatch: RegExpExecArray | null;
   while ((fileMatch = fileTagRegex.exec(rawText)) !== null) {
-    if (fileMatch[1]?.trim()) {
-      attachedFilePaths.push(fileMatch[1].trim());
+    const p = fileMatch[1]?.trim().replace(/[\]"')]+$/, '');
+    if (p) {
+      attachedFilePaths.push(p);
     }
   }
   rawText = rawText.replace(fileTagRegex, '').trim();
-  if (rawText === 'Please inspect and analyze the attached audit documents:') {
+  if (rawText === 'Please inspect and analyze the attached audit documents:' || rawText === 'Please inspect and analyze the attached audit documents') {
     rawText = '';
   }
 

@@ -112,7 +112,8 @@ async def _ensure_project_and_context(
     # So we pre-create/update the session with app-specific metadata. When NexAU's
     # _get_or_create_session runs, it'll find our session and reuse it.
     try:
-        clean_title = resolved_context.get("_raw_message", "")[:35].replace("\n", " ").strip()
+        from app.services.session_transcript import generate_clean_session_title
+        clean_title = generate_clean_session_title(resolved_context.get("_raw_message", ""), sid)
         title_val = resolved_context.get("title") or resolved_context.get("custom_title") or clean_title or f"Session {sid[:8]}"
         resolved_context["title"] = title_val
         resolved_context["custom_title"] = title_val

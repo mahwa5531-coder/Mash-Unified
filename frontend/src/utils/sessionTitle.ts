@@ -55,8 +55,37 @@ export function generateCleanSessionTitle(rawText: string, fallbackId = ''): str
     return fallbackId ? `Session ${fallbackId.slice(0, 8)}` : 'New Session';
   }
 
-  // Strip attachment metadata blocks injected into user text
+  // 0. Clean mid-flight steering envelope
+  if (t.includes('<USER_STEERING>') || t.includes('[USER MID-FLIGHT INSTRUCTION]:') || t.includes('</USER_STEERING>')) {
+    const match = t.match(/<USER_STEERING>[\s\S]*?(?:\[USER MID-FLIGHT INSTRUCTION\]:)?\s*([\s\S]*?)(?:\s*Adapt your current plan and respond to this instruction immediately\.?)?\s*<\/USER_STEERING>/i);
+    if (match && match[1] && match[1].trim()) {
+      t = match[1].trim();
+    } else {
+      t = t.replace(/<\/?USER_STEERING>/gi, '').replace(/\[USER MID-FLIGHT INSTRUCTION\]:\s*/gi, '').replace(/Adapt your current plan and respond to this instruction immediately\.?/gi, '').trim();
+    }
+  }
+
+  // 1. Extract attached file basename as fallback and strip attachment tags
+  let attachedFallback = '';
+  const attMatch = t.match(/\[Attached (?:file|files):\s*([^\]]+)\]/i);
+  if (attMatch && attMatch[1]) {
+    const rawPath = attMatch[1].trim();
+    const parts = rawPath.split(/[\\/]/).filter(Boolean);
+    const last = parts.pop() || rawPath;
+    attachedFallback = last.replace(/[\]"')]+$/, '').trim();
+  }
   t = t.replace(/\[Attached (?:file|files)[^\]]*\]/gi, '').trim();
+  if (t === 'Please inspect and analyze the attached audit documents:' || t === 'Please inspect and analyze the attached audit documents') {
+    t = '';
+  }
+
+  // Strip protocol sentinels
+  t = t.replace(/^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*|\[(?:VERIFIED|DONE|END|empty)\]|<\/?(?:user[\s_]+message|assistant[\s_]+message|identity|user_rules|system_prompt)>/gi, '').trim();
+
+  // If user only sent an attachment, use the attached filename
+  if (!t && attachedFallback) {
+    return truncateAtWordBoundary(toTitleCase(attachedFallback), 34);
+  }
 
   // Prefer first conversational line if prompt has multiple lines
   const firstNonEmptyLine = t.split('\n').map(l => l.trim()).find(l => l.length > 0) || '';
