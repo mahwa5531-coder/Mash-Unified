@@ -12,6 +12,7 @@ interface FileViewerNoticeProps {
 export function FileViewerNotice({ message, filename, path }: FileViewerNoticeProps) {
   const displayName = filename || (path ? path.split(/[/\\]/).pop() : undefined);
   const ext = displayName?.includes('.') ? displayName.split('.').pop()?.toLowerCase() : undefined;
+  const baseName = displayName && ext ? displayName.slice(0, -(ext.length + 1)) : displayName;
 
   return (
     <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center bg-[var(--bg-app)] dark:bg-black select-none">
@@ -24,7 +25,7 @@ export function FileViewerNotice({ message, filename, path }: FileViewerNoticePr
             className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate"
             title={displayName}
           >
-            {displayName}
+            {baseName}
           </span>
           {ext && (
             <span className="px-1.5 py-0.5 rounded text-[10.5px] font-mono font-medium bg-zinc-200/80 dark:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 shrink-0">

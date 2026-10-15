@@ -230,6 +230,7 @@ async def get_file_content(
         p = p.resolve()
     else:
         found = False
+        rel_path = clean_path.lstrip("/\\")
         candidates: list[Path] = []
         if session_id:
             try:
@@ -239,30 +240,30 @@ async def get_file_content(
             s_dir = (Path.home() / ".nexau" / "brain" / session_id).resolve()
             if s_dir.is_dir():
                 candidates.extend([
-                    s_dir / clean_path,
-                    s_dir / f"{clean_path}.md",
-                    s_dir / "working_papers" / clean_path,
-                    s_dir / "working_papers" / f"{clean_path}.md",
-                    s_dir / "scratch" / clean_path,
-                    s_dir / ".system_generated" / "tasks" / clean_path,
-                    s_dir / ".system_generated" / "logs" / clean_path,
+                    s_dir / rel_path,
+                    s_dir / f"{rel_path}.md",
+                    s_dir / "working_papers" / rel_path,
+                    s_dir / "working_papers" / f"{rel_path}.md",
+                    s_dir / "scratch" / rel_path,
+                    s_dir / ".system_generated" / "tasks" / rel_path,
+                    s_dir / ".system_generated" / "logs" / rel_path,
                 ])
             try:
                 ws = await resolve_session_workspace(eng, session_id)
                 if ws and ws.is_dir():
-                    clean_sub = clean_path.replace("NexAU_Outputs/", "").replace("NexAU_Outputs\\", "").replace("Audit_Deliverables/", "").replace("Audit_Deliverables\\", "")
+                    clean_sub = rel_path.replace("NexAU_Outputs/", "").replace("NexAU_Outputs\\", "").replace("Audit_Deliverables/", "").replace("Audit_Deliverables\\", "")
                     candidates.extend([
-                        ws / clean_path,
-                        ws / "Audit_Deliverables" / clean_path,
+                        ws / rel_path,
+                        ws / "Audit_Deliverables" / rel_path,
                         ws / "Audit_Deliverables" / clean_sub,
-                        ws / "NexAU_Outputs" / clean_path,
+                        ws / "NexAU_Outputs" / rel_path,
                         ws / "NexAU_Outputs" / clean_sub,
                     ])
             except Exception:
                 pass
         candidates.extend([
-            Path.cwd() / clean_path,
-            mash_root / clean_path,
+            Path.cwd() / rel_path,
+            mash_root / rel_path,
         ])
         for cand in candidates:
             if cand.is_file():

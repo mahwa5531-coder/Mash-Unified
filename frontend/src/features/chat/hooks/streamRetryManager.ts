@@ -144,9 +144,7 @@ export function finalizeStreamSession(activeSid: string): { updatedMessages: Mes
       s.queuedMessage = s.queuedMessages[0] || null;
     }
   }
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('mash:turn_completed', { detail: { sessionId: activeSid } }));
-  }
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mash:turn_completed', { detail: { sessionId: activeSid } }));
   notifyStoreListeners();
   markSessionViewed(activeSid).catch(() => {});
   return { updatedMessages, nextQueuedMsg };
@@ -156,12 +154,15 @@ export function resolveActiveSession(
   targetSessionId: string | undefined, currentSid: string | null, sessionIdProp: string | null, userText: string,
   skipNew: boolean, onCreated: (id: string, title?: string, repo?: string) => void, repo?: string
 ): { activeSid: string; isNewSession: boolean; title: string } {
+  const isExisting = Boolean(currentSid || sessionIdProp);
+  const isNewSession = !skipNew && !isExisting;
   let activeSid = targetSessionId || currentSid || sessionIdProp || '';
-  const isNewSession = !skipNew && !activeSid;
-  const title = generateCleanSessionTitle(userText || 'Resumed Turn', activeSid);
-  if (isNewSession) {
+  if (isNewSession && !activeSid) {
     const randSuffix = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 10) : Math.random().toString(36).slice(2, 10);
     activeSid = `sess_${Date.now().toString(36)}_${randSuffix}`;
+  }
+  const title = generateCleanSessionTitle(userText || 'Resumed Turn', activeSid);
+  if (isNewSession) {
     onCreated(activeSid, title, repo);
     renameSession(activeSid, title).catch(() => {});
   }

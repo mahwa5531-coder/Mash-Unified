@@ -85,7 +85,7 @@ export default function SafeFileViewer({
     return EXT_LANG_MAP[ext] || 'text';
   }, [cleanName]);
 
-  const isMassiveFile = (content?.length || 0) > MASSIVE_FILE_LIMIT;
+  const isMassiveFile = (content?.length || 0) >= 1_500_000 || (content?.includes('[MASH SAFE PREVIEW: Large file') ?? false);
   const MONACO_SAFE_LIMIT = 500 * 1024; // 500 KB max for Monaco AST tokenization
   const isHeavyFile = (content?.length || 0) > MONACO_SAFE_LIMIT;
   const [forceMonaco, setForceMonaco] = React.useState(false);
