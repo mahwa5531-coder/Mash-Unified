@@ -286,7 +286,7 @@ def _process_stream_chunk(
     return middleware_manager.stream_chunk(chunk, model_call_params)
 
 
-def _build_bifrost_headers(
+def _build_cloud_telemetry_headers(
     llm_config: LLMConfig,
     model_call_params: ModelCallParams | None = None,
 ) -> dict[str, str]:
@@ -329,6 +329,10 @@ def _build_bifrost_headers(
     if hasattr(llm_config, "default_headers") and llm_config.default_headers:
         headers.update(llm_config.default_headers)
     return headers
+
+
+# Backward-compatible alias
+_build_bifrost_headers = _build_cloud_telemetry_headers
 
 
 class LLMCaller:
@@ -887,7 +891,7 @@ def call_llm_with_openai_chat_completion(
         kwargs["extra_body"] = existing_extra_body
 
     if llm_config:
-        req_headers = _build_bifrost_headers(llm_config, model_call_params)
+        req_headers = _build_cloud_telemetry_headers(llm_config, model_call_params)
         if req_headers:
             existing_extra_headers = dict(kwargs.get("extra_headers") or {})
             existing_extra_headers.update(req_headers)
@@ -1007,7 +1011,7 @@ async def call_llm_with_openai_chat_completion_async(
         kwargs["extra_body"] = existing_extra_body
 
     if llm_config:
-        req_headers = _build_bifrost_headers(llm_config, model_call_params)
+        req_headers = _build_cloud_telemetry_headers(llm_config, model_call_params)
         if req_headers:
             existing_extra_headers = dict(kwargs.get("extra_headers") or {})
             existing_extra_headers.update(req_headers)

@@ -885,12 +885,12 @@ async def test_mash_client_get_me_rolling_quotas():
     assert data["quota"]["windows"][0]["percent"] == 42
 
 
-def test_bifrost_headers_include_request_id():
-    """Scenario 8.2: _build_bifrost_headers injects X-Request-ID and X-Session-ID."""
+def test_cloud_telemetry_headers_include_request_id():
+    """Scenario 8.2: _build_cloud_telemetry_headers injects X-Request-ID and X-Session-ID."""
     from nexau.archs.llm.llm_config import LLMConfig
-    from nexau.archs.main_sub.execution.llm_caller import _build_bifrost_headers
+    from nexau.archs.main_sub.execution.llm_caller import _build_cloud_telemetry_headers
     cfg = LLMConfig(session_id="sess_kpmg_test_123")
-    headers = _build_bifrost_headers(cfg)
+    headers = _build_cloud_telemetry_headers(cfg)
 
     assert "X-Request-ID" in headers
     assert headers["X-Request-ID"].startswith("req_")

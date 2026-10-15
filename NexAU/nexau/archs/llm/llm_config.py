@@ -238,7 +238,7 @@ class LLMConfig:
             read=read,
         )
 
-        # Inject Bifrost / Cloud Gateway telemetry headers
+        # Inject Cloud Gateway telemetry headers
         try:
             from nexau.archs.platform.crypto_vault import get_auth_metadata
             from nexau.archs.platform.path_helpers import get_installation_id
