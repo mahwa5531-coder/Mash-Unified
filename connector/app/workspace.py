@@ -24,9 +24,7 @@ def get_base_allowed_roots() -> list[Path]:
     if _BASE_ROOTS is None:
         roots = [APP_WORKSPACE_ROOT.resolve()]
         for folder in [".mash", ".nexau"]:
-            b_dir = (Path.home() / folder / "brain").resolve()
-            if b_dir.is_dir():
-                roots.append(b_dir)
+            roots.append((Path.home() / folder / "brain").resolve())
         _BASE_ROOTS = roots
     return _BASE_ROOTS
 

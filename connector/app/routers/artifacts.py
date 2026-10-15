@@ -161,6 +161,7 @@ async def get_artifact(
 
     candidate_dirs = [
         Path(primary_brain_dir),
+        Path.home() / ".mash" / "brain" / session_id,
         Path.home() / ".nexau" / "brain" / session_id,
     ]
 
@@ -237,17 +238,18 @@ async def get_file_content(
                 validate_safe_id(session_id, "session_id")
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))
-            s_dir = (Path.home() / ".nexau" / "brain" / session_id).resolve()
-            if s_dir.is_dir():
-                candidates.extend([
-                    s_dir / rel_path,
-                    s_dir / f"{rel_path}.md",
-                    s_dir / "working_papers" / rel_path,
-                    s_dir / "working_papers" / f"{rel_path}.md",
-                    s_dir / "scratch" / rel_path,
-                    s_dir / ".system_generated" / "tasks" / rel_path,
-                    s_dir / ".system_generated" / "logs" / rel_path,
-                ])
+            for b_folder in [".mash", ".nexau"]:
+                s_dir = (Path.home() / b_folder / "brain" / session_id).resolve()
+                if s_dir.is_dir():
+                    candidates.extend([
+                        s_dir / rel_path,
+                        s_dir / f"{rel_path}.md",
+                        s_dir / "working_papers" / rel_path,
+                        s_dir / "working_papers" / f"{rel_path}.md",
+                        s_dir / "scratch" / rel_path,
+                        s_dir / ".system_generated" / "tasks" / rel_path,
+                        s_dir / ".system_generated" / "logs" / rel_path,
+                    ])
             try:
                 ws = await resolve_session_workspace(eng, session_id)
                 if ws and ws.is_dir():
@@ -513,7 +515,7 @@ async def get_workspace_tree(session_id: str | None = None, engine: DatabaseEngi
         ignored = {
             ".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache",
             ".ruff_cache", "dist", "build", ".next", ".hypothesis", "antigravity",
-            "backup_frontend", ".nexau", ".gemini"
+            "backup_frontend", ".nexau", ".mash", ".gemini"
         }
         try:
             for entry in sorted(dir_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):

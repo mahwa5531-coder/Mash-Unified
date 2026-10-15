@@ -28,6 +28,7 @@ if str(nexau_dir) not in sys.path:
 
 import app.dependencies as deps
 from app.main import app, lifespan
+from app.paths import get_session_brain_dir
 from nexau.archs.session.models import AgentRunActionModel, SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 from nexau.core.messages import (
@@ -359,7 +360,7 @@ async def test_missing_or_deleted_physical_artifact_files_clean_404():
             assert "not found" in content_err["detail"].lower()
 
             # 3. Create a physical scratch file, verify 200, then delete it and verify clean 404
-            scratch_dir = Path.home() / ".nexau" / "brain" / sid / "scratch"
+            scratch_dir = get_session_brain_dir(sid) / "scratch"
             scratch_dir.mkdir(parents=True, exist_ok=True)
             temp_file = scratch_dir / "temp_audit_note.txt"
             temp_file.write_text("Audit notes draft content", encoding="utf-8")
