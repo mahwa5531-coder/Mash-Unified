@@ -29,7 +29,17 @@ input_schema:
       type: integer
       description: The process ID of the background task. Required for "status" and
         "kill" actions. This is the pid returned by run_shell_command when is_background=true.
+    toolAction:
+      type: string
+      description: Brief 2-5 word phrase in -ing form describing the specific action.
+        Capitalize like a sentence.
+    toolSummary:
+      type: string
+      description: Brief 2-5 word noun phrase describing the specific task. Capitalize
+        like a sentence.
   required:
   - action
+  - toolAction
+  - toolSummary
   additionalProperties: false
   $schema: http://json-schema.org/draft-07/schema#

@@ -54,11 +54,11 @@ jobs:
         run: |
           python -m ruff check NexAU/ connector/ --select E9,F821
 
-      - name: Run Core Connector Tests
+      - name: Run Connector and NexAU Tests
         env:
           PYTHONPATH: "connector:NexAU"
         run: |
-          python -m pytest connector/tests/test_scenario_matrix.py connector/tests/test_backend_sanity.py -v
+          python -m pytest connector/tests/ NexAU/tests/unit/ -v -m "not external and not llm and not live_nightly"
 
   cloud-api:
     name: Cloud API (Go Services)

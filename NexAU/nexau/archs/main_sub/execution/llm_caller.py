@@ -163,6 +163,19 @@ def _compact_scalar(value: Any, *, max_chars: int = 256) -> str:
     return text
 
 
+def _normalize_token_ids(token_ids: Any, context: str = "") -> list[int]:
+    """Normalize and validate a list of integer token IDs."""
+    if not isinstance(token_ids, list):
+        raise ValueError(f"{context} must be a list")
+    res = []
+    for item in token_ids:
+        try:
+            res.append(int(item))
+        except (ValueError, TypeError):
+            raise ValueError(f"non-integer item in {context}")
+    return res
+
+
 def _extract_error_detail(payload: object) -> str:
     if not isinstance(payload, dict):
         return ""

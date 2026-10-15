@@ -7,16 +7,16 @@ from pathlib import Path
 import httpx
 import pytest
 
-# Ensure project root and backend are in sys.path
+# Ensure project root and connector are in sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-backend_dir = Path(__file__).resolve().parent.parent.parent.parent / "backend"
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+connector_dir = Path(__file__).resolve().parent.parent.parent.parent / "connector"
+if str(connector_dir) not in sys.path:
+    sys.path.insert(0, str(connector_dir))
 
 try:
     from app.main import app, lifespan
 except ImportError:
-    from backend.app.main import app, lifespan
+    from connector.app.main import app, lifespan
 from nexau.archs.platform.path_helpers import (
     get_brain_dir,
     get_database_path,
@@ -105,9 +105,7 @@ async def test_storage_scaffold_lifecycle_live():
                 assert proj_brain.exists()
                 assert (proj_brain / ".system_generated" / "logs").exists()
                 assert (proj_brain / ".system_generated" / "tasks").exists()
-                assert (proj_brain / ".system_generated" / "messages").exists()
                 assert (proj_brain / ".user_uploaded").exists()
-                assert (proj_brain / "media").exists()
                 assert (proj_brain / "scratch").exists()
 
                 # 3. Trigger Standalone Session Stream

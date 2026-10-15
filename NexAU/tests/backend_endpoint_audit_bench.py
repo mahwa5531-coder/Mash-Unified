@@ -8,14 +8,14 @@ from pathlib import Path
 import httpx
 
 # Ensure paths
-backend_dir = Path(__file__).resolve().parent.parent.parent / "backend"
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+connector_dir = Path(__file__).resolve().parent.parent.parent / "connector"
+if str(connector_dir) not in sys.path:
+    sys.path.insert(0, str(connector_dir))
 
 try:
     from app.main import app, lifespan
 except ImportError:
-    from backend.app.main import app, lifespan
+    from connector.app.main import app, lifespan
 
 from nexau.archs.platform.path_helpers import get_database_path
 
