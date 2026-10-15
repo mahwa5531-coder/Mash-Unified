@@ -2,7 +2,7 @@
 # Primary runtime dependencies imported by the agent runtime itself.
 dependencies = [
   "pyyaml>=6.0",
-  "pydantic>=2.7,<2.10.0",
+  "pydantic>=2.7",
   "packaging>=24.0",
   "jsonschema>=4.0.0",
   "requests>=2.25.0",
