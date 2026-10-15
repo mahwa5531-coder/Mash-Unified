@@ -36,10 +36,10 @@ from unittest.mock import patch
 def test_path_helpers_resolution():
     """Verify that path helpers return the exact expected directory structure."""
     home = get_nexau_home()
-    assert home == Path.home() / ".nexau"
+    assert home == Path.home() / ".mash"
 
     db_path = get_database_path()
-    assert db_path == home / "database" / "nexau.db"
+    assert db_path == home / "database" / "mash.db"
 
     proj_id = "test_proj_123"
     sess_id = "test_sess_456"

@@ -8,6 +8,8 @@ export function shouldExcludePath(p: string): boolean {
     lower.startsWith('.scratch/') ||
     lower.includes('/.gemini/') ||
     lower.startsWith('.gemini/') ||
+    lower.includes('/.mash/') ||
+    lower.startsWith('.mash/') ||
     lower.includes('/.nexau/') ||
     lower.startsWith('.nexau/') ||
     lower.includes('/.system_generated/') ||

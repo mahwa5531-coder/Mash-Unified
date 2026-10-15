@@ -54,25 +54,30 @@ def is_windows_host() -> bool:
 
 
 def get_nexau_home() -> Path:
-    """Return the global ~/.nexau directory."""
-    p = Path.home() / ".nexau"
+    """Return the global ~/.mash directory."""
+    p = Path.home() / ".mash"
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
+get_mash_home = get_nexau_home
+
+
 def get_database_path() -> Path:
-    """Return the unified SQLite database path (~/.nexau/database/nexau.db).
-    Automatically scaffolds ~/.nexau/database/ and migrates legacy root DB files if present.
+    """Return the unified SQLite database path (~/.mash/database/mash.db).
+    Automatically scaffolds ~/.mash/database/ and migrates legacy root DB files if present.
     """
-    db_dir = get_nexau_home() / "database"
+    db_dir = get_mash_home() / "database"
     db_dir.mkdir(parents=True, exist_ok=True)
-    new_db = db_dir / "nexau.db"
-    legacy_db = get_nexau_home() / "nexau.db"
+    new_db = db_dir / "mash.db"
+    legacy_db = get_mash_home() / "nexau.db"
+    if not legacy_db.exists():
+        legacy_db = Path.home() / ".nexau" / "database" / "nexau.db"
     if legacy_db.exists() and not new_db.exists():
         import shutil
         for suffix in ["", "-wal", "-shm"]:
-            src = get_nexau_home() / f"nexau.db{suffix}"
-            dst = db_dir / f"nexau.db{suffix}"
+            src = Path(str(legacy_db) + suffix)
+            dst = db_dir / f"mash.db{suffix}"
             if src.exists():
                 try:
                     shutil.move(str(src), str(dst))
@@ -221,9 +226,11 @@ def scaffold_workspace_storage(workspace_path: str | Path) -> Path:
         ws.mkdir(parents=True, exist_ok=True)
 
     (ws / "Audit_Deliverables").mkdir(parents=True, exist_ok=True)
-    (ws / ".nexau" / "cache").mkdir(parents=True, exist_ok=True)
+    (ws / ".mash" / "cache").mkdir(parents=True, exist_ok=True)
 
-    ws_meta = ws / ".nexau" / "workspace.json"
+    ws_meta = ws / ".mash" / "workspace.json"
+    if not ws_meta.exists() and (ws / ".nexau" / "workspace.json").exists():
+        ws_meta = ws / ".nexau" / "workspace.json"
     if not ws_meta.exists():
         import json
         from datetime import datetime

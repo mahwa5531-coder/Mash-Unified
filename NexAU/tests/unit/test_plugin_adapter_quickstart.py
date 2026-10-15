@@ -4,8 +4,8 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
-from examples.plugin_adapter import quickstart, quickstart_yaml
 
+from examples.plugin_adapter import quickstart, quickstart_yaml
 from nexau.archs.main_sub.config.config import AgentConfig
 from nexau.archs.tracer.adapters.langfuse import LangfuseTracer
 

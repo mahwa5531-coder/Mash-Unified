@@ -37,6 +37,7 @@ if str(NEXAU_DIR) not in sys.path:
 from app.main import app, lifespan
 from app.paths import (
     SAFE_ID_REGEX,
+    get_database_path,
     get_nexau_home,
     get_session_brain_dir,
     safe_rmtree_session_brain,
@@ -147,7 +148,7 @@ async def test_bug_3_and_13_total_data_wipe_and_fake_success_elimination():
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=15.0) as client:
             nexau_home = get_nexau_home()
-            db_path = nexau_home / "database" / "nexau.db"
+            db_path = get_database_path()
 
             # 1. Traversal delete attempt via route parameter
             res_wipe = await client.delete("/api/sessions/sess_traversal..hack")
