@@ -14,8 +14,6 @@ from app.main import app, lifespan
 from nexau.archs.session.models import AgentRunActionModel, SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 
-DB_PATH = Path.home() / ".nexau" / "nexau.db"
-
 @pytest.fixture(scope="module")
 def anyio_backend():
     return "asyncio"
@@ -154,7 +152,8 @@ async def test_ui_backend_comprehensive_unit_suite():
             assert "test_ui_backend_comprehensive_unit_suite" in res.json()["content"]
 
             # Security: Path traversal outside allowed workspace returns 403 Forbidden
-            res = await client.get("/files/content?path=C:\\Windows\\win.ini")
+            traversal_target = "C:\\Windows\\win.ini" if os.name == "nt" else "/etc/shadow"
+            res = await client.get(f"/files/content?path={traversal_target}")
             assert res.status_code == 403
             assert "outside authorized workspace" in res.json()["detail"]
 

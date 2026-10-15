@@ -15,6 +15,7 @@ Testing 10 Mission-Critical Real-World Enterprise Audit Scenarios:
 """
 
 import datetime
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -491,7 +492,8 @@ async def test_audit_scenario_9_multi_client_workspace_isolation():
         # Verify Client B workspace has no access to Client A's path
         assert not Path(p_a).is_relative_to(Path(zenith_path))
         # Ensure path security boundary check catches non-base roots
-        assert is_path_in_base_roots(Path("C:/Windows/System32/config")) is False
+        forbidden_config = Path("C:/Windows/System32/config") if os.name == "nt" else Path("/etc/shadow")
+        assert is_path_in_base_roots(forbidden_config) is False
 
 
 # ==============================================================================

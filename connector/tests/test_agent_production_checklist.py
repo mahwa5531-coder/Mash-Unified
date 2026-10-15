@@ -10,6 +10,7 @@ Deep evaluation of the 7 core agent pillars:
 7. Process Lifecycle & Stop Cancellation Handshake
 """
 
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -216,7 +217,7 @@ def test_pillar_5_security_and_sandbox_boundaries():
         sandbox = LocalSandbox(work_dir=tmp_path)
 
         # 1. Path traversal attack check (outside allowed roots)
-        traversal_path = Path("C:/Windows/System32/cmd.exe")
+        traversal_path = Path("C:/Windows/System32/cmd.exe") if os.name == "nt" else Path("/etc/shadow")
         is_safe = is_path_in_base_roots(traversal_path)
         assert is_safe is False, "Path traversal outside allowed roots must be rejected!"
 

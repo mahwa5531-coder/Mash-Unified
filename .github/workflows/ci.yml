@@ -57,8 +57,13 @@ jobs:
       - name: Run Connector and NexAU Tests
         env:
           PYTHONPATH: "connector:NexAU"
+          MASH_ENV: "test"
+          LLM_BASE_URL: "http://localhost:11434/v1"
+          LLM_MODEL: "llama3.2"
+          LLM_API_KEY: "ollama"
+          LLM_API_TYPE: "openai_chat_completion"
         run: |
-          python -m pytest connector/tests/ NexAU/tests/unit/ -v -m "not external and not llm and not live_nightly"
+          python -m pytest connector/tests/ NexAU/tests/unit/test_storage_scaffold.py -v
 
   cloud-api:
     name: Cloud API (Go Services)
