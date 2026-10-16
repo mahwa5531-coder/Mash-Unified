@@ -69,7 +69,8 @@ def _build_config(database_url: str) -> Config:
     """
     cfg = Config()
     cfg.set_main_option("script_location", str(_migrations_dir()))
-    cfg.set_main_option("sqlalchemy.url", database_url)
+    # ponytail: escape '%' as '%%' because ConfigParser interpolates '%' unless escaped
+    cfg.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
     # Match alembic 1.x default. nexau migration files use only sync ops.
     cfg.set_main_option("file_template", "%%(rev)s_%%(slug)s")
     return cfg

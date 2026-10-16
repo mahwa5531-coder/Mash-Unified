@@ -1412,3 +1412,14 @@ def test_postgres_downgrade_pending_tool_calls():
 # SQLModel.metadata.create_all (not alembic), so stamping back to base
 # leaves the table intact. The 0002 + 0003 downgrade tests above cover
 # every reverse-DDL we actually own.
+
+
+def test_build_config_handles_percent_encoded_database_url():
+    """Verify that database URLs containing '%' (e.g. Windows drive letters C%3A or spaces %20)
+    do not crash ConfigParser with ValueError: invalid interpolation syntax."""
+    from nexau.db.migrate import _build_config
+
+    percent_url = "sqlite:///C%3A%5CUsers%5Ctest%20user%5CAppData%5CLocal%5Cmash.db"
+    cfg = _build_config(percent_url)
+    assert cfg.get_main_option("sqlalchemy.url") == percent_url
+

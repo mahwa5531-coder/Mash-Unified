@@ -44,7 +44,8 @@ config = context.config
 if not config.get_main_option("sqlalchemy.url"):
     url_from_env = os.environ.get("NEXAU_ALEMBIC_DATABASE_URL")
     if url_from_env:
-        config.set_main_option("sqlalchemy.url", url_from_env)
+        # ponytail: escape '%' as '%%' because ConfigParser interpolates '%' unless escaped
+        config.set_main_option("sqlalchemy.url", url_from_env.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:
