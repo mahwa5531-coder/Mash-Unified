@@ -74,13 +74,12 @@ def get_database_path() -> Path:
     if not legacy_db.exists():
         legacy_db = Path.home() / ".nexau" / "database" / "nexau.db"
     if legacy_db.exists() and not new_db.exists():
-        import shutil
         for suffix in ["", "-wal", "-shm"]:
             src = Path(str(legacy_db) + suffix)
             dst = db_dir / f"mash.db{suffix}"
             if src.exists():
                 try:
-                    shutil.move(str(src), str(dst))
+                    shutil.copy2(str(src), str(dst))
                 except Exception:
                     pass
     return new_db
@@ -137,11 +136,20 @@ def get_session_brain_dir(session_id: str | None = None, project_id: str | None 
             return legacy_standalone
 
         d = (brain_root / safe_sid).resolve()
-        # ponytail: verify strict containment inside ~/.nexau/brain/
+        # ponytail: verify strict containment inside ~/.mash/brain/
         if not d.is_relative_to(brain_root) or d == brain_root:
             raise ValueError(f"Directory traversal detected for session_id: {session_id!r}")
+        if not d.exists():
+            legacy_brain = (Path.home() / ".nexau" / "brain" / safe_sid).resolve()
+            legacy_root = (Path.home() / ".nexau" / "brain").resolve()
+            if legacy_brain.exists() and legacy_brain.is_relative_to(legacy_root):
+                return legacy_brain
         d.mkdir(parents=True, exist_ok=True)
         return d
+    if not brain_root.exists():
+        legacy_root = (Path.home() / ".nexau" / "brain").resolve()
+        if legacy_root.exists():
+            return legacy_root
     brain_root.mkdir(parents=True, exist_ok=True)
     return brain_root
 

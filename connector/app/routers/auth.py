@@ -27,6 +27,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from nexau.archs.platform.app_config import AppConfig
 from nexau.archs.platform.crypto_vault import (
+    _IN_MEMORY_AUTH_META,
     clear_vault,
     get_auth_metadata,
     load_secure_vault,
@@ -41,24 +42,40 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
+def _token_expires_at(data: dict[str, Any]) -> int:
+    """Convert the OAuth response's relative expiry into a local Unix timestamp."""
+    try:
+        expires_in = int(data["expires_in"])
+    except (KeyError, TypeError, ValueError):
+        logger.warning("Token response is missing a valid expires_in; treating it as expiring now.")
+        return int(time.time())
+
+    if expires_in <= 0:
+        logger.warning("Token response has a non-positive expires_in; treating it as expiring now.")
+        return int(time.time())
+
+    return int(time.time()) + expires_in
+
+
 async def ensure_valid_token(force_refresh: bool = False) -> str | None:
     """Ensures a valid access_token is available with sliding refresh token rotation.
 
     1. If access_token is valid with >= 5 mins remaining before expires_at (and not force_refresh), returns it.
     2. If expired, expiring soon, or force_refresh=True, uses the 30-day refresh_token to contact the Cloud
-       Gateway at /v1/auth/refresh, updating the vault with the newly issued access_token
-       and refreshed expiration window.
-    3. Fallback: returns decrypted access_token, api_key, or env LLM_API_KEY.
+       Gateway at /v1/auth/refresh, updating _IN_MEMORY_AUTH_META with the newly issued access_token
+       and saving rotated refresh_token in the vault.
+    3. Fallback: returns in-memory access_token, api_key, or env LLM_API_KEY.
     """
-    vault = load_secure_vault() or {}
-    access_token = vault.get("access_token")
-    refresh_token = vault.get("refresh_token")
-    expires_at = vault.get("expires_at") or 0
+    access_token = _IN_MEMORY_AUTH_META.get("access_token")
+    expires_at = _IN_MEMORY_AUTH_META.get("expires_at") or 0
     now = int(time.time())
 
     # 1. Valid access token with at least 5 minutes remaining
     if not force_refresh and access_token and now < (expires_at - 300):
         return access_token
+
+    vault = load_secure_vault() or {}
+    refresh_token = vault.get("refresh_token")
 
     # 2. Expired or expiring soon: rotate using sliding refresh_token via centralized MAShClient
     if refresh_token:
@@ -67,9 +84,25 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
             data = await client.refresh_access_token(refresh_token)
             new_access = data.get("access_token")
             if new_access:
-                vault["access_token"] = new_access
+                exp = _token_expires_at(data)
+                _IN_MEMORY_AUTH_META["access_token"] = new_access
+                _IN_MEMORY_AUTH_META["expires_at"] = exp
+                if "id_token" in data:
+                    _IN_MEMORY_AUTH_META["id_token"] = data["id_token"]
+
+                active_acc = vault.get("active_account")
+                if active_acc:
+                    acc_t = _IN_MEMORY_AUTH_META.setdefault("account_tokens", {}).setdefault(active_acc, {})
+                    acc_t["access_token"] = new_access
+                    acc_t["expires_at"] = exp
+                    if "id_token" in data:
+                        acc_t["id_token"] = data["id_token"]
+
                 vault["refresh_token"] = data.get("refresh_token", refresh_token)
-                vault["expires_at"] = data.get("expires_at") or (now + 3600)
+                vault.pop("access_token", None)
+                vault.pop("id_token", None)
+                vault.pop("expires_at", None)
+
                 meta = get_auth_metadata()
                 if "credits_remaining" in data:
                     meta["credits_remaining"] = data["credits_remaining"]
@@ -79,7 +112,7 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
         except Exception as e:
             logger.warning("Cloud gateway token refresh failed: %s", e)
 
-    return access_token or vault.get("api_key") or os.getenv("LLM_API_KEY")
+    return _IN_MEMORY_AUTH_META.get("access_token") or vault.get("api_key") or os.getenv("LLM_API_KEY")
 
 
 async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | None:
@@ -191,7 +224,7 @@ async def get_current_user_auth() -> dict[str, Any]:
     meta = get_auth_metadata()
     vault = load_secure_vault()
     if meta.get("authenticated") and vault is not None and meta.get("email"):
-        token = vault.get("access_token")
+        token = _IN_MEMORY_AUTH_META.get("access_token")
         # Proactively sync rolling quota position if not present
         if token and not meta.get("quota"):
             await sync_user_account_state(token)
@@ -209,7 +242,7 @@ async def get_current_user_auth() -> dict[str, Any]:
             "models": meta.get("models", []),
             "credits_remaining": meta.get("credits_remaining", 500),
             "accounts": meta.get("accounts", []),
-            "has_access_token": bool(vault.get("access_token") or vault.get("api_key")),
+            "has_access_token": bool(_IN_MEMORY_AUTH_META.get("access_token") or vault.get("api_key")),
         }
 
     return {
@@ -290,7 +323,7 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
             user_info = data.get("user", {})
             payload.access_token = data.get("access_token")
             payload.refresh_token = data.get("refresh_token")
-            payload.expires_at = now + data.get("expires_in", 3600)
+            payload.expires_at = _token_expires_at(data)
             payload.email = user_info.get("email") or payload.email
             payload.name = user_info.get("display_name") or payload.name or "User"
             logger.info("Successfully exchanged mcode with Cloud API for %s", payload.email)
@@ -331,25 +364,33 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
         effective_plan = payload.plan or "free"
         effective_credits = payload.credits_remaining if payload.credits_remaining is not None else 100
 
+    # Populate in-memory access and id tokens strictly in RAM
+    if payload.access_token:
+        _IN_MEMORY_AUTH_META["access_token"] = payload.access_token
+    if payload.id_token:
+        _IN_MEMORY_AUTH_META["id_token"] = payload.id_token
+    if payload.expires_at:
+        _IN_MEMORY_AUTH_META["expires_at"] = payload.expires_at
+
+    _IN_MEMORY_AUTH_META.setdefault("account_tokens", {})[payload.email] = {
+        "access_token": payload.access_token,
+        "id_token": payload.id_token,
+        "expires_at": payload.expires_at,
+    }
+
     accounts[payload.email] = {
         "email": payload.email,
         "name": payload.name,
         "plan": effective_plan,
         "api_key": payload.api_key,
-        "access_token": payload.access_token,
         "refresh_token": payload.refresh_token,
-        "id_token": payload.id_token,
-        "expires_at": payload.expires_at,
         "credits_remaining": effective_credits,
     }
 
     secrets = {
         "active_account": payload.email,
         "api_key": payload.api_key,
-        "access_token": payload.access_token,
         "refresh_token": payload.refresh_token,
-        "id_token": payload.id_token,
-        "expires_at": payload.expires_at,
         "accounts": accounts,
     }
 
@@ -398,8 +439,6 @@ async def handle_account_switch(payload: SwitchAccountPayload) -> dict[str, Any]
 
     if payload.api_key:
         target["api_key"] = payload.api_key
-    if payload.access_token:
-        target["access_token"] = payload.access_token
     if payload.refresh_token:
         target["refresh_token"] = payload.refresh_token
     if payload.name:
@@ -410,13 +449,27 @@ async def handle_account_switch(payload: SwitchAccountPayload) -> dict[str, Any]
 
     accounts[payload.email] = target
 
+    # Update in-memory auth state for target account
+    acc_tokens = _IN_MEMORY_AUTH_META.setdefault("account_tokens", {}).get(payload.email, {})
+    if payload.access_token:
+        acc_tokens["access_token"] = payload.access_token
+    _IN_MEMORY_AUTH_META["account_tokens"][payload.email] = acc_tokens
+
+    if acc_tokens.get("access_token"):
+        _IN_MEMORY_AUTH_META["access_token"] = acc_tokens["access_token"]
+        _IN_MEMORY_AUTH_META["id_token"] = acc_tokens.get("id_token")
+        _IN_MEMORY_AUTH_META["expires_at"] = acc_tokens.get("expires_at")
+    elif payload.access_token:
+        _IN_MEMORY_AUTH_META["access_token"] = payload.access_token
+    else:
+        _IN_MEMORY_AUTH_META.pop("access_token", None)
+        _IN_MEMORY_AUTH_META.pop("id_token", None)
+        _IN_MEMORY_AUTH_META.pop("expires_at", None)
+
     secrets = {
         "active_account": payload.email,
         "api_key": target.get("api_key"),
-        "access_token": target.get("access_token"),
         "refresh_token": target.get("refresh_token"),
-        "id_token": target.get("id_token"),
-        "expires_at": target.get("expires_at"),
         "accounts": accounts,
     }
 
@@ -449,7 +502,7 @@ async def handle_logout() -> dict[str, Any]:
     """Clears local secure vault on logout and revokes cloud session if present."""
     vault = load_secure_vault() or {}
     refresh_token = vault.get("refresh_token")
-    access_token = vault.get("access_token")
+    access_token = _IN_MEMORY_AUTH_META.get("access_token") or vault.get("access_token")
 
     # Best-effort cloud session revocation in background
     if refresh_token or access_token:

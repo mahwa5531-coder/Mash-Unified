@@ -49,11 +49,6 @@ export async function fetchAuthMe(): Promise<AuthUser | null> {
     const res = await safeFetch(`${BASE_URL}/api/auth/me`);
     if (!res.ok) return null;
     const data = await res.json();
-    if (typeof window !== 'undefined' && data?.access_token) {
-      try {
-        localStorage.setItem('nexau_access_token', data.access_token);
-      } catch {}
-    }
     return data;
   } catch (err) {
     console.warn("Failed to fetch auth state:", err);
@@ -67,11 +62,6 @@ export async function syncAuthMe(): Promise<AuthUser | null> {
     if (!res.ok) return null;
     const body = await res.json();
     const data = body?.data || null;
-    if (typeof window !== 'undefined' && data?.access_token) {
-      try {
-        localStorage.setItem('nexau_access_token', data.access_token);
-      } catch {}
-    }
     return data;
   } catch (err) {
     console.warn("Failed to sync auth state:", err);

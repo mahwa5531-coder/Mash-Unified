@@ -7,6 +7,10 @@ from typing import Any
 
 from fastapi import HTTPException
 from nexau.archs.session import AgentRunActionKey, AgentRunActionService
+from nexau.archs.session.agent_run_action_service import (
+    redact_data_structure,
+    redact_sensitive_content,
+)
 from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 from nexau.core.messages import Message, TextBlock, ToolResultBlock, ToolUseBlock
@@ -123,7 +127,7 @@ def messages_to_transcript_lines(
                 content_str = b.content if isinstance(b.content, str) else str(b.content)
                 if shallow_tools and len(content_str) > 3000:
                     content_str = content_str[:3000] + f"\n... [Truncated for rapid UI loading; {len(content_str)} total characters]"
-                tool_results[str(b.tool_use_id)] = content_str
+                tool_results[str(b.tool_use_id)] = redact_sensitive_content(content_str)
 
     lines = []
     for msg in messages:
@@ -136,36 +140,37 @@ def messages_to_transcript_lines(
 
         for b in msg.content:
             if isinstance(b, TextBlock):
-                c_text = clean_protocol_sentinels(clean_user_steering_envelope(b.text) if role_str == "user" else b.text)
+                c_text = redact_sensitive_content(clean_protocol_sentinels(clean_user_steering_envelope(b.text) if role_str == "user" else b.text))
                 text_parts.append(c_text)
                 steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "text", "content": c_text, "status": "completed"})
                 step_idx += 1
             elif hasattr(b, "thinking") and b.thinking:
-                th = re.sub(r"</?(?:thought|thinking)>", "", str(b.thinking), flags=re.I).strip()
+                th = redact_sensitive_content(re.sub(r"</?(?:thought|thinking)>", "", str(b.thinking), flags=re.I).strip())
                 thoughts.append(th)
                 steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "thinking", "content": th, "status": "completed"})
                 step_idx += 1
             elif getattr(b, "type", "") in ("thinking", "reasoning"):
                 t_text = getattr(b, "text", "") or getattr(b, "thinking", "")
                 if t_text:
-                    th = re.sub(r"</?(?:thought|thinking)>", "", str(t_text), flags=re.I).strip()
+                    th = redact_sensitive_content(re.sub(r"</?(?:thought|thinking)>", "", str(t_text), flags=re.I).strip())
                     thoughts.append(th)
                     steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "thinking", "content": th, "status": "completed"})
                     step_idx += 1
             elif isinstance(b, ToolUseBlock):
                 tc_id, tc_name = str(b.id), str(b.name)
-                t_args = b.input if isinstance(b.input, dict) else {}
+                t_args = redact_data_structure(b.input) if isinstance(b.input, dict) else {}
                 tool_action = get_tool_action_type(tc_name)
 
                 is_pending = bool(pending_map and tc_id in pending_map and not pending_map[tc_id].get("decision"))
                 decision_val = pending_map.get(tc_id, {}).get("decision") if pending_map else None
                 tool_status = "pending_approval" if is_pending else ("denied" if decision_val == "deny" else "completed")
                 output_val = tool_results.get(tc_id, "")
+                summary_raw = t_args.get("toolSummary") or (pending_map.get(tc_id, {}).get("prompt") if pending_map else None)
 
                 tools.append({
                     "id": tc_id, "name": tc_name, "args": t_args, "output": output_val,
                     "status": tool_status, "decision": decision_val,
-                    "toolSummary": t_args.get("toolSummary") or (pending_map.get(tc_id, {}).get("prompt") if pending_map else None),
+                    "toolSummary": redact_sensitive_content(str(summary_raw)) if summary_raw else None,
                     "toolAction": t_args.get("toolAction"), "action_type": tool_action,
                 })
                 steps.append({
@@ -175,7 +180,7 @@ def messages_to_transcript_lines(
                 })
                 step_idx += 1
 
-        combined_text = "\n\n".join(text_parts).strip()
+        combined_text = redact_sensitive_content("\n\n".join(text_parts).strip())
         if not combined_text and not tools and not thoughts:
             continue
 

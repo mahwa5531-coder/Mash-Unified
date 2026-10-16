@@ -140,12 +140,13 @@ async def get_task_log(task_id: str):
         task_root / f"{clean}.log",
     ]
     import glob
-    nexau_brain = (Path.home() / ".nexau" / "brain").resolve()
-    if nexau_brain.is_dir():
-        for p_str in glob.glob(str(nexau_brain / "*" / ".system_generated" / "tasks" / f"task-{clean}.log")):
-            candidate_paths.append(Path(p_str))
-        for p_str in glob.glob(str(nexau_brain / "*" / ".system_generated" / "tasks" / f"{clean}.log")):
-            candidate_paths.append(Path(p_str))
+    for brain_base in [Path.home() / ".mash" / "brain", Path.home() / ".nexau" / "brain"]:
+        b_resolved = brain_base.resolve()
+        if b_resolved.is_dir():
+            for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"task-{clean}.log")):
+                candidate_paths.append(Path(p_str))
+            for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"{clean}.log")):
+                candidate_paths.append(Path(p_str))
 
     for p in candidate_paths:
         if p.exists() and p.is_file():
@@ -267,12 +268,13 @@ async def stream_task_log(task_id: str, request: Request):
             task_root / f"{clean}.log",
         ]
         import glob
-        nexau_brain = (Path.home() / ".nexau" / "brain").resolve()
-        if nexau_brain.is_dir():
-            for p_str in glob.glob(str(nexau_brain / "*" / ".system_generated" / "tasks" / f"task-{clean}.log")):
-                candidate_paths.append(Path(p_str))
-            for p_str in glob.glob(str(nexau_brain / "*" / ".system_generated" / "tasks" / f"{clean}.log")):
-                candidate_paths.append(Path(p_str))
+        for brain_base in [Path.home() / ".mash" / "brain", Path.home() / ".nexau" / "brain"]:
+            b_resolved = brain_base.resolve()
+            if b_resolved.is_dir():
+                for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"task-{clean}.log")):
+                    candidate_paths.append(Path(p_str))
+                for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"{clean}.log")):
+                    candidate_paths.append(Path(p_str))
 
         target_file = next((p for p in candidate_paths if p.exists()), None)
         if target_file:

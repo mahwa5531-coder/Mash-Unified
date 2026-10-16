@@ -153,3 +153,91 @@ async def test_storage_scaffold_lifecycle_live():
 
                 if os.path.exists(workspace):
                     shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_nondestructive_database_migration_preserves_legacy(tmp_path):
+    """Verify get_database_path copies from legacy nexau.db using copy2 and preserves the legacy file."""
+    fake_home = tmp_path / "userhome"
+    legacy_dir = fake_home / ".nexau" / "database"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    legacy_db = legacy_dir / "nexau.db"
+    legacy_db.write_text("LEGACY_SQLITE_DATA", encoding="utf-8")
+
+    mash_dir = fake_home / ".mash"
+
+    with patch("pathlib.Path.home", return_value=fake_home):
+        with patch("nexau.archs.platform.path_helpers.get_mash_home", return_value=mash_dir):
+            db_path = get_database_path()
+            assert db_path.exists()
+            assert db_path.read_text(encoding="utf-8") == "LEGACY_SQLITE_DATA"
+            # Crucial R4 invariant: legacy file must STILL exist!
+            assert legacy_db.exists()
+            assert legacy_db.read_text(encoding="utf-8") == "LEGACY_SQLITE_DATA"
+
+
+def test_session_brain_legacy_fallback(tmp_path):
+    """Verify get_session_brain_dir returns legacy ~/.nexau/brain/<session_id> if ~/.mash/brain/<session_id> is missing."""
+    fake_home = tmp_path / "userhome"
+    legacy_session_brain = fake_home / ".nexau" / "brain" / "legacy_session_999"
+    legacy_session_brain.mkdir(parents=True, exist_ok=True)
+    (legacy_session_brain / "note.txt").write_text("legacy note", encoding="utf-8")
+
+    mash_home = fake_home / ".mash"
+
+    with patch("pathlib.Path.home", return_value=fake_home):
+        with patch("nexau.archs.platform.path_helpers.get_nexau_home", return_value=mash_home):
+            with patch("nexau.archs.platform.path_helpers.get_mash_home", return_value=mash_home):
+                resolved = get_session_brain_dir("legacy_session_999")
+                assert resolved == legacy_session_brain
+                assert (resolved / "note.txt").exists()
+
+
+def test_app_config_legacy_fallback(tmp_path):
+    """Verify AppConfig.load reads from legacy ~/.nexau/settings.json when ~/.mash/settings.json is absent."""
+    fake_home = tmp_path / "userhome"
+    legacy_settings_dir = fake_home / ".nexau"
+    legacy_settings_dir.mkdir(parents=True, exist_ok=True)
+    legacy_settings_file = legacy_settings_dir / "settings.json"
+    legacy_settings_file.write_text('{"theme": "cyberpunk_neon", "trusted_folders": ["/var/legacy"]}', encoding="utf-8")
+
+    mash_home = fake_home / ".mash"
+
+    from nexau.archs.platform.app_config import AppConfig
+
+    with patch("pathlib.Path.home", return_value=fake_home):
+        with patch("nexau.archs.platform.path_helpers.get_nexau_home", return_value=mash_home):
+            cfg = AppConfig.load()
+            assert cfg.theme == "cyberpunk_neon"
+            assert "/var/legacy" in cfg.trusted_folders
+            # Legacy file must remain untouched
+            assert legacy_settings_file.exists()
+            # Migrated file in .mash must now exist
+            assert (mash_home / "settings.json").exists()
+
+
+def test_redact_sensitive_content_comprehensive():
+    """Verify redact_sensitive_content properly redacts API keys, Bearer tokens, and auth headers."""
+    from nexau.archs.session.agent_run_action_service import redact_sensitive_content
+
+    # 1. API Keys
+    assert redact_sensitive_content("key is sk-1234567890123456789012") == "key is [REDACTED]"
+    assert redact_sensitive_content("key is sk-ant-1234567890123456789012") == "key is [REDACTED]"
+    assert redact_sensitive_content("key is ghp_12345678901234567890") == "key is [REDACTED]"
+    assert redact_sensitive_content("key is AIza12345678901234567890") == "key is [REDACTED]"
+
+    # 2. Bearer tokens (standard and base64 with +, /, =)
+    assert redact_sensitive_content("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.secret") == "Bearer [REDACTED]"
+    assert redact_sensitive_content("curl -H 'bearer token_abc123_def456_ghi789'") == "curl -H 'Bearer [REDACTED]'"
+    assert redact_sensitive_content("Bearer mysecret+token/withplusandslash") == "Bearer [REDACTED]"
+    assert redact_sensitive_content("Bearer dXNlcjpwYXNz+extra/token==") == "Bearer [REDACTED]"
+
+    # 3. Auth headers (standard, mixed quotes, unquoted, and whitespace variations)
+    assert redact_sensitive_content('{"Authorization": "Bearer token123"}') == '{"Authorization": "[REDACTED]"}'
+    assert redact_sensitive_content('{"Authorization": "Basic dXNlcjpwYXNz"}') == '{"Authorization": "[REDACTED]"}'
+    assert redact_sensitive_content("{'Authorization': 'secret_auth_token'}") == "{'Authorization': '[REDACTED]'}"
+    assert redact_sensitive_content("{'Authorization': \"Basic secret12345\"}") == "{'Authorization': \"[REDACTED]\"}"
+    assert redact_sensitive_content("{\"Authorization\": 'Basic secret12345'}") == "{\"Authorization\": '[REDACTED]'}"
+    assert redact_sensitive_content("Authorization: Basic secret12345") == "Authorization: Basic [REDACTED]"
+    assert redact_sensitive_content("Authorization: Bearer secret12345") == "Authorization: Bearer [REDACTED]"
+    assert redact_sensitive_content("Authorization: secret12345") == "Authorization: [REDACTED]"
+    assert redact_sensitive_content("{ \"Authorization\" : \"Basic secret12345\" }") == "{ \"Authorization\" : \"[REDACTED]\" }"

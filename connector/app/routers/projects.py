@@ -247,19 +247,20 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
     except Exception:
         pass
 
-    # 2. Clean up project storage directory in .nexau (~/.nexau/projects/<project_id>/ and <name>/)
-    nexau_projects_root = (get_nexau_home() / "projects").resolve()
-    for p_ident in [project.id, project.name]:
-        if p_ident:
-            proj_dir = (nexau_projects_root / str(p_ident)).resolve()
-            if proj_dir.exists() and proj_dir.is_relative_to(nexau_projects_root) and proj_dir != nexau_projects_root:
-                shutil.rmtree(proj_dir, ignore_errors=True)
+    # 2. Clean up project storage directory in .nexau and .mash (~/.mash/projects/ and ~/.nexau/projects/)
+    for root in [(get_nexau_home() / "projects").resolve(), (Path.home() / ".nexau" / "projects").resolve()]:
+        for p_ident in [project.id, project.name]:
+            if p_ident:
+                proj_dir = (root / str(p_ident)).resolve()
+                if proj_dir.exists() and proj_dir.is_relative_to(root) and proj_dir != root:
+                    shutil.rmtree(proj_dir, ignore_errors=True)
 
-    # 3. Clean up .nexau directory inside the workspace folder if it exists (local code files preserved!)
+    # 3. Clean up .mash and .nexau directory inside the workspace folder if it exists (local code files preserved!)
     if project.local_folder_path and os.path.isdir(project.local_folder_path):
-        local_nexau = os.path.join(project.local_folder_path, ".nexau")
-        if os.path.exists(local_nexau):
-            shutil.rmtree(local_nexau, ignore_errors=True)
+        for hidden_dir in [".mash", ".nexau"]:
+            local_meta = os.path.join(project.local_folder_path, hidden_dir)
+            if os.path.exists(local_meta):
+                shutil.rmtree(local_meta, ignore_errors=True)
 
     # 4. Delete all project records from DB matching id or name (case-insensitive)
     all_projs = await engine.find_many(ProjectModel)

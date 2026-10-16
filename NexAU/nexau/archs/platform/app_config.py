@@ -60,6 +60,14 @@ class AppConfig(BaseModel):
     def load(cls) -> AppConfig:
         path = cls.get_config_path()
         if not path.exists():
+            legacy_path = Path.home() / ".nexau" / "settings.json"
+            if legacy_path.exists():
+                try:
+                    config = cls.model_validate_json(legacy_path.read_text(encoding="utf-8"))
+                    config.save()
+                    return config
+                except Exception as e:
+                    logger.error("Failed to parse legacy settings.json: %s", e)
             config = cls()
             config.save()
             return config

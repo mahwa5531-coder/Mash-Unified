@@ -1,6 +1,6 @@
 // Agent SSE stream: POST /stream with event normalization (AG-UI protocol events).
 
-import { BASE_URL, getStoredAccessToken } from './client';
+import { BASE_URL } from './client';
 import type { ToolCall } from '@/types/chat';
 
 export interface StreamEventHandlers {
@@ -73,11 +73,7 @@ export async function streamQuery(
   };
 
   try {
-    const token = getStoredAccessToken();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
 
     let response: Response | null = null;
     const MAX_CONNECT_ATTEMPTS = 6;

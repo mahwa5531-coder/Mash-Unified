@@ -1,7 +1,10 @@
+import logging
 import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # ponytail: Explicitly load .env file so new LLM settings apply
 from dotenv import load_dotenv
@@ -66,7 +69,7 @@ def _build_agent_config() -> AgentConfig:
     import nexau
     from nexau.archs.main_sub.config import AgentConfig
     from nexau.archs.platform.app_config import AppConfig
-    from nexau.archs.platform.crypto_vault import load_secure_vault
+    from nexau.archs.platform.crypto_vault import _IN_MEMORY_AUTH_META, load_secure_vault
 
     # Load canonical agent configuration (local Mash manifest preferred)
     local_manifest = Path(__file__).resolve().parent / "resources" / "main_agent.yaml"
@@ -89,7 +92,7 @@ def _build_agent_config() -> AgentConfig:
     )
 
     active_key = (
-        vault.get("access_token")
+        _IN_MEMORY_AUTH_META.get("access_token")
         or vault.get("api_key")
         or "bearer-pending-auth"
     )
@@ -135,10 +138,17 @@ def _build_agent_config() -> AgentConfig:
 async def lifespan(app: FastAPI):
     import app.dependencies as _deps
     from app.paths import scaffold_nexau_system_storage
+    from app.routers.auth import ensure_valid_token
 
     scaffold_nexau_system_storage()
     engine = init_engine(_DB_ASYNC_URL)
     await engine.setup_models([ProjectModel])
+
+    # Automatic cold boot token refresh from vaulted refresh token
+    try:
+        await ensure_valid_token()
+    except Exception as e:
+        logger.warning("Cold boot token refresh skipped or offline: %s", e)
 
     agent_config = _build_agent_config()
     http_config = HTTPConfig()

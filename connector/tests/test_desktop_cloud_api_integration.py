@@ -35,6 +35,7 @@ from app.routers.auth import (
     handle_login,
 )
 from nexau.archs.platform.crypto_vault import (
+    _IN_MEMORY_AUTH_META,
     clear_vault,
     get_auth_metadata,
     load_secure_vault,
@@ -94,9 +95,12 @@ async def test_handshake_desktop_code_exchange_happy_path():
         # Verify credentials persisted into DPAPI vault
         vault = load_secure_vault()
         assert vault is not None
-        assert vault["access_token"] == "jwt_access_token_lead_auditor"
+        assert "access_token" not in vault
+        assert "id_token" not in vault
+        assert "expires_at" not in vault
         assert vault["refresh_token"] == "nxr_refresh_token_lead_auditor"
-        assert vault["expires_at"] > int(time.time()) + 3000
+        assert _IN_MEMORY_AUTH_META["access_token"] == "jwt_access_token_lead_auditor"
+        assert _IN_MEMORY_AUTH_META["expires_at"] > int(time.time()) + 3000
 
         # Verify metadata
         meta = get_auth_metadata()
@@ -185,7 +189,7 @@ async def test_sliding_token_refresh_pre_expiry_rotates_atomically():
             json={
                 "access_token": "jwt_fresh_rotated_token",
                 "refresh_token": "nxr_next_family_token",
-                "expires_in": 3600,
+                "expires_in": 900,
                 "credits_remaining": 4500,
             }
         )
@@ -197,9 +201,13 @@ async def test_sliding_token_refresh_pre_expiry_rotates_atomically():
 
         # Verify vault updated
         vault = load_secure_vault()
-        assert vault["access_token"] == "jwt_fresh_rotated_token"
+        assert "access_token" not in vault
+        assert "id_token" not in vault
+        assert "expires_at" not in vault
+        assert _IN_MEMORY_AUTH_META["access_token"] == "jwt_fresh_rotated_token"
         assert vault["refresh_token"] == "nxr_next_family_token"
-        assert vault["expires_at"] > now + 3000
+        remaining = _IN_MEMORY_AUTH_META["expires_at"] - int(time.time())
+        assert 890 <= remaining <= 900
 
 
 @pytest.mark.anyio
@@ -490,7 +498,9 @@ async def test_multi_account_vault_switching():
     meta = get_auth_metadata()
     assert meta["email"] == "associate@auditfirm.com"
     vault = load_secure_vault()
-    assert vault["access_token"] == "jwt_associate_token"
+    assert "access_token" not in vault
+    assert "id_token" not in vault
+    assert _IN_MEMORY_AUTH_META["access_token"] == "jwt_associate_token"
 
     # 4. Switch back to Partner
     from app.routers.auth import handle_account_switch
@@ -500,7 +510,9 @@ async def test_multi_account_vault_switching():
     assert meta["email"] == "partner@auditfirm.com"
     assert meta["plan"] == "enterprise"
     vault = load_secure_vault()
-    assert vault["access_token"] == "jwt_partner_token"
+    assert "access_token" not in vault
+    assert "id_token" not in vault
+    assert _IN_MEMORY_AUTH_META["access_token"] == "jwt_partner_token"
     assert vault["refresh_token"] == "nxr_partner_refresh"
 
 
@@ -783,19 +795,25 @@ async def test_cyclic_three_account_switching_isolation():
     # Cycle 1 -> Junior
     await handle_account_switch(SwitchAccountPayload(email="junior@audit.com"))
     v = load_secure_vault()
-    assert v["access_token"] == "jwt_j"
+    assert "access_token" not in v
+    assert "id_token" not in v
+    assert _IN_MEMORY_AUTH_META["access_token"] == "jwt_j"
     assert get_auth_metadata()["plan"] == "free"
 
     # Cycle 2 -> Senior
     await handle_account_switch(SwitchAccountPayload(email="senior@audit.com"))
     v = load_secure_vault()
-    assert v["access_token"] == "jwt_s"
+    assert "access_token" not in v
+    assert "id_token" not in v
+    assert _IN_MEMORY_AUTH_META["access_token"] == "jwt_s"
     assert get_auth_metadata()["plan"] == "pro"
 
     # Cycle 3 -> Partner
     await handle_account_switch(SwitchAccountPayload(email="partner@audit.com"))
     v = load_secure_vault()
-    assert v["access_token"] == "jwt_p"
+    assert "access_token" not in v
+    assert "id_token" not in v
+    assert _IN_MEMORY_AUTH_META["access_token"] == "jwt_p"
     assert get_auth_metadata()["plan"] == "enterprise"
 
 

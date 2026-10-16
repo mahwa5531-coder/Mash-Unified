@@ -14,13 +14,15 @@
 from __future__ import annotations
 
 import logging
-from typing import NamedTuple
+import re
+from typing import Any, NamedTuple
 
 from sqlalchemy.exc import IntegrityError
 
 from nexau.core.messages import (
     ImageBlock,
     Message,
+    ReasoningBlock,
     Role,
     TextBlock,
     ToolResultBlock,
@@ -32,6 +34,82 @@ from .models.agent_run_action_model import ReplaceVariantBase, RunActionType, Ru
 from .orm import AndFilter, ComparisonFilter, DatabaseEngine
 
 logger = logging.getLogger(__name__)
+
+
+def redact_sensitive_content(text: str) -> str:
+    """ponytail: redact sensitive API keys, bearer tokens, and auth headers using stdlib regex."""
+    if not text or not isinstance(text, str):
+        return text or ""
+    # 1. Redact auth headers:
+    # Quoted Authorization values (JSON / dict format with matching or mixed quotes)
+    text = re.sub(
+        r'(["\']Authorization["\']\s*:\s*["\'])[^"\'\r\n]+(["\'])',
+        r"\1[REDACTED]\2",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # Unquoted Authorization headers (HTTP headers / curl commands)
+    text = re.sub(
+        r'(\bAuthorization\s*:\s*(?:Bearer\s+|Basic\s+|Token\s+)?)[^"\'\r\n,{}]+',
+        r"\1[REDACTED]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # 2. Redact Bearer tokens including base64 +, /, and =
+    text = re.sub(r"Bearer\s+[A-Za-z0-9\-_./+=]+", "Bearer [REDACTED]", text, flags=re.IGNORECASE)
+    # 3. Redact API keys: (?:sk-ant-[A-Za-z0-9\-_]{20,}|sk-[A-Za-z0-9\-_]{20,}|ghp_[A-Za-z0-9]{20,}|AIza[A-Za-z0-9\-_]{20,})
+    text = re.sub(
+        r"(?:sk-ant-[A-Za-z0-9\-_]{20,}|sk-[A-Za-z0-9\-_]{20,}|ghp_[A-Za-z0-9]{20,}|AIza[A-Za-z0-9\-_]{20,})",
+        "[REDACTED]",
+        text,
+    )
+    return text
+
+
+def redact_data_structure(data: Any) -> Any:
+    """Recursively redact strings in dicts, lists, or primitives."""
+    if isinstance(data, str):
+        return redact_sensitive_content(data)
+    elif isinstance(data, dict):
+        return {k: redact_data_structure(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [redact_data_structure(item) for item in data]
+    return data
+
+
+def redact_message_secrets(msg: Message | dict[str, Any]) -> Message | dict[str, Any]:
+    """Redact sensitive credentials from a Message or dict before persistence."""
+    if isinstance(msg, dict):
+        return redact_data_structure(msg)
+    if not hasattr(msg, "content"):
+        return msg
+    new_blocks = []
+    for b in msg.content:
+        if isinstance(b, TextBlock):
+            new_blocks.append(b.model_copy(update={"text": redact_sensitive_content(b.text)}))
+        elif isinstance(b, ReasoningBlock):
+            new_blocks.append(b.model_copy(update={"text": redact_sensitive_content(b.text)}))
+        elif isinstance(b, ToolUseBlock):
+            new_input = redact_data_structure(b.input) if isinstance(b.input, dict) else b.input
+            new_raw = redact_sensitive_content(b.raw_input) if b.raw_input else b.raw_input
+            new_blocks.append(b.model_copy(update={"input": new_input, "raw_input": new_raw}))
+        elif isinstance(b, ToolResultBlock):
+            if isinstance(b.content, str):
+                new_c = redact_sensitive_content(b.content)
+            elif isinstance(b.content, list):
+                new_c = [
+                    sub.model_copy(update={"text": redact_sensitive_content(sub.text)})
+                    if isinstance(sub, TextBlock)
+                    else sub
+                    for sub in b.content
+                ]
+            else:
+                new_c = redact_sensitive_content(str(b.content)) if b.content is not None else ""
+            new_raw = redact_data_structure(b.raw_output) if b.raw_output is not None else None
+            new_blocks.append(b.model_copy(update={"content": new_c, "raw_output": new_raw}))
+        else:
+            new_blocks.append(b)
+    return msg.model_copy(update={"content": new_blocks})
 
 
 # ============================================================================
@@ -341,6 +419,9 @@ class AgentRunActionService:
                 msg.get_text_content()[:80] if msg.get_text_content() else "<empty>",
             )
 
+        # Redact secrets before creating record and persistence
+        messages = [redact_message_secrets(m) for m in messages]
+
         record = AgentRunActionModel.create_append(
             user_id=key.user_id,
             session_id=key.session_id,
@@ -393,6 +474,7 @@ class AgentRunActionService:
                                 "tool_calls": tc_val,
                                 "created_at": record.created_at.isoformat() if record.created_at else None,
                             }
+                            step_obj = redact_data_structure(step_obj)
                             f_full.write(_json.dumps(step_obj) + "\n")
 
                             compact_step = dict(step_obj)
@@ -493,6 +575,9 @@ class AgentRunActionService:
         messages = [m for m in messages if m.role != Role.SYSTEM]
         if not messages:
             raise ValueError("Cannot persist REPLACE action with no messages")
+
+        # Redact secrets before creating replace record
+        messages = [redact_message_secrets(m) for m in messages]
 
         if extra is not None:
             record = AgentRunActionModel.create_replace_with_variant(

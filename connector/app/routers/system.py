@@ -263,6 +263,7 @@ async def resolve_folder_endpoint(request: ResolveFolderRequest):
         home / "Desktop" / name,
         home / "Documents" / name,
         home / "projects" / name,
+        home / ".mash" / "projects" / name,
         home / ".nexau" / "projects" / name,
         home / name,
         Path.cwd() / name,
@@ -442,9 +443,12 @@ async def open_system_file(request: OpenFileRequest):
 
     p = Path(clean_path).expanduser()
     if not p.exists() and request.session_id:
-        cand = Path.home() / ".nexau" / "brain" / request.session_id / clean_path
-        if cand.exists():
-            p = cand
+        cand_mash = Path.home() / ".mash" / "brain" / request.session_id / clean_path
+        cand_nexau = Path.home() / ".nexau" / "brain" / request.session_id / clean_path
+        if cand_mash.exists():
+            p = cand_mash
+        elif cand_nexau.exists():
+            p = cand_nexau
 
     p = p.resolve()
     if not p.exists():
