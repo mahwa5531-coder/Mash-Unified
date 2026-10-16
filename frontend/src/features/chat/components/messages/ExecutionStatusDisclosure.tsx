@@ -6,7 +6,6 @@ import {
   WifiOff, 
   Clock, 
   AlertCircle, 
-  Lock, 
   Wrench, 
   Play, 
   RotateCcw, 
@@ -42,6 +41,11 @@ export function ExecutionStatusDisclosure({
   if (effectiveError) {
     const classified = classifyError(effectiveError, errorId);
 
+    // Suppress auth error card completely - auth expiration is an app-level state, not an in-turn execution error
+    if (classified?.category === 'auth') {
+      return null;
+    }
+
     // 1. Quota Error: Suppress intrusive crash box because QuotaBanner handles it docked above composer
     if (classified?.category === 'quota') {
       return (
@@ -65,8 +69,6 @@ export function ExecutionStatusDisclosure({
           return <WifiOff size={14} className="text-amber-500 dark:text-amber-400 shrink-0" />;
         case 'timeout':
           return <Clock size={14} className="text-amber-500 dark:text-amber-400 shrink-0" />;
-        case 'auth':
-          return <Lock size={14} className="text-zinc-500 dark:text-zinc-400 shrink-0" />;
         case 'tool_failure':
           return <Wrench size={14} className="text-amber-500 dark:text-amber-400 shrink-0" />;
         default:
@@ -93,7 +95,7 @@ export function ExecutionStatusDisclosure({
 
             {/* Quick Actions (Continue / Retry) */}
             <div className="flex items-center gap-1.5 shrink-0 select-none">
-              {onContinue && category === 'network_lost' && (
+              {onContinue && (category === 'network_lost' || category === 'offline') && (
                 <button
                   type="button"
                   onClick={onContinue}

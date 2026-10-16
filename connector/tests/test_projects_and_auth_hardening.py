@@ -443,3 +443,204 @@ def test_accounts_as_list_scrubs_tokens_and_prevents_disk_leak(monkeypatch, tmp_
 
     cv.clear_vault()
 
+
+@pytest.mark.anyio
+async def test_cold_boot_expired_refresh_token_fails_closed(client, monkeypatch):
+    """Verify cold-boot with expired refresh token marks auth False and purges dead token."""
+    import httpx
+    import nexau.archs.platform.crypto_vault as cv
+    from app.client import MAShClient
+    from app.routers.auth import ensure_valid_token
+
+    cv.clear_vault()
+    cv._IN_MEMORY_AUTH_META.clear()
+
+    # Seed vault with an account and expired refresh token (30+ days of inactivity)
+    cv.save_secure_vault({
+        "active_account": "dormant_user@auditfirm.com",
+        "refresh_token": "expired_rt_30d_plus",
+        "accounts": {
+            "dormant_user@auditfirm.com": {
+                "email": "dormant_user@auditfirm.com",
+                "name": "Dormant User",
+                "plan": "pro",
+                "refresh_token": "expired_rt_30d_plus",
+            }
+        }
+    })
+
+    # Simulate Cloud Gateway rejecting expired token with 401 Unauthorized / invalid_grant
+    async def mock_failed_refresh(self, refresh_tok: str):
+        req = httpx.Request("POST", "https://api.mash.ai/v1/auth/refresh")
+        resp = httpx.Response(401, json={"detail": "invalid_grant: refresh token expired"}, request=req)
+        raise httpx.HTTPStatusError("401 Unauthorized", request=req, response=resp)
+
+    monkeypatch.setattr(MAShClient, "refresh_access_token", mock_failed_refresh)
+
+    # 1. ensure_valid_token() fails closed and returns None
+    token = await ensure_valid_token()
+    assert token is None
+
+    # 2. In-memory metadata and get_auth_metadata report unauthenticated
+    meta = cv.get_auth_metadata()
+    assert meta["authenticated"] is False
+
+    # 3. /api/auth/me returns authenticated: False to frontend
+    res = client.get("/api/auth/me")
+    assert res.status_code == 200
+    assert res.json()["authenticated"] is False
+
+    # 4. Dead refresh token is scrubbed from disk vault
+    vault = cv.load_secure_vault()
+    assert vault is not None
+    assert "refresh_token" not in vault
+    acc = vault.get("accounts", {}).get("dormant_user@auditfirm.com", {})
+    assert "refresh_token" not in acc
+
+    cv.clear_vault()
+
+
+@pytest.mark.anyio
+async def test_cold_boot_vault_without_credentials_fails_closed(client, monkeypatch):
+    """Verify cold-boot vault having active_account but no credentials reports authenticated: False."""
+    import nexau.archs.platform.crypto_vault as cv
+    from app.routers.auth import ensure_valid_token
+
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("API_KEY", raising=False)
+
+    cv.clear_vault()
+    cv._IN_MEMORY_AUTH_META.clear()
+
+    # Vault has active_account string, but no refresh_token and no api_key
+    cv.save_secure_vault({
+        "active_account": "no_creds@mash.local",
+        "accounts": {
+            "no_creds@mash.local": {
+                "email": "no_creds@mash.local",
+                "name": "No Creds",
+                "plan": "free",
+            }
+        }
+    })
+
+    # 1. get_auth_metadata() immediately reports False
+    meta = cv.get_auth_metadata()
+    assert meta["authenticated"] is False
+
+    # 2. ensure_valid_token() returns None
+    token = await ensure_valid_token()
+    assert token is None
+
+    # 3. /api/auth/me returns authenticated: False
+    res = client.get("/api/auth/me")
+    assert res.status_code == 200
+    assert res.json()["authenticated"] is False
+
+    cv.clear_vault()
+
+
+@pytest.mark.anyio
+async def test_cold_boot_transient_offline_recovers_on_network_restore(client, monkeypatch):
+    """Verify transient network offline on cold boot does not scrub vault and cleanly recovers when online."""
+    import httpx
+    import nexau.archs.platform.crypto_vault as cv
+    from app.client import MAShClient
+    from app.routers.auth import ensure_valid_token
+
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("API_KEY", raising=False)
+
+    cv.clear_vault()
+    cv._IN_MEMORY_AUTH_META.clear()
+
+    cv.save_secure_vault({
+        "active_account": "offline_recovery@mash.local",
+        "refresh_token": "valid_rt_offline_test",
+        "accounts": {
+            "offline_recovery@mash.local": {
+                "email": "offline_recovery@mash.local",
+                "name": "Offline Recovery User",
+                "plan": "pro",
+                "refresh_token": "valid_rt_offline_test",
+            }
+        }
+    })
+
+    # Step 1: Network is offline
+    async def mock_offline(self, tok: str):
+        raise httpx.ConnectError("Offline: connection refused")
+
+    monkeypatch.setattr(MAShClient, "refresh_access_token", mock_offline)
+
+    # 1. ensure_valid_token returns None
+    tok = await ensure_valid_token()
+    assert tok is None
+
+    # 2. /api/auth/me fails closed while offline
+    res1 = client.get("/api/auth/me")
+    assert res1.status_code == 200
+    assert res1.json()["authenticated"] is False
+
+    # 3. Refresh token was NOT scrubbed from vault
+    vault = cv.load_secure_vault()
+    assert vault.get("refresh_token") == "valid_rt_offline_test"
+
+    # Step 2: Network is restored
+    async def mock_online(self, tok: str):
+        return {
+            "access_token": "fresh_recovered_jwt",
+            "expires_in": 3600,
+            "refresh_token": "valid_rt_offline_test",
+        }
+
+    monkeypatch.setattr(MAShClient, "refresh_access_token", mock_online)
+
+    # 4. /api/auth/me recovers seamlessly and authenticates user
+    res2 = client.get("/api/auth/me")
+    assert res2.status_code == 200
+    assert res2.json()["authenticated"] is True
+    assert res2.json()["email"] == "offline_recovery@mash.local"
+
+    cv.clear_vault()
+
+
+@pytest.mark.anyio
+async def test_account_switch_credential_validation(client, monkeypatch):
+    """Verify switching between accounts updates auth state based on target credentials."""
+    import nexau.archs.platform.crypto_vault as cv
+
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    cv.clear_vault()
+    cv._IN_MEMORY_AUTH_META.clear()
+
+    cv.save_secure_vault({
+        "active_account": "acc1@mash.local",
+        "refresh_token": "rt_acc1",
+        "accounts": {
+            "acc1@mash.local": {
+                "email": "acc1@mash.local",
+                "refresh_token": "rt_acc1",
+                "plan": "pro",
+            },
+            "acc2_no_creds@mash.local": {
+                "email": "acc2_no_creds@mash.local",
+                "plan": "free",
+            }
+        }
+    }, meta_dict={"authenticated": True, "email": "acc1@mash.local"})
+
+    # Switch to account with no credentials
+    res = client.post("/api/auth/switch", json={"email": "acc2_no_creds@mash.local"})
+    assert res.status_code == 200
+
+    # /api/auth/me must report authenticated: False
+    me = client.get("/api/auth/me")
+    assert me.status_code == 200
+    assert me.json()["authenticated"] is False
+
+    cv.clear_vault()
+
+

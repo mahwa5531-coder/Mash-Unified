@@ -61,7 +61,17 @@ export default function Home() {
         setIsAuthLoading(false);
       }
     });
-    return () => { isMounted = false; };
+    const handleAuthExpired = () => {
+      if (isMounted) {
+        setAuthUser(null);
+      }
+    };
+    window.addEventListener('mash:auth_expired', handleAuthExpired);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('mash:auth_expired', handleAuthExpired);
+    };
   }, []);
 
   useEffect(() => {

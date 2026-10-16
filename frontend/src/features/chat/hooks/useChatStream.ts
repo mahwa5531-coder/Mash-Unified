@@ -158,6 +158,7 @@ export function useChatStream({
       scrollToBottom: () => { if (scrollRef.current && isAtBottomRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; },
       onAutoDispatchQueue: (msg) => handleSendMessage(msg, false, false, activeSid),
       onSyncSteeringQueue: (q) => { if (activeSid === activeSessionIdRef.current) steering.setQueuedMessages(q); },
+      onRestorePrompt: (prompt) => { if (activeSid === activeSessionIdRef.current) setInputPrompt(prompt); },
       context: {
         workspace_uri: pendingWorkspacePath || (sessionRepo && sessionRepo !== 'No Repo' ? sessionRepo : 'No Repo'),
         working_directory: pendingWorkspacePath || (sessionRepo && sessionRepo !== 'No Repo' ? sessionRepo : 'No Repo'),

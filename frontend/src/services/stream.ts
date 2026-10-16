@@ -110,13 +110,20 @@ export async function streamQuery(
     if (!response) return;
 
     if (!response.ok) {
+      if (response.status === 401) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('mash:auth_expired'));
+        }
+      }
       const errText = await response.text().catch(() => "");
       let msg = `Server error (HTTP ${response.status})`;
       try {
         const parsed = JSON.parse(errText);
         if (parsed.detail) msg = parsed.detail;
       } catch {}
-      throw new Error(msg);
+      const err: any = new Error(msg);
+      err.status = response.status;
+      throw err;
     }
 
     if (!response.body) return;

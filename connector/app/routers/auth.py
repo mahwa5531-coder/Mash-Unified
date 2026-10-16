@@ -87,6 +87,7 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
                 exp = _token_expires_at(data)
                 _IN_MEMORY_AUTH_META["access_token"] = new_access
                 _IN_MEMORY_AUTH_META["expires_at"] = exp
+                _IN_MEMORY_AUTH_META["authenticated"] = True
                 if "id_token" in data:
                     _IN_MEMORY_AUTH_META["id_token"] = data["id_token"]
 
@@ -104,6 +105,7 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
                 vault.pop("expires_at", None)
 
                 meta = get_auth_metadata()
+                meta["authenticated"] = True
                 if "credits_remaining" in data:
                     meta["credits_remaining"] = data["credits_remaining"]
                 save_secure_vault(vault, meta)
@@ -111,8 +113,33 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
                 return new_access
         except Exception as e:
             logger.warning("Cloud gateway token refresh failed: %s", e)
+            is_auth_error = False
+            if isinstance(e, httpx.HTTPStatusError):
+                status = e.response.status_code
+                resp_text = e.response.text.lower()
+                if status in (400, 401, 403) or "invalid_grant" in resp_text or "expired" in resp_text or "invalid" in resp_text:
+                    is_auth_error = True
+            elif "401" in str(e) or "invalid_grant" in str(e).lower() or "expired" in str(e).lower():
+                is_auth_error = True
 
-    return _IN_MEMORY_AUTH_META.get("access_token") or vault.get("api_key") or os.getenv("LLM_API_KEY")
+            if is_auth_error:
+                _IN_MEMORY_AUTH_META.clear()
+                _IN_MEMORY_AUTH_META["authenticated"] = False
+                vault.pop("refresh_token", None)
+                active_acc = vault.get("active_account")
+                if active_acc and isinstance(vault.get("accounts"), dict) and active_acc in vault["accounts"]:
+                    vault["accounts"][active_acc].pop("refresh_token", None)
+                elif active_acc and isinstance(vault.get("accounts"), list):
+                    for acc in vault["accounts"]:
+                        if isinstance(acc, dict) and acc.get("email") == active_acc:
+                            acc.pop("refresh_token", None)
+                save_secure_vault(vault, {"authenticated": False})
+                return None
+
+    live_token = _IN_MEMORY_AUTH_META.get("access_token") or vault.get("api_key") or os.getenv("LLM_API_KEY")
+    if not live_token and not vault.get("refresh_token"):
+        _IN_MEMORY_AUTH_META["authenticated"] = False
+    return live_token
 
 
 async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | None:
@@ -223,30 +250,45 @@ async def get_current_user_auth() -> dict[str, Any]:
     """Returns the current active user authentication state and metadata."""
     meta = get_auth_metadata()
     vault = load_secure_vault()
-    if meta.get("authenticated") and vault is not None and meta.get("email"):
-        token = _IN_MEMORY_AUTH_META.get("access_token")
-        # Proactively sync rolling quota position if not present
-        if token and not meta.get("quota"):
-            await sync_user_account_state(token)
-            meta = get_auth_metadata()
 
+    if not meta.get("authenticated") or vault is None or not meta.get("email"):
         return {
-            "authenticated": True,
-            "email": meta.get("email"),
-            "name": meta.get("name") or "User",
-            "plan": meta.get("plan", "pro"),
-            "subscription_status": meta.get("subscription_status", "active"),
-            "quota": meta.get("quota"),
-            "usage": meta.get("usage"),
-            "limits": meta.get("limits"),
-            "models": meta.get("models", []),
-            "credits_remaining": meta.get("credits_remaining", 500),
-            "accounts": meta.get("accounts", []),
-            "has_access_token": bool(_IN_MEMORY_AUTH_META.get("access_token") or vault.get("api_key")),
+            "authenticated": False,
         }
 
+    # Ensure live valid token exists; if absent, attempt to acquire or validate one
+    live_token = _IN_MEMORY_AUTH_META.get("access_token") or (vault.get("api_key") if vault else None)
+    if not live_token:
+        live_token = await ensure_valid_token()
+        meta = get_auth_metadata()
+
+    # If still no valid token could be produced, fail closed to unauthenticated
+    if not live_token or not meta.get("authenticated"):
+        if not (vault and vault.get("refresh_token")):
+            _IN_MEMORY_AUTH_META["authenticated"] = False
+        return {
+            "authenticated": False,
+        }
+
+    token = _IN_MEMORY_AUTH_META.get("access_token")
+    # Proactively sync rolling quota position if not present
+    if token and not meta.get("quota"):
+        await sync_user_account_state(token)
+        meta = get_auth_metadata()
+
     return {
-        "authenticated": False,
+        "authenticated": True,
+        "email": meta.get("email"),
+        "name": meta.get("name") or "User",
+        "plan": meta.get("plan", "pro"),
+        "subscription_status": meta.get("subscription_status", "active"),
+        "quota": meta.get("quota"),
+        "usage": meta.get("usage"),
+        "limits": meta.get("limits"),
+        "models": meta.get("models", []),
+        "credits_remaining": meta.get("credits_remaining", 500),
+        "accounts": meta.get("accounts", []),
+        "has_access_token": bool(_IN_MEMORY_AUTH_META.get("access_token") or (vault and vault.get("api_key"))),
     }
 
 
@@ -473,6 +515,15 @@ async def handle_account_switch(payload: SwitchAccountPayload) -> dict[str, Any]
         "accounts": accounts,
     }
 
+    has_creds = bool(
+        acc_tokens.get("access_token")
+        or payload.access_token
+        or target.get("api_key")
+        or target.get("refresh_token")
+        or payload.api_key
+        or payload.refresh_token
+    )
+    meta["authenticated"] = has_creds
     meta["email"] = payload.email
     meta["name"] = target.get("name", meta.get("name", "Auditor"))
     meta["plan"] = target.get("plan", meta.get("plan", "pro"))

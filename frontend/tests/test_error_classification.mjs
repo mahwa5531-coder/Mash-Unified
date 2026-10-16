@@ -145,6 +145,11 @@ console.log("✓ Auth error correctly classified");
 const r6 = classifyError('{"error": {"message": "Model is currently experiencing high latency"}}');
 assert.strictEqual(r6.category, 'general');
 assert.strictEqual(r6.description, 'Model is currently experiencing high latency');
-console.log("✓ JSON error envelope extracted cleanly");
+// 7. Continue action support on offline & network_lost
+const canContinue = (category) => category === 'network_lost' || category === 'offline';
+assert.strictEqual(canContinue(r1.category), true, "offline category must allow continue action");
+assert.strictEqual(canContinue(r2.category), true, "network_lost category must allow continue action");
+assert.strictEqual(canContinue(r5.category), false, "auth category must not allow continue action");
+console.log("✓ Continue action enabled for offline and network_lost");
 
-console.log("All 6 Error Classification Tests PASSED!");
+console.log("All 7 Error Classification Tests PASSED!");

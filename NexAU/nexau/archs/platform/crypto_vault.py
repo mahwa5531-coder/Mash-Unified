@@ -58,12 +58,14 @@ def save_secure_vault(secrets_dict: dict[str, Any], meta_dict: dict[str, Any] | 
     ponytail: Access and ID tokens reside strictly in RAM (_IN_MEMORY_AUTH_META)
     and are purged from disk persistence to enforce process-memory isolation.
     """
-    # 1. Update in-memory metadata if provided, preserving existing tokens in RAM
+    # 1. Update in-memory metadata if provided, preserving existing tokens in RAM unless unauthenticated
     if meta_dict is not None:
-        tokens_preserved = {
-            k: v for k, v in _IN_MEMORY_AUTH_META.items()
-            if k in ("access_token", "id_token", "expires_at", "account_tokens")
-        }
+        tokens_preserved = {}
+        if meta_dict.get("authenticated") is not False:
+            tokens_preserved = {
+                k: v for k, v in _IN_MEMORY_AUTH_META.items()
+                if k in ("access_token", "id_token", "expires_at", "account_tokens")
+            }
         _IN_MEMORY_AUTH_META.clear()
         _IN_MEMORY_AUTH_META.update(meta_dict)
         _IN_MEMORY_AUTH_META.update(tokens_preserved)
@@ -230,10 +232,12 @@ def load_secure_vault() -> dict[str, Any] | None:
 
 def get_auth_metadata() -> dict[str, Any]:
     """Returns non-sensitive metadata (email, name, plan) from in-memory session state."""
-    if _IN_MEMORY_AUTH_META.get("authenticated") or _IN_MEMORY_AUTH_META.get("email"):
+    if _IN_MEMORY_AUTH_META.get("authenticated") is False:
+        return {"authenticated": False}
+    if _IN_MEMORY_AUTH_META.get("email"):
         return _IN_MEMORY_AUTH_META.copy()
 
-    # Cold boot fallback: check if DPAPI vault has an active account without touching disk JSON
+    # Cold boot fallback: check if DPAPI vault has an active account with credentials
     vault = load_secure_vault()
     if vault and vault.get("active_account"):
         acc_email = vault.get("active_account")
@@ -247,12 +251,22 @@ def get_auth_metadata() -> dict[str, Any]:
                     acc_info = a
                     break
 
+        # If vault and account contain no refresh_token or api_key, credentials do not exist
+        has_creds = bool(
+            vault.get("refresh_token")
+            or vault.get("api_key")
+            or acc_info.get("refresh_token")
+            or acc_info.get("api_key")
+        )
+        if not has_creds:
+            return {"authenticated": False}
+
         account_list_source = (
             raw_accounts.values()
             if isinstance(raw_accounts, dict)
             else (raw_accounts if isinstance(raw_accounts, list) else [])
         )
-        return {
+        vault_meta = {
             "authenticated": True,
             "email": acc_email,
             "name": acc_info.get("name") or "User",
@@ -269,6 +283,8 @@ def get_auth_metadata() -> dict[str, Any]:
                 if isinstance(acc, dict) and acc.get("email")
             ],
         }
+        _IN_MEMORY_AUTH_META.update({k: v for k, v in vault_meta.items() if k not in _IN_MEMORY_AUTH_META})
+        return _IN_MEMORY_AUTH_META.copy()
     return {"authenticated": False}
 
 

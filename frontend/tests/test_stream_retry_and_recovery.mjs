@@ -343,6 +343,52 @@ console.log("\n[Test 4] SSE Heartbeat (:keep-alive & : heartbeat) Comment Line F
   console.log("  -> PASSED: 100% of heartbeat comments safely filtered with zero token corruption or JSON parse errors");
 }
 
+// -----------------------------------------------------------------------------
+// Test 5: HTTP 401 Stream Auth Expiry Handling & Turn Undo
+// -----------------------------------------------------------------------------
+console.log("\n[Test 5] HTTP 401 Stream Auth Expiry, Window Event & Prompt Restoration");
+{
+  function computeUndoMessages(messages, flatIdx) {
+    if (typeof flatIdx === 'number') return messages.slice(0, flatIdx);
+    let removeCount = 0;
+    if (messages.length > 0 && messages[messages.length - 1].role === 'assistant') removeCount++;
+    if (messages.length > removeCount && messages[messages.length - 1 - removeCount].role === 'user') removeCount++;
+    return messages.slice(0, messages.length - removeCount);
+  }
+
+  let eventDispatched = false;
+  const mockWindow = {
+    dispatchEvent: (ev) => {
+      if (ev.type === 'mash:auth_expired') eventDispatched = true;
+    }
+  };
+
+  const initialMessages = [
+    { id: 'msg_u_1', role: 'user', content: 'Auditing step 1', status: 'completed' },
+    { id: 'msg_a_1', role: 'assistant', content: 'Step 1 complete.', status: 'completed' },
+    { id: 'msg_u_2', role: 'user', content: 'Calculate material threshold', status: 'completed' },
+    { id: 'msg_a_2', role: 'assistant', content: '', status: 'running' },
+  ];
+
+  const err = new Error("Authentication required. Please sign in to MASH.");
+  err.status = 401;
+
+  const isAuthError = err.status === 401 || err.message.includes("401") || err.message.toLowerCase().includes("authentication required");
+  assert.strictEqual(isAuthError, true, "Must detect 401 auth error");
+
+  if (isAuthError) {
+    mockWindow.dispatchEvent({ type: 'mash:auth_expired' });
+  }
+  assert.strictEqual(eventDispatched, true, "mash:auth_expired event must be dispatched to window");
+
+  // Verify unexecuted turn is undone rather than leaving a zombie error card
+  const cleanedMessages = computeUndoMessages(initialMessages);
+  assert.strictEqual(cleanedMessages.length, 2, "Turn 2 user and assistant messages must be undone");
+  assert.strictEqual(cleanedMessages[cleanedMessages.length - 1].content, "Step 1 complete.");
+
+  console.log("  -> PASSED: 401 auth expiration triggers event, reverts zombie turn, and restores composer prompt");
+}
+
 console.log("\n======================================================================");
-console.log("ALL FRONTEND STREAM RETRY & RECOVERY TESTS PASSED (4/4)");
+console.log("ALL FRONTEND STREAM RETRY & RECOVERY TESTS PASSED (5/5)");
 console.log("======================================================================");

@@ -204,6 +204,7 @@ export async function runChatStream(
     isResume: boolean; signal?: AbortSignal; context: Record<string, any>; scheduleFlush: () => void; flushBuffer: () => void;
     onUpdateMessages: (msgs: Message[]) => void; onStreamEnd: () => void; scrollToBottom: () => void;
     onAutoDispatchQueue: (msg: string) => void; onSyncSteeringQueue?: (queue: string[]) => void;
+    onRestorePrompt?: (prompt: string) => void;
   }
 ) {
   try {
@@ -228,9 +229,25 @@ export async function runChatStream(
     );
   } catch (err: any) {
     console.warn('Stream exception:', err);
+    const isAuthError =
+      err?.status === 401 ||
+      (err?.message && (err.message.includes("401") || err.message.toLowerCase().includes("authentication required")));
+    if (isAuthError) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mash:auth_expired'));
+      }
+    }
     const s = sessionStore.get(activeSid);
     if (s) {
-      s.chatMessages = applyStreamError(s.chatMessages, s.activeTurnId, err?.message || 'Agent execution encountered an error.');
+      if (isAuthError && !options.isResume) {
+        s.chatMessages = computeUndoMessages(s.chatMessages);
+        s.inputPrompt = userText;
+        if (options.onRestorePrompt) {
+          options.onRestorePrompt(userText);
+        }
+      } else {
+        s.chatMessages = applyStreamError(s.chatMessages, s.activeTurnId, err?.message || 'Agent execution encountered an error.');
+      }
       options.onUpdateMessages(s.chatMessages);
     }
   } finally {
