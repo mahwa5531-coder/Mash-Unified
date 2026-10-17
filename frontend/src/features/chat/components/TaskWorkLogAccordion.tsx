@@ -39,8 +39,8 @@ export default function TaskWorkLogAccordion({
   isLast: _isLast = false,
   turnStartTime,
 }: TaskWorkLogAccordionProps) {
-  // Starts collapsed by default so finished turns display "Worked for {time} >" summary
-  const [clusterOpen, setClusterOpen] = useState<boolean>(false);
+  // ponytail: Keep reasoning thoughts visible if turn has no assistant prose content (D2)
+  const [clusterOpen, setClusterOpen] = useState<boolean>(!hasAssistantContent);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
   const [expandedCmds, setExpandedCmds] = useState<Record<string, boolean>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
