@@ -140,3 +140,44 @@ async def test_create_session_normalizes_null_project_id():
         assert list_res == {"sessions": []}
 
 
+@pytest.mark.anyio
+async def test_chat_preserves_custom_session_title_on_subsequent_turns():
+    """D5: Subsequent chat turns must not clobber custom or already generated session titles."""
+    from unittest.mock import AsyncMock, MagicMock
+    from nexau.archs.session.models import SessionModel
+    from app.routers.chat import _ensure_project_and_context
+
+    existing_session = SessionModel(
+        session_id="sess_custom_title_test",
+        user_id="default_user",
+        context={"title": "Q3 Financial Audit Plan", "custom_title": "Q3 Financial Audit Plan"},
+    )
+
+    mock_engine = MagicMock()
+    mock_engine.find_first = AsyncMock(return_value=existing_session)
+    mock_engine.update = AsyncMock()
+
+    resolved_ctx = {
+        "_raw_message": "Tell me what time it is right now in Tokyo",
+        "working_directory": None,
+    }
+
+    await _ensure_project_and_context(
+        eng=mock_engine,
+        user_id="default_user",
+        sid="sess_custom_title_test",
+        resolved_context=resolved_ctx,
+        workspace_target="No Repo",
+    )
+
+    # 1. resolved_context passed to NexAU must retain the custom title
+    assert resolved_ctx["title"] == "Q3 Financial Audit Plan"
+    assert resolved_ctx["custom_title"] == "Q3 Financial Audit Plan"
+
+    # 2. Database update must retain the custom title
+    updated_session = mock_engine.update.call_args[0][0]
+    assert updated_session.context["title"] == "Q3 Financial Audit Plan"
+    assert updated_session.context["custom_title"] == "Q3 Financial Audit Plan"
+
+
+

@@ -135,7 +135,7 @@ class OpenAIChatCompletionAggregator(Aggregator[ChatCompletionChunk, ChatComplet
         self._aggregate_metadata(item)
 
         # Process each choice in the chunk
-        for choice in item.choices:
+        for choice in (item.choices or []):
             aggregator = self._choice_aggregators.setdefault(
                 choice.index,
                 _ChoiceAggregator(

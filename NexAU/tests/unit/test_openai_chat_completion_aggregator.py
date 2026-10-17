@@ -1763,6 +1763,54 @@ class TestReasoningContentStreaming:
         assert "<function=run_shell_command>" in rc
         assert "</tool_call>" in rc
 
+    def test_aggregate_chunk_with_none_or_omitted_choices(self):
+        """D4: Usage-only or non-spec chunk with choices=None must not raise TypeError."""
+        mock_on_event = Mock()
+        aggregator = OpenAIChatCompletionAggregator(on_event=mock_on_event, run_id="test-run")
+
+        # 1. Normal content chunk
+        chunk1 = ChatCompletionChunk(
+            id="chatcmpl-123",
+            choices=[
+                ChatCompletionChunkChoice(
+                    index=0,
+                    delta=ChoiceDelta(role="assistant", content="Hello"),
+                    finish_reason=None,
+                )
+            ],
+            created=1234567890,
+            model="gpt-4o-mini",
+            object="chat.completion.chunk",
+        )
+        aggregator.aggregate(chunk1)
+
+        # 2. Usage-only chunk with choices=None (e.g. non-spec chunk from mock or proxy)
+        chunk_usage_none = ChatCompletionChunk.model_construct(
+            id="chatcmpl-123",
+            choices=None,
+            created=1234567890,
+            model="gpt-4o-mini",
+            object="chat.completion.chunk",
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},  # type: ignore
+        )
+        # Must not raise TypeError: 'NoneType' object is not iterable
+        aggregator.aggregate(chunk_usage_none)
+
+        # 3. Usage-only chunk with empty choices list
+        chunk_usage_empty = ChatCompletionChunk(
+            id="chatcmpl-123",
+            choices=[],
+            created=1234567890,
+            model="gpt-4o-mini",
+            object="chat.completion.chunk",
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},  # type: ignore
+        )
+        aggregator.aggregate(chunk_usage_empty)
+
+        res = aggregator.build()
+        assert res.choices[0].message.content == "Hello"
+        assert res.usage is not None
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

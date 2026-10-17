@@ -115,19 +115,19 @@ async def _ensure_project_and_context(
     # So we pre-create/update the session with app-specific metadata. When NexAU's
     # _get_or_create_session runs, it'll find our session and reuse it.
     try:
-        from app.services.session_transcript import generate_clean_session_title
-        clean_title = generate_clean_session_title(resolved_context.get("_raw_message", ""), sid)
-        title_val = resolved_context.get("title") or resolved_context.get("custom_title") or clean_title or "New Conversation"
-        resolved_context["title"] = title_val
-        resolved_context["custom_title"] = title_val
-        if "section" not in resolved_context:
-            resolved_context["section"] = "workspace" if workspace_target != "No Repo" else "conversation"
-
-        now_utc = datetime.now(UTC)
-        resolved_context["last_user_view_time"] = now_utc.isoformat()
-
         session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
+        now_utc = datetime.now(UTC)
         if not session:
+            from app.services.session_transcript import generate_clean_session_title
+
+            clean_title = generate_clean_session_title(resolved_context.get("_raw_message", ""), sid)
+            title_val = resolved_context.get("title") or resolved_context.get("custom_title") or clean_title or "New Conversation"
+            resolved_context["title"] = title_val
+            resolved_context["custom_title"] = title_val
+            if "section" not in resolved_context:
+                resolved_context["section"] = "workspace" if workspace_target != "No Repo" else "conversation"
+            resolved_context["last_user_view_time"] = now_utc.isoformat()
+
             init_context = {
                 "title": title_val, "custom_title": title_val,
                 "workspace_uri": resolved_context.get("workspace_uri", workspace_target),
@@ -163,23 +163,35 @@ async def _ensure_project_and_context(
             session.updated_at = now_utc
             ctx = dict(session.context or {})
             ctx["updated_at"] = now_utc.isoformat()
+            now_iso = now_utc.isoformat()
+            ctx["last_user_view_time"] = now_iso
+            resolved_context["last_user_view_time"] = now_iso
+
             is_placeholder = (
                 not ctx.get("title")
                 or ctx.get("title") in ("New Session", "New Conversation", "Untitled Session", "New Chat")
                 or str(ctx.get("title", "")).startswith("Session sess_")
             )
-            if is_placeholder and clean_title and clean_title not in ("New Conversation", "New Session", "Untitled Session"):
-                ctx["title"] = clean_title
-                ctx["custom_title"] = clean_title
-            elif not ctx.get("title"):
-                ctx["title"] = title_val
-                ctx["custom_title"] = title_val
+            if is_placeholder:
+                from app.services.session_transcript import generate_clean_session_title
+
+                clean_title = generate_clean_session_title(resolved_context.get("_raw_message", ""), sid)
+                if clean_title and clean_title not in ("New Conversation", "New Session", "Untitled Session"):
+                    ctx["title"] = clean_title
+                    ctx["custom_title"] = clean_title
+
+            # Preserve existing custom/persisted title from session across turns (D5)
+            title_val = ctx.get("custom_title") or ctx.get("title") or "New Conversation"
+            resolved_context["title"] = title_val
+            resolved_context["custom_title"] = title_val
+
             if resolved_context.get("permission_mode"):
                 ctx["permission_mode"] = resolved_context["permission_mode"]
             elif not ctx.get("permission_mode"):
                 ctx["permission_mode"] = "default"
             session.context = ctx
             await eng.update(session)
+
             # Merge stored keys we don't already have
             for k, v in ctx.items():
                 if k not in resolved_context:
