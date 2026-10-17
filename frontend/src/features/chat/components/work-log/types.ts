@@ -28,6 +28,8 @@ export interface ExecutionStep {
   startTime?: number;
   thoughts?: string[];
   tools?: ToolCallItem[];
+  toolAction?: string;
+  toolSummary?: string;
 }
 
 export interface TimelineEntry {

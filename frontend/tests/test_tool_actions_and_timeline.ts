@@ -80,7 +80,7 @@ assert.strictEqual(emittedCalls[0].toolSummary, 'Test suite run');
 
 // 2.6 updateAssistantToolsAndSteps preservation in tools & steps
 const initialMessages: Message[] = [
-  { role: 'user', content: 'check auth' },
+  { role: 'user', content: 'check auth', thoughts: [], tools: [] },
   { id: 'turn_1', turnId: 'turn_1', role: 'assistant', content: '', thoughts: [], tools: [], steps: [] }
 ];
 const updated = updateAssistantToolsAndSteps(initialMessages, 'turn_1', emittedCalls[0]);

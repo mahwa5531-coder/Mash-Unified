@@ -95,6 +95,8 @@ async def list_all_sessions(engine: Any, include_benchmarks: bool = False) -> di
 
 
 async def list_project_sessions(engine: Any, project_id: str) -> dict[str, list[dict]]:
+    if str(project_id).strip().lower() in ("null", "undefined", "none", ""):
+        return {"sessions": []}
     eng = _get_engine(engine)
     p = await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("id", project_id)) or await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("name", project_id))
     t_id, t_name = (p.id if p else project_id), (p.name if p else project_id).lower()
@@ -107,6 +109,8 @@ async def create_new_session(
     project_id: str | None = None, title: str = "New Chat",
     workspace_uri: str | None = None, section: str | None = None,
 ) -> dict[str, str]:
+    if str(project_id).strip().lower() in ("null", "undefined", "none", ""):
+        project_id = None
     _validate_id(session_id, "session_id")
     _validate_id(project_id, "project_id")
     eng, project = _get_engine(engine), None
@@ -128,8 +132,14 @@ async def create_new_session(
             pass
 
     ctx = {"project_id": project.id if project else project_id, "title": title, "custom_title": title, "workspace_uri": ws_uri, "working_directory": work_dir, "section": sec, "brain_directory": str(brain_path), "scratch_directory": str(brain_path / "scratch")}
-    from app.routers.chat import get_sse_server
-    sm = getattr(get_sse_server(), "_session_manager", None) if get_sse_server else None
+    sm = None
+    try:
+        from app.routers.chat import _sse_server
+
+        if _sse_server is not None:
+            sm = getattr(_sse_server, "_session_manager", None)
+    except Exception:
+        sm = None
     if sm:
         _, sess = await sm.register_agent(user_id=user_id, session_id=sid, agent_name="nexau_main_auditor", is_root=True)
         sess.context = ctx

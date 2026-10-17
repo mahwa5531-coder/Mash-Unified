@@ -17,6 +17,12 @@ input_schema:
     include:
       type: string
       description: "Optional glob pattern to filter files (e.g. '*.py', '*.{ts,tsx}', '*.json')."
+    toolAction:
+      type: string
+      description: "Brief 2-5 word phrase in -ing form describing the specific action. Capitalize like a sentence. Some examples: 'Analyzing directory', 'Searching the web', 'Checking git status', 'Running tests', 'Searching code'."
+    toolSummary:
+      type: string
+      description: "Brief 2-5 word noun phrase describing the specific task. Capitalize like a sentence. Some examples: 'Directory analysis', 'Web search', 'Git status check', 'Test execution', 'Code search'."
   required:
     - pattern
   additionalProperties: false

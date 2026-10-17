@@ -19,19 +19,12 @@ _DYNAMIC_ROOTS_CACHE: tuple[float, list[Path]] | None = None
 
 
 def get_base_allowed_roots() -> list[Path]:
-    """Get the immutable base allowed directories (Mash root, NexAU brain, user workspace folders)."""
+    """Get the immutable base allowed directories (Mash root, NexAU brain)."""
     global _BASE_ROOTS
     if _BASE_ROOTS is None:
         roots = [APP_WORKSPACE_ROOT.resolve()]
         for folder in [".mash", ".nexau"]:
             roots.append((Path.home() / folder / "brain").resolve())
-        # Include user profile and personal workspace directories for local file viewing
-        user_home = Path.home().resolve()
-        for folder in ["Downloads", "Desktop", "Documents"]:
-            ud = user_home / folder
-            if ud.is_dir():
-                roots.append(ud)
-        roots.append(user_home)
         _BASE_ROOTS = list(dict.fromkeys(roots))
     return _BASE_ROOTS
 
@@ -56,17 +49,16 @@ FORBIDDEN_SYSTEM_PREFIXES = (
 
 
 def is_path_in_base_roots(target_path: Path) -> bool:
-    """ponytail: 0ms fast-path check: blocks forbidden OS system files, allows user computer files."""
+    """Blocks forbidden OS system files, checks membership against base roots."""
     try:
         resolved = target_path.resolve()
         res_str = str(resolved).lower()
         if any(res_str == p or res_str.startswith(p + "\\") or res_str.startswith(p + "/") for p in FORBIDDEN_SYSTEM_PREFIXES):
             return False
-        # Fast-match against base roots (Mash root, NexAU brain, user home)
+        # Fast-match against base roots (Mash root, NexAU brain)
         if any(resolved == root or resolved.is_relative_to(root) for root in get_base_allowed_roots()):
             return True
-        # Allow any existing non-system user file or directory across local drives
-        return resolved.exists()
+        return False
     except Exception:
         return False
 

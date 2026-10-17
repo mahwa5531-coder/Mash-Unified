@@ -1,16 +1,18 @@
 type: tool
 name: write_todos
-description: 'Use this tool to track subtasks and execution progress for complex multi-step
-  engagements. Maintains an observable checklist for the user UI. - pending: Work
-  has not begun on the subtask. - in_progress: Currently being executed (keep only
-  one subtask in_progress at a time). - completed: Subtask successfully finished.
-  - cancelled: Subtask is no longer needed.'
+description: >-
+  Use this tool to track subtasks and execution progress for complex multi-step engagements.
+  Maintains an observable checklist for the user UI.
+  - pending: Work has not begun on the subtask.
+  - in_progress: Currently being executed (keep only one subtask in_progress at a time).
+  - completed: Subtask successfully finished.
+  - cancelled: Subtask is no longer needed.
 input_schema:
   type: object
   properties:
     todos:
       type: array
-      description: The complete list of todo items. Replaces the current active list.
+      description: "The complete list of todo items. Replaces the current active list."
       items:
         type: object
         description: A single todo item.
@@ -22,25 +24,15 @@ input_schema:
             type: string
             description: The current status of the task.
             enum:
-            - pending
-            - in_progress
-            - completed
-            - cancelled
+              - pending
+              - in_progress
+              - completed
+              - cancelled
         required:
-        - description
-        - status
+          - description
+          - status
         additionalProperties: false
-    toolAction:
-      type: string
-      description: Brief 2-5 word phrase in -ing form describing the specific action.
-        Capitalize like a sentence.
-    toolSummary:
-      type: string
-      description: Brief 2-5 word noun phrase describing the specific task. Capitalize
-        like a sentence.
   required:
-  - todos
-  - toolAction
-  - toolSummary
+    - todos
   additionalProperties: false
   $schema: http://json-schema.org/draft-07/schema#

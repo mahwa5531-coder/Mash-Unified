@@ -41,17 +41,7 @@ input_schema:
       type: string
       description: The specific fact or piece of information to remember. Should be
         a clear, self-contained statement.
-    toolAction:
-      type: string
-      description: Brief 2-5 word phrase in -ing form describing the specific action.
-        Capitalize like a sentence.
-    toolSummary:
-      type: string
-      description: Brief 2-5 word noun phrase describing the specific task. Capitalize
-        like a sentence.
   required:
   - fact
-  - toolAction
-  - toolSummary
   additionalProperties: false
   $schema: http://json-schema.org/draft-07/schema#

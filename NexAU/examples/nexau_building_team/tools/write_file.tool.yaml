@@ -1,5 +1,6 @@
 type: tool
 name: write_file
+disable_parallel: true
 description: >-
   Use this tool to create new files or overwrite existing files.
   The file and any parent directories will be created for you if they do not already exist.
@@ -52,6 +53,12 @@ input_schema:
         - summary
         - user_facing
         - request_feedback
+    toolAction:
+      type: string
+      description: "Brief 2-5 word phrase in -ing form describing the specific action. Capitalize like a sentence. Some examples: 'Analyzing directory', 'Searching the web', 'Checking git status', 'Running tests', 'Searching code'."
+    toolSummary:
+      type: string
+      description: "Brief 2-5 word noun phrase describing the specific task. Capitalize like a sentence. Some examples: 'Directory analysis', 'Web search', 'Git status check', 'Test execution', 'Code search'."
   required:
     - file_path
     - content

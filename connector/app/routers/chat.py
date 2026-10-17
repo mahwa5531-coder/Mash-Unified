@@ -57,6 +57,9 @@ async def _ensure_project_and_context(
     from app.paths import scaffold_session_storage, scaffold_workspace_storage
 
     project_id = resolved_context.get("project_id")
+    if str(project_id).strip().lower() in ("null", "undefined", "none", ""):
+        project_id = None
+        resolved_context["project_id"] = None
 
     # Scaffold brain/scratch dirs
     brain_path = scaffold_session_storage(sid, project_id)

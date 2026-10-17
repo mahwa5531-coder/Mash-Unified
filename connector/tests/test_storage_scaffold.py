@@ -114,3 +114,29 @@ def test_system_folder_candidates_includes_mash(tmp_path):
         res = asyncio.run(resolve_folder_endpoint(req))
         assert res["status"] == "success"
         assert res["folder_path"] == str(target_proj.resolve())
+
+
+@pytest.mark.anyio
+async def test_create_session_normalizes_null_project_id():
+    """D-03: Passing 'null', 'undefined', or empty string as project_id must normalize to None."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from app.services.session_lifecycle import create_new_session, list_project_sessions
+
+    mock_engine = MagicMock()
+    mock_engine.find_first = AsyncMock(return_value=None)
+    mock_engine.find_many = AsyncMock(return_value=[])
+    mock_engine.create = AsyncMock()
+
+    with patch("app.routers.chat._sse_server", None):
+        # create_new_session with string 'null'
+        res = await create_new_session(engine=mock_engine, session_id="sess_test_null_proj", project_id="null")
+        assert res["status"] == "success"
+
+        created_model = mock_engine.create.call_args[0][0]
+        assert created_model.context["project_id"] is None
+
+        # list_project_sessions with 'null'
+        list_res = await list_project_sessions(engine=mock_engine, project_id="null")
+        assert list_res == {"sessions": []}
+
+

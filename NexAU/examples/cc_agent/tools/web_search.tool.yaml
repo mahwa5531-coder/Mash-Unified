@@ -1,6 +1,7 @@
 type: tool
 name: web_search
-description: Perform a live web search using DuckDuckGo to find up-to-date information,
+description: >-
+  Perform a live web search using DuckDuckGo to find up-to-date information,
   documentation, references, and websites without requiring any API keys.
 input_schema:
   $schema: http://json-schema.org/draft-07/schema#
@@ -11,9 +12,8 @@ input_schema:
       description: The search query string.
     domain:
       type: string
-      default: ''
-      description: Optional domain or website to restrict results to (e.g., 'github.com'
-        or 'python.org').
+      default: ""
+      description: Optional domain or website to restrict results to (e.g., 'github.com' or 'python.org').
     num_results:
       type: integer
       default: 4
@@ -22,14 +22,10 @@ input_schema:
       description: Maximum number of search results to return (default 4).
     toolAction:
       type: string
-      description: Brief 2-5 word phrase in -ing form describing the specific action.
-        Capitalize like a sentence.
+      description: "Brief 2-5 word phrase in -ing form describing the specific action. Capitalize like a sentence. Some examples: 'Analyzing directory', 'Searching the web', 'Checking git status', 'Running tests', 'Searching code'."
     toolSummary:
       type: string
-      description: Brief 2-5 word noun phrase describing the specific task. Capitalize
-        like a sentence.
+      description: "Brief 2-5 word noun phrase describing the specific task. Capitalize like a sentence. Some examples: 'Directory analysis', 'Web search', 'Git status check', 'Test execution', 'Code search'."
   required:
-  - query
-  - toolAction
-  - toolSummary
+    - query
   additionalProperties: false

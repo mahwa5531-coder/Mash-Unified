@@ -56,6 +56,8 @@ export interface ExecutionStep {
   startTime?: number;
   thoughts?: string[];
   tools?: ToolCall[];
+  toolAction?: string;
+  toolSummary?: string;
 }
 
 export interface Message {
