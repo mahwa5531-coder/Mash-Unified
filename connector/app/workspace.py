@@ -19,21 +19,54 @@ _DYNAMIC_ROOTS_CACHE: tuple[float, list[Path]] | None = None
 
 
 def get_base_allowed_roots() -> list[Path]:
-    """Get the immutable base allowed directories (Mash root, NexAU brain)."""
+    """Get the immutable base allowed directories (Mash root, NexAU brain, user workspace folders)."""
     global _BASE_ROOTS
     if _BASE_ROOTS is None:
         roots = [APP_WORKSPACE_ROOT.resolve()]
         for folder in [".mash", ".nexau"]:
             roots.append((Path.home() / folder / "brain").resolve())
-        _BASE_ROOTS = roots
+        # Include user profile and personal workspace directories for local file viewing
+        user_home = Path.home().resolve()
+        for folder in ["Downloads", "Desktop", "Documents"]:
+            ud = user_home / folder
+            if ud.is_dir():
+                roots.append(ud)
+        roots.append(user_home)
+        _BASE_ROOTS = list(dict.fromkeys(roots))
     return _BASE_ROOTS
 
 
+FORBIDDEN_SYSTEM_PREFIXES = (
+    "c:\\windows",
+    "c:\\program files",
+    "c:\\program files (x86)",
+    "c:\\system volume information",
+    "c:\\$recycle.bin",
+    "c:\\recovery",
+    "c:\\perflogs",
+    "/etc",
+    "/proc",
+    "/sys",
+    "/dev",
+    "/boot",
+    "/root",
+    "/bin",
+    "/sbin",
+)
+
+
 def is_path_in_base_roots(target_path: Path) -> bool:
-    """ponytail: 0ms fast-path check without querying SQLite or scanning all sessions on disk."""
+    """ponytail: 0ms fast-path check: blocks forbidden OS system files, allows user computer files."""
     try:
         resolved = target_path.resolve()
-        return any(resolved == root or resolved.is_relative_to(root) for root in get_base_allowed_roots())
+        res_str = str(resolved).lower()
+        if any(res_str == p or res_str.startswith(p + "\\") or res_str.startswith(p + "/") for p in FORBIDDEN_SYSTEM_PREFIXES):
+            return False
+        # Fast-match against base roots (Mash root, NexAU brain, user home)
+        if any(resolved == root or resolved.is_relative_to(root) for root in get_base_allowed_roots()):
+            return True
+        # Allow any existing non-system user file or directory across local drives
+        return resolved.exists()
     except Exception:
         return False
 

@@ -41,4 +41,5 @@ test_workspaces/
 .agents/
 PROJECT.md
 .nexau/
+.mash/
 pdf_text_dump.txt

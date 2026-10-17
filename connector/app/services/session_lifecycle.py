@@ -80,7 +80,7 @@ async def list_all_sessions(engine: Any, include_benchmarks: bool = False) -> di
 
             result.append({
                 "session_id": sid, "project_id": ctx.get("project_id"),
-                "title": generate_clean_session_title(ctx.get("title") or ctx.get("custom_title") or f"Session {sid[:8]}", sid),
+                "title": generate_clean_session_title(ctx.get("title") or ctx.get("custom_title") or "New Conversation", sid),
                 "custom_title": ctx.get("custom_title"), "workspace_uri": ws, "working_directory": ctx.get("working_directory", ws),
                 "section": sec, "message_count": msg_count, "total_tokens": ctx.get("total_tokens") or 0,
                 "last_user_view_time": ctx.get("last_user_view_time"), "has_unread": (msg_count > 0 and last_view_sec > 0.0 and latest_sec > (last_view_sec + 3.0)),

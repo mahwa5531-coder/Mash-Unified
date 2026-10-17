@@ -46,26 +46,55 @@ export class InFlightToolTracker {
     const cid = this.callId(rawId, runId);
     if (!cid || !deltaArg) return;
     this.toolArgBuffers[cid] = (this.toolArgBuffers[cid] || '') + deltaArg;
-    let parsedArgs = {};
+    let parsedArgs: any = {};
     try { parsedArgs = JSON.parse(this.toolArgBuffers[cid]); } catch {}
-    if (onToolCall) onToolCall({ id: cid, name: this.toolCallNames[cid] || 'action', args: parsedArgs, status: 'running' });
+    const toolSummary = parsedArgs?.toolSummary || parsedArgs?.tool_summary;
+    const toolAction = parsedArgs?.toolAction || parsedArgs?.tool_action;
+    if (onToolCall) onToolCall({
+      id: cid,
+      name: this.toolCallNames[cid] || 'action',
+      args: parsedArgs,
+      status: 'running',
+      ...(toolSummary ? { toolSummary } : {}),
+      ...(toolAction ? { toolAction } : {}),
+    });
   }
 
   handleToolEnd(rawId: string, runId?: string, onToolCall?: (t: ToolCall) => void) {
     const cid = this.callId(rawId, runId);
     if (!cid || !onToolCall) return;
-    let finalArgs = {};
+    let finalArgs: any = {};
     try { finalArgs = JSON.parse(this.toolArgBuffers[cid] || '{}'); } catch {}
-    onToolCall({ id: cid, name: this.toolCallNames[cid] || 'action', args: finalArgs, status: 'running' });
+    const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary;
+    const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
+    onToolCall({
+      id: cid,
+      name: this.toolCallNames[cid] || 'action',
+      args: finalArgs,
+      status: 'running',
+      ...(toolSummary ? { toolSummary } : {}),
+      ...(toolAction ? { toolAction } : {}),
+    });
   }
 
   handleToolResult(rawId: string, rawOutput: any, isError: boolean, durationSeconds?: number, runId?: string, onToolCall?: (t: ToolCall) => void) {
     const cid = this.callId(rawId, runId);
     const outputStr = typeof rawOutput === 'string' ? rawOutput : JSON.stringify(rawOutput, null, 2);
     if (cid && onToolCall) {
-      let finalArgs = {};
+      let finalArgs: any = {};
       try { finalArgs = JSON.parse(this.toolArgBuffers[cid] || '{}'); } catch {}
-      onToolCall({ id: cid, name: this.toolCallNames[cid] || 'action', args: finalArgs, output: outputStr || 'Done.', status: isError ? 'failed' : 'completed', durationSeconds });
+      const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary;
+      const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
+      onToolCall({
+        id: cid,
+        name: this.toolCallNames[cid] || 'action',
+        args: finalArgs,
+        output: outputStr || 'Done.',
+        status: isError ? 'failed' : 'completed',
+        durationSeconds,
+        ...(toolSummary ? { toolSummary } : {}),
+        ...(toolAction ? { toolAction } : {}),
+      });
       this.completedToolIds.add(cid);
     }
   }
@@ -79,9 +108,19 @@ export class InFlightToolTracker {
   finalizeRunningTools(status: 'completed' | 'cancelled' = 'completed', onToolCall?: (t: ToolCall) => void) {
     for (const cid of Object.keys(this.toolCallNames)) {
       if (!this.completedToolIds.has(cid)) {
-        let finalArgs = {};
+        let finalArgs: any = {};
         try { finalArgs = JSON.parse(this.toolArgBuffers[cid] || '{}'); } catch {}
-        if (onToolCall) onToolCall({ id: cid, name: this.toolCallNames[cid], args: finalArgs, output: status === 'cancelled' ? 'Execution interrupted.' : 'Done.', status });
+        const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary;
+        const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
+        if (onToolCall) onToolCall({
+          id: cid,
+          name: this.toolCallNames[cid],
+          args: finalArgs,
+          output: status === 'cancelled' ? 'Execution interrupted.' : 'Done.',
+          status,
+          ...(toolSummary ? { toolSummary } : {}),
+          ...(toolAction ? { toolAction } : {}),
+        });
         this.completedToolIds.add(cid);
       }
     }
@@ -114,6 +153,8 @@ export function updateAssistantToolsAndSteps(
   } else {
     steps.push({
       id: toolCall.id || `step_${steps.length}`, step_index: steps.length, type: 'tool', tool_call_id: toolCall.id, name: toolCall.name, args: toolCall.args, output: toolCall.output || '', status: toolCall.status || (toolCall.output ? 'completed' : 'running'),
+      toolSummary: toolCall.toolSummary,
+      toolAction: toolCall.toolAction,
     });
   }
   next[idx] = { ...next[idx], tools, steps, thinkingDurationSeconds: thinkingDuration ?? next[idx].thinkingDurationSeconds };

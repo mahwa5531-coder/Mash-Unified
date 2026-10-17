@@ -126,3 +126,50 @@ body,
 .animate-loading-dots span:nth-child(3) {
   animation: loadingEllipsis 1.3s infinite ease-in-out 0.44s;
 }
+
+/* Silver Light Sweep Text Shine for In-Flight Tools (60 FPS GPU-accelerated) */
+@keyframes silverShine {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.animate-silver-shine {
+  background: linear-gradient(
+    110deg,
+    #71717a 20%,
+    #27272a 40%,
+    #09090b 50%,
+    #27272a 60%,
+    #71717a 80%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  display: inline-block;
+  animation: silverShine 2.2s linear infinite;
+  will-change: background-position;
+  transform: translateZ(0);
+}
+
+[data-theme="dark"] .animate-silver-shine,
+.dark .animate-silver-shine {
+  background: linear-gradient(
+    110deg,
+    #71717a 20%,
+    #d4d4d8 40%,
+    #ffffff 50%,
+    #d4d4d8 60%,
+    #71717a 80%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}

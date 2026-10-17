@@ -43,13 +43,16 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     try { args = JSON.parse(args); } catch { args = {}; }
   }
 
+  const rawSummary = args.toolSummary || args.tool_summary || args.summary || args.description || t.toolSummary || (t as any).summary || null;
+  const toolSummary = rawSummary ? String(rawSummary).trim() : null;
+  const rawAction = args.toolAction || args.tool_action || t.toolAction || null;
+  const toolAction = rawAction ? String(rawAction).trim() : null;
+
   // The interactive approval card is ONLY rendered while waiting for human permission.
   // As soon as the user makes a decision (allow/deny) or status transitions, the card vanishes
   // and the tool call renders as its normal canonical timeline item (command, file_view, etc.).
   if (t.status === 'pending_approval' && !t.decision) {
     const rawCmd = args.CommandLine || args.command || args.cmd || '';
-    const toolSummary = args.toolSummary || t.toolSummary || null;
-    const toolAction = args.toolAction || t.toolAction || null;
     return {
       id: `tool-${tIdx}`,
       type: 'approval',
@@ -77,11 +80,10 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
   ) {
     const rawCmd = args.CommandLine || args.command || args.cmd || args.code || args.source_code || (typeof args === 'string' ? args : 'command');
     const cleanCmd = String(rawCmd).replace(/^powershell\s+-Command\s+/i, '').trim();
-    const toolSummary = args.toolSummary || args.tool_summary || args.summary || args.description || (t as any).summary || null;
     return {
       id: `tool-${tIdx}`,
       type: 'command',
-      data: { tool: t, cmd: cleanCmd, fullCmd: String(rawCmd), toolSummary }
+      data: { tool: t, cmd: cleanCmd, fullCmd: String(rawCmd), toolSummary, toolAction }
     };
   } else if (name.includes('list_directory') || name.includes('list_dir') || name.includes('browse')) {
     const p = args.DirectoryPath || args.dir_path || args.path || 'directory';
@@ -89,7 +91,7 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     return {
       id: `tool-${tIdx}`,
       type: 'folder_view',
-      data: { tool: t, foldername: fname, folderPath: String(p) }
+      data: { tool: t, foldername: fname, folderPath: String(p), toolSummary, toolAction }
     };
   } else if (name.includes('read_file') || name.includes('view_file') || name.includes('read_many_files') || name.includes('get_file')) {
     const p = args.TargetFile || args.AbsolutePath || args.file_path || args.path || 'file';
@@ -99,13 +101,13 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
       return {
         id: `tool-${tIdx}`,
         type: 'folder_view',
-        data: { tool: t, foldername: fname, folderPath: String(p) }
+        data: { tool: t, foldername: fname, folderPath: String(p), toolSummary, toolAction }
       };
     } else {
       return {
         id: `tool-${tIdx}`,
         type: 'file_read',
-        data: { tool: t, filename: fname, filePath: String(p), lineRange: extractLineRange(args) }
+        data: { tool: t, filename: fname, filePath: String(p), lineRange: extractLineRange(args), toolSummary, toolAction }
       };
     }
   } else if (
@@ -157,24 +159,24 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
         filePath: String(p), 
         added, 
         deleted, 
-        lineRange: extractLineRange(args) 
+        lineRange: extractLineRange(args),
+        toolSummary,
+        toolAction,
       }
     };
   } else if (name.includes('search_web') || (name.includes('web') && name.includes('search'))) {
     const query = args.Query || args.query || args.search_term || args.pattern || '*';
-    const toolSummary = args.toolSummary || args.description || null;
     return {
       id: `tool-${tIdx}`,
       type: 'web_search',
-      data: { tool: t, query: String(query), toolSummary }
+      data: { tool: t, query: String(query), toolSummary, toolAction }
     };
   } else if (name.includes('web_fetch') || name.includes('read_url_content') || name.includes('fetch_url') || (name.includes('web') && name.includes('fetch'))) {
     const url = args.Url || args.url || args.target_url || args.link || 'url';
-    const toolSummary = args.toolSummary || args.description || null;
     return {
       id: `tool-${tIdx}`,
       type: 'web_fetch',
-      data: { tool: t, url: String(url), toolSummary }
+      data: { tool: t, url: String(url), toolSummary, toolAction }
     };
   } else if (
     name.includes('search') || 
@@ -183,7 +185,6 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     name.includes('find')
   ) {
     const pattern = args.Query || args.Pattern || args.pattern || args.query || args.search_term || '*';
-    const toolSummary = args.toolSummary || args.description || null;
     let countStr = '';
     if (t.output) {
       const lines = t.output.split('\n').filter((l) => l.trim().length > 0);
@@ -192,7 +193,7 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     return {
       id: `tool-${tIdx}`,
       type: 'code_search',
-      data: { tool: t, pattern: String(pattern), countStr, toolSummary }
+      data: { tool: t, pattern: String(pattern), countStr, toolSummary, toolAction }
     };
   } else if (name.includes('invoke_subagent') || name.includes('define_subagent') || (name.includes('subagent') && !name.includes('manage'))) {
     let subagentRoles: string[] = [];
@@ -201,18 +202,18 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     } else if (args.Role || args.TypeName) {
       subagentRoles = [args.Role || args.TypeName];
     }
-    const roleLabel = subagentRoles.length > 0 ? subagentRoles.join(', ') : (args.toolSummary || args.description || 'Subagent');
+    const roleLabel = subagentRoles.length > 0 ? subagentRoles.join(', ') : (toolSummary || 'Subagent');
     return {
       id: `tool-${tIdx}`,
       type: 'subagent',
-      data: { tool: t, roleLabel, args }
+      data: { tool: t, roleLabel, args, toolSummary, toolAction }
     };
   } else if (
     name.includes('task') || 
     name.includes('manage_task')
   ) {
     const isStatusCheck = args.Action === 'status';
-    let taskName = args.toolSummary || args.description || args.Prompt || '';
+    let taskName = toolSummary || args.Prompt || '';
     if (!taskName) {
       if (args.Action === 'list') taskName = 'Running background tasks';
       else if (args.Action === 'status') taskName = args.TaskId ? `task ${args.TaskId}` : 'task';
@@ -223,13 +224,13 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     return {
       id: `tool-${tIdx}`,
       type: 'task',
-      data: { tool: t, taskName: String(taskName), isStatusCheck, action: args.Action }
+      data: { tool: t, taskName: String(taskName), isStatusCheck, action: args.Action, toolSummary, toolAction }
     };
   } else {
     return {
       id: `tool-${tIdx}`,
       type: 'other',
-      data: { tool: t }
+      data: { tool: t, toolSummary, toolAction }
     };
   }
 }
@@ -258,7 +259,28 @@ export function groupTimelineEntries(entries: TimelineEntry[]): TimelineEntry[] 
         return rId === cleanId || (current.data?.command && r.data?.command === current.data?.command);
       });
       if (!isDuplicate) {
-        result.push(current);
+        // Sequential Tool Approval Guard:
+        // Only ONE active approval card can be presented to the user at a time.
+        // If an undecided approval card is already in the timeline, subsequent parallel tool calls
+        // render as calm queued entries until the user resolves the active approval card.
+        const hasActiveUndecidedCard = result.some(
+          (r) => r.type === 'approval' && !r.data?.decision && r.data?.status === 'pending'
+        );
+        if (hasActiveUndecidedCard && !current.data?.decision) {
+          const fallbackEntry = parseToolItem(
+            { ...(current.data?.tool || {}), status: 'queued_approval' },
+            current.id
+          );
+          fallbackEntry.data = {
+            ...fallbackEntry.data,
+            toolSummary: current.data?.toolSummary || `Queued: awaiting approval of previous tool`,
+            toolAction: `Awaiting prior approval`,
+            status: 'queued',
+          };
+          result.push(fallbackEntry);
+        } else {
+          result.push(current);
+        }
       }
       i++;
       continue;

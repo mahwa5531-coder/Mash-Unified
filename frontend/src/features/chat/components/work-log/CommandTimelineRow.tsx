@@ -1,9 +1,8 @@
 "use client";
 
 import React from 'react';
-import { ChevronRight, Loader2, Check, Copy, AlertCircle } from 'lucide-react';
+import { ChevronRight, Check, Copy, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { renderOutputWithLinks } from './fileLinkRenderer';
 import { isToolRunning } from './toolTimeline';
 import type { TimelineEntry } from './types';
 
@@ -51,6 +50,35 @@ export function CommandTimelineRow({
   }
 
   const isFailed = entry.data?.tool?.status === 'failed' || Boolean(parsedError) || (!parsedError && /error:|command not found|fatal:/i.test(displayOutput));
+  const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
+  const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
+
+  let displayLabel: string;
+  let showCmd = false;
+
+  if (isFailed) {
+    displayLabel = 'Failed';
+    showCmd = true;
+  } else if (isCancelled) {
+    displayLabel = 'Cancelled';
+    showCmd = true;
+  } else if (isRunning) {
+    if (toolAction) {
+      displayLabel = toolAction;
+      showCmd = false;
+    } else {
+      displayLabel = 'Running';
+      showCmd = true;
+    }
+  } else {
+    if (toolSummary) {
+      displayLabel = toolSummary;
+      showCmd = false;
+    } else {
+      displayLabel = 'Ran';
+      showCmd = true;
+    }
+  }
 
   return (
     <div key={entry.id} className={cn("flex flex-col text-xs select-none transition-colors", isChild ? "pl-2 py-0.5" : "my-0.5")}>
@@ -59,21 +87,23 @@ export function CommandTimelineRow({
         onClick={() => toggleCmd(toolId)}
         className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-normal py-0.5 cursor-pointer select-none transition-colors group text-left w-fit"
       >
-        {isRunning && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
         {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
-        {entry.data?.toolSummary ? (
-          <span className={cn("font-sans text-[12px] font-normal text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 transition-colors", isFailed && "text-rose-500 font-medium")}>
-            {entry.data.toolSummary}
+        <span
+          className={cn(
+            "font-sans text-[12px] shrink-0",
+            isFailed
+              ? "text-rose-500 font-medium"
+              : isRunning
+                ? "animate-silver-shine"
+                : "text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 transition-colors"
+          )}
+        >
+          {displayLabel}
+        </span>
+        {showCmd && (
+          <span className="font-mono text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 text-[12px] truncate max-w-md">
+            {entry.data?.cmd}
           </span>
-        ) : (
-          <>
-            <span className={cn("font-sans text-[12px]", isFailed && "text-rose-500 font-medium")}>
-              {isCancelled ? 'Cancelled' : isRunning ? 'Running' : isFailed ? 'Failed' : 'Ran'}
-            </span>
-            <span className="font-mono text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 text-[12px] truncate max-w-md">
-              {entry.data?.cmd}
-            </span>
-          </>
         )}
         <ChevronRight
           size={11}
@@ -112,7 +142,7 @@ export function CommandTimelineRow({
               </div>
             </div>
             <pre className="text-zinc-300 whitespace-pre-wrap leading-tight max-h-36 overflow-y-auto custom-scrollbar font-mono text-[10.5px] select-text">
-              {displayOutput ? renderOutputWithLinks(displayOutput, onOpenFile) : <span className="text-zinc-500">Done (no output)</span>}
+              {displayOutput || <span className="text-zinc-500">Done (no output)</span>}
             </pre>
           </div>
         </div>

@@ -138,6 +138,7 @@ export function finalizeStreamSession(activeSid: string): { updatedMessages: Mes
     s.chatMessages = applyStreamCompletion(s.chatMessages, s.activeTurnId, !!s.wasUserAborted, s.turnStartTime);
     updatedMessages = s.chatMessages;
     const wasAborted = s.wasUserAborted;
+    s.wasUserAborted = false;
     const hasPending = s.chatMessages.some((m) => m.tools?.some((t) => t.status === 'pending_approval' && !t.decision));
     if (!wasAborted && !hasPending && s.queuedMessages?.length) {
       nextQueuedMsg = s.queuedMessages.shift() || null;

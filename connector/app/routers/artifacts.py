@@ -263,10 +263,21 @@ async def get_file_content(
                     ])
             except Exception:
                 pass
+        user_home = Path.home()
         candidates.extend([
+            user_home / "Downloads" / rel_path,
+            user_home / "Desktop" / rel_path,
+            user_home / "Documents" / rel_path,
             Path.cwd() / rel_path,
             mash_root / rel_path,
         ])
+        filename = Path(rel_path).name
+        if filename != rel_path:
+            candidates.extend([
+                user_home / "Downloads" / filename,
+                user_home / "Desktop" / filename,
+                user_home / "Documents" / filename,
+            ])
         for cand in candidates:
             if cand.is_file():
                 p = cand.resolve()

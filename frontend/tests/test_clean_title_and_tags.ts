@@ -35,13 +35,13 @@ assert.strictEqual(t6, 'Repo', `Expected 'Repo', got ${t6}`);
 
 // 1.7 Protocol sentinels return clean fallback
 const t7 = generateCleanSessionTitle('[DONE]', 'sess_12345678');
-assert.strictEqual(t7, 'Session sess_123', `Expected 'Session sess_123', got ${t7}`);
+assert.strictEqual(t7, 'New Conversation', `Expected 'New Conversation', got ${t7}`);
 
 const t8 = generateCleanSessionTitle('[VERIFIED]', '');
-assert.strictEqual(t8, 'New Session', `Expected 'New Session', got ${t8}`);
+assert.strictEqual(t8, 'New Conversation', `Expected 'New Conversation', got ${t8}`);
 
 const t9 = generateCleanSessionTitle('[empty]', '');
-assert.strictEqual(t9, 'New Session', `Expected 'New Session', got ${t9}`);
+assert.strictEqual(t9, 'New Conversation', `Expected 'New Conversation', got ${t9}`);
 
 const t10 = generateCleanSessionTitle('<session_mode>Audit fixed assets</session_mode>', '');
 assert.strictEqual(t10, 'Audit Fixed Assets', `Expected 'Audit Fixed Assets', got ${t10}`);

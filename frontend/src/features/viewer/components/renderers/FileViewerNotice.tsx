@@ -7,9 +7,11 @@ interface FileViewerNoticeProps {
   message: string;
   filename?: string;
   path?: string;
+  onRetry?: () => void;
+  action?: React.ReactNode;
 }
 
-export function FileViewerNotice({ message, filename, path }: FileViewerNoticeProps) {
+export function FileViewerNotice({ message, filename, path, onRetry, action }: FileViewerNoticeProps) {
   const displayName = filename || (path ? path.split(/[/\\]/).pop() : undefined);
   const ext = displayName?.includes('.') ? displayName.split('.').pop()?.toLowerCase() : undefined;
   const baseName = displayName && ext ? displayName.slice(0, -(ext.length + 1)) : displayName;
@@ -37,6 +39,16 @@ export function FileViewerNotice({ message, filename, path }: FileViewerNoticePr
       <span className="text-xs text-zinc-500 dark:text-zinc-400 font-normal tracking-wide">
         {message}
       </span>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-4 px-3 py-1.5 text-xs font-medium rounded-md bg-zinc-200/80 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 transition-colors cursor-pointer select-none"
+        >
+          Retry Preview
+        </button>
+      )}
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }

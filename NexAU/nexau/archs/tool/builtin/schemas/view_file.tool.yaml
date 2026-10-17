@@ -12,8 +12,10 @@ description: |
     - Specify EndLine only to view the remaining preceding lines of the file, or the previous 800 lines, whichever is smaller
     - Specify both to view a precise line range. This range must be smaller than 800 lines or only the first 800 lines of the range will be shown.
   - Content is limited to 46080 bytes per view. If content is truncated, use the ContentOffset parameter to view the remaining content
-  Binary file usage:
-  - Do not provide StartLine or EndLine arguments, this tool always returns the entire file
+  PDF document (.pdf) usage:
+  - Supports all PDF documents directly via native high-resolution visual page rendering for multimodal perception.
+  - Specify StartLine and EndLine to view specific page ranges (e.g. StartLine=1, EndLine=50).
+  - ALWAYS call view_file directly for PDF documents; NEVER write custom scripts or use shell commands to parse PDFs.
   Spreadsheet & Tabular Data (.xlsx, .xls, .csv, .parquet):
   - Automatically routes through the Calamine & Polars ingestion engine.
   - Small sheets (<=100 rows) are rendered directly as structured Markdown tables.

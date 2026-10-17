@@ -19,14 +19,11 @@ have been pruned.
 from __future__ import annotations
 
 import asyncio
-import contextvars
-import functools
 import logging
 import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
@@ -34,7 +31,6 @@ if TYPE_CHECKING:
 
 import httpx
 import openai
-import requests
 from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
@@ -134,7 +130,7 @@ def _get_stream_idle_timeout_seconds(llm_config: LLMConfig | None) -> float:
 
 def _is_stream_timeout_exception(exc: Exception) -> bool:
     """Best-effort detection for provider/transport stream read timeouts."""
-    if isinstance(exc, (httpx.ReadTimeout, requests.exceptions.ReadTimeout, TimeoutError)):
+    if isinstance(exc, (httpx.ReadTimeout, TimeoutError)):
         return True
     return exc.__class__.__name__ in {"ReadTimeout", "APITimeoutError"}
 
@@ -361,17 +357,12 @@ class LLMCaller:
         self.global_storage = global_storage
         self.session_id = session_id
 
-        self._llm_thread_pool: ThreadPoolExecutor = ThreadPoolExecutor(
-            max_workers=4,
-            thread_name_prefix="llm-call",
-        )
-
     def _get_tracer(self) -> BaseTracer | None:
         if self.global_storage is not None:
             return self.global_storage.get("tracer")
         return None
 
-    def call_llm(
+    def _build_model_call_params(
         self,
         messages: list[Message],
         max_tokens: int | None = None,
@@ -383,10 +374,8 @@ class LLMCaller:
         shutdown_event: threading.Event | None = None,
         token_trace_session: TokenTraceSession | None = None,
         framework_context: FrameworkContext | None = None,
-    ) -> ModelResponse | None:
-        """Call LLM with the given messages and return normalized response."""
+    ) -> ModelCallParams:
         runtime_client = openai_client if openai_client is not None else self.openai_client
-
         if not runtime_client and not self.middleware_manager:
             raise RuntimeError(
                 "OpenAI client is not available. Please check your API configuration.",
@@ -405,7 +394,6 @@ class LLMCaller:
             )
 
         api_params = self.llm_config.to_openai_params()
-
         if max_tokens is not None:
             api_params["max_tokens"] = max_tokens
 
@@ -431,10 +419,9 @@ class LLMCaller:
             _log_llm_debug_request(messages)
 
         logger.info(f"🧠 Calling LLM with {max_tokens} max tokens...")
-
         messages = _ensure_tool_results(messages)
 
-        model_call_params = ModelCallParams(
+        return ModelCallParams(
             messages=messages,
             max_tokens=max_tokens,
             force_stop_reason=force_stop_reason,
@@ -445,6 +432,33 @@ class LLMCaller:
             openai_client=runtime_client,
             llm_config=self.llm_config,
             retry_attempts=self.retry_attempts,
+            shutdown_event=shutdown_event,
+            token_trace_session=token_trace_session,
+            framework_context=framework_context,
+        )
+
+    def call_llm(
+        self,
+        messages: list[Message],
+        max_tokens: int | None = None,
+        force_stop_reason: Any = None,
+        agent_state: AgentState | None = None,
+        tool_call_mode: str = "xml",
+        tools: Sequence[StructuredToolDefinitionLike] | None = None,
+        openai_client: Any | None = None,
+        shutdown_event: threading.Event | None = None,
+        token_trace_session: TokenTraceSession | None = None,
+        framework_context: FrameworkContext | None = None,
+    ) -> ModelResponse | None:
+        """Call LLM with the given messages and return normalized response."""
+        model_call_params = self._build_model_call_params(
+            messages=messages,
+            max_tokens=max_tokens,
+            force_stop_reason=force_stop_reason,
+            agent_state=agent_state,
+            tool_call_mode=tool_call_mode,
+            tools=tools,
+            openai_client=openai_client,
             shutdown_event=shutdown_event,
             token_trace_session=token_trace_session,
             framework_context=framework_context,
@@ -636,63 +650,14 @@ class LLMCaller:
         framework_context: FrameworkContext | None = None,
     ) -> ModelResponse | None:
         """Async version of call_llm."""
-        runtime_client = openai_client if openai_client is not None else self.openai_client
-
-        if not runtime_client and not self.middleware_manager:
-            raise RuntimeError(
-                "OpenAI client is not available. Please check your API configuration.",
-            )
-
-        normalized_mode = normalize_tool_call_mode(tool_call_mode)
-        use_structured_tools = normalized_mode in STRUCTURED_TOOL_CALL_MODES
-        adapted_tools: list[Mapping[str, object]] | None = None
-        if use_structured_tools:
-            strict_tools = bool((self.llm_config.extra_params or {}).get("strict_tools", False))
-            adapted_tools = _adapt_structured_tools_for_provider(
-                tools,
-                "openai",
-                tool_streaming=self.llm_config.tool_streaming,
-                strict=strict_tools,
-            )
-
-        api_params = self.llm_config.to_openai_params()
-        if max_tokens is not None:
-            api_params["max_tokens"] = max_tokens
-
-        if adapted_tools:
-            api_params["tools"] = adapted_tools
-            api_params.setdefault("tool_choice", "auto")
-            api_params.setdefault("parallel_tool_calls", True)
-
-        if not use_structured_tools:
-            xml_stop_sequences = ["</tool_use>", "</use_parallel_tool_calls>"]
-            existing_stop = api_params.get("stop", [])
-            if isinstance(existing_stop, str):
-                existing_stop = [existing_stop]
-            elif existing_stop is None:
-                existing_stop = []
-            api_params["stop"] = existing_stop + xml_stop_sequences
-
-        dropper = getattr(self.llm_config, "apply_param_drops", None)
-        if callable(dropper):
-            api_params = cast(dict[str, Any], dropper(api_params))
-
-        if self.llm_config.debug:
-            _log_llm_debug_request(messages)
-
-        messages = _ensure_tool_results(messages)
-
-        model_call_params = ModelCallParams(
+        model_call_params = self._build_model_call_params(
             messages=messages,
             max_tokens=max_tokens,
             force_stop_reason=force_stop_reason,
             agent_state=agent_state,
             tool_call_mode=tool_call_mode,
             tools=tools,
-            api_params=api_params,
-            openai_client=runtime_client,
-            llm_config=self.llm_config,
-            retry_attempts=self.retry_attempts,
+            openai_client=openai_client,
             shutdown_event=shutdown_event,
             token_trace_session=token_trace_session,
             framework_context=framework_context,
@@ -780,13 +745,11 @@ class LLMCaller:
         return None
 
     async def _run_sync_in_llm_pool(self, fn: Callable[[ModelCallParams], Any], params: ModelCallParams) -> Any:
-        loop = asyncio.get_running_loop()
-        ctx = contextvars.copy_context()
-        bound_fn = functools.partial(ctx.run, fn, params)
-        return await loop.run_in_executor(self._llm_thread_pool, bound_fn)
+        return await asyncio.to_thread(fn, params)
 
     def shutdown_thread_pool(self) -> None:
-        self._llm_thread_pool.shutdown(wait=False)
+        """No-op stub for backward compatibility; dedicated ThreadPoolExecutor pruned."""
+        pass
 
     async def _call_once_async_cancellable(self, params: ModelCallParams) -> ModelResponse | None:
         call_task = asyncio.create_task(self._call_once_async(params))
@@ -868,6 +831,35 @@ async def call_llm_with_different_client_async(
     )
 
 
+def _prepare_chat_completion_kwargs(
+    kwargs: dict[str, Any],
+    llm_config: LLMConfig | None = None,
+    model_call_params: ModelCallParams | None = None,
+) -> dict[str, Any]:
+    """Normalize messages, extra bodies, and gateway headers for OpenAI completions."""
+    prepared = dict(kwargs)
+    messages = prepared.get("messages", [])
+    for msg in messages:
+        if isinstance(msg, dict):
+            typed_msg = cast(dict[str, object], msg)
+            if typed_msg.get("role") == "assistant" and typed_msg.get("content") == "" and typed_msg.get("tool_calls"):
+                del typed_msg["content"]
+    extra_params = prepared.pop("extra_params", None)
+    if extra_params and isinstance(extra_params, dict):
+        existing_extra_body = dict(prepared.get("extra_body") or {})
+        existing_extra_body.update(extra_params)
+        prepared["extra_body"] = existing_extra_body
+
+    if llm_config:
+        req_headers = _build_cloud_telemetry_headers(llm_config, model_call_params)
+        if req_headers:
+            existing_extra_headers = dict(prepared.get("extra_headers") or {})
+            existing_extra_headers.update(req_headers)
+            prepared["extra_headers"] = existing_extra_headers
+
+    return prepared
+
+
 def call_llm_with_openai_chat_completion(
     client: openai.OpenAI,
     kwargs: dict[str, Any],
@@ -878,25 +870,7 @@ def call_llm_with_openai_chat_completion(
     tracer: BaseTracer | None = None,
 ) -> ModelResponse:
     """Call OpenAI chat completion with the given messages and return response content."""
-    messages = kwargs.get("messages", [])
-    for msg in messages:
-        if isinstance(msg, dict):
-            typed_msg = cast(dict[str, object], msg)
-            if typed_msg.get("role") == "assistant" and typed_msg.get("content") == "" and typed_msg.get("tool_calls"):
-                del typed_msg["content"]
-    extra_params = kwargs.pop("extra_params", None)
-    if extra_params and isinstance(extra_params, dict):
-        existing_extra_body = dict(kwargs.get("extra_body") or {})
-        existing_extra_body.update(extra_params)
-        kwargs["extra_body"] = existing_extra_body
-
-    if llm_config:
-        req_headers = _build_cloud_telemetry_headers(llm_config, model_call_params)
-        if req_headers:
-            existing_extra_headers = dict(kwargs.get("extra_headers") or {})
-            existing_extra_headers.update(req_headers)
-            kwargs["extra_headers"] = existing_extra_headers
-
+    kwargs = _prepare_chat_completion_kwargs(kwargs, llm_config, model_call_params)
     stream_requested = bool(kwargs.pop("stream", False) or getattr(llm_config, "stream", False))
 
     should_trace = tracer is not None and get_current_span() is not None
@@ -998,25 +972,7 @@ async def call_llm_with_openai_chat_completion_async(
     tracer: BaseTracer | None = None,
 ) -> ModelResponse:
     """Async OpenAI chat completion."""
-    messages = kwargs.get("messages", [])
-    for msg in messages:
-        if isinstance(msg, dict):
-            typed_msg = cast(dict[str, object], msg)
-            if typed_msg.get("role") == "assistant" and typed_msg.get("content") == "" and typed_msg.get("tool_calls"):
-                del typed_msg["content"]
-    extra_params = kwargs.pop("extra_params", None)
-    if extra_params and isinstance(extra_params, dict):
-        existing_extra_body = dict(kwargs.get("extra_body") or {})
-        existing_extra_body.update(extra_params)
-        kwargs["extra_body"] = existing_extra_body
-
-    if llm_config:
-        req_headers = _build_cloud_telemetry_headers(llm_config, model_call_params)
-        if req_headers:
-            existing_extra_headers = dict(kwargs.get("extra_headers") or {})
-            existing_extra_headers.update(req_headers)
-            kwargs["extra_headers"] = existing_extra_headers
-
+    kwargs = _prepare_chat_completion_kwargs(kwargs, llm_config, model_call_params)
     stream_requested = bool(kwargs.pop("stream", False) or getattr(llm_config, "stream", False))
 
     should_trace = tracer is not None and get_current_span() is not None

@@ -114,7 +114,7 @@ async def _ensure_project_and_context(
     try:
         from app.services.session_transcript import generate_clean_session_title
         clean_title = generate_clean_session_title(resolved_context.get("_raw_message", ""), sid)
-        title_val = resolved_context.get("title") or resolved_context.get("custom_title") or clean_title or f"Session {sid[:8]}"
+        title_val = resolved_context.get("title") or resolved_context.get("custom_title") or clean_title or "New Conversation"
         resolved_context["title"] = title_val
         resolved_context["custom_title"] = title_val
         if "section" not in resolved_context:
@@ -160,7 +160,15 @@ async def _ensure_project_and_context(
             session.updated_at = now_utc
             ctx = dict(session.context or {})
             ctx["updated_at"] = now_utc.isoformat()
-            if not ctx.get("title"):
+            is_placeholder = (
+                not ctx.get("title")
+                or ctx.get("title") in ("New Session", "New Conversation", "Untitled Session", "New Chat")
+                or str(ctx.get("title", "")).startswith("Session sess_")
+            )
+            if is_placeholder and clean_title and clean_title not in ("New Conversation", "New Session", "Untitled Session"):
+                ctx["title"] = clean_title
+                ctx["custom_title"] = clean_title
+            elif not ctx.get("title"):
                 ctx["title"] = title_val
                 ctx["custom_title"] = title_val
             if resolved_context.get("permission_mode"):
@@ -198,14 +206,13 @@ async def stream_query_bridge(
 
     resolved_context = payload.context or {}
     workspace_target = resolved_context.get("workspace_uri", "No Repo")
-    resolved_context["_raw_message"] = payload.messages  # for title extraction
+    user_prompt = (payload.messages or payload.message or "").strip()
+    resolved_context["_raw_message"] = user_prompt
 
     # Ensure live valid token for cloud gateway dispatch FIRST before any database state is written (DEF-10)
     from app.routers.auth import ensure_valid_token
     live_token = await ensure_valid_token()
-    mash_env = os.getenv("MASH_ENV", "production").lower()
-    auth_required = os.getenv("MASH_AUTH_REQUIRED", "").lower() in ("true", "1", "yes") or mash_env == "production"
-    if auth_required and (not live_token or live_token == "bearer-pending-auth"):
+    if not live_token or live_token == "bearer-pending-auth":
         raise HTTPException(status_code=401, detail="Authentication required. Please sign in to MASH.")
 
     try:
@@ -221,11 +228,17 @@ async def stream_query_bridge(
 
     effective_agent_config = server._default_agent_config
 
-    if live_token and effective_agent_config and effective_agent_config.llm_config:
-        target_model = effective_agent_config.llm_config.model or "mash/auto"
-        if effective_agent_config.llm_config.api_key != live_token or effective_agent_config.llm_config.model != target_model:
+    if effective_agent_config and effective_agent_config.llm_config:
+        env_model = os.getenv("MASH_MODEL") or os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL")
+        target_model = (
+            env_model
+            if (not effective_agent_config.llm_config.model or effective_agent_config.llm_config.model == "mash/auto") and env_model
+            else (effective_agent_config.llm_config.model or "mash/auto")
+        )
+        api_key = live_token or effective_agent_config.llm_config.api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+        if effective_agent_config.llm_config.api_key != api_key or effective_agent_config.llm_config.model != target_model:
             new_llm = copy.copy(effective_agent_config.llm_config)
-            new_llm.api_key = live_token
+            new_llm.api_key = api_key
             new_llm.model = target_model
             effective_agent_config = effective_agent_config.model_copy(update={"llm_config": new_llm})
 
@@ -305,6 +318,28 @@ async def stream_query_bridge(
                 logger.info("Auto-denied pending tool calls in session %s due to user steer prompt.", sid)
         except Exception as steer_err:
             logger.warning("Error resolving preemptive steer for session %s: %s", sid, steer_err)
+
+    # When resuming on approval without new user text, verify all tool decisions are complete
+    if sm and sid and not user_prompt.strip():
+        try:
+            pending_check = await sm.get_pending_tool_calls(user_id=user_id, session_id=sid)
+            if pending_check and any(v.get("decision") is None for v in pending_check.values()):
+                # Still waiting for user to decide on remaining tool calls; do not start run yet
+                async def waiting_event_stream():
+                    yield f"data: {json.dumps({'type': 'STATUS', 'status': 'waiting_for_remaining_approvals'})}\n\n"
+                return StreamingResponse(
+                    waiting_event_stream(),
+                    media_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+                )
+        except Exception as check_err:
+            logger.debug("Pending approvals check skipped: %s", check_err)
+
+    # Ensure any previously running agent in this session is gracefully terminated
+    try:
+        await server.handle_stop_request(user_id=user_id, session_id=sid, force=True, timeout=1.0)
+    except Exception:
+        pass
 
     # When resuming on approval without new user text, pass message=[] (empty list)
     # so NexAU does not append an empty user bubble to history (Chain 3)
@@ -442,10 +477,18 @@ async def stop_agent_bridge(
         stop_reason = getattr(result, "stop_reason", "stopped")
     except Exception as e:
         logger.warning("handle_stop_request error for session %s: %s", sid, e)
-    # ponytail: removed manual AgentLockModel force-delete that was here.
-    # NexAU's TransportBase.handle_streaming_request.finally: already cleans up
-    # running agents, and AgentLockService has TTL auto-expiry. The manual delete
-    # was racing with NexAU's own cleanup and causing spurious lock errors.
+
+    # Force release the agent lock for this session immediately so no zombie lock remains
+    if sid:
+        try:
+            eng = get_engine()
+            if eng:
+                from nexau.archs.session.models.agent_lock import AgentLockModel
+                await eng.delete(AgentLockModel, filters=ComparisonFilter.eq("session_id", sid))
+                logger.info("Force-released agent lock for stopped session %s", sid)
+        except Exception as lock_err:
+            logger.debug("Lock release skipped on stop: %s", lock_err)
+
     return {"status": "success", "stop_reason": str(stop_reason)}
 
 

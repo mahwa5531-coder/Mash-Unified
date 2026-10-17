@@ -31,8 +31,8 @@ def test_generate_clean_session_title_scenarios():
     assert t6 == "Repo", f"Expected 'Repo', got {t6!r}"
 
     # 7. Protocol sentinels should return fallback
-    assert generate_clean_session_title("[DONE]", sid="sess_12345678") == "Session sess_123"
-    assert generate_clean_session_title("[VERIFIED]", sid="") == "New Session"
+    assert generate_clean_session_title("[DONE]", sid="sess_12345678") == "New Conversation"
+    assert generate_clean_session_title("[VERIFIED]", sid="") == "New Conversation"
     # 8. Section tags & protocol tokens
     t8 = generate_clean_session_title("<session_mode>Audit fixed assets</session_mode>")
     assert t8 == "Audit fixed assets", f"Expected 'Audit fixed assets', got {t8!r}"

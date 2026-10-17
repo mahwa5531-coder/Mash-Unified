@@ -93,21 +93,31 @@ def _build_agent_config() -> AgentConfig:
 
     active_key = (
         _IN_MEMORY_AUTH_META.get("access_token")
-        or vault.get("api_key")
+        or (vault.get("api_key") if vault else None)
+        or os.getenv("LLM_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
         or "bearer-pending-auth"
     )
-    # The desktop uses the abstract model alias "mash/auto".
-    # The Cloud API gateway resolves this dynamically based on the user's plan.
-    active_model = os.getenv("MASH_MODEL") or "mash/auto"
+    # The desktop uses the abstract model alias "mash/auto" unless overridden by env.
+    active_model = (
+        os.getenv("MASH_MODEL")
+        or os.getenv("LLM_MODEL")
+        or os.getenv("OPENAI_MODEL")
+        or "mash/auto"
+    )
 
     is_mock = os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes") or active_key.lower() in ("mock", "none", "test")
     if is_mock:
         default_base_url = "http://mock"
     else:
-        clean_gw = cloud_gateway.rstrip("/")
-        if clean_gw.endswith("/v1/agent"):
-            clean_gw = clean_gw[:-6]
-        default_base_url = clean_gw if clean_gw.endswith("/v1") else f"{clean_gw}/v1"
+        llm_base = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+        if llm_base:
+            default_base_url = llm_base.rstrip("/")
+        else:
+            clean_gw = cloud_gateway.rstrip("/")
+            if clean_gw.endswith("/v1/agent"):
+                clean_gw = clean_gw[:-6]
+            default_base_url = clean_gw if clean_gw.endswith("/v1") else f"{clean_gw}/v1"
 
     agent_config.llm_config = LLMConfig(
         api_type="openai_chat_completion",

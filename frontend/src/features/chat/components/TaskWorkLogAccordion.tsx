@@ -150,7 +150,7 @@ export default function TaskWorkLogAccordion({
           }
         }
       });
-      return groupTimelineEntries(fullTimeline);
+      return fullTimeline;
     }
 
     // Branch B: Streaming or legacy flat messages fallback

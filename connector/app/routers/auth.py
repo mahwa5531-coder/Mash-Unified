@@ -136,8 +136,8 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
                 save_secure_vault(vault, {"authenticated": False})
                 return None
 
-    live_token = _IN_MEMORY_AUTH_META.get("access_token") or vault.get("api_key") or os.getenv("LLM_API_KEY")
-    if not live_token and not vault.get("refresh_token"):
+    live_token = _IN_MEMORY_AUTH_META.get("access_token") or (vault.get("api_key") if vault else None) or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+    if not live_token and not (vault and vault.get("refresh_token")):
         _IN_MEMORY_AUTH_META["authenticated"] = False
     return live_token
 
@@ -247,7 +247,6 @@ async def get_auth_config() -> dict[str, Any]:
 
 @router.get("/me")
 async def get_current_user_auth() -> dict[str, Any]:
-    """Returns the current active user authentication state and metadata."""
     meta = get_auth_metadata()
     vault = load_secure_vault()
 

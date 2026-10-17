@@ -102,7 +102,7 @@ export function useAgentMarkdownComponents({
 
     ul({ children, node: _node, ...props }: any) {
       return (
-        <ul className="my-3 pl-5 list-disc space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:text-zinc-400 dark:marker:text-zinc-500" {...props}>
+        <ul className="my-2.5 pl-5 list-disc space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:text-zinc-400 dark:marker:text-zinc-500 [&_ul]:mt-1 [&_ul]:mb-0.5 [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:mt-1 [&_ol]:mb-0.5 [&_ol]:pl-4 [&_ol]:space-y-1" {...props}>
           {children}
         </ul>
       );
@@ -110,7 +110,7 @@ export function useAgentMarkdownComponents({
 
     ol({ children, node: _node, ...props }: any) {
       return (
-        <ol className="my-3 pl-5 list-decimal space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400" {...props}>
+        <ol className="my-2.5 pl-5 list-decimal space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400 [&_ul]:mt-1 [&_ul]:mb-0.5 [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:mt-1 [&_ol]:mb-0.5 [&_ol]:pl-4 [&_ol]:space-y-1" {...props}>
           {children}
         </ol>
       );
@@ -124,7 +124,7 @@ export function useAgentMarkdownComponents({
 
     li({ children, node: _node, ...props }: any) {
       return (
-        <li className="my-1 text-[13.5px] leading-[1.68] text-zinc-800 dark:text-[#d4d4d8]" {...props}>
+        <li className="my-1 text-[13.5px] leading-[1.68] text-zinc-800 dark:text-[#d4d4d8] [&_p]:mt-1 [&_p]:mb-1 [&_p:last-child]:mb-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </li>
       );
@@ -162,7 +162,7 @@ export function useAgentMarkdownComponents({
 
     h4({ children, node: _node, ...props }: any) {
       return (
-        <h4 className="mt-4 mb-1.5 text-[14px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
+        <h4 className="mt-4 mb-1.5 text-[14.5px] font-semibold text-zinc-950 dark:text-white tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h4>
       );

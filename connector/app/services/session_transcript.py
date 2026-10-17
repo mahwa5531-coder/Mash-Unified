@@ -65,7 +65,7 @@ def clean_protocol_sentinels(text: str) -> str:
 
 def generate_clean_session_title(raw_text: str, sid: str = "") -> str:
     """ponytail: concise session title generator without tag or bracket leakage."""
-    fallback = f"Session {sid[:8]}" if sid else "New Session"
+    fallback = "New Conversation"
     if not raw_text or not isinstance(raw_text, str) or not raw_text.strip():
         return fallback
     t = clean_protocol_sentinels(clean_user_steering_envelope(raw_text.strip().strip("\"'` \t\n\r")))

@@ -244,7 +244,7 @@ def test_cloud_gateway_url_routing_agent_completions():
     ]
 
     for input_url, expected_base in test_cases:
-        with patch.dict(os.environ, {"CLOUD_GATEWAY_URL": input_url, "MOCK_LLM": ""}):
+        with patch.dict(os.environ, {"CLOUD_GATEWAY_URL": input_url, "LLM_BASE_URL": "", "OPENAI_BASE_URL": "", "MOCK_LLM": ""}):
             cfg = _build_agent_config()
             assert cfg.llm_config.base_url == expected_base, f"Failed for {input_url}"
 

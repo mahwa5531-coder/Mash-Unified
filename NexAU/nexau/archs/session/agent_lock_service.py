@@ -61,6 +61,8 @@ class AgentLockService:
         ...     await long_running_task()
     """
 
+    _active_local_holders: set[str] = set()
+
     def __init__(
         self,
         *,
@@ -214,10 +216,41 @@ class AgentLockService:
         # Check for existing valid lock first
         existing = await self._find_valid_lock(session_id, agent_id)
         if existing:
-            logger.warning(
-                f"Lock acquisition failed: agent {agent_id} in session {session_id} is already locked by holder={existing.holder_id}"
-            )
-            raise TimeoutError(f"Agent {agent_id} in session {session_id} is already locked (holder: {existing.holder_id})")
+            # ponytail: Validate whether existing lock is actively held or an orphan from a cancelled/crashed task
+            is_stale = False
+            try:
+                if ":" in str(existing.holder_id):
+                    holder_pid_str = str(existing.holder_id).split(":", 1)[0]
+                    holder_pid = int(holder_pid_str)
+                    if holder_pid == os.getpid():
+                        # Same process: if holder_id is NOT actively held by a running coroutine, it is orphaned
+                        if existing.holder_id not in AgentLockService._active_local_holders:
+                            is_stale = True
+                    else:
+                        import psutil
+                        if not psutil.pid_exists(holder_pid):
+                            is_stale = True
+            except Exception as e:
+                logger.debug(f"Error checking lock holder liveness: {e}")
+
+            if is_stale:
+                logger.info(
+                    f"Pruning stale/orphaned lock from holder {existing.holder_id} for session={session_id}, agent={agent_id}"
+                )
+                await self._engine.delete(
+                    AgentLockModel,
+                    filters=AndFilter(
+                        filters=[
+                            ComparisonFilter.eq("session_id", session_id),
+                            ComparisonFilter.eq("agent_id", agent_id),
+                        ]
+                    ),
+                )
+            else:
+                logger.warning(
+                    f"Lock acquisition failed: agent {agent_id} in session {session_id} is already locked by holder={existing.holder_id}"
+                )
+                raise TimeoutError(f"Agent {agent_id} in session {session_id} is already locked (holder: {existing.holder_id})")
 
         # Try to create or replace lock
         # If there's an expired lock, we can overwrite it
@@ -291,12 +324,14 @@ class AgentLockService:
         if not lock_acquired:
             raise TimeoutError(f"Agent {agent_id} in session {session_id} could not acquire lock")
 
+        AgentLockService._active_local_holders.add(holder_id)
         # Start heartbeat task (run-level, not global)
         heartbeat_task = asyncio.create_task(self._heartbeat_loop(session_id, agent_id, holder_id))
 
         try:
             yield
         finally:
+            AgentLockService._active_local_holders.discard(holder_id)
             # Stop heartbeat
             logger.info(f"[LOCK_RELEASE] Starting lock release for session={session_id}, agent={agent_id}, holder={holder_id}")
             heartbeat_task.cancel()
@@ -385,6 +420,7 @@ class AgentLockService:
         )
         if deleted_count > 0:
             logger.info(f"Force-released lock for session={session_id}, agent={agent_id}")
+            AgentLockService._active_local_holders.clear()
             return True
         else:
             logger.debug(f"No lock to force-release for session={session_id}, agent={agent_id}")
@@ -396,4 +432,5 @@ class AgentLockService:
         Note: This is a no-op now since we no longer have a global cleanup task.
         Kept for API compatibility.
         """
-        logger.debug("AgentLockService stop called (no-op, no global cleanup task)")
+        AgentLockService._active_local_holders.clear()
+        logger.debug("AgentLockService stop called (cleared active local holders)")

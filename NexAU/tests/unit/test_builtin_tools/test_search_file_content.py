@@ -25,7 +25,7 @@ import pytest
 
 from nexau.archs.sandbox.base_sandbox import FileInfo, FileOperationResult, SandboxStatus
 from nexau.archs.sandbox.local_sandbox import LocalSandbox
-from nexau.archs.tool.builtin.file_tools import search_file_content
+from nexau.archs.tool.builtin.file_tools.search_file_content import search_file_content
 
 search_file_content_module = importlib.import_module("nexau.archs.tool.builtin.file_tools.search_file_content")
 

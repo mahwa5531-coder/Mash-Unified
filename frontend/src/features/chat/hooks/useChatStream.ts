@@ -133,6 +133,7 @@ export function useChatStream({
       if (!targetSession.isHistoryLoaded && targetSession.chatMessages.length === 2) targetSession.isHistoryLoaded = true;
     }
 
+    targetSession.wasUserAborted = false;
     targetSession.isStreaming = true;
     targetSession.tokenBuffer = '';
     targetSession.thoughtBuffer = '';
@@ -223,9 +224,16 @@ export function useChatStream({
       if (!curSid) return;
       const ok = await executeToolApproval(curSid, toolCallId, action, feedback);
       if (!ok) return;
-      if (curSid === activeSessionIdRef.current) {
-        const s = sessionStore.get(curSid);
-        if (s) setChatMessages(s.chatMessages);
+      const s = sessionStore.get(curSid);
+      if (curSid === activeSessionIdRef.current && s) {
+        setChatMessages(s.chatMessages);
+      }
+      // Check if there are still other pending approval tools in the turn waiting for user decision
+      const hasOtherPending = s?.chatMessages.some((m) =>
+        m.tools?.some((t) => (t.status === 'pending_approval' || (t as any).pending) && !t.decision && t.id !== toolCallId)
+      );
+      if (hasOtherPending) {
+        return;
       }
       dispatchSendMessage('', false, true, curSid, true);
     },

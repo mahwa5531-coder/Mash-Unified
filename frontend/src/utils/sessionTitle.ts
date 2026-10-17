@@ -47,12 +47,12 @@ function truncateAtWordBoundary(str: string, maxLen = 32): string {
  */
 export function generateCleanSessionTitle(rawText: string, fallbackId = ''): string {
   if (!rawText || typeof rawText !== 'string') {
-    return fallbackId ? `Session ${fallbackId.slice(0, 8)}` : 'New Session';
+    return 'New Conversation';
   }
 
   let t = rawText.trim().replace(/^["'`\s]+|["'`\s]+$/g, '').trim();
   if (!t) {
-    return fallbackId ? `Session ${fallbackId.slice(0, 8)}` : 'New Session';
+    return 'New Conversation';
   }
 
   // 0. Clean mid-flight steering envelope
@@ -143,5 +143,5 @@ export function generateCleanSessionTitle(rawText: string, fallbackId = ''): str
     t = toTitleCase(t);
   }
 
-  return truncateAtWordBoundary(t, 32) || (fallbackId ? `Session ${fallbackId.slice(0, 8)}` : 'New Session');
+  return truncateAtWordBoundary(t, 32) || 'New Conversation';
 }

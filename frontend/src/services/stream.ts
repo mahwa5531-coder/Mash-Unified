@@ -60,12 +60,16 @@ export async function streamQuery(
       if (!completedToolIds.has(callId)) {
         let finalArgs: Record<string, any> = {};
         try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
+        const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary;
+        const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
         onToolCall({
           id: callId,
           name: toolCallNames[callId],
           args: finalArgs,
           output: status === "cancelled" ? "Execution interrupted." : "Done.",
           status: status,
+          ...(toolSummary ? { toolSummary } : {}),
+          ...(toolAction ? { toolAction } : {}),
         });
         completedToolIds.add(callId);
       }
@@ -214,7 +218,16 @@ export async function streamQuery(
               try { parsedArgs = JSON.parse(toolArgBuffers[callId]); } catch { /* still buffering */ }
               if (onToolCall) {
                 const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
-                onToolCall({ id: callId, name: currentName, args: parsedArgs, status: "running" });
+                const toolSummary = parsedArgs?.toolSummary || parsedArgs?.tool_summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary;
+                const toolAction = parsedArgs?.toolAction || parsedArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
+                onToolCall({
+                  id: callId,
+                  name: currentName,
+                  args: parsedArgs,
+                  status: "running",
+                  ...(toolSummary ? { toolSummary } : {}),
+                  ...(toolAction ? { toolAction } : {}),
+                });
               }
             }
           }
@@ -227,7 +240,16 @@ export async function streamQuery(
               let finalArgs: Record<string, any> = {};
               try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
               const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
-              onToolCall({ id: callId, name: currentName, args: finalArgs, status: "running" });
+              const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary;
+              const toolAction = finalArgs?.toolAction || finalArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
+              onToolCall({
+                id: callId,
+                name: currentName,
+                args: finalArgs,
+                status: "running",
+                ...(toolSummary ? { toolSummary } : {}),
+                ...(toolAction ? { toolAction } : {}),
+              });
             }
           }
 
@@ -242,6 +264,8 @@ export async function streamQuery(
               let finalArgs: Record<string, any> = {};
               try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
               const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
+              const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary;
+              const toolAction = finalArgs?.toolAction || finalArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
               const isFailed = Boolean(
                 event.is_error ||
                 data.is_error ||
@@ -259,6 +283,8 @@ export async function streamQuery(
                 output: outputStr || "Done.",
                 status: isFailed ? "failed" : "completed",
                 durationSeconds: event.duration_seconds ?? data.duration_seconds,
+                ...(toolSummary ? { toolSummary } : {}),
+                ...(toolAction ? { toolAction } : {}),
               });
               completedToolIds.add(callId);
             }
