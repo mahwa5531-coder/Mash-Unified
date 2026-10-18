@@ -294,15 +294,15 @@ const allowedEntry = parseToolItem(allowedTool, 0);
 assert.strictEqual(allowedEntry.type, 'command', 'Approved tool MUST vanish approval card and render as normal command tool');
 assert.strictEqual(allowedEntry.data.cmd, 'rm -rf node_modules');
 
-// 6C. When user denies -> Card vanishes immediately, renders as normal 'command' tool with failed status
+// 6C. When user denies -> Card vanishes immediately, renders as normal 'command' tool with denied status
 const deniedTool = {
   ...pendingTool,
-  status: 'failed',
+  status: 'denied',
   decision: 'deny',
 };
 const deniedEntry = parseToolItem(deniedTool, 0);
 assert.strictEqual(deniedEntry.type, 'command', 'Denied tool MUST vanish approval card and render as normal tool');
-assert.strictEqual(deniedEntry.data.tool.status, 'failed');
+assert.strictEqual(deniedEntry.data.tool.status, 'denied');
 
 console.log('✓ Test 6: Ephemeral approval card vanishes immediately upon decision and renders normal tool call');
 

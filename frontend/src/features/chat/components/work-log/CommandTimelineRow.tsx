@@ -29,6 +29,7 @@ export function CommandTimelineRow({
 }: CommandTimelineRowProps) {
   const isRunning = isToolRunning(entry.data?.tool, isStreaming);
   const isCancelled = entry.data?.tool?.status === 'cancelled';
+  const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
   const toolId = String(entry.data?.tool?.id || entry.id);
   const rawOutput = entry.data?.tool?.output || '';
   const outputText = rawOutput.trim();
@@ -49,14 +50,17 @@ export function CommandTimelineRow({
     } catch {}
   }
 
-  const isFailed = entry.data?.tool?.status === 'failed' || Boolean(parsedError) || (!parsedError && /error:|command not found|fatal:/i.test(displayOutput));
+  const isFailed = !isDenied && (entry.data?.tool?.status === 'failed' || Boolean(parsedError));
   const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
   const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
 
   let displayLabel: string;
   let showCmd = false;
 
-  if (isFailed) {
+  if (isDenied) {
+    displayLabel = 'Cancelled by user';
+    showCmd = true;
+  } else if (isFailed) {
     displayLabel = 'Failed';
     showCmd = true;
   } else if (isCancelled) {
@@ -81,7 +85,7 @@ export function CommandTimelineRow({
   }
 
   return (
-    <div key={entry.id} className={cn("flex flex-col text-xs select-none transition-colors", isChild ? "pl-2 py-0.5" : "my-0.5")}>
+    <div key={entry.id} className={cn("flex flex-col text-xs select-none transition-colors", isChild ? "pl-2 py-0.5" : "my-0.5", isDenied && "opacity-75")}>
       <button
         type="button"
         onClick={() => toggleCmd(toolId)}
@@ -101,7 +105,14 @@ export function CommandTimelineRow({
           {displayLabel}
         </span>
         {showCmd && (
-          <span className="font-mono text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 text-[12px] truncate max-w-md">
+          <span
+            className={cn(
+              "font-mono text-[12px] truncate max-w-md",
+              isDenied
+                ? "text-zinc-400 dark:text-zinc-500 line-through opacity-60"
+                : "text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200"
+            )}
+          >
             {entry.data?.cmd}
           </span>
         )}

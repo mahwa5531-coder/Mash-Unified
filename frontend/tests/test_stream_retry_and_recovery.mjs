@@ -291,7 +291,7 @@ console.log("\n[Test 3] Approval Card Auto-Dismissal on Preemptive Steer");
         ...updated,
         tools: m.tools.map((t) =>
           t.status === "pending_approval" && !t.decision
-            ? { ...t, status: "failed", decision: "deny" }
+            ? { ...t, status: "denied", decision: "deny" }
             : t
         ),
       };
@@ -300,7 +300,7 @@ console.log("\n[Test 3] Approval Card Auto-Dismissal on Preemptive Steer");
   });
 
   const updatedTool = updatedMessages[1].tools[0];
-  assert.strictEqual(updatedTool.status, "failed", "Tool status must transition to 'failed'");
+  assert.strictEqual(updatedTool.status, "denied", "Tool status must transition to 'denied'");
   assert.strictEqual(updatedTool.decision, "deny", "Decision must be set to 'deny'");
 
   // Verify ID matching compatibility between raw and run_-prefixed IDs

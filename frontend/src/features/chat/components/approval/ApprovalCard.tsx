@@ -211,9 +211,9 @@ export function ApprovalCard({
             <span>{localDecision === 'allow' ? 'Always allowed' : 'Finished'}</span>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 text-xs text-rose-500 font-medium py-1">
-            <XCircle size={13} />
-            <span>Denied by user</span>
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 font-medium py-1">
+            <XCircle size={13} className="text-zinc-400 dark:text-zinc-500" />
+            <span>Cancelled by user</span>
           </div>
         )}
       </div>

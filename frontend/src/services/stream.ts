@@ -266,14 +266,12 @@ export async function streamQuery(
               const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
               const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary;
               const toolAction = finalArgs?.toolAction || finalArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
+              // ponytail: Only flag failed if wire protocol explicitly stamps event as failed/error.
+              // Tool stdout/stderr (e.g. CLI non-zero returns or not-found) is valid observation
+              // context for the LLM to inspect and self-correct, not a UI failure.
               const isFailed = Boolean(
-                event.is_error ||
-                data.is_error ||
                 event.status === "failed" ||
-                data.status === "failed" ||
-                /^(error|exception|validationerror|failed):/i.test(outputStr.trim()) ||
-                outputStr.toLowerCase().includes("schema validation failed") ||
-                outputStr.toLowerCase().includes("validation error")
+                data.status === "failed"
               );
 
               onToolCall({

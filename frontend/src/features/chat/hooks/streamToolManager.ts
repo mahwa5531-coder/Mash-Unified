@@ -190,7 +190,7 @@ export function dismissPendingApprovals(messages: Message[]): Message[] {
     if (!m.tools || !m.tools.some((t) => t.status === 'pending_approval' && !t.decision)) return m;
     return {
       ...m,
-      tools: m.tools.map((t) => t.status === 'pending_approval' && !t.decision ? { ...t, status: 'failed' as const, decision: 'deny' as const } : t),
+      tools: m.tools.map((t) => t.status === 'pending_approval' && !t.decision ? { ...t, status: 'denied' as const, decision: 'deny' as const } : t),
     };
   });
 }
@@ -201,13 +201,13 @@ export function applyToolApproval(
   return messages.map((m) => {
     let tools = m.tools;
     if (tools?.length) {
-      tools = tools.map((t) => isSameToolId(t.id, toolCallId) || isSameToolId(t.id, rawTcId) ? { ...t, status: action === 'deny' ? ('failed' as const) : ('running' as const), decision: action } : t);
+      tools = tools.map((t) => isSameToolId(t.id, toolCallId) || isSameToolId(t.id, rawTcId) ? { ...t, status: action === 'deny' ? ('denied' as const) : ('running' as const), decision: action } : t);
     }
     let steps = m.steps;
     if (steps?.length) {
       steps = steps.map((st: any) => {
         const matches = isSameToolId(st.tool_call_id, toolCallId) || isSameToolId(st.tool_call_id, rawTcId) || (st.type === 'tool' && (isSameToolId(st.id, toolCallId) || isSameToolId(st.id, rawTcId)));
-        return matches ? { ...st, status: action === 'deny' ? 'failed' : 'running', decision: action } : st;
+        return matches ? { ...st, status: action === 'deny' ? 'denied' : 'running', decision: action } : st;
       });
     }
     return { ...m, tools, steps };

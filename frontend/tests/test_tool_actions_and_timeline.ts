@@ -209,7 +209,8 @@ console.log('\n[Test 4] Timeline Row Presentation State Rules (running shine vs 
 function computeRowPresentation(entry: any, isStreaming: boolean = false) {
   const isRunning = isToolRunning(entry.data?.tool, isStreaming);
   const isCancelled = entry.data?.tool?.status === 'cancelled';
-  const isFailed = entry.data?.tool?.status === 'failed';
+  const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
+  const isFailed = !isDenied && entry.data?.tool?.status === 'failed';
   const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
   const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
 
@@ -242,7 +243,10 @@ function computeRowPresentation(entry: any, isStreaming: boolean = false) {
     other: 'Executed',
   };
 
-  if (isFailed) {
+  if (isDenied) {
+    label = 'Cancelled by user';
+    hasShine = false;
+  } else if (isFailed) {
     label = 'Failed';
     hasShine = false;
   } else if (isCancelled) {
@@ -256,11 +260,11 @@ function computeRowPresentation(entry: any, isStreaming: boolean = false) {
     hasShine = false;
   }
 
-  const hasCustomText = !isFailed && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
+  const hasCustomText = !isDenied && !isFailed && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
 
   // Command row visibility logic
   let showCmd = false;
-  if (isFailed || isCancelled) {
+  if (isDenied || isFailed || isCancelled) {
     showCmd = true;
   } else if (isRunning) {
     showCmd = !toolAction;
@@ -268,7 +272,7 @@ function computeRowPresentation(entry: any, isStreaming: boolean = false) {
     showCmd = !toolSummary;
   }
 
-  return { label, hasShine, isRunning, isFailed, isCancelled, hasCustomText, showCmd };
+  return { label, hasShine, isRunning, isFailed, isCancelled, isDenied, hasCustomText, showCmd };
 }
 
 // 4.1 Running with dynamic toolAction -> displays toolAction with animate-silver-shine
@@ -361,7 +365,21 @@ const failedWebSearch = computeRowPresentation({
 assert.strictEqual(failedWebSearch.label, 'Failed');
 assert.strictEqual(failedWebSearch.hasCustomText, false, 'Web search query MUST NOT be hidden when search fails!');
 
-console.log('  -> PASSED: All presentation states (running shine, calm ghost static completed, failed, cancelled, target retention) 100% verified');
+// 4.8 Denied tool -> displays "Cancelled by user" without shine, calm ghost line, zero error badge
+const deniedTool = computeRowPresentation({
+  type: 'command',
+  data: {
+    tool: { status: 'denied', decision: 'deny' },
+    cmd: 'npm run build',
+  }
+});
+assert.strictEqual(deniedTool.label, 'Cancelled by user');
+assert.strictEqual(deniedTool.hasShine, false, 'Denied tool MUST NOT shimmer!');
+assert.strictEqual(deniedTool.isFailed, false, 'Denied tool is NOT a failure!');
+assert.strictEqual(deniedTool.isDenied, true);
+assert.strictEqual(deniedTool.showCmd, true, 'Command name MUST be displayed when command is cancelled/denied!');
+
+console.log('  -> PASSED: All presentation states (running shine, calm ghost static completed, failed, cancelled, denied ghost line, target retention) 100% verified');
 
 console.log('\n======================================================================');
 console.log('ALL DYNAMIC TOOL ACTION & TOOL SUMMARY VERIFICATION TESTS PASSED');
