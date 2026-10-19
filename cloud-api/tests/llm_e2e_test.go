@@ -498,6 +498,48 @@ func TestNormalizationFloorAndDefault(t *testing.T) {
 	}
 }
 
+// TestNormalizeUsage_OpenRouterWireFormat tests unmarshaling raw OpenRouter
+// usage JSON with float cost and cached_tokens fields.
+func TestNormalizeUsage_OpenRouterWireFormat(t *testing.T) {
+	rawJSON := []byte(`{
+		"prompt_tokens": 194,
+		"completion_tokens": 82,
+		"total_tokens": 276,
+		"cost": 0.000952,
+		"prompt_tokens_details": {
+			"cached_tokens": 100,
+			"cache_write_tokens": 20
+		},
+		"completion_tokens_details": {
+			"reasoning_tokens": 15
+		}
+	}`)
+	var u bifrost.Usage
+	if err := json.Unmarshal(rawJSON, &u); err != nil {
+		t.Fatalf("OpenRouter usage unmarshal failed: %v", err)
+	}
+	if u.Cost == nil || u.Cost.TotalCost != 0.000952 {
+		t.Fatalf("want cost 0.000952, got %+v", u.Cost)
+	}
+	if u.PromptTokensDetails == nil || u.PromptTokensDetails.CachedTokens != 100 {
+		t.Fatalf("want cached_tokens 100, got %+v", u.PromptTokensDetails)
+	}
+	rule := domain.NormRule{InputWeight: 2.0, OutputWeight: 4.0, CachedReadWeight: 1.0, CachedWriteWeight: 1.0}
+	norm := llm.NormalizeUsage(&u, rule)
+	if norm.RawPromptTokens != 194 || norm.RawCompletionTokens != 82 {
+		t.Fatalf("raw tokens mismatch: %+v", norm)
+	}
+	if norm.CacheReadTokens != 100 {
+		t.Fatalf("want cache read 100, got %d", norm.CacheReadTokens)
+	}
+	if norm.ReasoningTokens != 15 {
+		t.Fatalf("want reasoning 15, got %d", norm.ReasoningTokens)
+	}
+	if norm.TotalCost != 0.000952 {
+		t.Fatalf("want total cost 0.000952, got %f", norm.TotalCost)
+	}
+}
+
 // staticRules is a fixed RuleSource (no DB).
 type staticRules []domain.NormRule
 
