@@ -22,8 +22,10 @@ export async function fetchProjects(): Promise<ProjectItem[]> {
 }
 
 function notifyProjectsChanged() {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('nexau:projects-updated'));
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    try {
+      window.dispatchEvent(new CustomEvent('nexau:projects-updated'));
+    } catch {}
   }
 }
 
@@ -86,18 +88,29 @@ export async function renameProject(projectId: string, name: string): Promise<bo
   }
 }
 
-export async function deleteProject(projectId: string): Promise<boolean> {
+export interface DeleteProjectResult {
+  success: boolean;
+  message?: string;
+}
+
+export async function deleteProject(projectId: string): Promise<DeleteProjectResult> {
   try {
     const res = await safeFetch(`${BASE_URL}/api/projects/${encodeURIComponent(projectId)}`, {
       method: 'DELETE',
     });
-    if (res.ok) {
-      notifyProjectsChanged();
+    if (!res.ok) {
+      let errMsg = `Failed to delete project (${res.status})`;
+      try {
+        const data = await res.json();
+        if (data.detail) errMsg = data.detail;
+        else if (data.message) errMsg = data.message;
+      } catch {}
+      return { success: false, message: errMsg };
     }
-    return res.ok;
-  } catch (err) {
-    console.warn("Failed to delete project:", err);
-    return false;
+    notifyProjectsChanged();
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, message: err?.message || "Network error while deleting project" };
   }
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { AlertCircle, Globe, ExternalLink, Search, CheckCircle2, Bot } from 'lucide-react';
+import { Globe, ExternalLink, Search, CheckCircle2, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FilePill } from '@/primitives/FilePill';
 import { isToolRunning } from './toolTimeline';
@@ -27,22 +27,28 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
-    const isFailed = !isDenied && entry.data?.tool?.status === 'failed';
     const filePath = entry.data?.filePath || entry.data?.filename || entry.data?.folderPath || entry.data?.foldername || 'file';
+    const baseName = (entry.data?.filename || entry.data?.foldername || filePath.split(/[/\\]/).pop() || '').trim();
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
 
     let label = 'Analysed';
     if (isDenied) {
       label = 'Cancelled by user';
-    } else if (isFailed) {
-      label = 'Failed';
     } else if (isCancelled) {
       label = 'Cancelled';
     } else if (isRunning) {
-      label = toolAction || 'Analysing';
+      if (toolAction && baseName && baseName !== 'file' && toolAction.toLowerCase().includes(baseName.toLowerCase())) {
+        label = 'Analysing';
+      } else {
+        label = toolAction || 'Analysing';
+      }
     } else {
-      label = toolSummary || 'Analysed';
+      if (toolSummary && baseName && baseName !== 'file' && toolSummary.toLowerCase().includes(baseName.toLowerCase())) {
+        label = 'Analysed';
+      } else {
+        label = toolSummary || 'Analysed';
+      }
     }
 
     return (
@@ -54,15 +60,12 @@ export function ToolTimelineRow({
           isDenied && "opacity-75"
         )}
       >
-        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
         <span
           className={cn(
             "font-sans text-[12px] shrink-0",
-            isFailed
-              ? "text-rose-500 font-medium"
-              : isRunning
-                ? "animate-silver-shine"
-                : "text-zinc-500 dark:text-zinc-400"
+            isRunning
+              ? "animate-silver-shine"
+              : "text-zinc-500 dark:text-zinc-400"
           )}
         >
           {label}
@@ -75,27 +78,33 @@ export function ToolTimelineRow({
     );
   }
 
-  // 2. Edited File -> Edited <FilePill> (no decomposition, no "created", opens right sidebar)
+  // 2. Edited File -> Edited <FilePill>
   if (entry.type === 'edit') {
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
-    const isFailed = !isDenied && entry.data?.tool?.status === 'failed';
     const filePath = entry.data?.filePath || entry.data?.filename || 'file';
+    const baseName = (entry.data?.filename || filePath.split(/[/\\]/).pop() || '').trim();
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
 
     let label = 'Edited';
     if (isDenied) {
       label = 'Cancelled by user';
-    } else if (isFailed) {
-      label = 'Failed';
     } else if (isCancelled) {
       label = 'Cancelled';
     } else if (isRunning) {
-      label = toolAction || 'Editing';
+      if (toolAction && baseName && baseName !== 'file' && toolAction.toLowerCase().includes(baseName.toLowerCase())) {
+        label = 'Editing';
+      } else {
+        label = toolAction || 'Editing';
+      }
     } else {
-      label = toolSummary || 'Edited';
+      if (toolSummary && baseName && baseName !== 'file' && toolSummary.toLowerCase().includes(baseName.toLowerCase())) {
+        label = 'Edited';
+      } else {
+        label = toolSummary || 'Edited';
+      }
     }
 
     return (
@@ -107,15 +116,12 @@ export function ToolTimelineRow({
           isDenied && "opacity-75"
         )}
       >
-        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
         <span
           className={cn(
             "font-sans text-[12px] shrink-0",
-            isFailed
-              ? "text-rose-500 font-medium"
-              : isRunning
-                ? "animate-silver-shine"
-                : "text-zinc-500 dark:text-zinc-400"
+            isRunning
+              ? "animate-silver-shine"
+              : "text-zinc-500 dark:text-zinc-400"
           )}
         >
           {label}
@@ -133,7 +139,6 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
-    const isFailed = !isDenied && entry.data?.tool?.status === 'failed';
     const query = entry.data?.query || 'query';
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
@@ -141,8 +146,6 @@ export function ToolTimelineRow({
     let label = 'Searched web';
     if (isDenied) {
       label = 'Cancelled by user';
-    } else if (isFailed) {
-      label = 'Failed';
     } else if (isCancelled) {
       label = 'Cancelled';
     } else if (isRunning) {
@@ -150,7 +153,7 @@ export function ToolTimelineRow({
     } else {
       label = toolSummary || 'Searched web';
     }
-    const hasCustomText = !isDenied && !isFailed && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
+    const hasCustomText = !isDenied && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
 
     return (
       <div
@@ -161,16 +164,13 @@ export function ToolTimelineRow({
           isDenied && "opacity-75"
         )}
       >
-        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
         <Globe size={11} className={cn("text-sky-500/80 shrink-0", isDenied && "opacity-60")} />
         <span
           className={cn(
             "font-sans text-[12px] shrink-0",
-            isFailed
-              ? "text-rose-500 font-medium"
-              : isRunning
-                ? "animate-silver-shine"
-                : "text-zinc-500 dark:text-zinc-400"
+            isRunning
+              ? "animate-silver-shine"
+              : "text-zinc-500 dark:text-zinc-400"
           )}
         >
           {label}
@@ -190,7 +190,6 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
-    const isFailed = !isDenied && entry.data?.tool?.status === 'failed';
     const url = entry.data?.url || 'url';
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
@@ -198,8 +197,6 @@ export function ToolTimelineRow({
     let label = 'Fetched';
     if (isDenied) {
       label = 'Cancelled by user';
-    } else if (isFailed) {
-      label = 'Failed';
     } else if (isCancelled) {
       label = 'Cancelled';
     } else if (isRunning) {
@@ -207,7 +204,7 @@ export function ToolTimelineRow({
     } else {
       label = toolSummary || 'Fetched';
     }
-    const hasCustomText = !isDenied && !isFailed && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
+    const hasCustomText = !isDenied && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
 
     return (
       <div
@@ -218,16 +215,13 @@ export function ToolTimelineRow({
           isDenied && "opacity-75"
         )}
       >
-        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
         <ExternalLink size={11} className={cn("text-emerald-500/80 shrink-0", isDenied && "opacity-60")} />
         <span
           className={cn(
             "font-sans text-[12px] shrink-0",
-            isFailed
-              ? "text-rose-500 font-medium"
-              : isRunning
-                ? "animate-silver-shine"
-                : "text-zinc-500 dark:text-zinc-400"
+            isRunning
+              ? "animate-silver-shine"
+              : "text-zinc-500 dark:text-zinc-400"
           )}
         >
           {label}
@@ -247,7 +241,6 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
-    const isFailed = !isDenied && entry.data?.tool?.status === 'failed';
     const pattern = entry.data?.pattern || 'query';
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
@@ -255,8 +248,6 @@ export function ToolTimelineRow({
     let label = 'Searched';
     if (isDenied) {
       label = 'Cancelled by user';
-    } else if (isFailed) {
-      label = 'Failed';
     } else if (isCancelled) {
       label = 'Cancelled';
     } else if (isRunning) {
@@ -264,7 +255,7 @@ export function ToolTimelineRow({
     } else {
       label = toolSummary || 'Searched';
     }
-    const hasCustomText = !isDenied && !isFailed && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
+    const hasCustomText = !isDenied && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
 
     return (
       <div
@@ -275,16 +266,13 @@ export function ToolTimelineRow({
           isDenied && "opacity-75"
         )}
       >
-        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
         <Search size={11} className={cn("text-amber-500/80 shrink-0", isDenied && "opacity-60")} />
         <span
           className={cn(
             "font-sans text-[12px] shrink-0",
-            isFailed
-              ? "text-rose-500 font-medium"
-              : isRunning
-                ? "animate-silver-shine"
-                : "text-zinc-500 dark:text-zinc-400"
+            isRunning
+              ? "animate-silver-shine"
+              : "text-zinc-500 dark:text-zinc-400"
           )}
         >
           {label}
@@ -304,7 +292,6 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
-    const isFailed = !isDenied && entry.data?.tool?.status === 'failed';
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
     const taskName = entry.data?.taskName || 'Task';
@@ -312,8 +299,6 @@ export function ToolTimelineRow({
     let label = 'Checked';
     if (isDenied) {
       label = 'Cancelled by user';
-    } else if (isFailed) {
-      label = 'Failed';
     } else if (isCancelled) {
       label = 'Cancelled';
     } else if (isRunning) {
@@ -321,23 +306,17 @@ export function ToolTimelineRow({
     } else {
       label = toolSummary || 'Checked';
     }
-    const hasCustomText = !isDenied && !isFailed && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
+    const hasCustomText = !isDenied && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
 
     return (
       <div key={entry.id} className={cn("flex items-center gap-1.5 text-xs select-none my-0.5", isChild ? "pl-1 py-0.5" : "my-0.5", isDenied && "opacity-75")}>
-        {isFailed && !isRunning ? (
-          <AlertCircle size={10} className="text-rose-500 shrink-0" />
-        ) : (
-          <CheckCircle2 size={11} className={cn("text-indigo-400 shrink-0", isDenied && "opacity-60")} />
-        )}
+        <CheckCircle2 size={11} className={cn("text-indigo-400 shrink-0", isDenied && "opacity-60")} />
         <span
           className={cn(
             "font-sans text-[12px] shrink-0",
-            isFailed
-              ? "text-rose-500 font-medium"
-              : isRunning
-                ? "animate-silver-shine"
-                : "text-zinc-500 dark:text-zinc-400"
+            isRunning
+              ? "animate-silver-shine"
+              : "text-zinc-500 dark:text-zinc-400"
           )}
         >
           {label}
@@ -350,12 +329,11 @@ export function ToolTimelineRow({
     );
   }
 
-  // 8. Subagent Row
+  // 7. Subagent Row
   if (entry.type === 'subagent') {
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
-    const isFailed = !isDenied && entry.data?.tool?.status === 'failed';
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
     const role = entry.data?.roleLabel || 'Subagent';
@@ -363,8 +341,6 @@ export function ToolTimelineRow({
     let label = 'Subagent';
     if (isDenied) {
       label = 'Cancelled by user';
-    } else if (isFailed) {
-      label = 'Failed';
     } else if (isCancelled) {
       label = 'Cancelled';
     } else if (isRunning) {
@@ -372,23 +348,17 @@ export function ToolTimelineRow({
     } else {
       label = toolSummary || 'Subagent';
     }
-    const hasCustomText = !isDenied && !isFailed && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
+    const hasCustomText = !isDenied && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
 
     return (
       <div key={entry.id} className={cn("flex items-center gap-1.5 text-xs select-none my-0.5", isChild ? "pl-1 py-0.5" : "my-0.5", isDenied && "opacity-75")}>
-        {isFailed && !isRunning ? (
-          <AlertCircle size={10} className="text-rose-500 shrink-0" />
-        ) : (
-          <Bot size={11} className={cn("text-purple-400 shrink-0", isDenied && "opacity-60")} />
-        )}
+        <Bot size={11} className={cn("text-purple-400 shrink-0", isDenied && "opacity-60")} />
         <span
           className={cn(
             "font-sans text-[12px] shrink-0",
-            isFailed
-              ? "text-rose-500 font-medium"
-              : isRunning
-                ? "animate-silver-shine"
-                : "text-zinc-500 dark:text-zinc-400"
+            isRunning
+              ? "animate-silver-shine"
+              : "text-zinc-500 dark:text-zinc-400"
           )}
         >
           {label}
@@ -401,22 +371,19 @@ export function ToolTimelineRow({
     );
   }
 
-  // 7. Generic Other Action
+  // 8. Generic Other Action
   if (entry.type === 'other') {
     const t = entry.data?.tool;
     const displayName = t?.name && t?.name !== 'action' ? t.name : 'Action';
     const isRunning = isToolRunning(t, isStreaming);
     const isCancelled = t?.status === 'cancelled';
     const isDenied = t?.status === 'denied' || t?.decision === 'deny';
-    const isFailed = !isDenied && t?.status === 'failed';
     const toolAction = entry.data?.toolAction || t?.toolAction;
     const toolSummary = entry.data?.toolSummary || t?.toolSummary;
 
     let label = 'Executed';
     if (isDenied) {
       label = 'Cancelled by user';
-    } else if (isFailed) {
-      label = 'Failed';
     } else if (isCancelled) {
       label = 'Cancelled';
     } else if (isRunning) {
@@ -424,19 +391,16 @@ export function ToolTimelineRow({
     } else {
       label = toolSummary || 'Executed';
     }
-    const hasCustomText = !isDenied && !isFailed && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
+    const hasCustomText = !isDenied && !isCancelled && (isRunning ? Boolean(toolAction) : Boolean(toolSummary));
 
     return (
       <div key={entry.id} className={cn("flex items-center gap-1.5 text-xs select-none my-0.5", isChild ? "pl-1 py-0.5" : "my-0.5", isDenied && "opacity-75")}>
-        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
         <span
           className={cn(
             "font-sans text-[12px] shrink-0",
-            isFailed
-              ? "text-rose-500 font-medium"
-              : isRunning
-                ? "animate-silver-shine"
-                : "text-zinc-500 dark:text-zinc-400"
+            isRunning
+              ? "animate-silver-shine"
+              : "text-zinc-500 dark:text-zinc-400"
           )}
         >
           {label}

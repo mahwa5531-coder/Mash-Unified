@@ -124,6 +124,9 @@ const AssistantMessage = memo(function AssistantMessage({
         error={msg.error}
         errorId={msg.errorId}
         totalDurationSeconds={msg.totalDurationSeconds}
+        retryAttempt={msg.retryAttempt}
+        isLast={isLast}
+        isStreaming={isStreaming}
         onRetry={onRetry}
         onContinue={onContinue}
       />
@@ -182,6 +185,7 @@ const AssistantMessage = memo(function AssistantMessage({
     prev.msg.content === next.msg.content &&
     prev.msg.timestamp === next.msg.timestamp &&
     prev.msg.error === next.msg.error &&
+    prev.msg.retryAttempt === next.msg.retryAttempt &&
     prev.msg.thoughts === next.msg.thoughts &&
     prev.msg.tools === next.msg.tools &&
     (prev.msg.tools?.length ?? 0) === (next.msg.tools?.length ?? 0) &&

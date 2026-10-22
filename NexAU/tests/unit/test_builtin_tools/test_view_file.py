@@ -80,3 +80,19 @@ def test_view_file_unsupported_formats(tmp_path):
         assert "not supported" in res["content"]
         assert f"Unsupported format: {ext}" in res["returnDisplay"]
 
+
+
+def test_view_file_file_uri_with_spaces(tmp_path):
+    f = tmp_path / "Audit Statement 2026.txt"
+    f.write_text("Balance: 500000", encoding="utf-8")
+
+    # Test with raw Windows path containing spaces
+    res1 = view_file(AbsolutePath=str(f))
+    assert not res1.get("isError", False)
+    assert "Balance: 500000" in res1["content"]
+
+    # Test with file:/// URI containing %20
+    uri = f"file:///{str(f).replace(' ', '%20')}"
+    res2 = view_file(AbsolutePath=uri)
+    assert not res2.get("isError", False)
+    assert "Balance: 500000" in res2["content"]

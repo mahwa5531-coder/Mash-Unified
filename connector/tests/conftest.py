@@ -15,6 +15,7 @@ import respx
 
 # Ensure test suite runs in isolated offline mock mode unless live LLM is explicitly requested
 os.environ.setdefault("MOCK_LLM", "true")
+os.environ["MASH_BYPASS_AUTH"] = "false"
 
 @pytest.fixture
 def anyio_backend():

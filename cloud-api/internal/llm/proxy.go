@@ -487,9 +487,6 @@ func NormalizeUsage(u *bifrost.Usage, rule domain.NormRule) *domain.TokenUsage {
 	}
 	if u.PromptTokensDetails != nil {
 		t.CacheReadTokens = u.PromptTokensDetails.CachedReadTokens
-		if t.CacheReadTokens == 0 && u.PromptTokensDetails.CachedTokens > 0 {
-			t.CacheReadTokens = u.PromptTokensDetails.CachedTokens
-		}
 		t.CacheWriteTokens = u.PromptTokensDetails.CachedWriteTokens
 	}
 	if u.CompletionDetails != nil {

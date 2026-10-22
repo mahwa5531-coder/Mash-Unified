@@ -111,7 +111,7 @@ class PosixProcessCompat:
 
 
 class WindowsProcessCompat:
-    """Windows process lifecycle implementation using stdlib primitives first."""
+    """Windows process lifecycle implementation using stdlib primitives and process tree kill."""
 
     def graceful_kill(self, process: ProcessHandle, grace_period: float) -> None:
         try:
@@ -123,6 +123,21 @@ class WindowsProcessCompat:
             process.wait(timeout=grace_period)
             return
         except subprocess.TimeoutExpired:
+            pass
+
+        # ponytail: On Windows, process.kill() terminates only the root process and leaves
+        # spawned children (e.g. node, python, compilers) orphaned. Mirroring tasks.py,
+        # invoke taskkill /F /T /PID to tear down the entire process tree.
+        try:
+            pid = getattr(process, "pid", None)
+            if isinstance(pid, int) and pid > 0:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+        except Exception:
             pass
 
         try:

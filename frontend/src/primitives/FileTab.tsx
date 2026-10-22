@@ -97,7 +97,7 @@ export function FileTab({
               e.stopPropagation();
               onClose(e);
             }}
-            className="absolute inset-0 m-auto w-3.5 h-3.5 p-0 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-200/80 dark:hover:bg-white/[0.15] opacity-0 group-hover/tab:opacity-100 transition-all cursor-pointer outline-none shrink-0"
+            className="absolute inset-0 m-auto w-3.5 h-3.5 p-0 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-200/80 dark:hover:bg-white/[0.15] opacity-0 group-hover/tab:opacity-100 focus-visible:opacity-100 transition-all cursor-pointer outline-none shrink-0"
             title={`Close ${fileName}`}
             aria-label={`Close ${fileName}`}
           >

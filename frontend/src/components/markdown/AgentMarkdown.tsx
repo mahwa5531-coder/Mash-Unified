@@ -11,6 +11,7 @@ import { useAgentMarkdownComponents } from './useAgentMarkdownComponents';
 import CodeBlock from '@/components/renderers/CodeBlock';
 import MermaidRenderer from '@/components/renderers/MermaidRenderer';
 import { splitMarkdownBlocks } from './splitMarkdownBlocks';
+import { escapeCurrencyInMarkdown } from '@/features/chat/components/messages/proseHelpers';
 
 /**
  * AgentMarkdown — the single unified markdown renderer for the whole app.
@@ -42,11 +43,22 @@ function LatexBlock({ code: source, isIncomplete }: { code: string; isIncomplete
   let html: string | null = null;
   try {
     html = katex.renderToString(source, { displayMode: true, throwOnError: false, strict: false });
+    if (html && html.includes('katex-error')) {
+      return (
+        <div className="font-mono text-xs text-rose-400 my-2 select-text p-2 rounded bg-rose-500/10 border border-rose-500/20 whitespace-pre-wrap">
+          {source}
+        </div>
+      );
+    }
   } catch {
     html = null;
   }
   if (!html) {
-    return <div className="font-mono text-xs text-rose-400 my-2">{source}</div>;
+    return (
+      <div className="font-mono text-xs text-rose-400 my-2 select-text p-2 rounded bg-rose-500/10 border border-rose-500/20 whitespace-pre-wrap">
+        {source}
+      </div>
+    );
   }
   return (
     <div
@@ -192,7 +204,8 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   className,
 }: AgentMarkdownProps) {
   const components = useAgentMarkdownComponents({ mode, sessionId, onOpenFile, onImageClick });
-  const blocks = React.useMemo(() => (content ? splitMarkdownBlocks(content, 35) : []), [content]);
+  const sanitizedContent = React.useMemo(() => (content ? escapeCurrencyInMarkdown(content) : ''), [content]);
+  const blocks = React.useMemo(() => (sanitizedContent ? splitMarkdownBlocks(sanitizedContent, 35) : []), [sanitizedContent]);
 
   if (!content) return null;
 
@@ -201,7 +214,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
 
   return (
     <div className={cn(
-      "font-sans text-zinc-800 dark:text-[#ececed] text-[13.5px] leading-[1.68]",
+      "font-sans text-zinc-900 dark:text-zinc-100 text-[13.5px] leading-[1.68]",
       isChat
         ? "mt-2"
         : "p-5 md:p-6 leading-[1.75] text-[13.5px] bg-[var(--bg-surface)]",

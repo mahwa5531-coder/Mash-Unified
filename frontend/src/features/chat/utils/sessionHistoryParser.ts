@@ -103,21 +103,19 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
             try { args = JSON.parse(args); } catch { args = {}; }
           }
           const outputStr = String(t.output || '');
-          const isFailed = Boolean(
-            t.status === 'failed' ||
-            t.is_error ||
-            (outputStr && (
-              /^(error|exception|validationerror|failed):/i.test(outputStr.trim()) ||
-              outputStr.toLowerCase().includes("schema validation failed") ||
-              outputStr.toLowerCase().includes("validation error")
-            ))
-          );
+          const isCancelled = t.status === 'cancelled';
+          const isDenied = t.status === 'denied' || t.decision === 'deny';
+          const isPending = t.status === 'pending_approval' || t.status === 'pending';
+          const status = isDenied ? 'denied' : isCancelled ? 'cancelled' : isPending ? 'pending_approval' : (t.status || 'completed');
           tools.push({
             id: t.id || `${stepPrefix}_tc_${tools.length}`,
             name,
             args,
             output: outputStr,
-            status: isFailed ? 'failed' : (t.status || 'completed')
+            status,
+            decision: t.decision,
+            toolSummary: t.toolSummary || args.toolSummary,
+            toolAction: t.toolAction || args.toolAction,
           });
         }
         const tasks = step.tasks || [];
@@ -143,8 +141,11 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
                 id: b.id || `${stepPrefix}_tc_${tools.length}`,
                 name,
                 args,
-                output: '',
-                status: 'completed'
+                output: b.output || '',
+                status: b.status || 'completed',
+                decision: b.decision,
+                toolSummary: b.toolSummary || args.toolSummary,
+                toolAction: b.toolAction || args.toolAction,
               });
             }
           }
@@ -156,7 +157,11 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
         const rawSteps = Array.isArray(step.steps) && step.steps.length > 0 ? step.steps : null;
         let resolvedSteps: any[] = [];
         if (rawSteps) {
-          resolvedSteps = [...rawSteps];
+          resolvedSteps = rawSteps.map((st: any) => ({
+            ...st,
+            toolSummary: st.toolSummary || st.args?.toolSummary,
+            toolAction: st.toolAction || st.args?.toolAction,
+          }));
         } else {
           if (thoughts.length > 0) {
             resolvedSteps.push({
@@ -177,7 +182,10 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
                 name: t.name,
                 args: t.args,
                 output: t.output || '',
-                status: 'completed',
+                status: t.status || 'completed',
+                decision: t.decision,
+                toolSummary: t.toolSummary,
+                toolAction: t.toolAction,
               });
             }
           }

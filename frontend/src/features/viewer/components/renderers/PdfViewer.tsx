@@ -9,10 +9,10 @@ interface PdfViewerProps {
   filename: string;
   path?: string;
   sessionId?: string;
-  sessionQuery: string;
+  sessionQuery?: string;
 }
 
-export function PdfViewer({ filename, path, sessionQuery }: PdfViewerProps) {
+export function PdfViewer({ filename, path, sessionQuery = '' }: PdfViewerProps) {
   const [retryKey, setRetryKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -38,15 +38,20 @@ export function PdfViewer({ filename, path, sessionQuery }: PdfViewerProps) {
           } else {
             setErrorMessage(`Unable to load PDF document (HTTP ${res.status}).`);
           }
+          setIsLoading(false);
+        } else {
+          const contentLength = res.headers.get('content-length');
+          if (contentLength === '0') {
+            setErrorMessage('PDF document is empty (0 bytes).');
+            setIsLoading(false);
+          }
         }
       })
       .catch((err) => {
         if (!cancelled) {
           setErrorMessage(err?.message || 'Failed to connect to local server to load PDF.');
+          setIsLoading(false);
         }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
       });
 
     return () => {

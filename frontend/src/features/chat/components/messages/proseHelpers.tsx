@@ -142,6 +142,9 @@ export function processTextNodes(children: any, onOpenFile?: (path: string) => v
   return children;
 }
 
-// NOTE: sanitizeMathString() was removed — streamdown's remend parser now
-// balances unterminated math delimiters natively during streaming.
+// Guard unescaped currency dollar signs (e.g. $100) outside math formulas
+export function escapeCurrencyInMarkdown(content: string): string {
+  if (!content || !content.includes('$')) return content;
+  return content.replace(/(?<![\$\\])\$(?=\d)/g, '\\$');
+}
 

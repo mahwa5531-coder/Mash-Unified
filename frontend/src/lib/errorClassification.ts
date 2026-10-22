@@ -10,7 +10,6 @@ export type AppErrorCategory =
   | 'timeout'          // Agent / model response timed out
   | 'quota'            // Rate limit / 429 / quota exceeded (triggers QuotaBanner)
   | 'auth'             // 401 / unauthorized / session token expired
-  | 'tool_failure'     // Tool execution / file access / sandbox error
   | 'service_error'    // 500 / 502 / 503 / upstream model provider error
   | 'general';         // Uncategorized execution interruption
 
@@ -21,7 +20,7 @@ export interface ClassifiedError {
   rawDetails: string;
   errorId?: string;
   actionType: 'retry' | 'continue' | 'auth' | 'quota' | 'dismiss';
-  iconType: 'offline' | 'network' | 'timeout' | 'quota' | 'auth' | 'tool' | 'error';
+  iconType: 'offline' | 'network' | 'timeout' | 'quota' | 'auth' | 'error';
 }
 
 /**
@@ -162,27 +161,7 @@ export function classifyError(
     };
   }
 
-  // 6. LOCAL TOOL / WORKSPACE PERMISSION FAILURE
-  const isToolFailure =
-    lower.includes("filenotfounderror") ||
-    lower.includes("permissiondenied") ||
-    lower.includes("permission denied") ||
-    lower.includes("schema validation failed") ||
-    lower.includes("command failed with exit code");
-
-  if (isToolFailure) {
-    return {
-      category: 'tool_failure',
-      title: 'Tool Execution Interrupted',
-      description: cleaned || 'A local workspace tool encountered an unexpected file access or permission restriction.',
-      rawDetails: raw,
-      errorId: errorId || undefined,
-      actionType: 'retry',
-      iconType: 'tool',
-    };
-  }
-
-  // 7. UPSTREAM SERVICE / 502 / 503 / OVERLOAD
+  // 6. UPSTREAM SERVICE / 502 / 503 / OVERLOAD
   const isServiceError =
     lower.includes("500 internal") ||
     lower.includes("502 bad gateway") ||

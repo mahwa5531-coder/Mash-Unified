@@ -20,7 +20,7 @@ export function GroupTimelineRow({
 }: GroupTimelineRowProps) {
   const isRunning = Boolean(entry.data?.isRunning);
   const isCancelled = Boolean(entry.data?.isCancelled);
-  const expanded = isGroupExpanded || isRunning;
+  const expanded = isGroupExpanded;
 
   let label = '';
   if (entry.type === 'command_group') {
@@ -30,8 +30,21 @@ export function GroupTimelineRow({
     const verb = isCancelled ? 'Cancelled' : isRunning ? 'Editing' : 'Edited';
     label = `${verb} ${entry.data?.count || entry.items?.length || 0} files`;
   } else {
-    const verb = isCancelled ? 'Cancelled' : isRunning ? 'Exploring' : 'Explored';
-    label = `${verb} ${entry.data?.count || entry.items?.length || 0} files`;
+    const rawLabel = entry.data?.label || `${entry.data?.count || entry.items?.length || 0} files`;
+    if (/^(Ran|Searched|Explored|Exploring|Running|Cancelled)\b/i.test(rawLabel)) {
+      label = rawLabel;
+    } else {
+      const isSearch = rawLabel.includes('search');
+      let verb = '';
+      if (isCancelled) {
+        verb = 'Cancelled';
+      } else if (isRunning) {
+        verb = isSearch ? 'Running' : 'Exploring';
+      } else {
+        verb = isSearch ? 'Ran' : 'Explored';
+      }
+      label = `${verb} ${rawLabel}`;
+    }
   }
 
   return (

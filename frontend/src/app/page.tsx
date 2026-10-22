@@ -8,7 +8,10 @@ import ConversationHistory from '@/features/sessions/components/ConversationHist
 import SettingsModal from '@/features/settings/components/SettingsModal';
 import DesktopSignInView from '@/features/auth/components/DesktopSignInView';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { fetchSessions, deleteSession, SessionItem } from '@/services/sessions';
+import { fetchSessions, deleteSession, unmarkSessionDeleted, cleanupSessionStorage, SessionItem, DeleteSessionResult } from '@/services/sessions';
+import { evictRightSidebarMemory } from '@/features/viewer/hooks/useViewerTabs';
+import { invalidateFileCache } from '@/services/files';
+import { FailedToDeleteCard } from '@/features/sessions/components/FailedToDeleteCard';
 import { fetchAuthMe, AuthUser } from '@/services/auth';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { sessionStore } from '@/features/chat';
@@ -43,6 +46,7 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<string>('appearance');
   const [allSessions, setAllSessions] = useState<SessionItem[]>([]);
+  const [deleteError, setDeleteError] = useState<{ title: string; message: string } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -85,7 +89,7 @@ export default function Home() {
     }
   }, [isDark]);
 
-  // Support ?file=... and ?session=... query parameters on load
+  // Support ?file=... and ?session=... query parameters, or sessionStorage on reload
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -100,9 +104,24 @@ export default function Home() {
         if (params.get('maximized') === 'true') {
           setIsRightSidebarMaximized(true);
         }
+      } else {
+        try {
+          const savedOpen = sessionStorage.getItem('mash_right_sidebar_open');
+          if (savedOpen === 'true') {
+            setIsRightSidebarOpen(true);
+          }
+        } catch {}
       }
     }
   }, []);
+
+  // ponytail: remember sidebar open state across F5 browser reloads
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem('mash_right_sidebar_open', String(isRightSidebarOpen));
+    } catch {}
+  }, [isRightSidebarOpen]);
 
   // ponytail: stable callbacks to prevent unneeded re-mounts/re-renders of ChatCanvas and Sidebar
   const handleSelectSession = useCallback((sessionId: string, title?: string, repoName?: string) => {
@@ -127,22 +146,51 @@ export default function Home() {
     setAllSessions(list);
   }, []);
 
-  const handleDeleteSession = useCallback((sessionId: string) => {
+  const handleDeleteSession = useCallback(async (sessionId: string, showToast: boolean = true): Promise<DeleteSessionResult> => {
     const state = sessionStore.get(sessionId);
     if (state?.abortController) {
       try {
         state.abortController.abort();
       } catch (_) {}
     }
+    const previousSessions = [...allSessions];
+    const targetSession = allSessions.find((s) => s.session_id === sessionId);
     setAllSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
     sessionStore.delete(sessionId);
     if (selectedSessionId === sessionId) {
       handleNewSession('No Repo');
     }
-    deleteSession(sessionId).catch((err) => {
-      console.warn("Background deleteSession failed:", err);
-    });
-  }, [selectedSessionId, handleNewSession]);
+
+    try {
+      const res = await deleteSession(sessionId);
+      if (!res.success) {
+        unmarkSessionDeleted(sessionId);
+        setAllSessions(previousSessions);
+        if (showToast) {
+          setDeleteError({
+            title: "Failed to delete",
+            message: res.message || `Session "${targetSession?.custom_title || targetSession?.title || sessionId}" could not be deleted on the server.`,
+          });
+        }
+        return res;
+      }
+      evictRightSidebarMemory(sessionId);
+      invalidateFileCache();
+      cleanupSessionStorage(sessionId);
+      return res;
+    } catch (err: any) {
+      unmarkSessionDeleted(sessionId);
+      setAllSessions(previousSessions);
+      const errMsg = err?.message || `Session "${targetSession?.custom_title || targetSession?.title || sessionId}" could not be deleted on the server.`;
+      if (showToast) {
+        setDeleteError({
+          title: "Failed to delete",
+          message: errMsg,
+        });
+      }
+      return { success: false, message: errMsg };
+    }
+  }, [selectedSessionId, handleNewSession, allSessions]);
 
   const [archivedSessionIds, setArchivedSessionIds] = useState<Set<string>>(new Set());
 
@@ -174,7 +222,7 @@ export default function Home() {
 
   if (isAuthLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#101010] text-zinc-400">
+      <div className="flex h-screen w-full items-center justify-center bg-[#09090b] text-zinc-400">
         <div className="flex flex-col items-center gap-3">
           <div className="w-6 h-6 rounded-full border-2 border-zinc-500 border-t-transparent animate-spin" />
           <span className="text-xs font-mono tracking-wider text-zinc-500 uppercase">MASH</span>
@@ -223,7 +271,7 @@ export default function Home() {
         <TooltipProvider delayDuration={150}>
           <main className="flex flex-1 overflow-hidden min-h-0">
             {/* Column 1: Left Sidebar (starts with Row 2 header when open) */}
-            {isSidebarOpen && (
+            {isSidebarOpen && !(isRightSidebarOpen && isRightSidebarMaximized) && (
               <Sidebar
                 selectedSessionId={selectedSessionId}
                 selectedSessionTitle={selectedSessionTitle}
@@ -318,6 +366,15 @@ export default function Home() {
             }
           }}
         />
+        {deleteError && (
+          <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <FailedToDeleteCard
+              title={deleteError.title}
+              message={deleteError.message}
+              onClose={() => setDeleteError(null)}
+            />
+          </div>
+        )}
       </ErrorBoundary>
     </div>
   );

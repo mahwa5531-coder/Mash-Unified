@@ -31,9 +31,9 @@ export interface SafeFileViewerProps {
   viewMode?: 'preview' | 'raw';
   onViewModeChange?: (mode: 'preview' | 'raw') => void;
   hideToolbar?: boolean;
+  isTruncated?: boolean;
+  is_truncated?: boolean;
 }
-
-const MASSIVE_FILE_LIMIT = 1.5 * 1024 * 1024; // 1.5 MB
 
 const EXT_LANG_MAP: Record<string, string> = {
   py: 'python',
@@ -61,6 +61,10 @@ const EXT_LANG_MAP: Record<string, string> = {
   md: 'markdown',
   xml: 'xml',
   svg: 'xml',
+  txt: 'text',
+  log: 'text',
+  env: 'text',
+  csv: 'text',
 };
 
 export default function SafeFileViewer({ 
@@ -70,10 +74,13 @@ export default function SafeFileViewer({
   content, 
   isLoading,
   viewMode = 'preview',
+  isTruncated,
+  is_truncated,
 }: SafeFileViewerProps) {
   const isDark = useIsDarkMode();
 
-  const cleanName = (path || filename || '').toLowerCase();
+  const rawPath = path || filename || '';
+  const cleanName = rawPath.split('#')[0].split('?')[0].toLowerCase();
   const isImage = /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/.test(cleanName);
   const isMarkdown = /\.md$/i.test(cleanName);
   const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods)$/i.test(cleanName);
@@ -85,10 +92,7 @@ export default function SafeFileViewer({
     return EXT_LANG_MAP[ext] || 'text';
   }, [cleanName]);
 
-  const isMassiveFile = (content?.length || 0) >= 1_500_000 || (content?.includes('[MASH SAFE PREVIEW: Large file') ?? false);
-  const MONACO_SAFE_LIMIT = 500 * 1024; // 500 KB max for Monaco AST tokenization
-  const isHeavyFile = (content?.length || 0) > MONACO_SAFE_LIMIT;
-  const [forceMonaco, setForceMonaco] = React.useState(false);
+  const isTruncatedFile = Boolean(isTruncated || is_truncated || (content?.length || 0) >= 10_000_000);
 
   const displayedContent = useMemo(() => {
     if (!content) return '// Empty file';
@@ -162,13 +166,13 @@ export default function SafeFileViewer({
 
   return (
     <div className="flex flex-col h-full bg-zinc-100/60 dark:bg-black overflow-hidden">
-      {/* Massive File Backend Truncation Shield */}
-      {isMassiveFile && (
+      {/* Massive File Status Bar */}
+      {isTruncatedFile && (
         <div className="px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/25 flex items-center justify-between text-xs text-amber-600 dark:text-amber-400 select-none shrink-0 gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <AlertTriangle size={14} className="shrink-0 text-amber-500" />
             <span className="truncate">
-              <strong>Massive File</strong>: Displaying initial 1.5MB preview.
+              <strong>Massive File</strong> — Displaying initial 10MB preview.
             </span>
           </div>
           <a
@@ -183,84 +187,72 @@ export default function SafeFileViewer({
       )}
 
       {/* Content Body */}
-      <div className="flex-1 overflow-auto custom-scrollbar">
-        {isMarkdown && viewMode === 'preview' ? (
-          <div className="min-h-full bg-zinc-50 dark:bg-[#121214] text-zinc-900 dark:text-zinc-100">
+      {isMarkdown && viewMode === 'preview' ? (
+        <div className="flex-1 overflow-auto custom-scrollbar min-h-full bg-zinc-50 dark:bg-[#121214] text-zinc-900 dark:text-zinc-100">
+          <ErrorBoundary
+            scope="markdown-viewer"
+            fallback={
+              <pre className="p-5 font-mono text-[12.5px] leading-relaxed whitespace-pre overflow-auto select-text">
+                {displayedContent}
+              </pre>
+            }
+          >
             <AgentMarkdown
-              content={isMassiveFile ? displayedContent : (content || '// Empty markdown file')}
+              content={content ? displayedContent : '// Empty markdown file'}
               mode="artifact"
               isStreaming={false}
               sessionId={sessionId}
             />
-          </div>
-        ) : (
-          <div className="flex-1 w-full h-full min-h-[350px] bg-white dark:bg-black text-[12.5px] leading-relaxed select-text flex flex-col overflow-hidden">
-            {isHeavyFile && !forceMonaco && (
-              <div className="px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/20 flex items-center justify-between text-xs text-blue-600 dark:text-blue-400 select-none shrink-0 gap-2">
-                <span>Fast Virtualized View ({Math.round((content?.length || 0) / 1024)} KB) — Zero-freeze instant rendering</span>
-                <button
-                  type="button"
-                  onClick={() => setForceMonaco(true)}
-                  className="px-2.5 py-0.5 rounded bg-blue-500/20 hover:bg-blue-500/30 text-blue-700 dark:text-blue-300 font-medium transition-colors cursor-pointer text-[11px]"
-                >
-                  Load in Monaco
-                </button>
-              </div>
-            )}
-            {(viewMode === 'raw' || (isHeavyFile && !forceMonaco)) ? (
+          </ErrorBoundary>
+        </div>
+      ) : (
+        <div className="flex-1 w-full h-full min-h-[350px] bg-white dark:bg-black text-[12.5px] leading-relaxed select-text flex flex-col overflow-hidden">
+          <ErrorBoundary
+            scope="monaco-editor"
+            fallback={
               <pre 
                 style={{ contentVisibility: 'auto', containIntrinsicSize: '0 500px' }}
                 className="p-5 font-mono text-[12.5px] leading-relaxed select-text whitespace-pre overflow-x-auto text-zinc-800 dark:text-zinc-200 h-full overflow-auto bg-white dark:bg-black"
               >
                 {displayedContent}
               </pre>
-            ) : (
-              <ErrorBoundary
-                scope="monaco-editor"
-                fallback={
-                  <pre 
-                    style={{ contentVisibility: 'auto', containIntrinsicSize: '0 500px' }}
-                    className="p-5 font-mono text-[12.5px] leading-relaxed select-text whitespace-pre overflow-x-auto text-zinc-800 dark:text-zinc-200 h-full overflow-auto bg-white dark:bg-black"
-                  >
-                    {displayedContent}
-                  </pre>
-                }
-              >
-                <MonacoEditor
-                  height="100%"
-                  language={monacoLang}
-                  theme={isDark ? 'pitch-black' : 'light'}
-                  beforeMount={handleEditorWillMount}
-                  value={displayedContent}
-                  options={{
-                    readOnly: true,
-                    domReadOnly: true,
-                    minimap: { enabled: false },
-                    fontSize: 12.5,
-                    lineHeight: 1.6,
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                    lineNumbers: 'on',
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    wordWrap: 'off',
-                    renderLineHighlight: 'none',
-                    contextmenu: true,
-                    folding: true,
-                    overviewRulerLanes: 0,
-                    stopRenderingLineAfter: 10000,
-                    scrollbar: {
-                      vertical: 'visible',
-                      horizontal: 'auto',
-                      verticalScrollbarSize: 8,
-                      horizontalScrollbarSize: 8,
-                    },
-                  }}
-                />
-              </ErrorBoundary>
-            )}
-          </div>
-        )}
-      </div>
+            }
+          >
+            <MonacoEditor
+              height="100%"
+              language={monacoLang}
+              theme={isDark ? 'pitch-black' : 'light'}
+              beforeMount={handleEditorWillMount}
+              value={displayedContent}
+              options={{
+                readOnly: true,
+                domReadOnly: true,
+                minimap: { enabled: false },
+                fontSize: 12.5,
+                lineHeight: 1.6,
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                wordWrap: 'off',
+                renderLineHighlight: 'none',
+                contextmenu: true,
+                folding: false,
+                largeFileOptimizations: true,
+                maxTokenizationLineLength: 20000,
+                stopRenderingLineAfter: 10000,
+                overviewRulerLanes: 0,
+                scrollbar: {
+                  vertical: 'visible',
+                  horizontal: 'auto',
+                  verticalScrollbarSize: 8,
+                  horizontalScrollbarSize: 8,
+                },
+              }}
+            />
+          </ErrorBoundary>
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ NexAU's BaseSandbox abstraction (e.g. LocalSandbox/E2B).
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import unquote
 
 from nexau.archs.main_sub.agent_state import AgentState
 from nexau.archs.sandbox import BaseSandbox
@@ -25,6 +26,14 @@ def get_sandbox(agent_state: AgentState | None) -> BaseSandbox:
 
 def resolve_path(path: str, sandbox: BaseSandbox) -> str:
     """Resolve relative paths against sandbox work_dir (string resolution only)."""
-    if Path(path).is_absolute():
-        return path
-    return str(Path(str(sandbox.work_dir)) / path)
+    clean = str(path).strip().strip("'\"")
+    if clean.startswith("file:///"):
+        clean = clean[8:]
+    elif clean.startswith("file://"):
+        clean = clean[7:]
+    clean = unquote(clean)
+    if len(clean) >= 3 and clean[0] == "/" and clean[2] == ":":
+        clean = clean[1:]
+    if Path(clean).is_absolute():
+        return clean
+    return str(Path(str(sandbox.work_dir)) / clean)

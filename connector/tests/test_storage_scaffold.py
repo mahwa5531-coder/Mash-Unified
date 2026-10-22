@@ -74,6 +74,62 @@ def test_messages_to_transcript_lines_redacts_secrets():
     assert "response_token" not in tool_entry["output"]
 
 
+def test_messages_to_transcript_lines_metadata_and_unique_step_ids():
+    """Verify messages_to_transcript_lines preserves toolSummary, toolAction, decision and enforces unique step IDs."""
+    msg_assistant = Message(
+        role=Role.ASSISTANT,
+        content=[
+            TextBlock(text="Checking files..."),
+            ToolUseBlock(
+                id="call_read_01",
+                name="read_file",
+                input={"TargetFile": "auth.ts", "toolAction": "Inspecting auth router", "toolSummary": "Auth router inspection"},
+            ),
+            TextBlock(text="Refactored code."),
+        ],
+    )
+    msg_tool = Message(
+        role=Role.TOOL,
+        content=[ToolResultBlock(tool_use_id="call_read_01", content="file content")],
+    )
+
+    pending_map = {"call_read_01": {"decision": "allow", "prompt": "Auth router inspection"}}
+    lines = messages_to_transcript_lines([msg_assistant, msg_tool], pending_map=pending_map)
+
+    assert len(lines) == 1
+    asst_line = lines[0]
+
+    # Verify tool entry metadata
+    assert len(asst_line["tools"]) == 1
+    t = asst_line["tools"][0]
+    assert t["toolAction"] == "Inspecting auth router"
+    assert t["toolSummary"] == "Auth router inspection"
+    assert t["decision"] == "allow"
+
+    # Verify step entry metadata and strictly unique step IDs
+    assert len(asst_line["steps"]) == 3
+    s0 = asst_line["steps"][0]
+    s1 = asst_line["steps"][1]
+    s2 = asst_line["steps"][2]
+
+    assert s0["id"] == "step_0_0"
+    assert s0["type"] == "text"
+
+    assert s1["id"] == "step_0_1"
+    assert s1["type"] == "tool"
+    assert s1["tool_call_id"] == "call_read_01"
+    assert s1["toolAction"] == "Inspecting auth router"
+    assert s1["toolSummary"] == "Auth router inspection"
+    assert s1["decision"] == "allow"
+
+    assert s2["id"] == "step_0_2"
+    assert s2["type"] == "text"
+
+    # Ensure step IDs are strictly unique per turn
+    step_ids = [s["id"] for s in asst_line["steps"]]
+    assert len(step_ids) == len(set(step_ids))
+
+
 def test_tasks_brain_resolution_order(tmp_path):
     """Verify tasks router searches .mash/brain before .nexau/brain."""
     fake_home = tmp_path / "userhome"

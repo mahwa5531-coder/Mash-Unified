@@ -65,7 +65,7 @@ async def stream_session(client: httpx.AsyncClient, session_id: str, prompt: str
         "duration_s": round(duration, 2),
     }
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_concurrent_sse_streams():
     print("=" * 60)
     print("TESTING CONCURRENT SSE STREAMS & SESSION ISOLATION")

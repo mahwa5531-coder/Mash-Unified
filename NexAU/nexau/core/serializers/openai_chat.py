@@ -63,7 +63,7 @@ def serialize_ump_to_openai_chat_payload(
                     rendered: list[dict[str, Any]] = []
                     for i in range(max_p):
                         p = doc.load_page(i)
-                        pix = p.get_pixmap(dpi=150)
+                        pix = p.get_pixmap(dpi=300)
                         jpg_b64 = b64_mod.b64encode(pix.tobytes("jpeg")).decode("utf-8")
                         detail_val = img.detail if img.detail != "auto" else "auto"
                         rendered.append({

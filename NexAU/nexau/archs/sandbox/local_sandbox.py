@@ -140,7 +140,16 @@ class LocalSandbox(BaseSandbox):
         Returns:
             Absolute Path object
         """
-        p = Path(path)
+        from urllib.parse import unquote
+        clean = str(path).strip().strip("'\"")
+        if clean.startswith("file:///"):
+            clean = clean[8:]
+        elif clean.startswith("file://"):
+            clean = clean[7:]
+        clean = unquote(clean)
+        if len(clean) >= 3 and clean[0] == "/" and clean[2] == ":":
+            clean = clean[1:]
+        p = Path(clean)
         if p.is_absolute():
             return p
         else:

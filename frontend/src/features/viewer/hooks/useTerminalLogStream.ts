@@ -50,10 +50,26 @@ export function useTerminalLogStream({
       let termBuffer = '';
       let flushTimeout: number | null = null;
 
+      const flushNow = () => {
+        if (flushTimeout) {
+          clearTimeout(flushTimeout);
+          flushTimeout = null;
+        }
+        if (termBuffer) {
+          const chunk = termBuffer;
+          termBuffer = '';
+          setTabContent(prev => ({
+            ...prev,
+            [tabId]: (prev[tabId] || '') + chunk
+          }));
+        }
+      };
+
       try {
         es = new EventSource(`${BASE_URL}/api/tasks/${taskId}/stream`);
         es.onmessage = (event) => {
           if (event.data === '[DONE]') {
+            flushNow();
             es?.close();
             return;
           }
@@ -76,6 +92,7 @@ export function useTerminalLogStream({
             if (data.status) {
               setTerminalStatuses(prev => ({ ...prev, [tabId]: data.status }));
               if (data.status !== 'running') {
+                flushNow();
                 es?.close();
               }
             }
@@ -85,8 +102,8 @@ export function useTerminalLogStream({
         };
 
         es.onerror = () => {
+          flushNow();
           es?.close();
-          if (flushTimeout) clearTimeout(flushTimeout);
           if (!hasStreamData) {
             fetchTaskLog(taskId).then(content => {
               if (content) {
@@ -104,8 +121,8 @@ export function useTerminalLogStream({
       }
 
       return () => {
+        flushNow();
         es?.close();
-        if (flushTimeout) clearTimeout(flushTimeout);
       };
     }
   }, [viewMode, activeTab?.id, activeTab?.type]);

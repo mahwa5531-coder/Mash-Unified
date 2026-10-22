@@ -112,7 +112,7 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
             <div 
               ref={textRef}
               className={cn(
-                "whitespace-pre-wrap font-sans text-[13.5px] leading-[22px] text-zinc-900 dark:text-zinc-200 break-words select-text transition-all",
+                "whitespace-pre-wrap font-sans text-[13.5px] leading-[22px] text-zinc-900 dark:text-zinc-100 break-words select-text transition-all",
                 !isExpanded && isOverflowing && "line-clamp-3 overflow-hidden"
               )}
             >

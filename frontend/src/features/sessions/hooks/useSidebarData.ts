@@ -30,12 +30,7 @@ export function useSidebarData({
 }: UseSidebarDataProps) {
   // ponytail: Synchronous lazy initializers eliminate cold boot empty-to-loaded layout jump
   const [sessions, setSessions] = useState<SessionItem[]>(() => {
-    const raw = loadCache<SessionItem[]>('nexau_cached_sessions', []);
-    if (raw.length > 1) {
-      const active = raw.filter(s => s.session_id === 'sess_mvbzva8o_98251b7540');
-      return active.length > 0 ? active : raw.slice(0, 1);
-    }
-    return raw;
+    return loadCache<SessionItem[]>('nexau_cached_sessions', []);
   });
   const [registeredProjects, setRegisteredProjects] = useState<ProjectItem[]>(() => []);
   const [pinnedSessionIds, setPinnedSessionIds] = useState<Set<string>>(() => new Set());
@@ -48,16 +43,11 @@ export function useSidebarData({
   const selectedSessionTitleRef = useRef(selectedSessionTitle);
   selectedSessionTitleRef.current = selectedSessionTitle;
 
-  // Hydration fallback sync & stale cache sanitization
+  // Hydration fallback sync
   useEffect(() => {
     try {
       const s = loadCache<SessionItem[]>('nexau_cached_sessions', []);
-      const curId = selectedSessionIdRef.current || 'sess_mvbzva8o_98251b7540';
-      if (s.length > 1) {
-        const cleaned = s.filter(x => x.session_id === curId);
-        setSessions(cleaned);
-        try { localStorage.setItem('nexau_cached_sessions', JSON.stringify(cleaned)); } catch {}
-      } else if (s.length > 0 && sessions.length === 0) {
+      if (s.length > 0 && sessions.length === 0) {
         setSessions(s);
       }
       const saved = loadCache<string[]>('nexau_pinned_sessions', []);

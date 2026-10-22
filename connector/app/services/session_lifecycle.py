@@ -38,11 +38,17 @@ def abort_session_execution(session_id: str, user_id: str = "default_user") -> N
         srv = get_sse_server()
         if srv and hasattr(srv, "handle_stop_request"):
             import asyncio
-            coro = srv.handle_stop_request(session_id=session_id, user_id=user_id, force=True)
+
+            async def _safe_stop():
+                try:
+                    await srv.handle_stop_request(session_id=session_id, user_id=user_id, force=True)
+                except Exception as ex:
+                    logger.debug(f"Stop request ignored for session {session_id}: {ex}")
+
             try:
-                asyncio.get_running_loop().create_task(coro)
+                asyncio.get_running_loop().create_task(_safe_stop())
             except RuntimeError:
-                asyncio.run(coro)
+                asyncio.run(_safe_stop())
     except Exception as e:
         logger.warning(f"Error aborting execution for session {session_id}: {e}")
 
@@ -157,9 +163,83 @@ async def delete_existing_session(engine: Any, session_id: str) -> dict[str, str
     s = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
     if not s:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
-    await eng.delete(AgentRunActionModel, filters=ComparisonFilter.eq("session_id", session_id))
-    await eng.delete(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
+
+    user_id = getattr(s, "user_id", "default_user") or "default_user"
+
+    # 1. Stop in-flight agents/subagents
+    abort_session_execution(session_id, user_id=user_id)
+    try:
+        from app.routers.chat import _sse_server
+
+        if _sse_server and hasattr(_sse_server, "handle_stop_request"):
+            await _sse_server.handle_stop_request(
+                user_id=user_id, session_id=session_id, force=True, timeout=5.0
+            )
+    except Exception as e:
+        logger.warning(f"Error stopping in-flight agent for session {session_id}: {e}")
+
+    # 2. Clear steering mailboxes
     clear_steering_messages(session_id)
+
+    # 3. Purge all related SQLite tables in a single atomic SQL transaction
+    tables_to_purge = [
+        "agent_run_actions",
+        "permission_rules",
+        "agent_locks",
+        "agents",
+        "teams",
+        "team_members",
+        "team_messages",
+        "team_tasks",
+        "team_task_locks",
+        "sessions",
+    ]
+
+    async_eng = getattr(getattr(eng, "_inner", None), "_engine", None) or getattr(eng, "_engine", None)
+    if async_eng:
+        from sqlalchemy import text
+
+        async with async_eng.begin() as conn:
+            res = await conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+            existing_tables = {row[0] for row in res.fetchall()}
+            for tbl in tables_to_purge:
+                if tbl in existing_tables:
+                    await conn.execute(
+                        text(f"DELETE FROM {tbl} WHERE session_id = :sid"),
+                        {"sid": session_id},
+                    )
+    else:
+        from nexau.archs.session.models import (
+            AgentLockModel,
+            AgentModel,
+            AgentRunActionModel,
+            PermissionRuleModel,
+            TeamMemberModel,
+            TeamMessageModel,
+            TeamModel,
+            TeamTaskLockModel,
+            TeamTaskModel,
+        )
+
+        models_to_delete = [
+            AgentRunActionModel,
+            PermissionRuleModel,
+            AgentLockModel,
+            AgentModel,
+            TeamModel,
+            TeamMemberModel,
+            TeamMessageModel,
+            TeamTaskModel,
+            TeamTaskLockModel,
+            SessionModel,
+        ]
+        for m in models_to_delete:
+            try:
+                await eng.delete(m, filters=ComparisonFilter.eq("session_id", session_id))
+            except Exception as e:
+                logger.warning(f"Fallback delete failed for {m.__name__}: {e}")
+
+    # 4. Safely unlink brain directories
     try:
         safe_rmtree_session_brain(session_id, (s.context or {}).get("brain_directory"))
     except Exception as e:

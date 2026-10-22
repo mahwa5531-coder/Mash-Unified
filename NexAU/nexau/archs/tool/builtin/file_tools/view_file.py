@@ -216,7 +216,7 @@ def view_file(
             p_idx + 1
             page = doc[p_idx]
             # 150 DPI provides crystal-clear rendering for financial balance sheets and fine print
-            pix = page.get_pixmap(dpi=150)
+            pix = page.get_pixmap(dpi=300)
             img_bytes = pix.tobytes("jpeg", jpg_quality=85)
             img_b64 = base64.b64encode(img_bytes).decode("utf-8")
             content_parts.append({

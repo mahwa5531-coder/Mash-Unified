@@ -51,7 +51,7 @@ export function Unit19Typography() {
         </div>
 
         {/* 2. Body Prose with Bold Lead-Ins and Inline Workspace Pills */}
-        <div className="space-y-3 p-4 rounded-lg border border-[var(--m-border-subtle)] bg-[var(--m-bg-app)] text-[13.5px] leading-[1.72] text-zinc-800 dark:text-[#d4d4d8]">
+        <div className="space-y-3 p-4 rounded-lg border border-[var(--m-border-subtle)] bg-[var(--m-bg-app)] text-[13.5px] leading-[1.72] text-zinc-900 dark:text-zinc-100">
           <span className="text-[10px] font-mono text-[var(--m-text-muted)] uppercase tracking-wider block mb-1">Paragraphs with Bold Lead-Ins &amp; Inline Pills:</span>
           
           <p>

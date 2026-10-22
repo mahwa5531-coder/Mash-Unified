@@ -1,7 +1,7 @@
 "use client";
 
-import React from 'react';
-import { ChevronRight, Check, Copy, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronRight, Check, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isToolRunning } from './toolTimeline';
 import type { TimelineEntry } from './types';
@@ -10,23 +10,37 @@ interface CommandTimelineRowProps {
   entry: TimelineEntry;
   isChild?: boolean;
   isStreaming?: boolean;
-  isCmdExpanded: boolean;
-  copiedId: string | null;
+  expandedCmds?: Set<string> | Record<string, boolean>;
+  isCmdExpanded?: boolean;
+  copiedId?: string | null;
   onOpenFile?: (path: string) => void;
-  handleCopy: (text: string, id: string) => void;
-  toggleCmd: (id: string) => void;
+  handleCopy?: (text: string, id: string) => void;
+  toggleCmd?: (id: string) => void;
 }
 
 export function CommandTimelineRow({
   entry,
-  isChild,
+  isChild = false,
   isStreaming,
-  isCmdExpanded,
-  copiedId,
-  onOpenFile,
-  handleCopy,
+  expandedCmds,
+  isCmdExpanded: directIsCmdExpanded,
+  copiedId: externalCopiedId,
+  handleCopy: externalHandleCopy,
   toggleCmd,
 }: CommandTimelineRowProps) {
+  const [internalCopiedId, setInternalCopiedId] = useState<string | null>(null);
+
+  const activeCopiedId = externalCopiedId !== undefined ? externalCopiedId : internalCopiedId;
+  const activeHandleCopy = (text: string, id: string) => {
+    if (externalHandleCopy) {
+      externalHandleCopy(text, id);
+    } else {
+      navigator.clipboard.writeText(text);
+      setInternalCopiedId(id);
+      setTimeout(() => setInternalCopiedId(null), 2000);
+    }
+  };
+
   const isRunning = isToolRunning(entry.data?.tool, isStreaming);
   const isCancelled = entry.data?.tool?.status === 'cancelled';
   const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
@@ -35,22 +49,18 @@ export function CommandTimelineRow({
   const outputText = rawOutput.trim();
 
   let displayOutput = outputText;
-  let parsedError: string | null = null;
   if (outputText.startsWith('{') && outputText.endsWith('}')) {
     try {
       const parsed = JSON.parse(outputText);
       if (parsed && typeof parsed === 'object') {
-        if (parsed.error) {
-          parsedError = typeof parsed.error === 'string' ? parsed.error : parsed.error.message || JSON.stringify(parsed.error);
-        }
-        if (parsed.returnDisplay || parsed.content) {
-          displayOutput = parsed.returnDisplay || parsed.content;
+        const val = parsed.returnDisplay || parsed.content || parsed.output || parsed.stdout || parsed.stderr;
+        if (val !== undefined && val !== null) {
+          displayOutput = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
         }
       }
     } catch {}
   }
 
-  const isFailed = !isDenied && (entry.data?.tool?.status === 'failed' || Boolean(parsedError));
   const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
   const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
 
@@ -59,9 +69,6 @@ export function CommandTimelineRow({
 
   if (isDenied) {
     displayLabel = 'Cancelled by user';
-    showCmd = true;
-  } else if (isFailed) {
-    displayLabel = 'Failed';
     showCmd = true;
   } else if (isCancelled) {
     displayLabel = 'Cancelled';
@@ -84,22 +91,25 @@ export function CommandTimelineRow({
     }
   }
 
+  const isCmdExpanded = directIsCmdExpanded !== undefined
+    ? directIsCmdExpanded
+    : expandedCmds instanceof Set
+      ? expandedCmds.has(toolId)
+      : Boolean(expandedCmds?.[toolId]);
+
   return (
     <div key={entry.id} className={cn("flex flex-col text-xs select-none transition-colors", isChild ? "pl-2 py-0.5" : "my-0.5", isDenied && "opacity-75")}>
       <button
         type="button"
-        onClick={() => toggleCmd(toolId)}
+        onClick={() => toggleCmd?.(toolId)}
         className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-normal py-0.5 cursor-pointer select-none transition-colors group text-left w-fit"
       >
-        {isFailed && !isRunning && <AlertCircle size={10} className="text-rose-500 shrink-0" />}
         <span
           className={cn(
             "font-sans text-[12px] shrink-0",
-            isFailed
-              ? "text-rose-500 font-medium"
-              : isRunning
-                ? "animate-silver-shine"
-                : "text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 transition-colors"
+            isRunning
+              ? "animate-silver-shine"
+              : "text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 transition-colors"
           )}
         >
           {displayLabel}
@@ -109,13 +119,14 @@ export function CommandTimelineRow({
             className={cn(
               "font-mono text-[12px] truncate max-w-md",
               isDenied
-                ? "text-zinc-400 dark:text-zinc-500 line-through opacity-60"
-                : "text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200"
+                ? "opacity-60 line-through text-zinc-500"
+                : "text-zinc-700 dark:text-zinc-300 font-normal"
             )}
           >
             {entry.data?.cmd}
           </span>
         )}
+        {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
         <ChevronRight
           size={11}
           className={cn(
@@ -138,18 +149,13 @@ export function CommandTimelineRow({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleCopy(displayOutput || entry.data?.fullCmd || entry.data?.cmd || '', toolId);
+                    activeHandleCopy(displayOutput || entry.data?.fullCmd || entry.data?.cmd || '', toolId);
                   }}
                   className="p-1 text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800 transition-colors cursor-pointer"
                   title="Copy command/output"
                 >
-                  {copiedId === toolId ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                  {activeCopiedId === toolId ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
                 </button>
-                {isFailed ? (
-                  <AlertCircle size={12} className="text-rose-400" />
-                ) : (
-                  <Check size={12} className="text-emerald-400/90" />
-                )}
               </div>
             </div>
             <pre className="text-zinc-300 whitespace-pre-wrap leading-tight max-h-36 overflow-y-auto custom-scrollbar font-mono text-[10.5px] select-text">

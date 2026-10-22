@@ -6,8 +6,8 @@
 
 :root {
   /* Surface & Canvas (Light Theme) */
-  --m-bg-app: #F9F9F9;
-  --m-bg-sidebar: #F0F1F3;
+  --m-bg-app: #F0F1F3;
+  --m-bg-sidebar: #F9F9F9;
   --m-bg-surface: #FFFFFF;
   --m-bg-surface-hover: #F1F3F5;
   --m-bg-surface-active: #E9ECEF;
@@ -39,8 +39,8 @@
 [data-theme="dark"],
 .dark {
   /* Surface & Canvas (Dark Theme) */
-  --m-bg-app: #101010;
-  --m-bg-sidebar: #09090b;
+  --m-bg-app: #09090b;
+  --m-bg-sidebar: #101010;
   --m-bg-surface: #141416;
   --m-bg-surface-hover: rgba(255, 255, 255, 0.05);
   --m-bg-surface-active: rgba(255, 255, 255, 0.09);

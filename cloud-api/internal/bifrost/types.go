@@ -226,8 +226,7 @@ type PromptTokensDetails struct {
 	TextTokens        int64 `json:"text_tokens,omitempty"`
 	AudioTokens       int64 `json:"audio_tokens,omitempty"`
 	ImageTokens       int64 `json:"image_tokens,omitempty"`
-	CachedTokens      int64 `json:"cached_tokens,omitempty"` // OpenAI & OpenRouter standard
-	CachedReadTokens  int64 `json:"cached_read_tokens,omitempty"` // Bifrost standard
+	CachedReadTokens  int64 `json:"cached_read_tokens,omitempty"`
 	CachedWriteTokens int64 `json:"cached_write_tokens,omitempty"`
 }
 
@@ -240,30 +239,12 @@ type CompletionTokensDetails struct {
 	RejectedPredictionTokens int64 `json:"rejected_prediction_tokens,omitempty"`
 }
 
-// Cost is Bifrost's cost breakdown. It supports both OpenRouter (single float number)
-// and Bifrost (structured object).
+// Cost is Bifrost's cost breakdown.
 type Cost struct {
 	InputTokensCost  float64 `json:"input_tokens_cost,omitempty"`
 	OutputTokensCost float64 `json:"output_tokens_cost,omitempty"`
 	RequestCost      float64 `json:"request_cost,omitempty"`
 	TotalCost        float64 `json:"total_cost,omitempty"`
-}
-
-// UnmarshalJSON unmarshals cost from either a float number (OpenRouter: "cost": 0.00095)
-// or a JSON object (Bifrost: "cost": {"total_cost": 0.00095}).
-func (c *Cost) UnmarshalJSON(data []byte) error {
-	var num float64
-	if err := json.Unmarshal(data, &num); err == nil {
-		c.TotalCost = num
-		return nil
-	}
-	type costAlias Cost
-	var obj costAlias
-	if err := json.Unmarshal(data, &obj); err != nil {
-		return err
-	}
-	*c = Cost(obj)
-	return nil
 }
 
 // ExtraFields is Bifrost's per-response metadata.

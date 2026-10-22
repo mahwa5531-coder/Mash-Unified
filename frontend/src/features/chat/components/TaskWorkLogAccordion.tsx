@@ -39,8 +39,9 @@ export default function TaskWorkLogAccordion({
   isLast: _isLast = false,
   turnStartTime,
 }: TaskWorkLogAccordionProps) {
-  // ponytail: Keep reasoning thoughts visible if turn has no assistant prose content (D2)
-  const [clusterOpen, setClusterOpen] = useState<boolean>(!hasAssistantContent);
+  // ponytail: Completed turns render calm collapsed summary bar by default on app reload; only pure reasoning-only turns without tools/prose stay open
+  const hasTools = Boolean((tools && tools.length > 0) || (steps && steps.some((s: any) => s.type === 'tool' || (!s.type && (s.name || s.tool_call_id)) || (s.tools && s.tools.length > 0))));
+  const [clusterOpen, setClusterOpen] = useState<boolean>(!hasAssistantContent && !hasTools);
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
   const [expandedCmds, setExpandedCmds] = useState<Record<string, boolean>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -111,7 +112,7 @@ export default function TaskWorkLogAccordion({
     if (steps && steps.length > 0) {
       steps.forEach((step: any, sIdx) => {
         // 1. Unitised 'thinking' step or legacy step.thoughts
-        if (step.type === 'thinking' || (step.thoughts && step.thoughts.length > 0)) {
+        if (step.type === 'thinking' || step.type === 'reasoning' || (step.thoughts && step.thoughts.length > 0)) {
           const thText = (step.content || (step.thoughts ? step.thoughts.join('\n\n') : '')).replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
           if (thText) {
             const computedSecs = step.thinkingDurationSeconds 
@@ -134,23 +135,30 @@ export default function TaskWorkLogAccordion({
               });
             }
           }
-        } else if (step.type === 'tool') {
-          // 2. Unitised single 'tool' step -> independent unit (no merge across sequential steps)
+        } else if (step.type === 'tool' || (!step.type && (step.name || step.tool_call_id))) {
+          // 2. Unitised single 'tool' step
           fullTimeline.push(parseToolItem(step, step.tool_call_id || (step.id ? `${step.id}_${sIdx}` : `tool_${sIdx}`)));
         } else if (step.tools && step.tools.length > 0) {
           // 3. Step with tools array
-          if (step.tools.length === 1) {
-            // Single tool in this step -> independent unit
-            fullTimeline.push(parseToolItem(step.tools[0], `${sIdx}_0`));
-          } else {
-            // Multiple tools called in parallel within the same step -> group only this step's tools
-            const stepToolEntries = step.tools.map((t: any, tIdx: number) => parseToolItem(t, `${sIdx}_${tIdx}`));
-            const grouped = groupTimelineEntries(stepToolEntries);
-            fullTimeline.push(...grouped);
+          const stepToolEntries = step.tools.map((t: any, tIdx: number) => parseToolItem(t, `${sIdx}_${tIdx}`));
+          fullTimeline.push(...stepToolEntries);
+        } else if (step.type === 'text' && step.content) {
+          // 4. Intermediate step note / commentary in unified worklog
+          const noteText = step.content.replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
+          if (noteText) {
+            fullTimeline.push({
+              id: step.id ? `note-${step.id}-${sIdx}` : `note-step-${sIdx}`,
+              type: 'text',
+              data: {
+                text: noteText,
+                status: step.status || 'completed',
+              }
+            });
           }
         }
       });
-      return fullTimeline;
+      // ponytail: group consecutive same-category tools across steps while preserving chronological order
+      return groupTimelineEntries(fullTimeline);
     }
 
     // Branch B: Streaming or legacy flat messages fallback
@@ -267,8 +275,7 @@ export default function TaskWorkLogAccordion({
   }
 
   // 2. Completed turn: render "Worked for {formattedTime} >" or "Thought for {formattedTime} >" naked text link dropdown
-  const hasThoughts = thoughts.length > 0 || (steps && steps.some((s: any) => s.type === 'thinking' || (s.thoughts && s.thoughts.length > 0)));
-  const hasTools = (tools && tools.length > 0) || (steps && steps.some((s: any) => s.type === 'tool' || (s.tools && s.tools.length > 0)));
+  const hasThoughts = thoughts.length > 0 || (steps && steps.some((s: any) => s.type === 'thinking' || s.type === 'reasoning' || (s.thoughts && s.thoughts.length > 0)));
   const actionLabel = hasThoughts && !hasTools ? `Thought for ${formattedTime}` : `Worked for ${formattedTime}`;
 
   // Find any active pending approval that is awaiting user decision

@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
-import { markSessionViewed, renameSession, deleteSession, markSessionDeleted, SessionItem } from '@/services/sessions';
+import { markSessionViewed, renameSession, deleteSession, markSessionDeleted, unmarkSessionDeleted, cleanupSessionStorage, SessionItem } from '@/services/sessions';
 import { ProjectItem, selectFolder, resolveFolder, createProject, deleteProject } from '@/services/projects';
 import { sessionStore } from '@/features/chat';
+import { evictRightSidebarMemory } from '@/features/viewer/hooks/useViewerTabs';
+import { invalidateFileCache } from '@/services/files';
+import { FailedToDeleteCard } from './FailedToDeleteCard';
 import { SessionItemRow } from './SessionItemRow';
 import { SessionContextMenu } from './SessionContextMenu';
 import { SidebarHeader } from './SidebarHeader';
@@ -33,7 +36,7 @@ interface SidebarProps {
   onWidthChange?: (width: number) => void;
   archivedSessionIds?: Set<string>;
   onToggleArchive?: (sessionId: string) => void;
-  onDeleteSession?: (sessionId: string) => void;
+  onDeleteSession?: (sessionId: string, showToast?: boolean) => Promise<any> | void;
   authUser?: AuthUser | null;
 }
 
@@ -113,6 +116,7 @@ export default function Sidebar({
   // Deletion Confirmation States
   const [sessionToDelete, setSessionToDelete] = useState<{ id: string; title: string } | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string; path?: string; sessionCount: number } | null>(null);
+  const [deleteError, setDeleteError] = useState<{ title: string; message: string } | null>(null);
 
   const handleSessionClick = async (session: SessionItem) => {
     const title = generateCleanSessionTitle(session.custom_title || session.title || '', session.session_id);
@@ -203,9 +207,12 @@ export default function Sidebar({
     setSessionToDelete({ id: sessionId, title });
   };
 
-  const confirmDeleteSession = () => {
+  const confirmDeleteSession = async () => {
     if (!sessionToDelete) return;
-    const sessionId = sessionToDelete.id;
+    const { id: sessionId, title: sessionTitle } = sessionToDelete;
+    const targetSession = sessions.find(s => s.session_id === sessionId);
+    const previousSessions = [...sessions];
+
     setSessionToDelete(null);
     markSessionDeleted(sessionId);
     setSessions(prev => prev.filter(s => s.session_id !== sessionId));
@@ -215,11 +222,43 @@ export default function Sidebar({
       onNewSession();
     }
 
-    if (onDeleteSession) {
-      onDeleteSession(sessionId);
-    } else {
-      deleteSession(sessionId).catch(err => {
-        console.warn("Failed to delete session on backend:", err);
+    try {
+      let res: { success: boolean; message?: string };
+      if (onDeleteSession) {
+        const out = await onDeleteSession(sessionId, false);
+        res = (out && typeof out === 'object' && 'success' in out) ? out : { success: true };
+      } else {
+        res = await deleteSession(sessionId);
+      }
+
+      if (!res.success) {
+        unmarkSessionDeleted(sessionId);
+        if (targetSession) {
+          setSessions(prev => [targetSession, ...prev.filter(s => s.session_id !== sessionId)]);
+        } else {
+          setSessions(previousSessions);
+        }
+        refreshData();
+        setDeleteError({
+          title: "Failed to delete",
+          message: res.message || `Session "${sessionTitle}" could not be deleted on the server.`,
+        });
+      } else {
+        evictRightSidebarMemory(sessionId);
+        invalidateFileCache();
+        cleanupSessionStorage(sessionId);
+      }
+    } catch (err: any) {
+      unmarkSessionDeleted(sessionId);
+      if (targetSession) {
+        setSessions(prev => [targetSession, ...prev.filter(s => s.session_id !== sessionId)]);
+      } else {
+        setSessions(previousSessions);
+      }
+      refreshData();
+      setDeleteError({
+        title: "Failed to delete",
+        message: err?.message || `Session "${sessionTitle}" could not be deleted on the server.`,
       });
     }
   };
@@ -249,15 +288,26 @@ export default function Sidebar({
     const { id, name } = projectToDelete;
     setProjectToDelete(null);
     try {
-      const ok = await deleteProject(id);
-      if (ok) {
+      const res = await deleteProject(id);
+      if (res.success) {
         refreshData();
         if (selectedSessionRepo && name && selectedSessionRepo.toLowerCase() === name.toLowerCase()) {
           onNewSession('No Repo');
         }
+        invalidateFileCache();
+      } else {
+        refreshData();
+        setDeleteError({
+          title: "Failed to delete",
+          message: res.message || `Workspace "${name}" could not be deleted on the server.`,
+        });
       }
-    } catch (err) {
-      console.warn("Failed to delete project:", err);
+    } catch (err: any) {
+      refreshData();
+      setDeleteError({
+        title: "Failed to delete",
+        message: err?.message || `Workspace "${name}" could not be deleted on the server.`,
+      });
     }
   };
 
@@ -354,6 +404,16 @@ export default function Sidebar({
         isHistoryActive={isHistoryActive}
         onOpenHistory={onOpenHistory}
       />
+
+      {deleteError && (
+        <div className="px-3 pt-2 pb-1 shrink-0">
+          <FailedToDeleteCard
+            title={deleteError.title}
+            message={deleteError.message}
+            onClose={() => setDeleteError(null)}
+          />
+        </div>
+      )}
 
       {/* Scrollable Content Area */}
       <div className="relative flex-1 min-h-0 flex flex-col">

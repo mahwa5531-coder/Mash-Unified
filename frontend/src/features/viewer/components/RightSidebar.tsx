@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, MouseEvent as ReactMouseEvent } from 'react';
 import SafeFileViewer from '@/features/viewer/components/SafeFileViewer';
+import { TerminalViewer } from '@/features/viewer/components/TerminalViewer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ViewerHeader } from './ViewerHeader';
@@ -10,9 +11,12 @@ import { ViewerEmptyState } from './ViewerEmptyState';
 import { FileBreadcrumbBar } from '@/primitives';
 import { ViewerTabMenu } from './ViewerTabMenu';
 import { fetchSessionArtifactsData, SessionArtifactsData } from '@/services/artifacts';
+import { isFileTruncatedFromCache } from '@/services/files';
+import { BASE_URL } from '@/services/client';
 import { normalizePath } from '@/utils/normalizePath';
 import { useRightSidebarResize } from '../hooks/useRightSidebarResize';
 import { useViewerTabs } from '../hooks/useViewerTabs';
+import { useTerminalLogStream } from '../hooks/useTerminalLogStream';
 
 export interface RightSidebarProps {
   onToggle: () => void;
@@ -64,11 +68,30 @@ export default function RightSidebar({
     activeTabId,
     setActiveTabId,
     tabContent,
+    setTabContent,
+    tabTruncated,
     isLoadingContent,
     openFileTab,
     handleCloseTab,
     activeTab,
   } = useViewerTabs(sessionId);
+
+  // Live Terminal Log Streamer for Background Process Tabs
+  const { terminalStatuses, terminalPreRef } = useTerminalLogStream({
+    activeTab,
+    viewMode,
+    tabContent,
+    setTabContent,
+  });
+
+  const handleKillTask = useCallback(async (e: ReactMouseEvent, pid: number) => {
+    e.stopPropagation();
+    try {
+      await fetch(`${BASE_URL}/api/tasks/${pid}/kill`, { method: 'POST' });
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Data States
   const [artifactsData, setArtifactsData] = useState<SessionArtifactsData>({
@@ -197,25 +220,41 @@ export default function RightSidebar({
                   activeTab={activeTab}
                   content={tabContent[activeTab.id]}
                   onCloseTab={handleCloseTab}
+                  sessionId={sessionId}
                 />
               }
             />
 
-            {/* Safe File Viewer Body */}
-            <div className="flex-1 overflow-hidden bg-[var(--bg-app)] dark:bg-black">
-              <ErrorBoundary scope="safe-file-viewer">
-                <SafeFileViewer
-                  filename={activeTab?.title || ''}
-                  path={activeTab?.path}
-                  sessionId={sessionId}
-                  content={activeTab ? tabContent[activeTab.id] || '' : ''}
-                  isLoading={isLoadingContent}
-                  viewMode={fileViewMode}
-                  onViewModeChange={setFileViewMode}
-                  hideToolbar={true}
-                />
-              </ErrorBoundary>
-            </div>
+            {/* Content Body: Terminal Viewer vs Safe File Viewer */}
+            {activeTab.type === 'terminal' ? (
+              <div className="flex-1 overflow-hidden bg-[#121214]">
+                <ErrorBoundary scope="terminal-viewer">
+                  <TerminalViewer
+                    activeTab={activeTab}
+                    terminalStatuses={terminalStatuses}
+                    tabContent={tabContent}
+                    handleKillTask={handleKillTask}
+                    terminalPreRef={terminalPreRef}
+                  />
+                </ErrorBoundary>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-hidden bg-[var(--bg-app)] dark:bg-black">
+                <ErrorBoundary scope="safe-file-viewer">
+                  <SafeFileViewer
+                    filename={activeTab?.title || ''}
+                    path={activeTab?.path}
+                    sessionId={sessionId}
+                    content={activeTab ? tabContent[activeTab.id] || '' : ''}
+                    isTruncated={Boolean(activeTab && (tabTruncated?.[activeTab.id] || (activeTab.path && isFileTruncatedFromCache(activeTab.path, sessionId))))}
+                    isLoading={isLoadingContent}
+                    viewMode={fileViewMode}
+                    onViewModeChange={setFileViewMode}
+                    hideToolbar={true}
+                  />
+                </ErrorBoundary>
+              </div>
+            )}
           </div>
         )}
       </div>

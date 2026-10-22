@@ -24,6 +24,7 @@ export function useRightSidebarResize({
   const widthRef = useRef(DEFAULT_WIDTH);
 
   const startResizing = useCallback((e: ReactMouseEvent) => {
+    if (e.button !== 0) return;
     e.preventDefault();
     setIsResizing(true);
   }, []);

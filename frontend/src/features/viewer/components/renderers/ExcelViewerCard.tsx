@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Download, Loader2, ExternalLink, AlertCircle, Check } from 'lucide-react';
 import { BASE_URL, safeFetch } from '@/services/client';
 import { FluentExcelLogo } from '@/primitives/FileLogos';
+import { cn } from '@/lib/utils';
 
 export interface ExcelViewerCardProps {
   filename: string;
@@ -19,10 +20,17 @@ export function ExcelViewerCard({
   sessionQuery = '',
 }: ExcelViewerCardProps) {
   const [isOpening, setIsOpening] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
+  const downloadTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const [statusFeedback, setStatusFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+
+  const displayName = filename || (path ? path.split(/[/\\]/).pop() : 'Workbook.xlsx') || 'Workbook.xlsx';
+  const ext = displayName.includes('.') ? displayName.split('.').pop()?.toLowerCase() : 'xlsx';
+  const baseName = ext ? displayName.slice(0, -(ext.length + 1)) : displayName;
 
   const handleOpenInExcel = async () => {
     setIsOpening(true);
@@ -38,7 +46,7 @@ export function ExcelViewerCard({
           setStatusFeedback({
             type: 'error',
             message: errorMsg.includes('1155') || errorMsg.toLowerCase().includes('no application')
-              ? 'No spreadsheet application found. Please download the file or install Excel.'
+              ? 'No spreadsheet app found. Click Download to open in Google Sheets or Excel.'
               : errorMsg,
           });
         } else {
@@ -70,7 +78,7 @@ export function ExcelViewerCard({
         setStatusFeedback({
           type: 'error',
           message: isNoApp
-            ? 'No spreadsheet application found. Please download the file to view it in Google Sheets or Excel.'
+            ? 'No spreadsheet app found. Click Download to open in Google Sheets or Excel.'
             : (rawMsg || 'Unable to launch spreadsheet application.'),
         });
       }
@@ -82,91 +90,118 @@ export function ExcelViewerCard({
     } finally {
       setTimeout(() => {
         setIsOpening(false);
-      }, 1200);
+      }, 1000);
     }
+  };
+
+  const handleDownloadClick = () => {
+    setDownloaded(true);
+    if (downloadTimerRef.current) clearTimeout(downloadTimerRef.current);
+    downloadTimerRef.current = setTimeout(() => {
+      setDownloaded(false);
+    }, 4000);
   };
 
   const downloadUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}&raw=true${sessionQuery}`;
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full p-6 text-center bg-[var(--bg-app)] dark:bg-black select-none">
-      <div className="max-w-sm w-full flex flex-col items-center p-8 rounded-2xl border border-zinc-200/80 dark:border-white/[0.08] bg-white dark:bg-zinc-900/80 shadow-xl backdrop-blur-md">
-        {/* Fluent Excel Logo */}
-        <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mb-4 shadow-sm group">
-          <FluentExcelLogo size={36} className="transition-transform group-hover:scale-105 duration-200" />
-        </div>
+    <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center bg-[var(--bg-app)] dark:bg-black select-none">
+      {/* Fluent Excel Logo */}
+      <div className="w-12 h-12 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mb-3 shadow-2xs">
+        <FluentExcelLogo size={28} />
+      </div>
 
-        {/* File Name & Type */}
-        <h3
-          className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1.5 max-w-full truncate px-1"
-          title={filename}
+      {/* File Name Header + Extension Badge */}
+      <div className="flex items-center gap-1.5 mb-1 max-w-sm px-2 truncate justify-center">
+        <span
+          className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate"
+          title={displayName}
         >
-          {filename}
-        </h3>
-        <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400 mb-6 flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-          Microsoft Excel Spreadsheet (.xlsx)
-        </p>
+          {baseName}
+        </span>
+        {ext && (
+          <span className="px-1.5 py-0.5 rounded text-[10.5px] font-mono font-medium bg-zinc-200/80 dark:bg-white/[0.08] text-zinc-700 dark:text-zinc-300 shrink-0">
+            .{ext}
+          </span>
+        )}
+      </div>
 
-        {/* Primary Action Button: Open in Excel */}
+      {/* Clean Single Subtitle */}
+      <span className="text-xs text-zinc-500 dark:text-zinc-400 font-normal mb-5">
+        Microsoft Excel Spreadsheet
+      </span>
+
+      {/* Twin Pill Action Buttons */}
+      <div className="flex items-center gap-2 mb-2">
         <button
           type="button"
           onClick={handleOpenInExcel}
           disabled={isOpening}
           id="btn-open-in-excel"
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-xs text-white bg-[#107C41] hover:bg-[#0E6B38] active:scale-[0.98] shadow-md transition-all cursor-pointer mb-2.5 disabled:opacity-70 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 h-[30px] px-3.5 rounded-full font-sans text-xs font-medium leading-none select-none outline-none transition-all duration-150 cursor-pointer active:scale-[0.97] bg-[#107C41] hover:bg-[#0E6B38] text-white shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
           title="Open this file in Microsoft Excel or your default spreadsheet application"
         >
           {isOpening ? (
             <>
-              <Loader2 size={14} className="animate-spin" />
-              <span>Launching Excel...</span>
+              <Loader2 size={13} className="animate-spin" />
+              <span>Launching...</span>
             </>
           ) : (
             <>
-              <FluentExcelLogo size={16} />
-              <span>Open in Microsoft Excel</span>
-              <ExternalLink size={13} className="opacity-80" />
+              <span>Open in Excel</span>
+              <ExternalLink size={12} className="opacity-80" />
             </>
           )}
         </button>
 
-        {/* Secondary Action: Download Full File */}
         <a
           href={downloadUrl}
           download={filename}
           id="link-download-excel"
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11.5px] font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 hover:bg-zinc-200/70 dark:bg-white/[0.06] dark:hover:bg-white/[0.10] transition-colors cursor-pointer"
+          onClick={handleDownloadClick}
+          className="inline-flex items-center gap-1.5 h-[30px] px-3.5 rounded-full font-sans text-xs font-medium leading-none select-none outline-none transition-all duration-150 cursor-pointer active:scale-[0.97] bg-zinc-100 hover:bg-zinc-200 dark:bg-white/[0.08] dark:hover:bg-white/[0.14] text-zinc-700 hover:text-zinc-950 dark:text-zinc-200 dark:hover:text-white border border-zinc-200 dark:border-white/[0.08] shadow-xs"
+          title="Download file to your local computer"
         >
-          <Download size={12} />
-          <span>Download File</span>
+          {downloaded ? (
+            <>
+              <Check size={13} className="text-emerald-500" />
+              <span className="text-emerald-600 dark:text-emerald-400">Downloaded</span>
+            </>
+          ) : (
+            <>
+              <Download size={12} />
+              <span>Download</span>
+            </>
+          )}
         </a>
-
-        {/* Feedback message on launch attempt */}
-        {statusFeedback && (
-          <div
-            className={`mt-4 px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 text-left w-full ${
-              statusFeedback.type === 'success'
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-            }`}
-          >
-            {statusFeedback.type === 'success' ? (
-              <Check size={14} className="shrink-0 text-emerald-500" />
-            ) : (
-              <AlertCircle size={14} className="shrink-0 text-amber-500" />
-            )}
-            <span className="leading-tight">{statusFeedback.message}</span>
-          </div>
-        )}
-
-        {/* Subtle Explanation Footnote */}
-        {!statusFeedback && (
-          <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-4 leading-normal">
-            Opens directly in Microsoft Excel on your computer.
-          </p>
-        )}
       </div>
+
+      {/* Confirmation of Download Destination */}
+      {downloaded && (
+        <div className="text-[11.5px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1 mt-1 animate-in fade-in duration-150 select-text">
+          <Check size={12} className="text-emerald-500 shrink-0" />
+          <span>Saved to your Downloads folder</span>
+        </div>
+      )}
+
+      {/* Calm Ghost Error / Success Feedback */}
+      {statusFeedback && (
+        <div
+          className={cn(
+            "text-xs flex items-center gap-1.5 mt-2 max-w-sm px-2 text-center",
+            statusFeedback.type === 'success'
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-zinc-500 dark:text-zinc-400"
+          )}
+        >
+          {statusFeedback.type === 'success' ? (
+            <Check size={13} className="shrink-0 text-emerald-500" />
+          ) : (
+            <AlertCircle size={13} className="shrink-0 text-amber-500" />
+          )}
+          <span className="leading-tight">{statusFeedback.message}</span>
+        </div>
+      )}
     </div>
   );
 }

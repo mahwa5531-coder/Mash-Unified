@@ -4,7 +4,7 @@ import assert from 'node:assert';
 // 1. Emulate File Viewer Matrix & FileViewerNotice logic
 // ==============================================================================
 const UNSUPPORTED_REGEX = /\.(docx|doc|pptx|ppt|zip|tar|gz|7z|rar|exe|bin|iso|dmg|dll|so|dylib)$/i;
-const MASSIVE_FILE_LIMIT = 1.5 * 1024 * 1024; // 1.5 MB
+const MASSIVE_FILE_LIMIT = 10_000_000; // 10 MB limit
 
 function getFileViewerNoticeData(message, filename, path) {
   const displayName = filename || (path ? path.split(/[/\\]/).pop() : undefined);
@@ -17,7 +17,7 @@ function getFileViewerNoticeData(message, filename, path) {
   };
 }
 
-function resolveViewerMode(filename, path, content) {
+function resolveViewerMode(filename, path, content, isTruncated = false) {
   const cleanName = (path || filename || '').toLowerCase();
   const isImage = /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/.test(cleanName);
   const isMarkdown = /\.md$/i.test(cleanName);
@@ -66,7 +66,7 @@ function resolveViewerMode(filename, path, content) {
   return {
     renderer: isMarkdown ? 'markdown' : 'editor',
     displayedContent,
-    isMassiveFile: (content?.length || 0) > MASSIVE_FILE_LIMIT,
+    isMassiveFile: Boolean(isTruncated || (content?.length || 0) >= MASSIVE_FILE_LIMIT),
   };
 }
 
@@ -244,10 +244,20 @@ console.log("\n[Test 3] Zero-Byte Files & Massive File Protection");
   const zeroTs = resolveViewerMode("types.ts", "/src/types.ts", "");
   assert.strictEqual(zeroTs.displayedContent, '// Empty file');
 
-  // Massive file exceeding 1.5MB
-  const massiveContent = "x".repeat(2 * 1024 * 1024);
+  // Massive file exceeding 10MB
+  const massiveContent = "x".repeat(11 * 1024 * 1024);
   const massiveRes = resolveViewerMode("giant_log.txt", "/logs/giant_log.txt", massiveContent);
-  assert.strictEqual(massiveRes.isMassiveFile, true, "Files > 1.5MB must trigger massive file shield");
+  assert.strictEqual(massiveRes.isMassiveFile, true, "Files >= 10MB must trigger massive file shield");
+
+  // Massive file truncated by backend (head chunk < 10MB with isTruncated: true)
+  const truncatedHeadChunk = "x".repeat(9_999_500);
+  const truncatedRes = resolveViewerMode("truncated.log", "/logs/truncated.log", truncatedHeadChunk, true);
+  assert.strictEqual(truncatedRes.isMassiveFile, true, "Backend isTruncated flag must trigger massive file shield even when chunk < 10MB");
+
+  // File under 10MB (e.g. 2MB)
+  const mediumContent = "x".repeat(2 * 1024 * 1024);
+  const mediumRes = resolveViewerMode("medium.log", "/logs/medium.log", mediumContent);
+  assert.strictEqual(mediumRes.isMassiveFile, false, "Files under 10MB must NOT trigger massive file shield");
 
   // Single huge un-wrapped line (> 100k chars)
   const hugeSingleLine = "A".repeat(120_000);

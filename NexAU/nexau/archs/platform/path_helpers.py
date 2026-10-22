@@ -168,24 +168,46 @@ def get_project_cache_dir(project_id: str) -> Path:
 def safe_rmtree_session_brain(session_id: str, brain_dir: str | Path | None = None) -> bool:
     """Safely delete a session brain directory with strict confinement checks.
 
-    ponytail: Never deletes nexau_home, brain root, database, or anything outside ~/.nexau/brain/.
+    ponytail: Supports path confinement for both ~/.mash/brain/ and ~/.nexau/brain/
+    so legacy session brains do not throw ValueError and leak.
+    Never deletes mash/nexau home, brain roots, database, or anything outside allowed roots.
     """
     safe_sid = validate_safe_id(session_id, "session_id")
-    brain_root = (get_nexau_home() / "brain").resolve()
-    nexau_home = get_nexau_home().resolve()
+    mash_home = (Path.home() / ".mash").resolve()
+    mash_brain_root = (mash_home / "brain").resolve()
+    nexau_home = (Path.home() / ".nexau").resolve()
+    nexau_brain_root = (nexau_home / "brain").resolve()
 
-    target = Path(brain_dir).resolve() if brain_dir else (brain_root / safe_sid).resolve()
+    allowed_roots = [mash_brain_root, nexau_brain_root]
+    protected_dirs = {mash_home, mash_brain_root, nexau_home, nexau_brain_root}
+
+    targets: list[Path] = []
+    if brain_dir:
+        target = Path(brain_dir).resolve()
+        targets.append(target)
+        for root in allowed_roots:
+            alt = (root / safe_sid).resolve()
+            if alt != target and alt.exists() and alt not in targets:
+                targets.append(alt)
+    else:
+        targets.append((mash_brain_root / safe_sid).resolve())
+        legacy_target = (nexau_brain_root / safe_sid).resolve()
+        if legacy_target.exists() and legacy_target not in targets:
+            targets.append(legacy_target)
 
     # Hard confinement invariants
-    if not target.is_relative_to(brain_root):
-        raise ValueError(f"Target directory {target} is outside brain root {brain_root}")
-    if target == brain_root or target == nexau_home:
-        raise ValueError(f"Target directory {target} is a protected root directory")
+    for t in targets:
+        if not any(t.is_relative_to(root) for root in allowed_roots):
+            raise ValueError(f"Target directory {t} is outside brain root {mash_brain_root}")
+        if t in protected_dirs:
+            raise ValueError(f"Target directory {t} is a protected root directory")
 
-    if target.exists():
-        shutil.rmtree(target, ignore_errors=True)
-        return True
-    return False
+    removed = False
+    for t in targets:
+        if t.exists():
+            shutil.rmtree(t, ignore_errors=True)
+            removed = True
+    return removed
 
 
 def scaffold_nexau_system_storage() -> Path:

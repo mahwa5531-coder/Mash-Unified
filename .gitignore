@@ -43,3 +43,13 @@ PROJECT.md
 .nexau/
 .mash/
 pdf_text_dump.txt
+# Scratch testing files
+fast_stream.py
+generate_analytics_and_charts.py
+inspect_excel.py
+process_benchmark_data.py
+scanned_sample_page1.pdf
+session_trace.txt
+stream_analytics.py
+apple_income_statement.json
+

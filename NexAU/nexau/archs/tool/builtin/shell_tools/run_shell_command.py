@@ -18,10 +18,10 @@ from nexau.archs.sandbox import BaseSandbox, CommandResult, SandboxStatus
 from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 
 # Configuration constants (matching Antigravity / modern agent limits)
-DEFAULT_TIMEOUT_MS = 120000  # 2 minutes default timeout (prevents hanging runaway scripts)
-TRUNCATE_OUTPUT_THRESHOLD = 48_000  # Truncate when output exceeds 48KB (~12,000 tokens)
-TRUNCATE_OUTPUT_LINES = 200  # Keep last 200 lines when truncating
-MAX_TRUNCATED_LINE_WIDTH = 500  # Max chars per line in truncated output
+DEFAULT_TIMEOUT_MS = 600000  # 10 minutes default timeout (prevents premature termination of builds/installs)
+TRUNCATE_OUTPUT_THRESHOLD = 64_000  # Truncate when output exceeds 64KB (~16,000 tokens)
+TRUNCATE_OUTPUT_LINES = 300  # Keep last 300 lines when truncating
+MAX_TRUNCATED_LINE_WIDTH = 1000  # Max chars per line in truncated output
 MAX_TRUNCATED_CHARS = 4000  # Keep last N chars for single massive line
 FOREGROUND_COMMAND_POLL_INTERVAL_SECONDS = 0.2
 
@@ -323,8 +323,8 @@ def run_shell_command(
 
         # Build result
         llm_parts: list[str] = []
+        timeout_minutes = (timeout_ms / 60000) if timeout_ms else 0
         if cmd_result.status == SandboxStatus.TIMEOUT:
-            timeout_minutes = (timeout_ms / 60000) if timeout_ms else 0
             llm_parts.append(f"Timeout: command timed out after {timeout_minutes:.1f} minutes.")
         elif cmd_result.status == SandboxStatus.STOPPED:
             llm_parts.append("Interrupted: command stopped due to stop request.")
@@ -345,7 +345,7 @@ def run_shell_command(
         elif cmd_result.status == SandboxStatus.STOPPED:
             return_display = "Command interrupted by stop request."
         elif cmd_result.status == SandboxStatus.TIMEOUT:
-            return_display = f"Command timed out after {timeout_ms / 60000:.1f} minutes."
+            return_display = f"Command timed out after {timeout_minutes:.1f} minutes."
         elif error_message:
             return_display = f"Command failed: {error_message}"
         elif exit_code != 0:

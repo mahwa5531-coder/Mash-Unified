@@ -130,7 +130,7 @@ def messages_to_transcript_lines(
                 tool_results[str(b.tool_use_id)] = redact_sensitive_content(content_str)
 
     lines = []
-    for msg in messages:
+    for msg_idx, msg in enumerate(messages):
         role_str = msg.role.value if hasattr(msg.role, "value") else str(msg.role).lower()
         if role_str in ("system", "tool"):
             continue
@@ -142,19 +142,19 @@ def messages_to_transcript_lines(
             if isinstance(b, TextBlock):
                 c_text = redact_sensitive_content(clean_protocol_sentinels(clean_user_steering_envelope(b.text) if role_str == "user" else b.text))
                 text_parts.append(c_text)
-                steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "text", "content": c_text, "status": "completed"})
+                steps.append({"id": f"step_{msg_idx}_{step_idx}", "step_index": step_idx, "type": "text", "content": c_text, "status": "completed"})
                 step_idx += 1
             elif hasattr(b, "thinking") and b.thinking:
                 th = redact_sensitive_content(re.sub(r"</?(?:thought|thinking)>", "", str(b.thinking), flags=re.I).strip())
                 thoughts.append(th)
-                steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "thinking", "content": th, "status": "completed"})
+                steps.append({"id": f"step_{msg_idx}_{step_idx}", "step_index": step_idx, "type": "thinking", "content": th, "status": "completed"})
                 step_idx += 1
             elif getattr(b, "type", "") in ("thinking", "reasoning"):
                 t_text = getattr(b, "text", "") or getattr(b, "thinking", "")
                 if t_text:
                     th = redact_sensitive_content(re.sub(r"</?(?:thought|thinking)>", "", str(t_text), flags=re.I).strip())
                     thoughts.append(th)
-                    steps.append({"id": f"step_{step_idx}", "step_index": step_idx, "type": "thinking", "content": th, "status": "completed"})
+                    steps.append({"id": f"step_{msg_idx}_{step_idx}", "step_index": step_idx, "type": "thinking", "content": th, "status": "completed"})
                     step_idx += 1
             elif isinstance(b, ToolUseBlock):
                 tc_id, tc_name = str(b.id), str(b.name)
@@ -166,17 +166,20 @@ def messages_to_transcript_lines(
                 tool_status = "pending_approval" if is_pending else ("denied" if decision_val == "deny" else "completed")
                 output_val = tool_results.get(tc_id, "")
                 summary_raw = t_args.get("toolSummary") or (pending_map.get(tc_id, {}).get("prompt") if pending_map else None)
+                summary_str = redact_sensitive_content(str(summary_raw)) if summary_raw else None
+                action_str = t_args.get("toolAction")
 
                 tools.append({
                     "id": tc_id, "name": tc_name, "args": t_args, "output": output_val,
                     "status": tool_status, "decision": decision_val,
-                    "toolSummary": redact_sensitive_content(str(summary_raw)) if summary_raw else None,
-                    "toolAction": t_args.get("toolAction"), "action_type": tool_action,
+                    "toolSummary": summary_str,
+                    "toolAction": action_str, "action_type": tool_action,
                 })
                 steps.append({
-                    "id": tc_id or f"step_{step_idx}", "step_index": step_idx, "type": "tool",
+                    "id": f"step_{msg_idx}_{step_idx}", "step_index": step_idx, "type": "tool",
                     "tool_call_id": tc_id, "name": tc_name, "args": t_args, "output": output_val,
-                    "status": tool_status, "action_type": tool_action,
+                    "status": tool_status, "decision": decision_val, "action_type": tool_action,
+                    "toolSummary": summary_str, "toolAction": action_str,
                 })
                 step_idx += 1
 

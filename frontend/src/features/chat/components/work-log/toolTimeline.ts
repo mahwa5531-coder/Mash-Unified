@@ -347,21 +347,21 @@ export function groupTimelineEntries(entries: TimelineEntry[]): TimelineEntry[] 
     }
 
     // 3. Group consecutive file reads / searches / folder views (>= 2)
-    if (current.type === 'search' || current.type === 'code_search' || current.type === 'file_read' || current.type === 'folder_view') {
+    const isExploration = (type: string) =>
+      type === 'search' || type === 'code_search' || type === 'web_search' || type === 'web_fetch' || type === 'file_read' || type === 'folder_view';
+
+    if (isExploration(current.type)) {
       const group: TimelineEntry[] = [current];
       let j = i + 1;
-      while (
-        j < entries.length && 
-        (entries[j].type === 'search' || entries[j].type === 'code_search' || entries[j].type === 'file_read' || entries[j].type === 'folder_view')
-      ) {
+      while (j < entries.length && isExploration(entries[j].type)) {
         group.push(entries[j]);
         j++;
       }
       if (group.length > 1) {
         const isRunning = group.some(e => isToolRunning(e.data?.tool));
         const isCancelled = group.some(e => e.data?.tool?.status === 'cancelled');
-        const allReads = group.every(e => e.type === 'file_read');
-        const allSearches = group.every(e => e.type === 'search');
+        const allReads = group.every(e => e.type === 'file_read' || e.type === 'folder_view');
+        const allSearches = group.every(e => e.type === 'search' || e.type === 'code_search' || e.type === 'web_search' || e.type === 'web_fetch');
         const label = allReads 
           ? `${group.length} files` 
           : allSearches 

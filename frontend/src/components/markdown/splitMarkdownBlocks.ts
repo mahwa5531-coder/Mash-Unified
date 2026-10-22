@@ -15,6 +15,7 @@ export function splitMarkdownBlocks(text: string, targetBlockLines: number = 35)
   const blocks: string[] = [];
   let currentBlock: string[] = [];
   let inCodeFence = false;
+  let inMathFence = false;
   let fenceDelimiter = '';
 
   for (let i = 0; i < lines.length; i++) {
@@ -32,12 +33,17 @@ export function splitMarkdownBlocks(text: string, targetBlockLines: number = 35)
         inCodeFence = false;
         fenceDelimiter = '';
       }
+    } else if (!inCodeFence) {
+      // Check display math fence ($$)
+      if (trimmed === '$$' || (trimmed.startsWith('$$') && !trimmed.slice(2).includes('$$'))) {
+        inMathFence = !inMathFence;
+      }
     }
 
     currentBlock.push(line);
 
-    // Only consider boundary split when NOT inside a code fence
-    if (!inCodeFence) {
+    // Only consider boundary split when NOT inside a code fence or math block
+    if (!inCodeFence && !inMathFence) {
       const isBlank = trimmed === '';
       const isHr = /^(\*\*\*|---|___)$/.test(trimmed);
       const isMajorHeading = /^#{1,3}\s+/.test(trimmed);

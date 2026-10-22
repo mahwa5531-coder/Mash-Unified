@@ -23,6 +23,10 @@ export function markSessionDeleted(sessionId: string): void {
   deletedSessionIds.add(sessionId);
 }
 
+export function unmarkSessionDeleted(sessionId: string): void {
+  deletedSessionIds.delete(sessionId);
+}
+
 export async function fetchSessions(): Promise<SessionItem[]> {
   try {
     const res = await safeFetch(`${BASE_URL}/sessions`);
@@ -85,16 +89,31 @@ export async function renameSession(sessionId: string, customTitle: string): Pro
   }
 }
 
-export async function deleteSession(sessionId: string): Promise<boolean> {
+export interface DeleteSessionResult {
+  success: boolean;
+  message?: string;
+}
+
+export async function deleteSession(sessionId: string): Promise<DeleteSessionResult> {
   markSessionDeleted(sessionId);
   try {
     const res = await safeFetch(`${BASE_URL}/sessions/${sessionId}`, {
       method: "DELETE",
     });
-    return res.ok;
-  } catch (err) {
-    console.warn("Failed to delete session:", err);
-    return false;
+    if (!res.ok) {
+      unmarkSessionDeleted(sessionId);
+      let errMsg = `Failed to delete session (${res.status})`;
+      try {
+        const data = await res.json();
+        if (data.detail) errMsg = data.detail;
+        else if (data.message) errMsg = data.message;
+      } catch {}
+      return { success: false, message: errMsg };
+    }
+    return { success: true };
+  } catch (err: any) {
+    unmarkSessionDeleted(sessionId);
+    return { success: false, message: err?.message || "Network error while deleting session" };
   }
 }
 
@@ -158,4 +177,54 @@ export async function uploadSessionFile(
     console.warn("Failed to upload file:", err);
     return null;
   }
+}
+
+export function cleanupSessionStorage(sessionId: string): void {
+  const storage = typeof window !== 'undefined' && window.localStorage ? window.localStorage : (typeof localStorage !== 'undefined' ? localStorage : null);
+  if (!storage) return;
+  try {
+    const pinnedRaw = storage.getItem('nexau_pinned_sessions');
+    if (pinnedRaw) {
+      try {
+        const pinned: string[] = JSON.parse(pinnedRaw);
+        if (Array.isArray(pinned) && pinned.includes(sessionId)) {
+          const updated = pinned.filter(id => id !== sessionId);
+          storage.setItem('nexau_pinned_sessions', JSON.stringify(updated));
+        }
+      } catch {}
+    }
+
+    const archivedRaw = storage.getItem('nexau_archived_session_ids');
+    if (archivedRaw) {
+      try {
+        const archived: string[] = JSON.parse(archivedRaw);
+        if (Array.isArray(archived) && archived.includes(sessionId)) {
+          const updated = archived.filter(id => id !== sessionId);
+          storage.setItem('nexau_archived_session_ids', JSON.stringify(updated));
+        }
+      } catch {}
+    }
+
+    const cachedRaw = storage.getItem('nexau_cached_sessions');
+    if (cachedRaw) {
+      try {
+        const cached: SessionItem[] = JSON.parse(cachedRaw);
+        if (Array.isArray(cached) && cached.some(s => s.session_id === sessionId)) {
+          const updated = cached.filter(s => s.session_id !== sessionId);
+          storage.setItem('nexau_cached_sessions', JSON.stringify(updated));
+        }
+      } catch {}
+    }
+
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key && (key.includes(sessionId) || key.startsWith(`draft_${sessionId}`))) {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      storage.removeItem(key);
+    }
+  } catch {}
 }

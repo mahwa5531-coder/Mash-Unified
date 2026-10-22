@@ -473,22 +473,19 @@ async def get_file_content(
 
     try:
         file_size = p.stat().st_size
-        MAX_SAFE_PREVIEW_BYTES = 1_500_000  # 1.5 MB safe preview chunk
+        MAX_SAFE_PREVIEW_BYTES = 10_000_000  # 10 MB safe preview limit
         if file_size > MAX_SAFE_PREVIEW_BYTES:
             with open(p, "rb") as f:
                 raw_chunk = f.read(MAX_SAFE_PREVIEW_BYTES)
             text_chunk = raw_chunk.decode("utf-8", errors="replace")
             last_nl = text_chunk.rfind("\n")
-            if last_nl > 0:
+            if last_nl > 0 and (len(text_chunk) - last_nl) < 100_000:
                 text_chunk = text_chunk[:last_nl]
-            size_mb = round(file_size / (1024 * 1024), 1)
-            comment_prefix = "-- " if p.suffix.lower() == ".sql" else "# " if p.suffix.lower() in (".py", ".sh", ".yaml", ".yml") else "// "
-            preview_banner = f"{comment_prefix}[MASH SAFE PREVIEW: Large file ({size_mb} MB). Displaying initial schema and records to protect system memory. Use 3-dots menu to download full file.]\n\n"
             return {
                 "type": "text",
                 "filename": p.name,
                 "path": str(p),
-                "content": preview_banner + text_chunk,
+                "content": text_chunk,
                 "is_truncated": True,
                 "total_bytes": file_size,
                 "preview_bytes": len(text_chunk.encode("utf-8")),

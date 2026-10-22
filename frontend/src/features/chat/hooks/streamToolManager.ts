@@ -232,7 +232,14 @@ export async function executeToolApproval(curSid: string, toolCallId: string, ac
 
 export function createStreamCallbacks(
   activeSid: string,
-  handlers: { scheduleFlush: () => void; flushBuffer: () => void; onUpdateMessages: (msgs: Message[]) => void; onStreamError: (errText: string, errId?: string) => void; onToolCallRender: () => void }
+  handlers: {
+    scheduleFlush: () => void;
+    flushBuffer: () => void;
+    onUpdateMessages: (msgs: Message[]) => void;
+    onStreamError: (errText: string, errId?: string) => void;
+    onToolCallRender: () => void;
+    onRetryAttempt?: (attempt: number) => void;
+  }
 ) {
   return {
     onToken: (token: string) => {
@@ -265,5 +272,18 @@ export function createStreamCallbacks(
       handlers.onToolCallRender();
     },
     onError: (errText: string, errId?: string) => handlers.onStreamError(errText, errId),
+    onRetryAttempt: (attempt: number) => {
+      const s = sessionStore.get(activeSid);
+      if (!s) return;
+      const idx = findTargetAssistantIdx(s.chatMessages, s.activeTurnId);
+      if (idx >= 0) {
+        const next = [...s.chatMessages];
+        next[idx] = { ...next[idx], retryAttempt: attempt > 0 ? attempt : undefined };
+        s.chatMessages = next;
+        handlers.onUpdateMessages(s.chatMessages);
+        notifyStoreListeners();
+      }
+      handlers.onRetryAttempt?.(attempt);
+    },
   };
 }

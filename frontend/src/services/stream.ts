@@ -9,6 +9,7 @@ export interface StreamEventHandlers {
   onThinkingEnd?: () => void;
   onToolCall?: (tool: ToolCall) => void;
   onError?: (error: string, errorId?: string) => void;
+  onRetryAttempt?: (attempt: number) => void;
 }
 
 // ponytail: normalize raw backend stack traces, 404s, and provider JSON envelopes into clean user notices
@@ -47,6 +48,7 @@ export async function streamQuery(
   const onThinkingEnd = typeof handlers === 'object' ? handlers.onThinkingEnd : undefined;
   const onToolCall = typeof handlers === 'object' ? handlers.onToolCall : undefined;
   const onError = typeof handlers === 'object' ? handlers.onError : undefined;
+  const onRetryAttempt = typeof handlers === 'object' ? handlers.onRetryAttempt : undefined;
 
   // Track raw argument buffers per tool_call_id
   const toolArgBuffers: Record<string, string> = {};
@@ -80,34 +82,67 @@ export async function streamQuery(
     const headers: Record<string, string> = { "Content-Type": "application/json" };
 
     let response: Response | null = null;
-    const MAX_CONNECT_ATTEMPTS = 6;
-    for (let attempt = 1; attempt <= MAX_CONNECT_ATTEMPTS; attempt++) {
+    let initialError: any = null;
+
+    try {
       if (signal?.aborted) return;
-      try {
-        response = await fetch(`${BASE_URL}/stream`, {
-          method: "POST",
-          headers,
-          signal,
-          body: JSON.stringify({
-            session_id: sessionId,
-            messages: userMessage,
-            context: context || {},
-          }),
-        });
-        if (response.ok) break;
-        if (response.status >= 500 && attempt < MAX_CONNECT_ATTEMPTS) {
-          const backoff = Math.min(1000 * Math.pow(1.5, attempt), 8000);
-          await new Promise((r) => setTimeout(r, backoff));
-          continue;
-        }
-        break;
-      } catch (fetchErr: any) {
+      response = await fetch(`${BASE_URL}/stream`, {
+        method: "POST",
+        headers,
+        signal,
+        body: JSON.stringify({
+          session_id: sessionId,
+          messages: userMessage,
+          context: context || {},
+        }),
+      });
+    } catch (err: any) {
+      if (signal?.aborted) return;
+      initialError = err;
+    }
+
+    if (initialError || (response && response.status >= 500)) {
+      const MAX_RETRY_ATTEMPTS = 3;
+      let succeeded = false;
+
+      for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
         if (signal?.aborted) return;
-        if (attempt === MAX_CONNECT_ATTEMPTS) {
-          throw fetchErr;
-        }
-        const backoff = Math.min(1000 * Math.pow(1.5, attempt), 8000);
+        onRetryAttempt?.(attempt);
+        const backoff = Math.min(1000 * Math.pow(1.5, attempt), 5000);
         await new Promise((r) => setTimeout(r, backoff));
+        if (signal?.aborted) return;
+
+        try {
+          response = await fetch(`${BASE_URL}/stream`, {
+            method: "POST",
+            headers,
+            signal,
+            body: JSON.stringify({
+              session_id: sessionId,
+              messages: userMessage,
+              context: context || {},
+            }),
+          });
+          if (response.ok) {
+            succeeded = true;
+            onRetryAttempt?.(0);
+            break;
+          }
+          if (response.status < 500) {
+            onRetryAttempt?.(0);
+            break;
+          }
+        } catch (retryErr: any) {
+          if (signal?.aborted) return;
+          initialError = retryErr;
+        }
+      }
+
+      if (!succeeded) {
+        onRetryAttempt?.(0);
+        if (initialError && (!response || !response.ok)) {
+          throw initialError;
+        }
       }
     }
 
@@ -335,6 +370,7 @@ export async function streamQuery(
   }
 } catch (err: any) {
     if (signal?.aborted) return; // User stopped the stream intentionally
+    onRetryAttempt?.(0);
     console.warn("Error streaming query:", err);
 
     // ponytail: Detect WiFi / network disconnection with clear status messages

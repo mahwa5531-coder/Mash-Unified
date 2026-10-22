@@ -109,7 +109,26 @@ export function TimelineRow(props: TimelineRowProps) {
     );
   }
 
-  // 5. Other Tools & Actions
+  // 5. Intermediate Step Note / Commentary
+  if (entry.type === 'text') {
+    const text = entry.data?.text || entry.data?.content || '';
+    if (!text) return null;
+    return (
+      <div
+        key={entry.id}
+        className={cn(
+          "flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 font-sans my-0.5",
+          isChild ? "pl-1 py-0.5" : "my-0.5"
+        )}
+      >
+        <span className="font-sans text-[12px] text-zinc-500 dark:text-zinc-400 italic">
+          {text}
+        </span>
+      </div>
+    );
+  }
+
+  // 6. Other Tools & Actions
   return (
     <ToolTimelineRow
       entry={entry}

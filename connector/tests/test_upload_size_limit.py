@@ -13,7 +13,12 @@ from fastapi import HTTPException
 from fastapi.datastructures import UploadFile
 
 
-@pytest.mark.asyncio
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.mark.anyio
 async def test_upload_within_limit():
     engine = AsyncMock()
     engine.find_first.return_value = None
@@ -30,7 +35,7 @@ async def test_upload_within_limit():
             assert res["size"] == len(data)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_upload_exceeds_limit():
     engine = AsyncMock()
     engine.find_first.return_value = None

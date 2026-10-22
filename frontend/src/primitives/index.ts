@@ -15,3 +15,4 @@ export * from './WebLink';
 export * from './QuotaBanner';
 export * from './InvalidMediaBanner';
 export * from './ReasoningDisclosure';
+export * from '../features/sessions/components/FailedToDeleteCard';

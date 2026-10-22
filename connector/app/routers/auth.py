@@ -66,6 +66,12 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
        and saving rotated refresh_token in the vault.
     3. Fallback: returns in-memory access_token, api_key, or env LLM_API_KEY.
     """
+    if os.getenv("MASH_BYPASS_AUTH", "").lower() in ("true", "1", "yes"):
+        dev_token = _IN_MEMORY_AUTH_META.get("access_token") or os.getenv("LLM_API_KEY") or os.getenv("MASH_API_KEY") or os.getenv("OPENAI_API_KEY") or "dev-bypass-token"
+        _IN_MEMORY_AUTH_META["access_token"] = dev_token
+        _IN_MEMORY_AUTH_META["authenticated"] = True
+        return dev_token
+
     access_token = _IN_MEMORY_AUTH_META.get("access_token")
     expires_at = _IN_MEMORY_AUTH_META.get("expires_at") or 0
     now = int(time.time())
@@ -247,6 +253,17 @@ async def get_auth_config() -> dict[str, Any]:
 
 @router.get("/me")
 async def get_current_user_auth() -> dict[str, Any]:
+    if os.getenv("MASH_BYPASS_AUTH", "").lower() in ("true", "1", "yes"):
+        return {
+            "authenticated": True,
+            "email": "user@mash.local",
+            "name": "Local User",
+            "plan": "pro",
+            "subscription_status": "active",
+            "quota": {"windows": [{"window": "weekly", "percent": 0}]},
+            "usage": {"used_tokens": 0, "remaining_percent": 100},
+        }
+
     meta = get_auth_metadata()
     vault = load_secure_vault()
 

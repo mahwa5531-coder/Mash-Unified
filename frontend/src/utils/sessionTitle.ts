@@ -45,7 +45,7 @@ function truncateAtWordBoundary(str: string, maxLen = 32): string {
  * ponytail: extracts clean, human-readable session titles from user prompts.
  * Formats in Title Case, preserves acronyms, and avoids cutting words in half.
  */
-export function generateCleanSessionTitle(rawText: string, fallbackId = ''): string {
+export function generateCleanSessionTitle(rawText: string, _fallbackId = ''): string {
   if (!rawText || typeof rawText !== 'string') {
     return 'New Conversation';
   }

@@ -190,9 +190,9 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
     import shutil
     from urllib.parse import unquote
 
-    from nexau.archs.session.models import AgentRunActionModel, SessionModel
+    from nexau.archs.session.models import SessionModel
 
-    from app.paths import get_nexau_home, safe_rmtree_session_brain
+    from app.paths import get_nexau_home
 
     clean_id = unquote(project_id).strip()
 
@@ -233,16 +233,12 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
 
             if matches:
                 sid = s.session_id
-                # Delete actions/transcripts from DB
-                await engine.delete(AgentRunActionModel, filters=ComparisonFilter.eq("session_id", sid))
-                # Delete session brain directory safely via safe_rmtree_session_brain
-                brain_dir = ctx.get("brain_directory")
+                from app.services.session_lifecycle import delete_existing_session
+
                 try:
-                    safe_rmtree_session_brain(sid, brain_dir)
+                    await delete_existing_session(engine=engine, session_id=sid)
                 except Exception:
                     pass
-                # Delete session record from DB
-                await engine.delete(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
                 deleted_sessions_count += 1
     except Exception:
         pass

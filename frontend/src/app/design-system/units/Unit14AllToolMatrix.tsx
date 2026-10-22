@@ -7,8 +7,7 @@ import { GroupTimelineRow } from '@/features/chat/components/work-log/GroupTimel
 import { ReasoningDisclosure } from '@/primitives';
 
 export function Unit14AllToolMatrix() {
-  const [expandedCmds, setExpandedCmds] = useState<Record<string, boolean>>({ 'cmd-decomposed-demo': true });
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedCmds, setExpandedCmds] = useState<Set<string>>(new Set(['cmd-decomposed-demo']));
   const [isThoughtOpen, setIsThoughtOpen] = useState(false);
   const [isLiveThinkingOpen, setIsLiveThinkingOpen] = useState(false);
   const [isGroupOpen, setIsGroupOpen] = useState<Record<string, boolean>>({
@@ -19,7 +18,12 @@ export function Unit14AllToolMatrix() {
   const [openedFileAlert, setOpenedFileAlert] = useState<string | null>(null);
 
   const toggleCmd = (id: string) => {
-    setExpandedCmds(prev => ({ ...prev, [id]: !prev[id] }));
+    setExpandedCmds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const handleOpenFile = (path: string) => {
@@ -27,11 +31,6 @@ export function Unit14AllToolMatrix() {
     setTimeout(() => setOpenedFileAlert(null), 3000);
   };
 
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 1500);
-  };
 
   const toggleGroup = (id: string) => {
     setIsGroupOpen(prev => ({ ...prev, [id]: !prev[id] }));
@@ -156,9 +155,7 @@ export function Unit14AllToolMatrix() {
                   }
                 }}
                 isStreaming={true}
-                isCmdExpanded={!!expandedCmds['c-act']}
-                copiedId={copiedId}
-                handleCopy={handleCopy}
+                expandedCmds={expandedCmds}
                 toggleCmd={toggleCmd}
               />
             </div>
@@ -179,9 +176,7 @@ export function Unit14AllToolMatrix() {
                     }
                   }
                 }}
-                isCmdExpanded={!!expandedCmds['cmd-decomposed-demo']}
-                copiedId={copiedId}
-                handleCopy={handleCopy}
+                expandedCmds={expandedCmds}
                 toggleCmd={toggleCmd}
               />
             </div>
@@ -311,9 +306,7 @@ export function Unit14AllToolMatrix() {
                     key={child.id}
                     entry={child}
                     isChild={true}
-                    isCmdExpanded={!!expandedCmds[child.id]}
-                    copiedId={copiedId}
-                    handleCopy={handleCopy}
+                    expandedCmds={expandedCmds}
                     toggleCmd={toggleCmd}
                   />
                 )}

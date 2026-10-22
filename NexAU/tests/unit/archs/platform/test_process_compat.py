@@ -50,6 +50,26 @@ def test_windows_graceful_kill_forces_kill_after_timeout() -> None:
     assert process.wait.call_count == 2
 
 
+def test_windows_graceful_kill_invokes_taskkill_when_pid_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    process = Mock()
+    process.pid = 9999
+    process.wait.side_effect = [subprocess.TimeoutExpired(cmd="cmd", timeout=0.1), 0]
+    mock_run = Mock()
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    compat = WindowsProcessCompat()
+
+    compat.graceful_kill(cast(ProcessHandle, process), grace_period=0.1)
+
+    mock_run.assert_called_once_with(
+        ["taskkill", "/F", "/T", "/PID", "9999"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    process.terminate.assert_called_once_with()
+    process.kill.assert_called_once_with()
+
+
 def test_windows_supported_cleanup_signals_only_registers_sigint() -> None:
     assert WindowsProcessCompat().supported_cleanup_signals() == (signal.SIGINT,)
 

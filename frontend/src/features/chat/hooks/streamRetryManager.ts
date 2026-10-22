@@ -5,7 +5,7 @@ import { BASE_URL, safeFetch } from '@/services/client';
 import { markSessionViewed, removeSessionQueueItem, renameSession } from '@/services/sessions';
 import { streamQuery } from '@/services/stream';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
-import { findTargetAssistantIdx, sessionStore, notifyStoreListeners, type SessionRuntimeState } from '../state/sessionStore';
+import { findTargetAssistantIdx, sessionStore, notifyStoreListeners } from '../state/sessionStore';
 import { createStreamCallbacks } from './streamToolManager';
 
 export function formatErrorMessage(rawErr: string): string {
@@ -37,13 +37,13 @@ export function prepareRetryMessages(
     const next = [...messages];
     const existingTurnId = next[targetIdx].turnId || activeTurnId || `turn_${startNow}_${Math.random().toString(36).slice(2, 6)}`;
     next[targetIdx] = {
-      role: 'assistant', turnId: existingTurnId, status: 'running', content: '', thoughts: [], tools: [], tasks: [], steps: [], error: undefined, sessionId: activeSid, turnStartTime: startNow,
+      role: 'assistant', turnId: existingTurnId, status: 'running', content: '', thoughts: [], tools: [], tasks: [], steps: [], error: undefined, retryAttempt: undefined, sessionId: activeSid, turnStartTime: startNow,
     };
     return { updatedMessages: next, targetTurnId: existingTurnId };
   }
   const fallbackTurnId = activeTurnId || `turn_${startNow}_${Math.random().toString(36).slice(2, 6)}`;
   return {
-    updatedMessages: [...messages, { role: 'assistant', turnId: fallbackTurnId, status: 'running', content: '', thoughts: [], tools: [], tasks: [], steps: [], sessionId: activeSid, turnStartTime: startNow }],
+    updatedMessages: [...messages, { role: 'assistant', turnId: fallbackTurnId, status: 'running', content: '', thoughts: [], tools: [], tasks: [], steps: [], retryAttempt: undefined, sessionId: activeSid, turnStartTime: startNow }],
     targetTurnId: fallbackTurnId,
   };
 }
@@ -53,7 +53,7 @@ export function prepareResumeMessages(messages: Message[], activeTurnId?: string
   const fallbackTurnId = activeTurnId || `turn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   if (targetIdx >= 0) {
     const next = [...messages];
-    next[targetIdx] = { ...next[targetIdx], status: 'running' };
+    next[targetIdx] = { ...next[targetIdx], status: 'running', retryAttempt: undefined };
     return { updatedMessages: next, targetTurnId: next[targetIdx].turnId || fallbackTurnId };
   }
   return { updatedMessages: messages, targetTurnId: fallbackTurnId };
@@ -62,7 +62,7 @@ export function prepareResumeMessages(messages: Message[], activeTurnId?: string
 export function prepareSteerTurn(messages: Message[]): Message[] {
   return messages.map((m) => {
     let updated = m;
-    if (m.role === 'assistant' && (m.status === 'running' || m.error)) updated = { ...updated, error: undefined, status: 'completed' as const };
+    if (m.role === 'assistant' && m.status === 'running') updated = { ...updated, status: 'completed' as const };
     if (m.tools && m.tools.some((t) => t.status === 'pending_approval' && !t.decision)) {
       updated = {
         ...updated,
@@ -103,7 +103,7 @@ export function applyStreamError(messages: Message[], activeTurnId: string | nul
   const next = [...messages];
   const idx = findTargetAssistantIdx(next, activeTurnId);
   if (idx >= 0 && next[idx].status !== 'aborted') {
-    next[idx] = { ...next[idx], status: 'error', error: errorText, ...(errorId ? { errorId } : {}) };
+    next[idx] = { ...next[idx], status: 'error', error: errorText, retryAttempt: undefined, ...(errorId ? { errorId } : {}) };
   }
   return next;
 }
@@ -113,7 +113,7 @@ export function applyStreamAbort(messages: Message[], activeTurnId: string | nul
   const next = [...messages];
   const targetIdx = findTargetAssistantIdx(next, activeTurnId);
   if (targetIdx >= 0) {
-    next[targetIdx] = { ...next[targetIdx], status: 'aborted', totalDurationSeconds: elapsed ?? next[targetIdx].totalDurationSeconds };
+    next[targetIdx] = { ...next[targetIdx], status: 'aborted', retryAttempt: undefined, totalDurationSeconds: elapsed ?? next[targetIdx].totalDurationSeconds };
   }
   return next;
 }
@@ -123,7 +123,7 @@ export function applyStreamCompletion(messages: Message[], activeTurnId: string 
   const next = [...messages];
   const idx = findTargetAssistantIdx(next, activeTurnId);
   if (idx >= 0 && next[idx].status !== 'aborted' && next[idx].status !== 'error') {
-    next[idx] = { ...next[idx], status: wasUserAborted ? 'aborted' : 'completed', totalDurationSeconds: totalElapsed ?? next[idx].totalDurationSeconds };
+    next[idx] = { ...next[idx], status: wasUserAborted ? 'aborted' : 'completed', retryAttempt: undefined, totalDurationSeconds: totalElapsed ?? next[idx].totalDurationSeconds };
   }
   return next;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { Component, ErrorInfo, ReactNode } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 interface Props {
   children: ReactNode;
@@ -43,19 +43,19 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
       return (
-        <div className="p-3.5 my-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <AlertTriangle size={15} className="text-amber-400 shrink-0" />
-            <span className="truncate text-zinc-300">
+        <div className="p-2.5 my-2 rounded-xl bg-zinc-100/80 dark:bg-white/[0.03] border border-zinc-200 dark:border-white/[0.08] text-xs flex items-center justify-between gap-3 font-sans">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 shrink-0" />
+            <span className="truncate text-zinc-500 dark:text-zinc-400 text-xs">
               Message rendering error encountered. Content preserved safely.
             </span>
           </div>
           <button
             type="button"
             onClick={this.handleReset}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700/60 transition-colors shrink-0 cursor-pointer"
+            className="group inline-flex items-center gap-1.5 h-[21px] px-2.5 py-0 rounded-full font-sans text-[11px] font-medium leading-none select-none outline-none transition-all duration-150 cursor-pointer active:scale-[0.97] bg-zinc-100/90 hover:bg-zinc-200/90 dark:bg-white/[0.06] dark:hover:bg-white/[0.12] text-zinc-700 hover:text-zinc-950 dark:text-zinc-200 dark:hover:text-white border border-zinc-200/90 hover:border-zinc-300 dark:border-white/[0.08] dark:hover:border-white/[0.20] shadow-2xs shrink-0"
           >
-            <RefreshCw size={12} />
+            <RefreshCw size={10} className="text-zinc-400 group-hover:rotate-45 transition-transform" />
             <span>Retry</span>
           </button>
         </div>

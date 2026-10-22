@@ -20,8 +20,8 @@ export default function ArtifactCard({
   artifact, 
   sessionId,
   onOpen, 
-  isLast = true, 
-  isStreaming = false 
+  isLast: _isLast = true, 
+  isStreaming: _isStreaming = false 
 }: ArtifactCardProps) {
   const lowerPath = artifact.filePath.toLowerCase();
   const lowerTitle = artifact.title.toLowerCase();

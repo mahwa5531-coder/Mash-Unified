@@ -42,8 +42,9 @@ export type TurnStatus = 'running' | 'completed' | 'error' | 'aborted';
 export interface ExecutionStep {
   id?: string;
   step_index?: number;
-  type?: 'thinking' | 'text' | 'tool' | 'diff' | 'system';
+  type?: 'thinking' | 'reasoning' | 'text' | 'tool' | 'diff' | 'system';
   content?: string;
+  thinking?: string;
   name?: string;
   args?: Record<string, any>;
   output?: string;
@@ -73,6 +74,7 @@ export interface Message {
   timestamp?: string;
   error?: string;
   errorId?: string;
+  retryAttempt?: number;
   sessionId?: string;
   thinkingDurationSeconds?: number;
   totalDurationSeconds?: number;

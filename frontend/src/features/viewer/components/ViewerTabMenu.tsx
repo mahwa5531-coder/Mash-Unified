@@ -17,9 +17,12 @@ interface ViewerTabMenuProps {
   activeTab: TabItem;
   content?: string;
   onCloseTab: (e: React.MouseEvent, tabId: string) => void;
+  sessionId?: string;
 }
 
-export function ViewerTabMenu({ activeTab, content = '', onCloseTab }: ViewerTabMenuProps) {
+export function ViewerTabMenu({ activeTab, content = '', onCloseTab, sessionId }: ViewerTabMenuProps) {
+  const sessionQuery = sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : '';
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -35,7 +38,7 @@ export function ViewerTabMenu({ activeTab, content = '', onCloseTab }: ViewerTab
       <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-[#18181a] border border-zinc-200 dark:border-white/[0.08] shadow-xl p-1 rounded-xl">
         {content && (
           <DropdownMenuItem
-            onClick={() => navigator.clipboard.writeText(content)}
+            onClick={() => navigator.clipboard.writeText(content).catch(() => {})}
             className="text-xs gap-2 cursor-pointer rounded-lg py-1.5"
           >
             <Copy className="h-3.5 w-3.5 text-muted-foreground" />
@@ -45,7 +48,7 @@ export function ViewerTabMenu({ activeTab, content = '', onCloseTab }: ViewerTab
 
         {activeTab.path && (
           <DropdownMenuItem
-            onClick={() => navigator.clipboard.writeText(activeTab.path!)}
+            onClick={() => navigator.clipboard.writeText(activeTab.path!).catch(() => {})}
             className="text-xs gap-2 cursor-pointer rounded-lg py-1.5"
           >
             <Copy className="h-3.5 w-3.5 text-muted-foreground" />
@@ -56,7 +59,7 @@ export function ViewerTabMenu({ activeTab, content = '', onCloseTab }: ViewerTab
         {activeTab.path && (
           <>
             <DropdownMenuItem
-              onClick={() => openSystemFile(activeTab.path!)}
+              onClick={() => openSystemFile(activeTab.path!, sessionId)}
               className="text-xs gap-2 cursor-pointer rounded-lg py-1.5"
             >
               <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
@@ -65,7 +68,7 @@ export function ViewerTabMenu({ activeTab, content = '', onCloseTab }: ViewerTab
             <DropdownMenuItem
               onClick={() => {
                 const a = document.createElement('a');
-                a.href = `${BASE_URL}/files/content?path=${encodeURIComponent(activeTab.path!)}&raw=true`;
+                a.href = `${BASE_URL}/files/content?path=${encodeURIComponent(activeTab.path!)}&raw=true${sessionQuery}`;
                 a.download = activeTab.title || 'file';
                 document.body.appendChild(a);
                 a.click();

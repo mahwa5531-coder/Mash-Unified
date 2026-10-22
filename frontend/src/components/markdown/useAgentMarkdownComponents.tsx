@@ -92,8 +92,8 @@ export function useAgentMarkdownComponents({
     p({ children, node: _node, ...props }: any) {
       return (
         <p className={isChat
-          ? "mb-3.5 text-[13.5px] leading-[1.75] text-zinc-800 dark:text-[#d4d4d8] last:mb-0"
-          : "mb-4 text-[13.5px] leading-[1.75] text-zinc-800 dark:text-[#d4d4d8] last:mb-0"
+          ? "mb-3.5 text-[13.5px] leading-[1.75] text-zinc-900 dark:text-zinc-100 last:mb-0"
+          : "mb-4 text-[13.5px] leading-[1.75] text-zinc-900 dark:text-zinc-100 last:mb-0"
         } {...props}>
           {processTextNodes(children, onOpenFile)}
         </p>
@@ -102,7 +102,7 @@ export function useAgentMarkdownComponents({
 
     ul({ children, node: _node, ...props }: any) {
       return (
-        <ul className="my-2.5 pl-5 list-disc space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:text-zinc-400 dark:marker:text-zinc-500 [&_ul]:mt-1 [&_ul]:mb-0.5 [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:mt-1 [&_ol]:mb-0.5 [&_ol]:pl-4 [&_ol]:space-y-1" {...props}>
+        <ul className="my-2.5 pl-5 list-disc space-y-1.5 text-zinc-900 dark:text-zinc-100 marker:text-zinc-400 dark:marker:text-zinc-500 [&_ul]:mt-1 [&_ul]:mb-0.5 [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:mt-1 [&_ol]:mb-0.5 [&_ol]:pl-4 [&_ol]:space-y-1" {...props}>
           {children}
         </ul>
       );
@@ -110,7 +110,7 @@ export function useAgentMarkdownComponents({
 
     ol({ children, node: _node, ...props }: any) {
       return (
-        <ol className="my-2.5 pl-5 list-decimal space-y-1.5 text-zinc-800 dark:text-[#d4d4d8] marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400 [&_ul]:mt-1 [&_ul]:mb-0.5 [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:mt-1 [&_ol]:mb-0.5 [&_ol]:pl-4 [&_ol]:space-y-1" {...props}>
+        <ol className="my-2.5 pl-5 list-decimal space-y-1.5 text-zinc-900 dark:text-zinc-100 marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400 [&_ul]:mt-1 [&_ul]:mb-0.5 [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:mt-1 [&_ol]:mb-0.5 [&_ol]:pl-4 [&_ol]:space-y-1" {...props}>
           {children}
         </ol>
       );
@@ -124,7 +124,7 @@ export function useAgentMarkdownComponents({
 
     li({ children, node: _node, ...props }: any) {
       return (
-        <li className="my-1 text-[13.5px] leading-[1.68] text-zinc-800 dark:text-[#d4d4d8] [&_p]:mt-1 [&_p]:mb-1 [&_p:last-child]:mb-0" {...props}>
+        <li className="my-1 text-[13.5px] leading-[1.68] text-zinc-900 dark:text-zinc-100 [&_p]:mt-1 [&_p]:mb-1 [&_p:last-child]:mb-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </li>
       );
@@ -175,7 +175,7 @@ export function useAgentMarkdownComponents({
     td({ children, node: _node, ...props }: any) {
       const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
       return (
-        <td className={`py-2 px-3.5 text-zinc-800 dark:text-zinc-200 tabular-nums ${alignClass} text-[12.5px]`} {...props}>
+        <td className={`py-2 px-3.5 text-zinc-900 dark:text-zinc-100 tabular-nums ${alignClass} text-[12.5px]`} {...props}>
           {processTextNodes(children, onOpenFile)}
         </td>
       );
@@ -184,7 +184,7 @@ export function useAgentMarkdownComponents({
     th({ children, node: _node, ...props }: any) {
       const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
       return (
-        <th className={`py-2.5 px-3.5 font-semibold text-zinc-800 dark:text-zinc-200 text-[11.5px] uppercase tracking-wider ${alignClass}`} {...props}>
+        <th className={`py-2.5 px-3.5 font-semibold text-zinc-900 dark:text-zinc-100 text-[11.5px] uppercase tracking-wider ${alignClass}`} {...props}>
           {children}
         </th>
       );

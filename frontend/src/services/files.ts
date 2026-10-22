@@ -6,41 +6,71 @@ import { normalizePath } from '@/utils/normalizePath';
 // Client-side in-memory cache with LRU eviction: keeps active working-set tabs instantly accessible with 0ms network latency
 const MAX_FILE_CACHE_SIZE = 25;
 const fileContentMemoryCache = new Map<string, string>();
+const fileTruncationMemoryCache = new Map<string, boolean>();
 const inFlightFileFetches = new Map<string, Promise<string>>();
 
-function cacheFileContent(cleanKey: string, content: string): void {
-  if (fileContentMemoryCache.has(cleanKey)) {
-    fileContentMemoryCache.delete(cleanKey);
+function makeCacheKey(filePath: string, sessionId?: string): string {
+  const clean = normalizePath(filePath);
+  const isAbs = clean.startsWith('/') || /^[a-zA-Z]:[/\\]/.test(clean);
+  if (!isAbs && sessionId) {
+    return `${sessionId}:${clean}`;
+  }
+  return clean;
+}
+
+function cacheFileContent(cacheKey: string, content: string, isTruncated: boolean = false): void {
+  if (fileContentMemoryCache.has(cacheKey)) {
+    fileContentMemoryCache.delete(cacheKey);
+    fileTruncationMemoryCache.delete(cacheKey);
   } else if (fileContentMemoryCache.size >= MAX_FILE_CACHE_SIZE) {
     const oldestKey = fileContentMemoryCache.keys().next().value;
-    if (oldestKey) fileContentMemoryCache.delete(oldestKey);
+    if (oldestKey) {
+      fileContentMemoryCache.delete(oldestKey);
+      fileTruncationMemoryCache.delete(oldestKey);
+    }
   }
-  fileContentMemoryCache.set(cleanKey, content);
+  fileContentMemoryCache.set(cacheKey, content);
+  fileTruncationMemoryCache.set(cacheKey, isTruncated);
 }
 
-export function getFileContentFromCache(filePath: string): string | undefined {
-  const cleanKey = normalizePath(filePath);
-  return fileContentMemoryCache.get(cleanKey);
+export function getFileContentFromCache(filePath: string, sessionId?: string): string | undefined {
+  const cacheKey = makeCacheKey(filePath, sessionId);
+  return fileContentMemoryCache.get(cacheKey);
 }
 
-export function invalidateFileCache(filePath?: string): void {
+export function isFileTruncatedFromCache(filePath: string, sessionId?: string): boolean {
+  const cacheKey = makeCacheKey(filePath, sessionId);
+  return fileTruncationMemoryCache.get(cacheKey) ?? false;
+}
+
+export function invalidateFileCache(filePath?: string, sessionId?: string): void {
   if (filePath) {
+    const cacheKey = makeCacheKey(filePath, sessionId);
     const cleanKey = normalizePath(filePath);
-    fileContentMemoryCache.delete(cleanKey);
-    inFlightFileFetches.delete(cleanKey);
+    fileContentMemoryCache.delete(cacheKey);
+    fileTruncationMemoryCache.delete(cacheKey);
+    inFlightFileFetches.delete(cacheKey);
+    if (cacheKey !== cleanKey) {
+      fileContentMemoryCache.delete(cleanKey);
+      fileTruncationMemoryCache.delete(cleanKey);
+      inFlightFileFetches.delete(cleanKey);
+    }
   } else {
     fileContentMemoryCache.clear();
+    fileTruncationMemoryCache.clear();
     inFlightFileFetches.clear();
   }
 }
 
 export async function fetchFileContent(filePath: string, sessionId?: string, bypassCache: boolean = false): Promise<string> {
   const cleanKey = normalizePath(filePath);
-  if (!bypassCache && fileContentMemoryCache.has(cleanKey)) {
-    return fileContentMemoryCache.get(cleanKey)!;
+  const cacheKey = makeCacheKey(filePath, sessionId);
+
+  if (!bypassCache && fileContentMemoryCache.has(cacheKey)) {
+    return fileContentMemoryCache.get(cacheKey)!;
   }
-  if (!bypassCache && inFlightFileFetches.has(cleanKey)) {
-    return inFlightFileFetches.get(cleanKey)!;
+  if (!bypassCache && inFlightFileFetches.has(cacheKey)) {
+    return inFlightFileFetches.get(cacheKey)!;
   }
 
   const fetchPromise = (async () => {
@@ -62,30 +92,31 @@ export async function fetchFileContent(filePath: string, sessionId?: string, byp
       }
       if (isCsv) {
         const csvContent = await res.text();
-        cacheFileContent(cleanKey, csvContent);
+        cacheFileContent(cacheKey, csvContent);
         return csvContent;
       }
       const data = await res.json();
       if (data.type === 'excel' || data.type === 'univer') {
         const serialized = JSON.stringify(data);
-        cacheFileContent(cleanKey, serialized);
+        cacheFileContent(cacheKey, serialized);
         return serialized;
       }
       const content = data.content !== undefined ? data.content : "";
       if (data.error || content.includes('not found on local disk')) {
         return content || "File not found on local disk.";
       }
-      cacheFileContent(cleanKey, content);
+      const isTruncated = Boolean(data.is_truncated);
+      cacheFileContent(cacheKey, content, isTruncated);
       return content;
     } catch (err) {
       console.warn("Failed to fetch file content:", err);
       return "Error fetching file content.";
     } finally {
-      inFlightFileFetches.delete(cleanKey);
+      inFlightFileFetches.delete(cacheKey);
     }
   })();
 
-  inFlightFileFetches.set(cleanKey, fetchPromise);
+  inFlightFileFetches.set(cacheKey, fetchPromise);
   return fetchPromise;
 }
 
@@ -104,4 +135,3 @@ export async function openSystemFile(filePath: string, sessionId?: string): Prom
     return false;
   }
 }
-
