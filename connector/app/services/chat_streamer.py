@@ -12,7 +12,9 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
 from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -51,6 +53,26 @@ class StreamQueryPayload(BaseModel):
     context: dict[str, Any] | None = None
     variables: dict[str, Any] | None = None
     user_id: str | None = "default_user"
+    client_request_id: str | None = None
+
+
+# ponytail: in-memory turn idempotency registry to deduplicate retried /stream requests
+@dataclass
+class _TurnExecutionRecord:
+    session_id: str
+    status: str  # "executing" | "completed" | "cancelled" | "failed"
+    done_event: asyncio.Event = field(default_factory=asyncio.Event)
+    created_at: float = field(default_factory=time.time)
+
+
+_request_idempotency_store: dict[str, _TurnExecutionRecord] = {}
+
+
+def _cleanup_idempotency_store() -> None:
+    now = time.time()
+    stale = [k for k, v in _request_idempotency_store.items() if now - v.created_at > 600.0]
+    for k in stale:
+        _request_idempotency_store.pop(k, None)
 
 
 class StopPayload(BaseModel):
@@ -91,6 +113,7 @@ async def generate_chat_sse_stream(
     sm: Any = None,
     eng: Any = None,
     last_run_id_hint: str | None = None,
+    client_request_id: str | None = None,
     **extra: Any,
 ) -> AsyncIterator[str]:
     """Shielded SSE event generator supporting 15s keepalive and disconnect cancellation."""
@@ -131,6 +154,10 @@ async def generate_chat_sse_stream(
             except TimeoutError:
                 yield ": heartbeat\n\n"
             except StopAsyncIteration:
+                if client_request_id and client_request_id in _request_idempotency_store:
+                    rec = _request_idempotency_store[client_request_id]
+                    rec.status = "completed"
+                    rec.done_event.set()
                 if sm and session_id:
                     with contextlib.suppress(Exception):
                         for ptc_id, ptc in (await sm.get_pending_tool_calls(user_id=user_id, session_id=session_id) or {}).items():
@@ -138,6 +165,11 @@ async def generate_chat_sse_stream(
                                 yield f"data: {json.dumps({'type': 'TOOL_CALL_PENDING_APPROVAL', 'tool_call_id': ptc_id, 'run_id': ptc.get('run_id') or last_run_id or 'run', 'tool_name': ptc.get('tool_name') or 'action', 'prompt': ptc.get('prompt', ''), 'permission_key': ptc.get('permission_key', ''), 'parameters': ptc.get('parameters', {})})}\n\n"
                 break
     except (asyncio.CancelledError, GeneratorExit):
+        if client_request_id and client_request_id in _request_idempotency_store:
+            rec = _request_idempotency_store[client_request_id]
+            if rec.status == "executing":
+                rec.status = "cancelled"
+                rec.done_event.set()
         if not anext_task.done():
             anext_task.cancel()
         logger.info("Client disconnected from stream for session %s. Stopping agent.", session_id)
@@ -148,7 +180,19 @@ async def generate_chat_sse_stream(
                 elif hasattr(agent, "stop"):
                     await agent.stop()
         raise
+    except Exception:
+        if client_request_id and client_request_id in _request_idempotency_store:
+            rec = _request_idempotency_store[client_request_id]
+            if rec.status == "executing":
+                rec.status = "failed"
+                rec.done_event.set()
+        raise
     finally:
+        if client_request_id and client_request_id in _request_idempotency_store:
+            rec = _request_idempotency_store[client_request_id]
+            if rec.status == "executing":
+                rec.status = "completed"
+                rec.done_event.set()
         if not anext_task.done():
             anext_task.cancel()
         if eng and session_id:
@@ -170,9 +214,13 @@ async def generate_chat_sse_stream(
 def build_shielded_chat_stream(
     request: Request, agent: Any, run_kwargs: dict[str, Any], user_id: str, session_id: str,
     sm: Any = None, eng: Any = None, as_generator: bool = False,
+    client_request_id: str | None = None,
 ) -> StreamingResponse | AsyncIterator[str]:
     """Build and return a FastAPI StreamingResponse wrapping the shielded SSE generator."""
-    gen = generate_chat_sse_stream(request=request, agent=agent, run_kwargs=run_kwargs, user_id=user_id, session_id=session_id, sm=sm, eng=eng)
+    gen = generate_chat_sse_stream(
+        request=request, agent=agent, run_kwargs=run_kwargs, user_id=user_id,
+        session_id=session_id, sm=sm, eng=eng, client_request_id=client_request_id,
+    )
     return gen if as_generator else StreamingResponse(gen, media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
 
 
@@ -190,40 +238,82 @@ async def stream_chat_query(
     user_prompt = (payload.messages or payload.message or "").strip()
     resolved_context["_raw_message"] = user_prompt
 
-    from app.routers.auth import ensure_valid_token
-    live_token = await ensure_valid_token()
-    if not live_token or live_token == "bearer-pending-auth":
-        raise HTTPException(status_code=401, detail="Authentication required. Please sign in to MASH.")
+    # ponytail: handle client_request_id turn idempotency across /stream retries
+    req_id = payload.client_request_id
+    if req_id:
+        _cleanup_idempotency_store()
+        existing = _request_idempotency_store.get(req_id)
+        if existing:
+            if existing.status == "completed":
+                logger.info("Request %s already completed for session %s. Returning idempotent completion frame.", req_id, sid)
+                async def _completed_stream():
+                    yield f"data: {json.dumps({'type': 'STATUS', 'status': 'already_completed'})}\n\n"
+                    yield "data: [DONE]\n\n"
+                return StreamingResponse(_completed_stream(), media_type="text/event-stream")
 
-    eng = None
-    with contextlib.suppress(Exception):
-        eng = get_engine()
+            if existing.status == "executing":
+                logger.info("Request %s is currently executing for session %s. Yielding in-flight wait without duplicate execution.", req_id, sid)
+                async def _in_flight_stream():
+                    try:
+                        while not existing.done_event.is_set():
+                            if request is not None and await request.is_disconnected():
+                                break
+                            try:
+                                await asyncio.wait_for(existing.done_event.wait(), timeout=5.0)
+                            except TimeoutError:
+                                yield ": heartbeat\n\n"
+                        if existing.status == "failed":
+                            yield f"data: {json.dumps({'type': 'RUN_ERROR', 'message': 'Original execution failed'})}\n\n"
+                        elif existing.status == "cancelled":
+                            yield f"data: {json.dumps({'type': 'RUN_ERROR', 'message': 'Original execution cancelled'})}\n\n"
+                        else:
+                            yield f"data: {json.dumps({'type': 'STATUS', 'status': 'already_completed'})}\n\n"
+                        yield "data: [DONE]\n\n"
+                    except (asyncio.CancelledError, GeneratorExit):
+                        pass
+                return StreamingResponse(_in_flight_stream(), media_type="text/event-stream")
 
-    ws_target = resolved_context.get("workspace_uri", "No Repo")
-    if ensure_context_fn:
-        await ensure_context_fn(eng, user_id, sid, resolved_context, ws_target, sse_server=server)
-    resolved_context.pop("_raw_message", None)
+        _request_idempotency_store[req_id] = _TurnExecutionRecord(session_id=sid, status="executing")
 
-    cfg = setup_sandbox_and_model(server._default_agent_config, resolved_context, live_token)
-    mode = str(resolved_context.get("permission_mode") or "default").lower()
-    if cfg and cfg.tools:
-        cfg = cfg.model_copy(update={"tools": apply_permission_mode_to_tools(cfg.tools, mode)})
+    try:
+        from app.routers.auth import ensure_valid_token
+        live_token = await ensure_valid_token()
+        if not live_token or live_token == "bearer-pending-auth":
+            raise HTTPException(status_code=401, detail="Authentication required. Please sign in to MASH.")
 
-    sm = getattr(server, "_session_manager", None)
-    if sm and sid:
+        eng = None
+        with contextlib.suppress(Exception):
+            eng = get_engine()
+
+        ws_target = resolved_context.get("workspace_uri", "No Repo")
+        if ensure_context_fn:
+            await ensure_context_fn(eng, user_id, sid, resolved_context, ws_target, sse_server=server)
+        resolved_context.pop("_raw_message", None)
+
+        cfg = setup_sandbox_and_model(server._default_agent_config, resolved_context, live_token)
+        mode = str(resolved_context.get("permission_mode") or "default").lower()
         if cfg and cfg.tools:
-            await init_session_permissions(sm, user_id, sid, cfg.tools, mode)
-        if user_prompt:
-            await handle_preemptive_steer(sm, user_id, sid, user_prompt)
-        elif await has_pending_undecided_tool_calls(sm, user_id, sid):
-            async def waiting():
-                yield f"data: {json.dumps({'type': 'STATUS', 'status': 'waiting_for_remaining_approvals'})}\n\n"
-            return StreamingResponse(waiting(), media_type="text/event-stream")
+            cfg = cfg.model_copy(update={"tools": apply_permission_mode_to_tools(cfg.tools, mode)})
 
-    with contextlib.suppress(Exception):
-        await server.handle_stop_request(user_id=user_id, session_id=sid, force=True, timeout=1.0)
+        sm = getattr(server, "_session_manager", None)
+        if sm and sid:
+            if cfg and cfg.tools:
+                await init_session_permissions(sm, user_id, sid, cfg.tools, mode)
+            if user_prompt:
+                await handle_preemptive_steer(sm, user_id, sid, user_prompt)
+            elif await has_pending_undecided_tool_calls(sm, user_id, sid):
+                async def waiting():
+                    yield f"data: {json.dumps({'type': 'STATUS', 'status': 'waiting_for_remaining_approvals'})}\n\n"
+                return StreamingResponse(waiting(), media_type="text/event-stream")
 
-    run_kwargs = {"message": user_prompt or [], "user_id": user_id, "agent_config": cfg, "session_id": sid, "context": resolved_context}
-    if payload.variables:
-        run_kwargs["variables"] = payload.variables
-    return build_shielded_chat_stream(request, server, run_kwargs, user_id, sid, sm=sm, eng=eng)
+        with contextlib.suppress(Exception):
+            await server.handle_stop_request(user_id=user_id, session_id=sid, force=True, timeout=1.0)
+
+        run_kwargs = {"message": user_prompt or [], "user_id": user_id, "agent_config": cfg, "session_id": sid, "context": resolved_context}
+        if payload.variables:
+            run_kwargs["variables"] = payload.variables
+        return build_shielded_chat_stream(request, server, run_kwargs, user_id, sid, sm=sm, eng=eng, client_request_id=req_id)
+    except Exception:
+        if req_id and req_id in _request_idempotency_store:
+            _request_idempotency_store.pop(req_id, None)
+        raise

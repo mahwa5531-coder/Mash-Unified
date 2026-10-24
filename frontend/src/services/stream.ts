@@ -36,6 +36,50 @@ export function formatErrorMessage(rawErr: string): string {
   return cleaned.length > 200 ? cleaned.slice(0, 197) + '...' : cleaned;
 }
 
+// Canonical CRLF-tolerant SSE chunk parser for stream consumption and unit tests
+export function parseSseChunkBuffer(
+  rawStreamText: string,
+  callbacks?: { onToken?: (t: string) => void; onToolStart?: (ev: any) => void }
+): { processedEvents: any[]; ignoredComments: string[] } {
+  // Support standard SSE frame delimiters (LF or CRLF)
+  const frames = rawStreamText.split(/(?:\r?\n){2}/);
+  const processedEvents: any[] = [];
+  const ignoredComments: string[] = [];
+
+  for (const frame of frames) {
+    const lines = frame.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      if (trimmed.startsWith(':')) {
+        ignoredComments.push(trimmed);
+        continue;
+      }
+      if (!trimmed.startsWith('data:')) continue;
+      const jsonStr = trimmed.slice(5).trim();
+      if (!jsonStr) continue;
+      if (jsonStr === '[DONE]' || jsonStr === '[END]') {
+        processedEvents.push({ type: 'DONE' });
+        continue;
+      }
+      try {
+        const parsed = JSON.parse(jsonStr);
+        processedEvents.push(parsed);
+        const evType = String(parsed.type || '').toUpperCase();
+        if (evType === 'TEXT_MESSAGE_CONTENT' || evType === 'TEXT_MESSAGE_CHUNK') {
+          const delta = parsed.delta ?? parsed.content ?? '';
+          if (delta && callbacks?.onToken) callbacks.onToken(delta);
+        } else if (evType === 'TOOL_CALL_START' && callbacks?.onToolStart) {
+          callbacks.onToolStart(parsed);
+        }
+      } catch {
+        throw new Error(`Invalid SSE JSON: ${jsonStr}`);
+      }
+    }
+  }
+  return { processedEvents, ignoredComments };
+}
+
 export async function streamQuery(
   sessionId: string,
   userMessage: string,
@@ -78,6 +122,12 @@ export async function streamQuery(
     }
   };
 
+  // ponytail: stable client_request_id for turn idempotency across retry attempts
+  const clientRequestId = (context?.client_request_id as string) ||
+    (typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`);
+
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
 
@@ -94,6 +144,7 @@ export async function streamQuery(
           session_id: sessionId,
           messages: userMessage,
           context: context || {},
+          client_request_id: clientRequestId,
         }),
       });
     } catch (err: any) {
@@ -121,6 +172,7 @@ export async function streamQuery(
               session_id: sessionId,
               messages: userMessage,
               context: context || {},
+              client_request_id: clientRequestId,
             }),
           });
           if (response.ok) {
@@ -176,19 +228,21 @@ export async function streamQuery(
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
 
-      const lines = buffer.split("\n\n");
-      buffer = lines.pop() || "";
+      // Support standard SSE frame delimiters (LF or CRLF) while preserving trailing buffer
+      const frames = buffer.split(/(?:\r?\n){2}/);
+      buffer = frames.pop() || "";
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const jsonStr = trimmed.slice(5).trim();
-        if (!jsonStr) continue;
+      for (const frame of frames) {
+        for (const line of frame.split(/\r?\n/)) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const jsonStr = trimmed.slice(5).trim();
+          if (!jsonStr) continue;
 
-        // Terminal SSE protocol sentinel frame ([DONE] or [END])
-        if (jsonStr === "[DONE]" || jsonStr === "[END]") {
-          break;
-        }
+          // Terminal SSE protocol sentinel frame ([DONE] or [END])
+          if (jsonStr === "[DONE]" || jsonStr === "[END]") {
+            break;
+          }
 
         try {
           const event = JSON.parse(jsonStr);
@@ -365,7 +419,8 @@ export async function streamQuery(
         }
       }
     }
-  } finally {
+  }
+} finally {
     finalizeRunningTools("cancelled");
   }
 } catch (err: any) {
@@ -374,7 +429,7 @@ export async function streamQuery(
     console.warn("Error streaming query:", err);
 
     // ponytail: Detect WiFi / network disconnection with clear status messages
-    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    const isOffline = typeof window !== 'undefined' && typeof navigator !== 'undefined' && !navigator.onLine;
     const isFetchErr = err?.name === "TypeError" || 
       String(err?.message || "").toLowerCase().includes("failed to fetch") ||
       String(err?.message || "").toLowerCase().includes("networkerror");

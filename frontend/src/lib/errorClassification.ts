@@ -59,7 +59,7 @@ export function classifyError(
   const cleaned = extractInnerErrorMessage(raw);
 
   // 1. OFFLINE (Device WiFi / Internet disconnect)
-  const isOffline = (typeof navigator !== 'undefined' && !navigator.onLine) ||
+  const isOffline = (typeof window !== 'undefined' && typeof navigator !== 'undefined' && !navigator.onLine) ||
     lower.includes("wifi disconnected") ||
     lower.includes("offline") ||
     lower.includes("no internet connection");

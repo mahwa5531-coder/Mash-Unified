@@ -21,7 +21,7 @@ export function formatErrorMessage(rawErr: string): string {
 }
 
 export function classifyDisconnectError(err: any): string {
-  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  const isOffline = typeof window !== 'undefined' && typeof navigator !== 'undefined' && !navigator.onLine;
   const isFetch = err?.name === 'TypeError' || String(err?.message || '').toLowerCase().includes('failed to fetch') || String(err?.message || '').toLowerCase().includes('networkerror');
   if (isOffline) return 'Network connection lost (WiFi disconnected). Reconnection timed out. Agent execution terminated.';
   if (isFetch) return 'Network connection interrupted or backend server unreachable. Could not reconnect within time. Agent execution terminated.';
@@ -142,7 +142,6 @@ export function finalizeStreamSession(activeSid: string): { updatedMessages: Mes
     const hasPending = s.chatMessages.some((m) => m.tools?.some((t) => t.status === 'pending_approval' && !t.decision));
     if (!wasAborted && !hasPending && s.queuedMessages?.length) {
       nextQueuedMsg = s.queuedMessages.shift() || null;
-      s.queuedMessage = s.queuedMessages[0] || null;
     }
   }
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mash:turn_completed', { detail: { sessionId: activeSid } }));

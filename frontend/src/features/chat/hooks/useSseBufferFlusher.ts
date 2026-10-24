@@ -33,6 +33,13 @@ export function useSseBufferFlusher({
     const thoughtDelta = s.thoughtBuffer;
     if (!tokenDelta && !thoughtDelta) return;
 
+    const next = [...s.chatMessages];
+    const targetIdx = findTargetAssistantIdx(next, s.activeTurnId);
+    if (targetIdx === -1) {
+      // Retain s.tokenBuffer and s.thoughtBuffer until assistant placeholder mounts
+      return;
+    }
+
     s.tokenBuffer = '';
     s.thoughtBuffer = '';
 
@@ -40,8 +47,6 @@ export function useSseBufferFlusher({
       s.thinkingDuration = Math.max(1, Math.round((Date.now() - s.turnStartTime) / 1000));
     }
 
-    const next = [...s.chatMessages];
-    const targetIdx = findTargetAssistantIdx(next, s.activeTurnId);
     if (targetIdx >= 0) {
       let updatedThoughts = next[targetIdx].thoughts || [];
       const currentSteps: any[] = next[targetIdx].steps && next[targetIdx].steps.length > 0

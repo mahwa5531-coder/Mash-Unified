@@ -3,6 +3,7 @@
 import { useState, useMemo, memo } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { useIsDarkMode } from '@/hooks/useIsDarkMode';
+import { useTurnViewport } from '@/features/chat/context/TurnViewportContext';
 
 // ----------------------------------------------------------------------
 // High-performance, zero-dependency syntax tokenizer for chat code blocks
@@ -36,7 +37,7 @@ const KEYWORDS = new Set([
   'create', 'table', 'drop', 'alter', 'and', 'or', 'not', 'distinct', 'as'
 ]);
 
-function highlightCodeSnippet(rawCode: string, language: string, isDark: boolean): string {
+export function highlightCodeSnippet(rawCode: string, language: string, isDark: boolean): string {
   if (!rawCode) return '';
   const lang = (language || '').toLowerCase().trim();
 
@@ -103,6 +104,7 @@ const CodeBlock = memo(function CodeBlock({
   const [copied, setCopied] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const isDark = useIsDarkMode();
+  const { isNearViewport } = useTurnViewport();
   
   // ponytail: allocation-free O(N) line counter avoids allocating thousands of throwaway substrings per render
   let lineCount = 1;
@@ -119,8 +121,9 @@ const CodeBlock = memo(function CodeBlock({
 
   const highlightedHtml = useMemo(() => {
     if (isStreaming) return '';
+    if (!isNearViewport) return escapeHtml(code);
     return highlightCodeSnippet(code, language, isDark);
-  }, [code, language, isDark, isStreaming]);
+  }, [code, language, isDark, isStreaming, isNearViewport]);
 
   return (
     <div className="my-3 rounded-lg overflow-hidden border border-[var(--border-subtle)] shadow-xs bg-[var(--bg-surface)]">

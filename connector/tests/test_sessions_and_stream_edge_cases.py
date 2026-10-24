@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -41,6 +42,23 @@ from nexau.core.messages import (
 )
 
 
+@asynccontextmanager
+async def _managed_lifespan(app):
+    """Test-scoped lifespan wrapper that disposes aiosqlite threads after each test."""
+    async with lifespan(app):
+        try:
+            yield
+        finally:
+            if hasattr(app.state, "engine") and app.state.engine:
+                try:
+                    inner = getattr(app.state.engine, "_inner", app.state.engine)
+                    raw_eng = getattr(inner, "_engine", None)
+                    if raw_eng and hasattr(raw_eng, "dispose"):
+                        await raw_eng.dispose()
+                except Exception:
+                    pass
+
+
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
@@ -52,7 +70,7 @@ def anyio_backend():
 @pytest.mark.anyio
 async def test_client_disconnect_mid_stream_cancellation():
     """Verify that client disconnect during SSE streaming terminates the running agent immediately."""
-    async with lifespan(app):
+    async with _managed_lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=15.0) as client:
             test_id = uuid.uuid4().hex[:8]
@@ -111,7 +129,7 @@ async def test_client_disconnect_direct_is_disconnected_trigger():
     """Directly test the request.is_disconnected() branch in sse_event_stream."""
     from app.routers.chat import stream_query_bridge
 
-    async with lifespan(app):
+    async with _managed_lifespan(app):
         sid = f"sess_discon_mock_{uuid.uuid4().hex[:8]}"
         user_id = "test_user_discon"
 
@@ -145,7 +163,7 @@ async def test_client_disconnect_direct_is_disconnected_trigger():
 @pytest.mark.anyio
 async def test_transcript_folding_corrupted_missing_actions_recovery():
     """Verify that transcript folding recovers cleanly from corrupted actions, missing extra, or invalid JSON."""
-    async with lifespan(app):
+    async with _managed_lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=15.0) as client:
             engine = deps.get_engine()
@@ -338,7 +356,7 @@ async def test_messages_to_transcript_lines_edge_cases():
 @pytest.mark.anyio
 async def test_missing_or_deleted_physical_artifact_files_clean_404():
     """Verify that requests for missing, deleted, or unresolvable artifact files return clean 404."""
-    async with lifespan(app):
+    async with _managed_lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=15.0) as client:
             test_id = uuid.uuid4().hex[:8]
@@ -403,7 +421,7 @@ async def test_missing_or_deleted_physical_artifact_files_clean_404():
 @pytest.mark.anyio
 async def test_idempotent_background_task_cancellation():
     """Verify that canceling non-existent or already dead tasks returns clean status without throwing 500."""
-    async with lifespan(app):
+    async with _managed_lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=15.0) as client:
             dead_pid = 99999999
@@ -445,7 +463,7 @@ async def test_idempotent_background_task_cancellation():
 @pytest.mark.anyio
 async def test_concurrent_steer_collision_under_sqlite():
     """Verify that concurrent steering queue updates and session operations succeed without SQLite lock collisions."""
-    async with lifespan(app):
+    async with _managed_lifespan(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver", timeout=20.0) as client:
             test_id = uuid.uuid4().hex[:8]

@@ -1,24 +1,21 @@
 import assert from 'node:assert/strict';
-
-// Test attachment limit and size logic mimicking useChatAttachments
-const MAX_CHAT_ATTACHMENTS = 5;
-const MAX_FILE_SIZE_BYTES = 30 * 1024 * 1024; // 30 MB
+import { MAX_CHAT_ATTACHMENTS, MAX_FILE_SIZE_BYTES } from '../src/features/chat/hooks/useChatAttachments';
 
 function simulateAttachmentHandler() {
-  let attachedFiles = [];
+  let attachedFiles: any[] = [];
   let hasInvalidMedia = false;
   let invalidMediaReason = "";
 
-  const onInvalidMedia = (val, reason = "") => {
+  const onInvalidMedia = (val: boolean, reason = "") => {
     hasInvalidMedia = val;
     invalidMediaReason = reason;
   };
 
-  const handleUploadFiles = (files) => {
+  const handleUploadFiles = (files: any[]) => {
     const validFiles = Array.from(files);
     if (validFiles.length === 0) return;
 
-    // Check per-file size limit (30 MB)
+    // Check per-file size limit (30 MB from production constant)
     const oversized = validFiles.find((f) => (f.size || 0) > MAX_FILE_SIZE_BYTES);
     if (oversized) {
       const sizeMb = ((oversized.size || 0) / (1024 * 1024)).toFixed(1);
@@ -38,7 +35,7 @@ function simulateAttachmentHandler() {
     attachedFiles = [...attachedFiles, ...filesToUpload];
   };
 
-  const removeAttachedFile = (idx) => {
+  const removeAttachedFile = (idx: number) => {
     attachedFiles = attachedFiles.filter((_, i) => i !== idx);
   };
 
@@ -59,7 +56,9 @@ function simulateAttachmentHandler() {
   };
 }
 
-console.log("Running Chat Composer Attachment Limit & File Size Verification...");
+console.log("Running Chat Composer Attachment Limit & File Size Verification (from useChatAttachments)...");
+assert.strictEqual(MAX_CHAT_ATTACHMENTS, 5);
+assert.strictEqual(MAX_FILE_SIZE_BYTES, 30 * 1024 * 1024);
 
 // Test 1: Uploading up to 5 files under 30 MB succeeds without error
 const session1 = simulateAttachmentHandler();

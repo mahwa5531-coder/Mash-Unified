@@ -8,6 +8,16 @@ import { fetchTaskLog } from '@/services/tasks';
 import { normalizePath } from '@/utils/normalizePath';
 import { UNSUPPORTED_DOC_REGEX } from '../utils/artifactPresentation';
 
+export function isFileLoadError(content?: string): boolean {
+  if (!content) return false;
+  return (
+    content.startsWith('Error loading file:') ||
+    content.includes('not found on local disk') ||
+    content.includes('File not found') ||
+    content.includes('Failed to load file content')
+  );
+}
+
 interface SessionRightSidebarMemory {
   tabs: TabItem[];
   activeId: string | null;
@@ -233,7 +243,7 @@ export function useViewerTabs(sessionId?: string) {
 
     if (!isImg && !isPdf && !isUnsupported && !isBinaryExcel) {
       const cached = getFileContentFromCache(normalizedPath, sessionId);
-      if (cached !== undefined && !cached.includes('not found on local disk')) {
+      if (cached !== undefined && !isFileLoadError(cached)) {
         setTabContent(c => ({ ...c, [tabId]: cached }));
         setTabTruncated(t => ({ ...t, [tabId]: isFileTruncatedFromCache(normalizedPath, sessionId) }));
         setIsLoadingContent(false);
@@ -352,6 +362,27 @@ export function useViewerTabs(sessionId?: string) {
 
   const activeTab = useMemo(() => openTabs.find(t => t.id === activeTabId), [openTabs, activeTabId]);
 
+  // Retry tab content loading on demand (invalidates cache and re-fetches)
+  const retryTabContent = useCallback(async (tabId?: string) => {
+    const targetId = tabId || activeTabId;
+    if (!targetId) return;
+    const targetTab = openTabs.find(t => t.id === targetId);
+    if (!targetTab || targetTab.type !== 'file' || !targetTab.path) return;
+
+    const cleanPath = targetTab.path.split('#')[0];
+    invalidateFileCache(cleanPath, sessionId);
+    setIsLoadingContent(true);
+    try {
+      const content = await fetchFileContent(cleanPath, sessionId, true);
+      setTabContent(c => ({ ...c, [targetId]: content }));
+      setTabTruncated(t => ({ ...t, [targetId]: isFileTruncatedFromCache(cleanPath, sessionId) }));
+    } catch (err: any) {
+      setTabContent(c => ({ ...c, [targetId]: `Error loading file: ${err?.message || err}` }));
+    } finally {
+      setIsLoadingContent(false);
+    }
+  }, [activeTabId, openTabs, sessionId]);
+
   // Automatically hydrate content for active file tab from cache or backend
   useEffect(() => {
     if (activeTab && activeTab.type === 'file' && activeTab.path) {
@@ -361,16 +392,20 @@ export function useViewerTabs(sessionId?: string) {
       if (isPdf || isUnsupported || isBinaryExcel) return;
 
       const tabId = activeTab.id;
-      if (tabContentRef.current[tabId] === undefined) {
+      const current = tabContentRef.current[tabId];
+      if (current === undefined || isFileLoadError(current)) {
         const cleanPath = activeTab.path.split('#')[0];
+        if (isFileLoadError(current)) {
+          invalidateFileCache(cleanPath, sessionId);
+        }
         const cached = getFileContentFromCache(cleanPath, sessionId);
-        if (cached !== undefined) {
+        if (cached !== undefined && !isFileLoadError(cached)) {
           setTabContent(c => ({ ...c, [tabId]: cached }));
           setTabTruncated(t => ({ ...t, [tabId]: isFileTruncatedFromCache(cleanPath, sessionId) }));
           setIsLoadingContent(false);
         } else {
           setIsLoadingContent(true);
-          fetchFileContent(cleanPath, sessionId).then(content => {
+          fetchFileContent(cleanPath, sessionId, true).then(content => {
             setTabContent(c => ({ ...c, [tabId]: content }));
             setTabTruncated(t => ({ ...t, [tabId]: isFileTruncatedFromCache(cleanPath, sessionId) }));
           }).catch(err => {
@@ -397,6 +432,7 @@ export function useViewerTabs(sessionId?: string) {
     openFileTab,
     openTerminalTab,
     handleCloseTab,
+    retryTabContent,
     activeTab,
   };
 }

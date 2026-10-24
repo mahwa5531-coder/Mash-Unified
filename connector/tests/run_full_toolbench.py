@@ -98,10 +98,17 @@ class ToolBenchEvaluator:
                             full_text += delta
                             sys.stdout.write(delta)
                             sys.stdout.flush()
-                        elif "RUN_FINISHED" in ev_type:
+                        elif "RUN_FINISHED" in ev_type or data_json in ("[DONE]", "[END]"):
                             print(f"\n[TURN FINISHED in {time.time()-t0:.2f}s]")
+                            try:
+                                response.close()
+                            except Exception:
+                                pass
+                            break
                     except Exception:
                         pass
+                if data_json in ("[DONE]", "[END]"):
+                    break
 
         elapsed = round(time.time() - t0, 2)
         print("\n--- FINAL AGENT ANSWER ---")

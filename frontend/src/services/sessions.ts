@@ -183,37 +183,43 @@ export function cleanupSessionStorage(sessionId: string): void {
   const storage = typeof window !== 'undefined' && window.localStorage ? window.localStorage : (typeof localStorage !== 'undefined' ? localStorage : null);
   if (!storage) return;
   try {
-    const pinnedRaw = storage.getItem('nexau_pinned_sessions');
-    if (pinnedRaw) {
-      try {
-        const pinned: string[] = JSON.parse(pinnedRaw);
-        if (Array.isArray(pinned) && pinned.includes(sessionId)) {
-          const updated = pinned.filter(id => id !== sessionId);
-          storage.setItem('nexau_pinned_sessions', JSON.stringify(updated));
-        }
-      } catch {}
+    for (const key of ['mash_pinned_sessions', 'nexau_pinned_sessions']) {
+      const pinnedRaw = storage.getItem(key);
+      if (pinnedRaw) {
+        try {
+          const pinned: string[] = JSON.parse(pinnedRaw);
+          if (Array.isArray(pinned) && pinned.includes(sessionId)) {
+            const updated = pinned.filter(id => id !== sessionId);
+            storage.setItem(key, JSON.stringify(updated));
+          }
+        } catch {}
+      }
     }
 
-    const archivedRaw = storage.getItem('nexau_archived_session_ids');
-    if (archivedRaw) {
-      try {
-        const archived: string[] = JSON.parse(archivedRaw);
-        if (Array.isArray(archived) && archived.includes(sessionId)) {
-          const updated = archived.filter(id => id !== sessionId);
-          storage.setItem('nexau_archived_session_ids', JSON.stringify(updated));
-        }
-      } catch {}
+    for (const key of ['mash_archived_session_ids', 'nexau_archived_session_ids']) {
+      const archivedRaw = storage.getItem(key);
+      if (archivedRaw) {
+        try {
+          const archived: string[] = JSON.parse(archivedRaw);
+          if (Array.isArray(archived) && archived.includes(sessionId)) {
+            const updated = archived.filter(id => id !== sessionId);
+            storage.setItem(key, JSON.stringify(updated));
+          }
+        } catch {}
+      }
     }
 
-    const cachedRaw = storage.getItem('nexau_cached_sessions');
-    if (cachedRaw) {
-      try {
-        const cached: SessionItem[] = JSON.parse(cachedRaw);
-        if (Array.isArray(cached) && cached.some(s => s.session_id === sessionId)) {
-          const updated = cached.filter(s => s.session_id !== sessionId);
-          storage.setItem('nexau_cached_sessions', JSON.stringify(updated));
-        }
-      } catch {}
+    for (const key of ['mash_cached_sessions', 'nexau_cached_sessions']) {
+      const cachedRaw = storage.getItem(key);
+      if (cachedRaw) {
+        try {
+          const cached: SessionItem[] = JSON.parse(cachedRaw);
+          if (Array.isArray(cached) && cached.some(s => s.session_id === sessionId)) {
+            const updated = cached.filter(s => s.session_id !== sessionId);
+            storage.setItem(key, JSON.stringify(updated));
+          }
+        } catch {}
+      }
     }
 
     const keysToRemove: string[] = [];

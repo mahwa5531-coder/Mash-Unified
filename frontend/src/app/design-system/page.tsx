@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { notFound } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Sun, Moon } from 'lucide-react';
 import {
@@ -29,6 +30,10 @@ const Unit21SignIn = dynamic(() => import('./units').then(m => m.Unit21SignIn), 
 const Unit22SettingsModal = dynamic(() => import('./units').then(m => m.Unit22SettingsModal), { ssr: false });
 
 export default function DesignSystemPreviewPage() {
+  if (process.env.NODE_ENV === 'production') {
+    notFound();
+  }
+
   const [isDark, setIsDark] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [lastClicked, setLastClicked] = useState<string>('None');

@@ -103,8 +103,16 @@ export default function TaskWorkLogAccordion({
 
   const hasWork = steps.length > 0 || thoughts.length > 0 || tools.length > 0;
 
+  // Find any active pending approval that is awaiting user decision
+  const hasPendingApproval = useMemo(() => {
+    return tools.some(t => t.status === 'pending_approval' && !t.decision) ||
+      steps.some((s: any) => s.type === 'approval' || (s.tools && s.tools.some((t: any) => t.status === 'pending_approval' && !t.decision)));
+  }, [tools, steps]);
+
   // Build chronologically authentic timeline: Step 1 (Thought -> Parallel Tools) -> Step 2 (Thought -> Edits) -> Step 3 (Command)
   const groupedTimeline = useMemo(() => {
+    // ponytail: 100% inert in collapsed historical turns. When collapsed and not streaming, defer timeline compilation until expanded.
+    if (!clusterOpen && !isStreaming && !hasPendingApproval) return [];
     if (!hasWork && (!isStreaming || hasAssistantContent)) return [];
     const fullTimeline: TimelineEntry[] = [];
 
@@ -184,7 +192,7 @@ export default function TaskWorkLogAccordion({
     fullTimeline.push(...groupedTools);
 
     return fullTimeline;
-  }, [steps, thoughts, tools, isStreaming, thinkingDurationSeconds]);
+  }, [steps, thoughts, tools, isStreaming, thinkingDurationSeconds, clusterOpen, hasPendingApproval, hasWork, hasAssistantContent]);
 
   // Format header time for completed turn (e.g. 3m or 26s)
   const fallbackSecs = Math.max(

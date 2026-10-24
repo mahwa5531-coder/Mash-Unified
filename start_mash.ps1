@@ -8,6 +8,8 @@ Write-Host "                 MASH / NexAU PLATFORM LAUNCHER                     
 Write-Host "====================================================================" -ForegroundColor Cyan
 Write-Host ""
 
+Remove-Item Env:\PYTHONHOME -ErrorAction SilentlyContinue
+
 $pythonExe = "C:\Python313\python.exe"
 if (-not (Test-Path $pythonExe)) {
     $pythonExe = "python"
@@ -35,6 +37,7 @@ $nexauDir = Join-Path $scriptDir "NexAU"
 $connectorDir = Join-Path $scriptDir "connector"
 $frontendDir = Join-Path $scriptDir "frontend"
 
+Remove-Item Env:\PYTHONHOME -ErrorAction SilentlyContinue
 $env:PYTHONPATH = "$nexauDir;$connectorDir"
 
 Write-Host ""

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, History } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { ChevronDown } from 'lucide-react';
 import ChatComposer from '@/features/chat/components/ChatComposer';
 import { QuotaBanner, InvalidMediaBanner } from '@/primitives';
 import { classifyError } from '@/lib/errorClassification';
@@ -11,6 +11,10 @@ import { ScrollToBottomButton } from '@/features/chat/components/ScrollToBottomB
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useChatStream } from '@/features/chat/hooks/useChatStream';
 import { useScrollToBottom } from '@/features/chat/hooks/useScrollToBottom';
+import { useTurnViewportWindow } from '@/features/chat/hooks/useTurnViewportWindow';
+import { useReverseInfiniteScroll } from '@/features/chat/hooks/useReverseInfiniteScroll';
+import { TurnViewportProvider } from '@/features/chat/context/TurnViewportContext';
+import type { Turn } from '@/types/chat';
 import { ChatHeroView } from './ChatHeroView';
 import { SteeringQueueBanner } from './SteeringQueueBanner';
 import { ChatHistoryLoadState } from './ChatHistoryLoadState';
@@ -34,6 +38,107 @@ interface ChatCanvasProps {
 
 // ponytail: Module-level stable empty array prevents breaking AssistantMessage memo on every token
 const EMPTY_ARTIFACTS: any[] = [];
+
+interface MountedTurnRowProps {
+  turn: Turn;
+  turnKey: string;
+  globalTurnIdx: number;
+  isLastTurn: boolean;
+  isStreaming: boolean;
+  artifactsByTurnMsg: Map<string, any[]>;
+  onOpenFile?: (path: string) => void;
+  onContinue: () => void;
+  onRetryTurn: (content: string, sid?: string) => void;
+  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<void> | void;
+  onUndo: (flatIdx: number, content: string, turnIdx?: number) => void;
+  onMeasureHeight: (turnKey: string, height: number) => void;
+}
+
+const MountedTurnRow = memo(function MountedTurnRow({
+  turn,
+  turnKey,
+  globalTurnIdx,
+  isLastTurn,
+  isStreaming,
+  artifactsByTurnMsg,
+  onOpenFile,
+  onContinue,
+  onRetryTurn,
+  onApproveTool,
+  onUndo,
+  onMeasureHeight,
+}: MountedTurnRowProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isSyntheticContext = turn.userMsg.content === '[Earlier Context]';
+  const turnIdx = turn.turnIndex ?? globalTurnIdx;
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    if (el.offsetHeight > 0) {
+      onMeasureHeight(turnKey, el.offsetHeight);
+    }
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const h = entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight;
+          if (h > 0) {
+            onMeasureHeight(turnKey, Math.round(h));
+          }
+        }
+      });
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+  }, [turnKey, onMeasureHeight]);
+
+  const handleRetry = useCallback(() => {
+    onRetryTurn(turn.userMsg.content, turn.userMsg.sessionId);
+  }, [onRetryTurn, turn.userMsg.content, turn.userMsg.sessionId]);
+
+  const handleUndo = useCallback(() => {
+    onUndo(turn.flatIdx, turn.userMsg.content, turnIdx);
+  }, [onUndo, turn.flatIdx, turn.userMsg.content, turnIdx]);
+
+  return (
+    <TurnViewportProvider isNearViewport={true}>
+      <div 
+        ref={containerRef}
+        className="flex flex-col w-full relative pb-3 border-b border-zinc-200/50 dark:border-white/[0.04] last:border-b-0 last:pb-1"
+      >
+        {!isSyntheticContext && (
+          <div className="sticky top-0 z-20 py-2 bg-[var(--bg-app)]/90 backdrop-blur-md border-b border-zinc-200/40 dark:border-white/[0.04] transition-all">
+            <UserMessage
+              msg={turn.userMsg}
+              onUndo={handleUndo}
+            />
+          </div>
+        )}
+        <div className={!isSyntheticContext ? "mt-1 px-1 sm:px-2 flex flex-col space-y-2.5" : "px-1 sm:px-2 flex flex-col space-y-2.5"}>
+          {turn.aiMsgs.map((aiMsg, j) => {
+            const isLastMsg = isLastTurn && j === turn.aiMsgs.length - 1;
+            return (
+              <ErrorBoundary key={`${turnKey}_ai_${j}`} scope="assistant-turn">
+                <AssistantMessage
+                  msg={aiMsg}
+                  artifacts={artifactsByTurnMsg.get(`${turnIdx}_${j}`) || EMPTY_ARTIFACTS}
+                  isLast={isLastMsg}
+                  isStreaming={isLastMsg && isStreaming}
+                  onOpenFile={onOpenFile}
+                  onContinue={onContinue}
+                  onRetry={handleRetry}
+                  onApproveTool={onApproveTool}
+                />
+              </ErrorBoundary>
+            );
+          })}
+        </div>
+      </div>
+    </TurnViewportProvider>
+  );
+});
 
 export default function ChatCanvas({ 
   sessionId, sessionRepo, pendingWorkspacePath,
@@ -108,39 +213,37 @@ export default function ChatCanvas({
   const [showInvalidMediaBanner, setShowInvalidMediaBanner] = useState<boolean>(false);
   const [invalidMediaReason, setInvalidMediaReason] = useState<string>("Maximum number of attachments reached");
 
-  // ponytail: Live DOM RAM window - strictly mount at most 100 turns in DOM to prevent tab freezes and RAM bloat
-  const MAX_LIVE_TURNS = 100;
-  const [windowOffsetFromEnd, setWindowOffsetFromEnd] = useState<number>(0);
+  // Milestone 1: Zero-dependency dynamic viewport windowing & DOM culling
+  const {
+    startIndex,
+    endIndex,
+    turnHeightCache,
+    recordTurnHeight,
+    estimateTurnHeight,
+  } = useTurnViewportWindow({
+    containerRef: chatScrollContainerRef,
+    turns,
+    isStreaming,
+  });
 
-  // Auto-reset window to latest turns when streaming or sending prompt
-  useEffect(() => {
-    if (isStreaming) {
-      setWindowOffsetFromEnd(0);
-    }
-  }, [isStreaming]);
+  const handleRetryTurn = useCallback((content: string, sid?: string) => {
+    retry(content, sid);
+  }, [retry]);
 
-  // Reset window and dismiss quota/media banners when session changes
+  // Reset quota/media banners when session changes
   useEffect(() => {
-    setWindowOffsetFromEnd(0);
     setShowQuotaBanner(false);
     setShowInvalidMediaBanner(false);
   }, [sessionId]);
 
-  const startIndex = Math.max(0, turns.length - MAX_LIVE_TURNS - windowOffsetFromEnd);
-  const endIndex = Math.min(turns.length, startIndex + MAX_LIVE_TURNS);
-  const visibleTurns = turns.slice(startIndex, endIndex);
-
-  const olderCount = startIndex + remainingEarlierCount;
-  const newerCount = turns.length - endIndex;
-
-  const handleLoadEarlier = async () => {
-    if (startIndex > 0) {
-      setWindowOffsetFromEnd((prev) => Math.max(0, Math.min(turns.length - MAX_LIVE_TURNS, prev + 50)));
-    } else if (hasEarlierTurns) {
-      await loadEarlierTurns();
-      setWindowOffsetFromEnd((prev) => prev + 50);
-    }
-  };
+  // Milestone 2: Seamless Reverse Infinite Scroll with Scroll-Anchoring
+  const { topSentinelRef } = useReverseInfiniteScroll({
+    containerRef: chatScrollContainerRef,
+    hasEarlierTurns,
+    isLoadingEarlier,
+    loadEarlierTurns,
+    turnsCount: turns.length,
+  });
 
   // Velocity-aware scroll retention hook
   const {
@@ -227,85 +330,65 @@ export default function ChatCanvas({
           {/* Messages Feed */}
           {chatMessages.length > 0 && (
             <div className="flex flex-col pt-3 space-y-3.5">
-              {/* Earlier Turns Pagination Header */}
-              {(olderCount > 0 || hasEarlierTurns) && (
-                <div className="flex justify-center -mt-1 -mb-1 pb-1.5">
-                  <button
-                    type="button"
-                    onClick={handleLoadEarlier}
-                    disabled={isLoadingEarlier}
-                    className="flex items-center gap-2 px-3.5 py-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer shadow-xs disabled:opacity-50 group"
-                  >
-                    {isLoadingEarlier ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
-                        <span>Loading earlier turns...</span>
-                      </>
-                    ) : (
-                      <>
-                        <History size={12} className="text-zinc-400 group-hover:text-zinc-200 transition-colors" />
-                        <span>Load earlier turns ({olderCount > 0 ? `${olderCount} older` : 'older turns'})</span>
-                      </>
-                    )}
-                  </button>
+              {/* Milestone 2: Top Sentinel for Reverse Infinite Scroll */}
+              {hasEarlierTurns && (
+                <div
+                  ref={topSentinelRef}
+                  className="flex justify-center -mt-1 -mb-1 pb-1.5 min-h-[24px]"
+                  aria-hidden="true"
+                >
+                  {isLoadingEarlier && (
+                    <div className="flex items-center gap-2 text-xs text-zinc-400">
+                      <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                      <span>Loading earlier turns...</span>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {visibleTurns.map((turn, i) => {
-                const globalTurnIdx = startIndex + i;
+              {turns.map((turn, i) => {
+                const globalTurnIdx = i;
                 const isLastTurn = globalTurnIdx === turns.length - 1;
-                const isSyntheticContext = turn.userMsg.content === '[Earlier Context]';
                 const turnKey = turn.id || `turn_${turn.flatIdx}_${globalTurnIdx}`;
-                const turnIdx = turn.turnIndex ?? globalTurnIdx;
+                const isPinnedStreaming = isStreaming && isLastTurn;
+                const isVisible = (i >= startIndex && i <= endIndex) || isPinnedStreaming;
+
+                if (!isVisible) {
+                  const cachedHeight = turnHeightCache.get(turnKey) || estimateTurnHeight(turn);
+                  return (
+                    <div
+                      key={turnKey}
+                      data-turn-idx={globalTurnIdx}
+                      data-turn-culled="true"
+                      style={{
+                        height: `${cachedHeight}px`,
+                        containIntrinsicSize: `auto ${cachedHeight}px`,
+                        contentVisibility: 'auto',
+                      }}
+                      className="w-full shrink-0 border-b border-zinc-200/50 dark:border-white/[0.04]"
+                      aria-hidden="true"
+                    />
+                  );
+                }
+
                 return (
-                  <div 
-                    key={turnKey} 
-                    className="flex flex-col w-full relative pb-3 border-b border-zinc-200/50 dark:border-white/[0.04] last:border-b-0 last:pb-1"
-                  >
-                    {!isSyntheticContext && (
-                      <div className="sticky top-0 z-20 py-2 bg-[var(--bg-app)]/90 backdrop-blur-md border-b border-zinc-200/40 dark:border-white/[0.04] transition-all">
-                        <UserMessage
-                          msg={turn.userMsg}
-                          onUndo={() => undo(turn.flatIdx, turn.userMsg.content, turnIdx)}
-                        />
-                      </div>
-                    )}
-                    <div className={!isSyntheticContext ? "mt-1 px-1 sm:px-2 flex flex-col space-y-2.5" : "px-1 sm:px-2 flex flex-col space-y-2.5"}>
-                      {turn.aiMsgs.map((aiMsg, j) => {
-                        const isLastMsg = isLastTurn && j === turn.aiMsgs.length - 1;
-                        return (
-                          <ErrorBoundary key={`${turnKey}_ai_${j}`} scope="assistant-turn">
-                            <AssistantMessage
-                              msg={aiMsg}
-                              artifacts={artifactsByTurnMsg.get(`${turnIdx}_${j}`) || EMPTY_ARTIFACTS}
-                              isLast={isLastMsg}
-                              isStreaming={isLastMsg && isStreaming}
-                              onOpenFile={onOpenFile}
-                              onContinue={handleContinue}
-                              onRetry={() => retry(turn.userMsg.content, turn.userMsg.sessionId)}
-                              onApproveTool={approveToolCall}
-                            />
-                          </ErrorBoundary>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <MountedTurnRow
+                    key={turnKey}
+                    turn={turn}
+                    turnKey={turnKey}
+                    globalTurnIdx={globalTurnIdx}
+                    isLastTurn={isLastTurn}
+                    isStreaming={isStreaming}
+                    artifactsByTurnMsg={artifactsByTurnMsg}
+                    onOpenFile={onOpenFile}
+                    onContinue={handleContinue}
+                    onRetryTurn={handleRetryTurn}
+                    onApproveTool={approveToolCall}
+                    onUndo={undo}
+                    onMeasureHeight={recordTurnHeight}
+                  />
                 );
               })}
-
-              {/* Jump to latest turns pill when viewing earlier history */}
-              {newerCount > 0 && (
-                <div className="flex justify-center pt-2 pb-1 sticky bottom-2 z-20">
-                  <button
-                    type="button"
-                    onClick={() => setWindowOffsetFromEnd(0)}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-xs font-medium shadow-md transition-all cursor-pointer select-none"
-                  >
-                    <span>Jump to latest turns ({newerCount} newer)</span>
-                    <ChevronDown size={14} />
-                  </button>
-                </div>
-              )}
 
               {/* Terminal anchor for browser-native scroll-anchoring */}
               <div className="h-px shrink-0 w-full [overflow-anchor:auto]" aria-hidden="true" />

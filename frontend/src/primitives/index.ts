@@ -1,4 +1,4 @@
-export * from './Button';
+export * from '@/components/ui/button';
 export * from './AuditBadge';
 export * from './FilePill';
 export * from './PathPill';

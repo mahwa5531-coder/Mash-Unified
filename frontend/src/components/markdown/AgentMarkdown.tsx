@@ -106,10 +106,8 @@ const ensureCodeLanguagePlugin = () => (tree: any) => {
   visit(tree);
 };
 
-// Same URL policy as the previous AssistantProse stack.
-function safeUrlTransform(url: string): string {
-  return /^\s*(javascript|vbscript|data):/i.test(url) ? '' : url;
-}
+import { safeUrlTransform } from './urlPolicy';
+export { safeUrlTransform };
 
 export interface AgentMarkdownProps {
   content: string;

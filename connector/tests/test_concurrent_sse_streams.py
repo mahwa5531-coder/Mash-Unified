@@ -43,6 +43,8 @@ async def stream_session(client: httpx.AsyncClient, session_id: str, prompt: str
             async for line in resp.aiter_lines():
                 if line.startswith("data:"):
                     data_str = line[5:].strip()
+                    if data_str in ("[DONE]", "[END]"):
+                        break
                     if data_str:
                         try:
                             ev = json.loads(data_str)
@@ -51,6 +53,8 @@ async def stream_session(client: httpx.AsyncClient, session_id: str, prompt: str
                                 delta = ev.get("delta", "")
                                 if delta:
                                     tokens.append(delta)
+                            elif "RUN_FINISHED" in ev_type.upper() or "DONE" in ev_type.upper():
+                                break
                         except Exception:
                             pass
     except Exception as e:

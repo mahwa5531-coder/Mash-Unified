@@ -71,23 +71,6 @@ export async function createQuickProject(name: string): Promise<ProjectItem | nu
   }
 }
 
-export async function renameProject(projectId: string, name: string): Promise<boolean> {
-  try {
-    const res = await safeFetch(`${BASE_URL}/api/projects/${projectId}/rename`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (res.ok) {
-      notifyProjectsChanged();
-    }
-    return res.ok;
-  } catch (err) {
-    console.warn("Failed to rename project:", err);
-    return false;
-  }
-}
-
 export interface DeleteProjectResult {
   success: boolean;
   message?: string;

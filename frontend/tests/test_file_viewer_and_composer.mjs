@@ -74,7 +74,6 @@ function resolveViewerMode(filename, path, content, isTruncated = false) {
 // 2. Emulate Slash Command Autocomplete & Navigation
 // ==============================================================================
 const AVAILABLE_COMMANDS = [
-  { command: '/audit', label: 'Run statutory audit verification checklist', category: 'workflow' },
   { command: '/clear', label: 'Clear current session transcript', category: 'action' },
   { command: '/default', label: 'Set permission mode to Default', category: 'mode' },
   { command: '/help', label: 'View all commands and tools', category: 'help' },
@@ -135,7 +134,7 @@ function evaluateComposerAction({ key, shiftKey, isUploading, isSubmitting, text
       const fileRefs = attachedFiles.map((f) => `[Attached file: ${f.path}]`).join('\n');
       payloadText = payloadText
         ? `${payloadText}\n\n${fileRefs}`
-        : `Please inspect and analyze the attached audit documents:\n${fileRefs}`;
+        : `Please inspect and analyze the attached documents:\n${fileRefs}`;
     }
 
     return { action: 'submit', payload: payloadText };
@@ -274,9 +273,9 @@ console.log("\n[Test 3] Zero-Byte Files & Massive File Protection");
 console.log("\n[Test 4] Composer Slash Command Autocomplete Filtering");
 {
   // Query starting with /
-  const matchesA = filterSlashCommands("/a");
-  assert.strictEqual(matchesA.length, 1);
-  assert.strictEqual(matchesA[0].command, "/audit");
+  const matchesC = filterSlashCommands("/c");
+  assert.strictEqual(matchesC.length, 1);
+  assert.strictEqual(matchesC[0].command, "/clear");
 
   const matchesT = filterSlashCommands("/t");
   assert.strictEqual(matchesT.length, 2);
@@ -405,7 +404,7 @@ console.log("\n[Test 6] Composer Submit Rules, Double-Enter Lock & Attachments")
     attachedFiles: [{ path: "ledger.xlsx" }],
   });
   assert.strictEqual(resAttachedEmptyText.action, 'submit');
-  assert.ok(resAttachedEmptyText.payload.includes("Please inspect and analyze the attached audit documents:"));
+  assert.ok(resAttachedEmptyText.payload.includes("Please inspect and analyze the attached documents:"));
   assert.ok(resAttachedEmptyText.payload.includes("[Attached file: ledger.xlsx]"));
 
   console.log("  -> PASSED: Synchronous submission locks, Shift+Enter newlines, and attached document schemas verified");

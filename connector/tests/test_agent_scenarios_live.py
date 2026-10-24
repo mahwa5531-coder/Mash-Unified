@@ -132,10 +132,17 @@ def send_nlp_turn(session_id: str, prompt: str, timeout: int = 180):
                         full_text += delta
                         sys.stdout.write(delta)
                         sys.stdout.flush()
-                    elif "RUN_FINISHED" in ev_type:
+                    elif "RUN_FINISHED" in ev_type or data_json in ("[DONE]", "[END]"):
                         print(f"\n[AGENT TURN FINISHED in {time.time()-t0:.2f}s]")
+                        try:
+                            response.close()
+                        except Exception:
+                            pass
+                        break
                 except Exception:
                     pass
+            if data_json in ("[DONE]", "[END]"):
+                break
 
     print("\n---------------- AGENT FINAL ANSWER ----------------")
     print(full_text.strip())

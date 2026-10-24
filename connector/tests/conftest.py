@@ -54,3 +54,17 @@ def mock_llm_offline_environment():
     else:
         yield
 
+
+def pytest_sessionfinish(session, exitstatus):
+    """Clean up background SQLAlchemy / aiosqlite connection pools so Python exits immediately."""
+    import asyncio
+    try:
+        import app.dependencies as deps
+        if deps._engine is not None:
+            inner = deps._engine._inner
+            if hasattr(inner, "_engine"):
+                asyncio.run(inner._engine.dispose())
+    except Exception:
+        pass
+
+

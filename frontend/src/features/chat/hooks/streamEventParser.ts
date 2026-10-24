@@ -45,58 +45,6 @@ export function extractThoughtDelta(event: StreamWireEvent): string {
   return stripSentinels(event.delta ?? data.delta ?? event.content ?? data.content ?? '');
 }
 
-export function parseSseLine(line: string): StreamWireEvent | null {
-  const trimmed = line.trim();
-  if (!trimmed || isHeartbeatComment(trimmed) || !trimmed.startsWith('data:')) return null;
-  const jsonStr = trimmed.slice(5).trim();
-  if (!jsonStr) return null;
-  if (jsonStr === '[DONE]' || jsonStr === '[END]') return { type: 'DONE' };
-  try {
-    return JSON.parse(jsonStr) as StreamWireEvent;
-  } catch {
-    return null;
-  }
-}
-
-export function parseSseChunkBuffer(
-  rawStreamText: string,
-  callbacks?: { onToken?: (t: string) => void; onToolStart?: (ev: any) => void }
-): { processedEvents: any[]; ignoredComments: string[] } {
-  const lines = rawStreamText.split('\n\n');
-  const processedEvents: any[] = [];
-  const ignoredComments: string[] = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (trimmed.startsWith(':')) {
-      ignoredComments.push(trimmed);
-      continue;
-    }
-    if (!trimmed.startsWith('data:')) continue;
-    const jsonStr = trimmed.slice(5).trim();
-    if (!jsonStr) continue;
-    if (jsonStr === '[DONE]' || jsonStr === '[END]') {
-      processedEvents.push({ type: 'DONE' });
-      continue;
-    }
-    try {
-      const parsed = JSON.parse(jsonStr);
-      processedEvents.push(parsed);
-      const evType = String(parsed.type || '').toUpperCase();
-      if (evType === 'TEXT_MESSAGE_CONTENT' || evType === 'TEXT_MESSAGE_CHUNK') {
-        const delta = parsed.delta ?? parsed.content ?? '';
-        if (delta && callbacks?.onToken) callbacks.onToken(delta);
-      } else if (evType === 'TOOL_CALL_START' && callbacks?.onToolStart) {
-        callbacks.onToolStart(parsed);
-      }
-    } catch {
-      throw new Error(`Invalid SSE JSON: ${jsonStr}`);
-    }
-  }
-  return { processedEvents, ignoredComments };
-}
-
 const messageArtifactCache = new WeakMap<Message, ArtifactItem[]>();
 
 export function getCachedArtifacts(msg: Message, isStreamingMsg: boolean): ArtifactItem[] {
@@ -183,7 +131,6 @@ export async function syncBackendSessionQueue(sessionId: string, onSynced?: (que
     const s = sessionStore.get(sessionId);
     if (s && backendQueue?.length && (!s.queuedMessages || s.queuedMessages.length === 0)) {
       s.queuedMessages = [...backendQueue];
-      s.queuedMessage = backendQueue[0] || null;
       onSynced?.(backendQueue);
       notifyStoreListeners();
     }

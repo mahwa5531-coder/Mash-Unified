@@ -33,6 +33,7 @@ export interface SafeFileViewerProps {
   hideToolbar?: boolean;
   isTruncated?: boolean;
   is_truncated?: boolean;
+  onRetry?: () => void;
 }
 
 const EXT_LANG_MAP: Record<string, string> = {
@@ -76,6 +77,7 @@ export default function SafeFileViewer({
   viewMode = 'preview',
   isTruncated,
   is_truncated,
+  onRetry,
 }: SafeFileViewerProps) {
   const isDark = useIsDarkMode();
 
@@ -123,7 +125,7 @@ export default function SafeFileViewer({
   );
 
   if (isFileNotFound) {
-    return <FileViewerNotice message="File not found" filename={filename} path={path} />;
+    return <FileViewerNotice message="File not found" filename={filename} path={path} onRetry={onRetry} />;
   }
 
   if (isBinaryExcel) {

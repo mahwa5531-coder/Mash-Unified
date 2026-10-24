@@ -73,6 +73,7 @@ export default function RightSidebar({
     isLoadingContent,
     openFileTab,
     handleCloseTab,
+    retryTabContent,
     activeTab,
   } = useViewerTabs(sessionId);
 
@@ -251,6 +252,7 @@ export default function RightSidebar({
                     viewMode={fileViewMode}
                     onViewModeChange={setFileViewMode}
                     hideToolbar={true}
+                    onRetry={() => retryTabContent(activeTab?.id)}
                   />
                 </ErrorBoundary>
               </div>

@@ -98,10 +98,17 @@ def send_nlp_query(session_id: str, prompt: str):
                         full_text += delta
                         sys.stdout.write(delta)
                         sys.stdout.flush()
-                    elif "RUN_FINISHED" in ev_type:
+                    elif "RUN_FINISHED" in ev_type or data_json in ("[DONE]", "[END]"):
                         print("\n[RUN FINISHED]")
+                        try:
+                            response.close()
+                        except Exception:
+                            pass
+                        break
                 except Exception:
                     pass
+            if data_json in ("[DONE]", "[END]"):
+                break
 
     print("\n--- FINAL AGENT ANSWER ---")
     print(full_text.strip())

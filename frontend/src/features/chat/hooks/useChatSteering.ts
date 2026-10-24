@@ -31,7 +31,6 @@ export function useChatSteering({
     if (!msgToInject) return;
 
     s.queuedMessages.splice(index, 1);
-    s.queuedMessage = s.queuedMessages[0] || null;
     if (activeSid === activeSessionIdRef.current) {
       setQueuedMessages([...s.queuedMessages]);
     }
@@ -59,7 +58,6 @@ export function useChatSteering({
       s.queuedMessages = [];
       removeSessionQueueItem(activeSid).catch(() => {});
     }
-    s.queuedMessage = s.queuedMessages[0] || null;
     if (activeSid === activeSessionIdRef.current) {
       setQueuedMessages([...s.queuedMessages]);
     }

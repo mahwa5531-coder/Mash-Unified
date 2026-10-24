@@ -91,8 +91,68 @@ class LocalSandbox(BaseSandbox):
         """Convert a local native path into the active shell backend format."""
         return self._shell_backend.format_path_for_shell(path)
 
+    @classmethod
+    def _resolve_runtime_python_dirs(cls) -> list[Path]:
+        """Resolve directories containing Python executables and scripts.
+
+        Order of precedence:
+        1. MASH_PYTHON_RUNTIME_DIR environment override
+        2. Frozen application runtime directories (PyInstaller desktop mode)
+        3. Active development interpreter (sys.executable)
+        """
+        # 1. Environment override
+        override = os.environ.get("MASH_PYTHON_RUNTIME_DIR", "").strip().strip("\"'")
+        if override:
+            p = Path(override)
+            if p.is_file():
+                p = p.parent
+            if p.name.lower() in ("scripts", "bin"):
+                return [p, p.parent]
+            scripts_name = "Scripts" if sys.platform == "win32" else "bin"
+            return [p / scripts_name, p]
+
+        # 2. Frozen desktop mode (PyInstaller)
+        if getattr(sys, "frozen", False):
+            base_dir = Path(sys.executable).parent
+            # Probe candidates: prioritize candidate containing a python interpreter
+            candidates = [
+                base_dir / "runtime" / "python",
+                base_dir / "resources" / "python_runtime",
+            ]
+            for candidate in candidates:
+                if (candidate / "python.exe").is_file() or (candidate / "python").is_file():
+                    scripts = candidate / "Scripts" if sys.platform == "win32" else candidate / "bin"
+                    return [scripts, candidate] if scripts.exists() else [candidate]
+            # Fall back to any candidate directory that exists
+            for candidate in candidates:
+                if candidate.exists():
+                    scripts = candidate / "Scripts" if sys.platform == "win32" else candidate / "bin"
+                    return [scripts, candidate] if scripts.exists() else [candidate]
+
+        # 3. Development mode: sys.executable
+        # ponytail: prioritize Scripts/bin and venv root for tools and interpreter isolation
+        parent = Path(sys.executable).parent
+        if parent.name.lower() in ("scripts", "bin"):
+            return [parent, parent.parent]
+        scripts_name = "Scripts" if sys.platform == "win32" else "bin"
+        return [parent / scripts_name, parent]
+
     def get_python_command(self) -> str:
         """Return the shell-safe Python interpreter command for LocalSandbox."""
+        for d in self._resolve_runtime_python_dirs():
+            for name in ("python.exe", "python"):
+                candidate = d / name
+                if candidate.is_file():
+                    return self._shell_backend.format_executable_for_shell(str(candidate))
+        if getattr(sys, "frozen", False):
+            # In PyInstaller frozen desktop mode, sys.executable is the app binary (e.g. Mash.exe).
+            # Invoking it with -c spawns a duplicate GUI instance (runaway loop).
+            # Fall back to system python in PATH if available.
+            import shutil
+            system_python = shutil.which("python.exe") or shutil.which("python")
+            if system_python:
+                return self._shell_backend.format_executable_for_shell(system_python)
+            return "python"
         return self._shell_backend.format_executable_for_shell(sys.executable)
 
     def _ensure_working_directory(self) -> Path:
@@ -161,7 +221,7 @@ class LocalSandbox(BaseSandbox):
         """Build environment variables for local subprocess execution.
 
         Merges os.environ + self.envs + per_call_envs.
-        Returns None if no custom envs are set (subprocess inherits parent env).
+        Sanitizes toxic Python environment variables and prepends runtime Python directories to PATH.
 
         Args:
             per_call_envs: Optional per-call environment variables
@@ -169,15 +229,67 @@ class LocalSandbox(BaseSandbox):
         Returns:
             Merged envs dict including os.environ, or None to inherit parent env
         """
-        merged = self._merge_envs(per_call_envs)
         base = dict(os.environ)
+        merged = self._merge_envs(per_call_envs)
+        if merged:
+            base.update(merged)
+
         # Guarantee UTF-8 console output for Python and tools on Windows (prevents cp932/cp1252 crashes)
         base.setdefault("PYTHONIOENCODING", "utf-8")
         base.setdefault("PYTHONUTF8", "1")
-        if merged is None:
-            return base
-        # For local subprocess, we must include os.environ as base
-        return {**base, **merged}
+
+        # Strip toxic environment variables that cause cross-version collisions
+        toxic_keys = {"PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"}
+        for k in list(base.keys()):
+            if k.upper() in toxic_keys:
+                base.pop(k, None)
+
+        # Smart PYTHONNOUSERSITE handling:
+        # Only set PYTHONNOUSERSITE = 1 if in a virtual environment or frozen app.
+        # If running on host system Python where libraries live in %APPDATA%\Python\...\site-packages,
+        # leave user site-packages intact.
+        is_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+        is_frozen = bool(getattr(sys, "frozen", False))
+        if is_venv or is_frozen:
+            base["PYTHONNOUSERSITE"] = "1"
+        else:
+            for k in list(base.keys()):
+                if k.upper() == "PYTHONNOUSERSITE":
+                    base.pop(k, None)
+
+        # Prepend resolved runtime Python directories (Scripts and python root) to PATH without duplicating.
+        # Consolidate all variations of PATH (case-insensitivity on Windows).
+        runtime_dirs = [str(d) for d in self._resolve_runtime_python_dirs()]
+        path_fragments: list[str] = []
+        for k in list(base.keys()):
+            if k.upper() == "PATH":
+                val = base.pop(k, None)
+                if val:
+                    path_fragments.append(val)
+
+        existing_entries: list[str] = []
+        for frag in path_fragments:
+            for p in frag.split(os.pathsep):
+                if p:
+                    existing_entries.append(p)
+
+        new_entries: list[str] = []
+        seen: set[str] = set()
+
+        for d_str in runtime_dirs:
+            norm = os.path.normcase(os.path.normpath(d_str))
+            if norm not in seen:
+                seen.add(norm)
+                new_entries.append(d_str)
+
+        for entry in existing_entries:
+            norm = os.path.normcase(os.path.normpath(entry))
+            if norm not in seen:
+                seen.add(norm)
+                new_entries.append(entry)
+
+        base["PATH"] = os.pathsep.join(new_entries)
+        return base
 
     @staticmethod
     def _normalize_powershell_command(command: str) -> str:

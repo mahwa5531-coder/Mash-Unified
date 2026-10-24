@@ -53,12 +53,21 @@ export function useChatStream({
 
   const steering = useChatSteering({ activeSessionIdRef, sessionId, onSendMessage: dispatchSendMessage });
 
+  const prevScrollTopRef = useRef<number>(0);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const onScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = el;
-      isAtBottomRef.current = scrollHeight - (scrollTop + clientHeight) < 80;
+      const distFromBottom = scrollHeight - (scrollTop + clientHeight);
+      const isScrollingUp = scrollTop < prevScrollTopRef.current;
+      prevScrollTopRef.current = scrollTop;
+
+      if (isScrollingUp || distFromBottom > 40) {
+        isAtBottomRef.current = false;
+      } else if (distFromBottom <= 20) {
+        isAtBottomRef.current = true;
+      }
     };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
@@ -108,7 +117,6 @@ export function useChatStream({
 
     if (targetSession.isStreaming && !isRetry && !isImmediate && !isResume) {
       targetSession.queuedMessages = [...(targetSession.queuedMessages || []), userText];
-      targetSession.queuedMessage = targetSession.queuedMessages[0] || null;
       if (activeSid === activeSessionIdRef.current) steering.setQueuedMessages([...targetSession.queuedMessages]);
       notifyStoreListeners();
       return;

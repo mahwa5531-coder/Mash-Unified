@@ -27,29 +27,22 @@ export function useScrollToBottom(scrollRef: RefObject<HTMLDivElement | null>) {
   // Handle scroll events on the chat container
   const onChatBodyScroll = useCallback(
     (e: HTMLElement) => {
-      const isCurrentlyAtBottom = isAtBottom(e);
+      const currentScrollTop = e.scrollTop;
+      const distFromBottom = e.scrollHeight - (currentScrollTop + e.clientHeight);
+      const isCurrentlyAtBottom = distFromBottom <= 20;
       setHitBottom(isCurrentlyAtBottom);
 
-      // Get current scroll position
-      const currentScrollTop = e.scrollTop;
-
-      // Detect scroll direction: upward scroll immediately pauses following
+      // Detect scroll direction: upward scroll or distance > 40px immediately disarms autoscroll
       const isScrollingUp = currentScrollTop < prevScrollTopRef.current;
-
-      // Update previous scroll position for next comparison
       prevScrollTopRef.current = currentScrollTop;
 
-      // Turn off autoscroll only when scrolling up
-      if (isScrollingUp) {
+      if (isScrollingUp || distFromBottom > 40) {
         setAutoscroll(false);
-      }
-
-      // Turn on autoscroll when scrolled back to the bottom
-      if (isCurrentlyAtBottom) {
+      } else if (isCurrentlyAtBottom) {
         setAutoscroll(true);
       }
     },
-    [isAtBottom],
+    [],
   );
 
   // Scroll to bottom on demand or on send

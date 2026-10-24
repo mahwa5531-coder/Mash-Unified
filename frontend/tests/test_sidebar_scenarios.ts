@@ -1,57 +1,18 @@
 import assert from 'node:assert';
+import { groupSidebarSessions } from '../src/features/sessions/hooks/useSidebarData';
+import type { SessionItem } from '../src/services/sessions';
+import type { ProjectItem } from '../src/services/projects';
 
 // -------------------------------------------------------------
-// Emulate useSidebarData grouping logic (from useSidebarData.ts)
+// ConversationHistory filtering logic verification
 // -------------------------------------------------------------
-function groupSidebarSessions(sessions, pinnedSessionIds, archivedIds, registeredProjects) {
-  const visibleSessions = sessions.filter(s => !archivedIds.has(s.session_id));
-  const pinnedSessions = visibleSessions.filter(s => pinnedSessionIds.has(s.session_id));
-  const unpinnedSessions = visibleSessions.filter(s => !pinnedSessionIds.has(s.session_id));
-
-  const workspaceSessions = {};
-  const directConversations = [];
-
-  registeredProjects.forEach(p => {
-    workspaceSessions[p.name] = [];
-  });
-
-  unpinnedSessions.forEach(session => {
-    const uri = session.workspace_uri;
-    if (!uri || uri === 'No Repo') {
-      directConversations.push(session);
-      return;
-    }
-
-    const normUri = uri.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-    const matchedProject = registeredProjects.find(p => {
-      const normPath = p.local_folder_path ? p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() : '';
-      return (
-        normPath === normUri ||
-        p.name.toLowerCase() === uri.toLowerCase() ||
-        normPath.endsWith('/' + uri.toLowerCase()) ||
-        normUri.endsWith('/' + p.name.toLowerCase())
-      );
-    });
-
-    const targetGroupName = matchedProject ? matchedProject.name : (
-      uri.includes('/') || uri.includes('\\')
-        ? uri.split(/[/\\]/).filter(Boolean).pop() || uri
-        : uri
-    );
-
-    if (!workspaceSessions[targetGroupName]) {
-      workspaceSessions[targetGroupName] = [];
-    }
-    workspaceSessions[targetGroupName].push(session);
-  });
-
-  return { pinnedSessions, workspaceSessions, directConversations };
-}
-
-// -------------------------------------------------------------
-// Emulate ConversationHistory filtering (from ConversationHistory.tsx)
-// -------------------------------------------------------------
-function filterConversationHistory(sessions, searchQuery, filterMode, viewTab, archivedSessionIds) {
+function filterConversationHistory(
+  sessions: any[],
+  searchQuery: string,
+  filterMode: string,
+  viewTab: string,
+  archivedSessionIds: Set<string>
+) {
   return sessions.filter((s) => {
     // Archive tab filter
     const isArchived = Boolean(archivedSessionIds?.has(s.session_id));
@@ -75,25 +36,25 @@ function filterConversationHistory(sessions, searchQuery, filterMode, viewTab, a
 }
 
 console.log("======================================================================");
-console.log("STARTING FRONTEND SIDEBAR & CONVERSATION HISTORY LOGIC TESTS");
+console.log("STARTING FRONTEND SIDEBAR & CONVERSATION HISTORY LOGIC TESTS (DIRECT FROM useSidebarData)");
 console.log("======================================================================");
 
 // Sample Data
-const mockProjects = [
+const mockProjects: ProjectItem[] = [
   { id: 'p1', name: 'Alpha-Project', local_folder_path: 'C:/Users/rama/Documents/Alpha-Project' },
   { id: 'p2', name: 'Beta-Project', local_folder_path: 'C:/Users/rama/Documents/Beta-Project' },
 ];
 
-const mockSessions = [
-  { session_id: 's1', title: 'Audit Alpha codebase', workspace_uri: 'Alpha-Project', section: 'workspace' },
-  { session_id: 's2', title: 'Quick direct query', workspace_uri: 'No Repo', section: 'conversation' },
-  { session_id: 's3', title: 'Beta deployment sync', workspace_uri: 'C:/Users/rama/Documents/Beta-Project', section: 'workspace' },
-  { session_id: 's4', title: 'Legacy research task', workspace_uri: 'No Repo', section: 'conversation' },
+const mockSessions: SessionItem[] = [
+  { session_id: 's1', title: 'Audit Alpha codebase', custom_title: '', workspace_uri: 'Alpha-Project', section: 'workspace', created_at: '', updated_at: '', message_count: 0, total_tokens: 0, last_user_view_time: '', has_unread: false },
+  { session_id: 's2', title: 'Quick direct query', custom_title: '', workspace_uri: 'No Repo', section: 'conversation', created_at: '', updated_at: '', message_count: 0, total_tokens: 0, last_user_view_time: '', has_unread: false },
+  { session_id: 's3', title: 'Beta deployment sync', custom_title: '', workspace_uri: 'C:/Users/rama/Documents/Beta-Project', section: 'workspace', created_at: '', updated_at: '', message_count: 0, total_tokens: 0, last_user_view_time: '', has_unread: false },
+  { session_id: 's4', title: 'Legacy research task', custom_title: '', workspace_uri: 'No Repo', section: 'conversation', created_at: '', updated_at: '', message_count: 0, total_tokens: 0, last_user_view_time: '', has_unread: false },
 ];
 
 // Test 1: Baseline grouping without pins
-let pinned = new Set();
-let archived = new Set();
+let pinned = new Set<string>();
+let archived = new Set<string>();
 let grouped = groupSidebarSessions(mockSessions, pinned, archived, mockProjects);
 
 assert.strictEqual(grouped.pinnedSessions.length, 0, "Expected 0 pinned sessions initially");
@@ -150,5 +111,5 @@ assert.strictEqual(archivedView[0].session_id, 's4');
 console.log("[PASS] Test 8: Conversation History archive tab displays only archived sessions");
 
 console.log("======================================================================");
-console.log("ALL 8 FRONTEND LOGIC TESTS PASSED WITH ZERO REGRESSIONS!");
+console.log("ALL 8 FRONTEND SIDEBAR TESTS PASSED DIRECTLY FROM useSidebarData!");
 console.log("======================================================================");

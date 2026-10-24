@@ -82,7 +82,9 @@ async def kill_task(pid: int):
 
         # Fallback direct OS tree kill if sandbox did not find it or to guarantee shutdown
         if not is_success and sys.platform == "win32":
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            import psutil
+            if psutil.pid_exists(pid):
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
             is_success = True
 
         return {"success": is_success, "pid": pid, "status": str(res.status) if is_success else "killed"}
@@ -91,8 +93,10 @@ async def kill_task(pid: int):
         import sys
         if sys.platform == "win32":
             try:
-                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-                return {"success": True, "pid": pid, "status": "killed"}
+                import psutil
+                if psutil.pid_exists(pid):
+                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                    return {"success": True, "pid": pid, "status": "killed"}
             except Exception:
                 pass
         return {"success": False, "pid": pid, "error": str(e)}
@@ -302,4 +306,4 @@ async def stream_task_log(task_id: str, request: Request):
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         }
-    )
+    )

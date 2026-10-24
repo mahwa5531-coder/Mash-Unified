@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Terminal, FileEdit, Globe, Trash2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -75,6 +75,10 @@ export function ApprovalCard({
 }: ApprovalCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localDecision, setLocalDecision] = useState<'allow' | 'allow_once' | 'deny' | null>(decision);
+
+  useEffect(() => {
+    setLocalDecision(decision);
+  }, [decision]);
 
   const resolvedCommand =
     command ||

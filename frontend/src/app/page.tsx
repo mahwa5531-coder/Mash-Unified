@@ -196,7 +196,7 @@ export default function Home() {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('nexau_archived_session_ids');
+      const stored = localStorage.getItem('mash_archived_session_ids') || localStorage.getItem('nexau_archived_session_ids');
       if (stored) {
         setArchivedSessionIds(new Set(JSON.parse(stored)));
       }
@@ -209,7 +209,9 @@ export default function Home() {
       if (next.has(sessionId)) next.delete(sessionId);
       else next.add(sessionId);
       try {
-        localStorage.setItem('nexau_archived_session_ids', JSON.stringify(Array.from(next)));
+        const val = JSON.stringify(Array.from(next));
+        localStorage.setItem('mash_archived_session_ids', val);
+        localStorage.setItem('nexau_archived_session_ids', val);
       } catch {}
       return next;
     });

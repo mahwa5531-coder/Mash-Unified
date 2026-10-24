@@ -74,9 +74,13 @@ export function useSessionHistory({
           updatePaginationState(s);
 
           requestAnimationFrame(() => {
-            if (container) {
+            if (container && prevScrollHeight > 0) {
               const newScrollHeight = container.scrollHeight;
-              container.scrollTop = newScrollHeight - prevScrollHeight + prevScrollTop;
+              const expectedTop = newScrollHeight - prevScrollHeight + prevScrollTop;
+              // Only apply fallback if not already compensated by synchronous useLayoutEffect
+              if (Math.abs(container.scrollTop - expectedTop) > 2) {
+                container.scrollTop = expectedTop;
+              }
             }
           });
         }

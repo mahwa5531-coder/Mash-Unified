@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useId } from "react";
 import { X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { useIsDarkMode } from "@/hooks/useIsDarkMode";
+import { useTurnViewport } from "@/features/chat/context/TurnViewportContext";
 
 interface MermaidRendererProps {
   chart: string;
@@ -60,11 +62,18 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [modalZoom, setModalZoom] = useState<number>(1);
+  const isDark = useIsDarkMode();
+  const { isNearViewport } = useTurnViewport();
   const uniqueId = useId().replace(/[^a-zA-Z0-9]/g, "_");
-  const chartIdRef = useRef<string>(`mermaid_${uniqueId}`);
+  const renderCountRef = useRef<number>(0);
 
   useEffect(() => {
+    // ponytail: Defer Mermaid layout calculation until within viewport or already rendered
+    if (!isNearViewport && !svgContent) return;
+
     let isMounted = true;
+    renderCountRef.current += 1;
+    const renderId = `mermaid_${uniqueId}_${renderCountRef.current}`;
 
     async function renderChart() {
       if (!chart.trim()) return;
@@ -75,7 +84,6 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
         const mermaidModule = await import("mermaid");
         const mermaid = mermaidModule.default || mermaidModule;
 
-        const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
         mermaid.initialize({
           startOnLoad: false,
           theme: isDark ? "dark" : "default",
@@ -93,10 +101,14 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
           },
         });
 
-        const repairedChart = repairMermaidSyntax(chart);
-        const id = chartIdRef.current;
+        // Clean up any existing orphan element before render to avoid DOM collision
+        const existing = document.getElementById(renderId);
+        if (existing) existing.remove();
+        const existingD = document.getElementById(`d${renderId}`);
+        if (existingD) existingD.remove();
 
-        const { svg } = await mermaid.render(id, repairedChart);
+        const repairedChart = repairMermaidSyntax(chart);
+        const { svg } = await mermaid.render(renderId, repairedChart);
         if (isMounted) {
           setSvgContent(svg);
           setError(null);
@@ -105,10 +117,9 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
       } catch (err: any) {
         console.warn("Mermaid render error:", err);
         try {
-          const id = chartIdRef.current;
-          const orphan = document.getElementById(id);
+          const orphan = document.getElementById(renderId);
           if (orphan) orphan.remove();
-          const dOrphan = document.getElementById(`d${id}`);
+          const dOrphan = document.getElementById(`d${renderId}`);
           if (dOrphan) dOrphan.remove();
         } catch {}
 
@@ -123,8 +134,14 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
 
     return () => {
       isMounted = false;
+      try {
+        const orphan = document.getElementById(renderId);
+        if (orphan) orphan.remove();
+        const dOrphan = document.getElementById(`d${renderId}`);
+        if (dOrphan) dOrphan.remove();
+      } catch {}
     };
-  }, [chart]);
+  }, [chart, isDark, uniqueId, isNearViewport, svgContent]);
 
   // Handle escape key to close modal
   useEffect(() => {
@@ -169,9 +186,18 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
         className="my-3 rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111113] p-4 flex justify-center items-center overflow-x-auto cursor-pointer hover:border-zinc-300 dark:hover:border-white/[0.16] transition-all group/mermaid"
       >
         {loading && (
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-mono py-4">
-            <span className="w-3.5 h-3.5 rounded-full border-2 border-sky-500 border-t-transparent animate-spin" />
-            <span>Rendering diagram...</span>
+          <div className="flex items-center gap-2 text-muted-foreground text-xs font-mono py-4 select-none">
+            {isNearViewport ? (
+              <>
+                <span className="w-3.5 h-3.5 rounded-full border-2 border-sky-500 border-t-transparent animate-spin" />
+                <span>Rendering diagram...</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-zinc-400/60" />
+                <span>Diagram deferred</span>
+              </>
+            )}
           </div>
         )}
 

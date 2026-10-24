@@ -48,8 +48,16 @@ export function CommandTimelineRow({
   const rawOutput = entry.data?.tool?.output || '';
   const outputText = rawOutput.trim();
 
+
+  const isCmdExpanded = directIsCmdExpanded !== undefined
+    ? directIsCmdExpanded
+    : expandedCmds instanceof Set
+      ? expandedCmds.has(toolId)
+      : Boolean(expandedCmds?.[toolId]);
+
+  // ponytail: Defer JSON parsing of command output until user expands the terminal drawer
   let displayOutput = outputText;
-  if (outputText.startsWith('{') && outputText.endsWith('}')) {
+  if (isCmdExpanded && outputText.startsWith('{') && outputText.endsWith('}')) {
     try {
       const parsed = JSON.parse(outputText);
       if (parsed && typeof parsed === 'object') {
@@ -91,11 +99,6 @@ export function CommandTimelineRow({
     }
   }
 
-  const isCmdExpanded = directIsCmdExpanded !== undefined
-    ? directIsCmdExpanded
-    : expandedCmds instanceof Set
-      ? expandedCmds.has(toolId)
-      : Boolean(expandedCmds?.[toolId]);
 
   return (
     <div key={entry.id} className={cn("flex flex-col text-xs select-none transition-colors", isChild ? "pl-2 py-0.5" : "my-0.5", isDenied && "opacity-75")}>

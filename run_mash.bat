@@ -6,6 +6,9 @@ echo                 MASH / NexAU PLATFORM LAUNCHER
 echo ====================================================================
 echo.
 
+:: Strip ambient PYTHONHOME to ensure ambient terminal variables don't contaminate
+set PYTHONHOME=
+
 :: Detect Python
 set PYTHON_EXE=C:\Python313\python.exe
 if not exist "%PYTHON_EXE%" (
@@ -30,9 +33,12 @@ if errorlevel 1 (
 echo [OK] Python and Node.js detected.
 echo.
 
+:: Strip ambient PYTHONHOME to ensure ambient terminal variables don't contaminate
+set PYTHONHOME=
+
 :: Start Mash Desktop Connector in separate background window
 echo [*] Starting Mash Desktop Connector on http://localhost:8000 ...
-start "Mash Connector (Port 8000)" cmd /k "cd /d ""%~dp0connector"" && set ""PYTHONPATH=%~dp0NexAU;%~dp0connector"" && ""%PYTHON_EXE%"" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload"
+start "Mash Connector (Port 8000)" cmd /k "cd /d ""%~dp0connector"" && set PYTHONHOME= && set ""PYTHONPATH=%~dp0NexAU;%~dp0connector"" && ""%PYTHON_EXE%"" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload"
 
 :: Give connector a moment to bind port
 timeout /t 3 /nobreak >nul
