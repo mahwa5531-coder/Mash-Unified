@@ -291,8 +291,26 @@ class TransportBase[TTransportConfig](ABC):
 
         async def run_agent() -> str:
             try:
-                return cast(str, await agent.run_async(message=message, context=context, variables=variables))
+                res = cast(str, await agent.run_async(message=message, context=context, variables=variables))
+                if isinstance(res, str) and not res.strip():
+                    notice = "The model returned an empty response. Please rephrase your query or provide more context."
+                    from nexau.archs.llm.llm_aggregators.events import RunFinishedEvent, TextMessageContentEvent
+
+                    run_id = getattr(agent, "run_id", None) or f"run_{session_id[:8]}"
+                    event_queue.put_nowait(TextMessageContentEvent(delta=notice, run_id=run_id, message_id=f"msg_{session_id[:8]}"))
+                    event_queue.put_nowait(RunFinishedEvent(run_id=run_id, thread_id=session_id, result=notice))
+                    return notice
+                return res
             except Exception as exc:
+                if "No response content or tool calls" in str(exc):
+                    logger.info("Empty completion for session %s; yielding clean terminal notification.", session_id)
+                    from nexau.archs.llm.llm_aggregators.events import RunFinishedEvent, TextMessageContentEvent
+
+                    run_id = getattr(agent, "run_id", None) or f"run_{session_id[:8]}"
+                    notice = "The model returned an empty response. Please rephrase your query or provide more context."
+                    event_queue.put_nowait(TextMessageContentEvent(delta=notice, run_id=run_id, message_id=f"msg_{session_id[:8]}"))
+                    event_queue.put_nowait(RunFinishedEvent(run_id=run_id, thread_id=session_id, result=notice))
+                    return notice
                 # ponytail: Defect 2 - emit RunErrorEvent to event_queue so SSE delivers it to client instead of hanging
                 logger.error("Unhandled exception in agent run (session_id: %s): %s", session_id, exc, exc_info=True)
                 from nexau.archs.llm.llm_aggregators.events import RunErrorEvent

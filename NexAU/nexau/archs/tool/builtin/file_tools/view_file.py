@@ -202,7 +202,7 @@ def view_file(
         title_str = f" - '{meta_title}'" if meta_title else ""
         header_text = (
             f"[PDF Document: {Path(target_path).name}{title_str} ({num_pages} total pages)]\n"
-            f"All {p_end - p_start + 1} pages rendered into high-resolution visual images for direct multimodal perception."
+            f"Pages {p_start} to {p_end} ingested with hybrid digital-text & 200 DPI visual engine."
         )
         if p_end < num_pages:
             header_text += (
@@ -211,21 +211,41 @@ def view_file(
             )
 
         content_parts: list[dict[str, Any]] = [{"type": "text", "text": header_text}]
+        digital_pages = 0
+        scanned_pages = 0
 
         for p_idx in range(p_start - 1, p_end):
-            p_idx + 1
+            p_no = p_idx + 1
             page = doc[p_idx]
-            # 150 DPI provides crystal-clear rendering for financial balance sheets and fine print
-            pix = page.get_pixmap(dpi=300)
-            img_bytes = pix.tobytes("jpeg", jpg_quality=85)
-            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
-            content_parts.append({
-                "type": "image",
-                "image_url": f"data:image/jpeg;base64,{img_b64}",
-                "detail": "high",
-            })
+            page_text = page.get_text("text").strip()
 
-        display_desc = f"Read PDF {Path(target_path).name} (rendered {p_end - p_start + 1} visual pages for multimodal model)"
+            # ponytail: hybrid threshold. >=50 chars indicates native digital text.
+            # <50 chars indicates scanned bitmap, seal/signature, invoice, or diagram.
+            if len(page_text) >= 50:
+                content_parts.append({
+                    "type": "text",
+                    "text": f"--- [Page {p_no}: Digital Text] ---\n{page_text}\n",
+                })
+                digital_pages += 1
+            else:
+                # 200 DPI provides optimal legibility for fine print/stamps while saving 60% payload over 300 DPI
+                pix = page.get_pixmap(dpi=200)
+                img_bytes = pix.tobytes("jpeg", jpg_quality=85)
+                img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+                content_parts.append({
+                    "type": "image",
+                    "image_url": f"data:image/jpeg;base64,{img_b64}",
+                    "detail": "high",
+                })
+                scanned_pages += 1
+
+        if digital_pages > 0 and scanned_pages > 0:
+            display_desc = f"Read PDF {Path(target_path).name} (hybrid: {digital_pages} digital text pages, {scanned_pages} visual pages)"
+        elif scanned_pages > 0:
+            display_desc = f"Read PDF {Path(target_path).name} (rendered {scanned_pages} visual pages for multimodal model)"
+        else:
+            display_desc = f"Read PDF {Path(target_path).name} ({digital_pages} digital text pages)"
+
         return {
             "content": content_parts,
             "returnDisplay": display_desc,

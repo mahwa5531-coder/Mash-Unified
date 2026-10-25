@@ -93,7 +93,6 @@ _desktop_update_state = {
 
 
 @router.get("/system/updates")
-@router.get("/api/system/updates")
 async def get_system_updates():
     """Returns background auto-update status."""
     return _desktop_update_state
@@ -418,7 +417,6 @@ class OpenFileRequest(BaseModel):
 
 
 @router.post("/system/open-file")
-@router.post("/api/system/open-file")
 async def open_system_file(request: OpenFileRequest):
     """Open a local file or directory with the host operating system's registered application."""
     import os

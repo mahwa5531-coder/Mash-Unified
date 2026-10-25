@@ -32,7 +32,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 from nexau.archs.platform.path_helpers import get_local_bash_tool_results_dir, get_local_temp_root
 from nexau.archs.platform.process_compat import graceful_kill
@@ -67,6 +67,7 @@ _ENCODING_PROBE_MAX_BYTES = 64 * 1024
 
 @dataclass(kw_only=True)
 class LocalSandbox(BaseSandbox):
+    _shared_background_tasks: ClassVar[dict[int, Any]] = {}
     """
     Local sandbox implementation that executes commands directly on the host system.
 
@@ -81,6 +82,7 @@ class LocalSandbox(BaseSandbox):
 
     def __post_init__(self) -> None:
         super().__post_init__()
+        self._background_tasks = LocalSandbox._shared_background_tasks
         self._shell_backend = create_shell_backend()
 
     def get_temp_dir(self) -> str:

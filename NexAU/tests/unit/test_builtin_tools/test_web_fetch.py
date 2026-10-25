@@ -82,3 +82,45 @@ class TestWebFetchOutputFormat:
         result = web_fetch(prompt="")
 
         assert "Error" in result["returnDisplay"]
+
+
+class TestWebFetchExtractionEngine:
+    """Test trafilatura extraction and fallback mechanics."""
+
+    def test_direct_http_trafilatura_extraction(self, monkeypatch):
+        """Should extract main article content via trafilatura and follow redirects."""
+        from nexau.archs.tool.builtin.web_tools.web_tool import web_read
+
+        html_sample = (
+            "<html><head><title>Audit Standard</title></head>"
+            "<body><nav>Menu</nav><article><h1>SA 700</h1><p>Forming an opinion on financial statements.</p></article>"
+            "<footer>Footer info</footer></body></html>"
+        )
+
+        class DummyResponse:
+            status_code = 200
+            url = "https://audit.example.com/sa700"
+            text = html_sample
+            headers = {"content-type": "text/html; charset=utf-8"}
+
+            def raise_for_status(self):
+                pass
+
+        class DummyClient:
+            def __init__(self, *args, **kwargs):
+                assert kwargs.get("follow_redirects") is True
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                pass
+
+            def get(self, *args, **kwargs):
+                return DummyResponse()
+
+        monkeypatch.setattr("nexau.archs.tool.builtin.web_tools.web_tool.httpx.Client", DummyClient)
+        res = web_read("https://audit.example.com/sa700")
+        assert res["status"] == "success"
+        assert "SA 700" in res["extracted_text"]
+        assert "Forming an opinion" in res["extracted_text"]

@@ -46,6 +46,10 @@ async def _ensure_project_and_context(
 
 
 async def stream_query_bridge(payload: StreamQueryPayload, request: Request, path_session_id: str | None = None):
+    sid = (path_session_id or payload.session_id or "").strip()
+    if not sid:
+        raise HTTPException(status_code=400, detail="session_id is required")
+    _check_id(sid)
     return await stream_chat_query(request, payload, get_sse_server(), path_session_id, _ensure_project_and_context)
 
 

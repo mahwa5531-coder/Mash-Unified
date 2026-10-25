@@ -96,3 +96,27 @@ def test_view_file_file_uri_with_spaces(tmp_path):
     res2 = view_file(AbsolutePath=uri)
     assert not res2.get("isError", False)
     assert "Balance: 500000" in res2["content"]
+
+
+def test_view_file_mixed_pdf_hybrid(tmp_path):
+    import fitz
+    pdf_path = tmp_path / "mixed_test.pdf"
+    doc = fitz.open()
+    # Page 1: Digital text (>50 chars)
+    p1 = doc.new_page()
+    p1.insert_text((50, 50), "This is a digital text page with enough characters to exceed the 50 char threshold.")
+    # Page 2: Empty / scanned image drawing (<50 chars)
+    p2 = doc.new_page()
+    p2.draw_rect([10, 10, 50, 50], color=(1, 0, 0))
+    doc.save(str(pdf_path))
+    doc.close()
+
+    res = view_file(AbsolutePath=str(pdf_path))
+    assert not res.get("isError", False)
+    assert "hybrid: 1 digital text pages, 1 visual pages" in res["returnDisplay"]
+    assert len(res["content"]) == 3
+    assert res["content"][0]["type"] == "text"
+    assert res["content"][1]["type"] == "text"
+    assert "Digital Text" in res["content"][1]["text"]
+    assert res["content"][2]["type"] == "image"
+    assert res["content"][2]["image_url"].startswith("data:image/jpeg;base64,")

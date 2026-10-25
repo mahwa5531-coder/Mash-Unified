@@ -29,7 +29,16 @@ async def upload_file(session_id: str, file: UploadFile, engine: DatabaseEngineD
         brain_dir = str(get_session_brain_dir(session_id, project_id))
     save_dir = os.path.join(brain_dir, ".user_uploaded")
     os.makedirs(save_dir, exist_ok=True)
-    safe_filename = os.path.basename(file.filename or "uploaded_file")
+    raw_filename = file.filename
+    if raw_filename is not None and not raw_filename.strip():
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    raw_filename = raw_filename or "uploaded_file"
+    if "\x00" in raw_filename:
+        raise HTTPException(status_code=400, detail="Invalid filename: null byte detected")
+    norm_name = raw_filename.replace("\\", "/")
+    if any((set(s) == {"."} and len(s) >= 2) or ".." in s for s in norm_name.split("/")):
+        raise HTTPException(status_code=400, detail="Invalid filename: path traversal detected")
+    safe_filename = Path(norm_name).name
     if not safe_filename or safe_filename in (".", ".."):
         raise HTTPException(status_code=400, detail="Invalid filename")
     dest_path = (Path(save_dir) / safe_filename).resolve()

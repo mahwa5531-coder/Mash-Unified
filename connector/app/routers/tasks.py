@@ -19,7 +19,6 @@ async def list_active_tasks(session_id: str | None = None):
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
         from nexau.archs.session.models import SessionModel
         from nexau.archs.session.orm import ComparisonFilter
-        from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
 
         from app.dependencies import get_engine
 
@@ -34,7 +33,8 @@ async def list_active_tasks(session_id: str | None = None):
             except Exception:
                 pass
 
-        sandbox = get_sandbox(session_work_dir)
+        from nexau.archs.sandbox.local_sandbox import LocalSandbox
+        sandbox = LocalSandbox(work_dir=Path(session_work_dir) if session_work_dir else Path.cwd())
         bg_tasks = sandbox.list_background_tasks()
         for pid, info in bg_tasks.items():
             task_cwd = info.get("cwd", "")
@@ -85,9 +85,10 @@ async def kill_task(pid: int):
             import psutil
             if psutil.pid_exists(pid):
                 subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-            is_success = True
+                is_success = True
 
-        return {"success": is_success, "pid": pid, "status": str(res.status) if is_success else "killed"}
+        # ponytail: B-15 fix inverted status ternary: return "killed" on success, "failed" on failure
+        return {"success": is_success, "pid": pid, "status": "killed" if is_success else "failed"}
     except Exception as e:
         import subprocess
         import sys
@@ -99,7 +100,7 @@ async def kill_task(pid: int):
                     return {"success": True, "pid": pid, "status": "killed"}
             except Exception:
                 pass
-        return {"success": False, "pid": pid, "error": str(e)}
+        return {"success": False, "pid": pid, "status": "failed", "error": str(e)}
 
 
 def _normalize_task_id(raw_id: str) -> tuple[int | None, str]:

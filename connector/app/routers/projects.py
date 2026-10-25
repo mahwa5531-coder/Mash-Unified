@@ -75,24 +75,34 @@ async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEng
 
 @router.post("")
 async def create_project(request: CreateProjectRequest, engine: DatabaseEngineDep):
-    normalized_path = os.path.normpath(request.local_folder_path).replace("\\", "/")
+    # ponytail: B-11 validate stripped name immediately
+    clean_name = request.name.strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="Project name cannot be empty")
+
+    # ponytail: B-07 guard workspace folder exists as directory prior to creation
+    folder_path = Path(request.local_folder_path)
+    if not folder_path.is_dir():
+        raise HTTPException(status_code=422, detail="Workspace directory does not exist or is not a directory")
+
+    normalized_path = os.path.normpath(str(folder_path.resolve())).replace("\\", "/")
     try:
         from app.paths import scaffold_workspace_storage
         scaffold_workspace_storage(normalized_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create directory: {e}")
 
-    # Single source of truth: check if project already exists with same name
+    # ponytail: B-12 case-insensitive uniqueness check & return existing project with stripped name
     all_projects = await engine.find_many(ProjectModel)
     for p in all_projects:
-        if p.name.strip().lower() == request.name.strip().lower():
+        if p.name.strip().lower() == clean_name.lower():
             p.local_folder_path = normalized_path
             p.user_id = request.user_id
             await engine.update(p)
             invalidate_roots_cache()
             return p
 
-    project = ProjectModel(user_id=request.user_id, name=request.name, local_folder_path=normalized_path)
+    project = ProjectModel(user_id=request.user_id, name=clean_name, local_folder_path=normalized_path)
     await engine.create(project)
     invalidate_roots_cache()
     return project
@@ -207,13 +217,8 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
                 project = p
                 break
     if not project:
-        return {
-            "status": "success",
-            "message": f"Project '{clean_id}' already removed.",
-            "deleted_sessions_count": 0,
-            "deleted_project_id": clean_id,
-            "deleted_project_name": clean_id,
-        }
+        # ponytail: Return 404 on missing project to standardize deletion contract with sessions (B-13)
+        raise HTTPException(status_code=404, detail=f"Project '{clean_id}' not found")
 
     deleted_sessions_count = 0
     # 1. Find all sessions tied to this workspace and delete their data

@@ -161,10 +161,14 @@ def messages_to_transcript_lines(
                 t_args = redact_data_structure(b.input) if isinstance(b.input, dict) else {}
                 tool_action = get_tool_action_type(tc_name)
 
+                output_val = tool_results.get(tc_id, "")
                 is_pending = bool(pending_map and tc_id in pending_map and not pending_map[tc_id].get("decision"))
                 decision_val = pending_map.get(tc_id, {}).get("decision") if pending_map else None
-                tool_status = "pending_approval" if is_pending else ("denied" if decision_val == "deny" else "completed")
-                output_val = tool_results.get(tc_id, "")
+                # ponytail: preserve audit trail of denied tool calls on reload even after pending_tool_calls is cleared
+                is_denied = (decision_val == "deny") or ("Permission denied" in str(output_val))
+                if is_denied:
+                    decision_val = "deny"
+                tool_status = "pending_approval" if is_pending else ("denied" if is_denied else "completed")
                 summary_raw = t_args.get("toolSummary") or (pending_map.get(tc_id, {}).get("prompt") if pending_map else None)
                 summary_str = redact_sensitive_content(str(summary_raw)) if summary_raw else None
                 action_str = t_args.get("toolAction")

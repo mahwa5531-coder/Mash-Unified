@@ -21,7 +21,6 @@ from typing import Any
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from nexau.archs.main_sub.context_value import ContextValue
-from nexau.archs.session.id_generator import generate_session_id
 from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 from nexau.archs.session.steering import clear_steering_messages
@@ -134,6 +133,8 @@ async def generate_chat_sse_stream(
     # ponytail: shield-and-re-await pattern prevents 15s timeout from cancelling underlying task
     anext_task = asyncio.ensure_future(event_iter.__anext__())
     last_run_id = last_run_id_hint
+    run_started_emitted = False
+    pending_flushed = False
 
     try:
         while True:
@@ -146,6 +147,48 @@ async def generate_chat_sse_stream(
                 if hasattr(event, "run_id") and event.run_id:
                     last_run_id = event.run_id
                 data_str = event.model_dump_json() if hasattr(event, "model_dump_json") else (event if isinstance(event, str) else json.dumps(event))
+
+                # Extract event type for protocol ordering and error interception
+                event_type = getattr(event, "type", None)
+                if not event_type and isinstance(event, dict):
+                    event_type = event.get("type")
+                if not event_type and isinstance(data_str, str) and data_str.strip().startswith("{"):
+                    with contextlib.suppress(Exception):
+                        event_type = json.loads(data_str).get("type")
+
+                # B-04/B-05: Handle empty / whitespace-only model completion error cleanly
+                if event_type == "RUN_ERROR":
+                    err_msg = getattr(event, "message", None) or ""
+                    if not err_msg and isinstance(data_str, str) and "No response content or tool calls" in data_str:
+                        err_msg = "No response content or tool calls"
+                    if "No response content or tool calls" in str(err_msg):
+                        notice = "The model returned an empty response. Please rephrase your query or provide more context."
+                        run_id = getattr(event, "run_id", None) or last_run_id or f"run_{session_id[:8]}"
+                        if not run_started_emitted:
+                            yield f"data: {json.dumps({'type': 'RUN_STARTED', 'run_id': run_id, 'session_id': session_id})}\n\n"
+                            run_started_emitted = True
+                        yield f"data: {json.dumps({'type': 'TEXT_MESSAGE_CONTENT', 'delta': notice, 'run_id': run_id, 'message_id': f'msg_{session_id[:8]}'})}\n\n"
+                        yield f"data: {json.dumps({'type': 'RUN_FINISHED', 'run_id': run_id, 'session_id': session_id, 'result': notice})}\n\n"
+                        anext_task = asyncio.ensure_future(event_iter.__anext__())
+                        continue
+
+                # B-01: On stream resume, ensure RUN_STARTED precedes tool execution result or content
+                if not run_started_emitted:
+                    if event_type == "RUN_STARTED":
+                        run_started_emitted = True
+                    elif event_type in ("TOOL_CALL_RESULT", "TOOL_CALL_START", "TEXT_MESSAGE_CONTENT", "TEXT_MESSAGE_START", "THINKING_START", "THINKING_CONTENT"):
+                        run_id = getattr(event, "run_id", None) or last_run_id or f"run_{session_id[:8]}"
+                        yield f"data: {json.dumps({'type': 'RUN_STARTED', 'run_id': run_id, 'session_id': session_id})}\n\n"
+                        run_started_emitted = True
+
+                # B-01: Flush TOOL_CALL_PENDING_APPROVAL before yielding RUN_FINISHED
+                if event_type == "RUN_FINISHED" and sm and session_id and not pending_flushed:
+                    with contextlib.suppress(Exception):
+                        for ptc_id, ptc in (await sm.get_pending_tool_calls(user_id=user_id, session_id=session_id) or {}).items():
+                            if not ptc.get("decision"):
+                                yield f"data: {json.dumps({'type': 'TOOL_CALL_PENDING_APPROVAL', 'tool_call_id': ptc_id, 'run_id': ptc.get('run_id') or last_run_id or 'run', 'tool_name': ptc.get('tool_name') or 'action', 'prompt': ptc.get('prompt', ''), 'permission_key': ptc.get('permission_key', ''), 'parameters': ptc.get('parameters', {})})}\n\n"
+                        pending_flushed = True
+
                 if isinstance(data_str, str) and (data_str.startswith("data:") or data_str.startswith(":")):
                     yield data_str if data_str.endswith("\n\n") else f"{data_str}\n\n"
                 else:
@@ -158,11 +201,12 @@ async def generate_chat_sse_stream(
                     rec = _request_idempotency_store[client_request_id]
                     rec.status = "completed"
                     rec.done_event.set()
-                if sm and session_id:
+                if sm and session_id and not pending_flushed:
                     with contextlib.suppress(Exception):
                         for ptc_id, ptc in (await sm.get_pending_tool_calls(user_id=user_id, session_id=session_id) or {}).items():
                             if not ptc.get("decision"):
                                 yield f"data: {json.dumps({'type': 'TOOL_CALL_PENDING_APPROVAL', 'tool_call_id': ptc_id, 'run_id': ptc.get('run_id') or last_run_id or 'run', 'tool_name': ptc.get('tool_name') or 'action', 'prompt': ptc.get('prompt', ''), 'permission_key': ptc.get('permission_key', ''), 'parameters': ptc.get('parameters', {})})}\n\n"
+                        pending_flushed = True
                 break
     except (asyncio.CancelledError, GeneratorExit):
         if client_request_id and client_request_id in _request_idempotency_store:
@@ -232,7 +276,10 @@ async def stream_chat_query(
     path_session_id: str | None = None, ensure_context_fn: Any = None,
 ) -> StreamingResponse:
     """Prepare context, sandbox, permissions, and stream chat response."""
-    user_id, sid = payload.user_id or "default_user", path_session_id or payload.session_id or generate_session_id()
+    sid = (path_session_id or payload.session_id or "").strip()
+    if not sid:
+        raise HTTPException(status_code=400, detail="session_id is required")
+    user_id = payload.user_id or "default_user"
     check_session_id(sid)
     resolved_context = payload.context or {}
     user_prompt = (payload.messages or payload.message or "").strip()

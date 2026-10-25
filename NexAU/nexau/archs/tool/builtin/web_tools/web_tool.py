@@ -25,9 +25,6 @@ logger = logging.getLogger(__name__)
 MAX_WEB_CONTENT_LENGTH = 64 * 1024  # 64KB
 
 
-
-
-
 class HtmlParser:
     """HTML parser for web content extraction."""
 
@@ -38,7 +35,7 @@ class HtmlParser:
 
     def parse(self, url: str) -> tuple[bool, str]:
         if not self.base_url or not self.api_key or not self.secret:
-            logger.warning("HTML parser configuration is incomplete; skipping parser request")
+            # ponytail: Silently fall through when optional external parser credentials are not set
             return False, ""
 
         timestamp = str(int(time.time()))
@@ -73,86 +70,64 @@ class HtmlParser:
             return False, ""
 
 
-class DuckDuckGoSearch:
-    """Free, zero-config search using DuckDuckGo (ddgs)."""
-
-    def search(self, query: str, num_results: int = 4, search_type: str = "search", **kwargs) -> list[dict[str, Any]]:
-        from ddgs import DDGS
-        try:
-            with DDGS() as ddgs:
-                if search_type == "news":
-                    raw = list(ddgs.news(query, max_results=num_results))
-                else:
-                    raw = list(ddgs.text(query, max_results=num_results))
-                return [
-                    {
-                        "title": r.get("title", "Untitled"),
-                        "link": r.get("href", r.get("url", "")),
-                        "snippet": r.get("body", ""),
-                    }
-                    for r in raw
-                ]
-        except Exception as e:
-            logger.warning(f"DuckDuckGo search error for '{query}': {e}")
-            clean_q = query.replace('"', '').replace("'", "").strip()
-            if clean_q != query:
-                try:
-                    with DDGS() as ddgs:
-                        if search_type == "news":
-                            raw = list(ddgs.news(clean_q, max_results=num_results))
-                        else:
-                            raw = list(ddgs.text(clean_q, max_results=num_results))
-                        return [
-                            {
-                                "title": r.get("title", "Untitled"),
-                                "link": r.get("href", r.get("url", "")),
-                                "snippet": r.get("body", ""),
-                            }
-                            for r in raw
-                        ]
-                except Exception:
-                    pass
-            return []
-
-
 # Global instances
 _html_parser: HtmlParser | None = None
 
 
-def web_search(
-    query: str,
-    num_results: int = 10,
-    search_type: str = "search",
-    proxy_url: str | None = None,
-) -> dict[str, Any]:
-    """Search the web using DuckDuckGo (free, zero-config)."""
+def _extract_markdown_from_html(content: str) -> tuple[str, str]:
+    """Convert HTML to clean structured Markdown without external dependencies beyond bs4."""
+    # ponytail: Priority ladder:
+    # 1. Trafilatura (if available) for precision article extraction
+    # 2. Native bs4 element-to-markdown transformation (zero extra dependencies, always installed)
+    text = ""
+    title = ""
+
     try:
-        ddg = DuckDuckGoSearch()
-        results = ddg.search(query, num_results=num_results, search_type=search_type)
+        import trafilatura
 
-        if isinstance(results, str):
-            return {
-                "status": "error",
-                "error": results,
-                "query": query,
-                "search_type": search_type,
-            }
-        else:
-            return {
-                "status": "success",
-                "query": query,
-                "search_type": search_type,
-                "results": results,
-                "total_results": len(results),
-            }
+        extracted = trafilatura.extract(content, output_format="markdown")
+        if extracted and extracted.strip():
+            text = extracted.strip()
+    except Exception:
+        pass
 
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "query": query,
-            "search_type": search_type,
-        }
+    if not text:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(content, "html.parser")
+        title = soup.title.string.strip() if soup.title and soup.title.string else ""
+
+        for tag in soup(["script", "style", "noscript", "svg", "iframe"]):
+            tag.decompose()
+
+        for h in soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]):
+            level = int(h.name[1])
+            h.replace_with(f"\n\n{'#' * level} {h.get_text().strip()}\n\n")
+
+        for p in soup.find_all("p"):
+            p.replace_with(f"\n\n{p.get_text().strip()}\n\n")
+
+        for li in soup.find_all("li"):
+            li.replace_with(f"\n- {li.get_text().strip()}\n")
+
+        for a in soup.find_all("a"):
+            href = a.get("href", "")
+            a_text = a.get_text().strip()
+            if href and a_text:
+                a.replace_with(f"[{a_text}]({href})")
+
+        lines = [line.strip() for line in soup.get_text().splitlines()]
+        text = "\n".join(line for line in lines if line)
+    else:
+        try:
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(content[:4096], "html.parser")
+            title = soup.title.string.strip() if soup.title and soup.title.string else ""
+        except Exception:
+            pass
+
+    return text, title
 
 
 def web_read(
@@ -198,16 +173,19 @@ def web_read(
         except Exception as e:
             logger.warning(f"HTML parser failed for {url}: {e}")
 
-    # Fallback to direct HTTP request
+    # Direct HTTP request with redirect following & modern browser user agent
     try:
-        user_agent = "NexAU-Bot/1.0 (https://github.com/nexau; nexau-agent@gmail.com) Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        user_agent = (
+            "MashDesktop/1.0 (Mozilla/5.0 Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36; +https://mash.app)"
+        )
         headers = {
             "User-Agent": user_agent,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
         }
 
-        with httpx.Client(timeout=timeout) as client:
+        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
             response = client.get(url, headers=headers)
             response.raise_for_status()
 
@@ -216,41 +194,17 @@ def web_read(
 
         result: dict[str, Any] = {
             "status": "success",
-            "url": url,
+            "url": str(response.url),
             "status_code": response.status_code,
             "content_type": content_type,
             "content_length": len(content),
             "method": "direct_http",
         }
 
-        # Extract markdown if content is HTML (matching Antigravity read_url_content)
+        # Extract markdown if content is HTML
         if "html" in content_type.lower():
             try:
-                import markdownify
-                from bs4 import BeautifulSoup
-
-                soup = BeautifulSoup(content, "html.parser")
-
-                # Remove non-content elements
-                for tag in soup(["script", "style", "noscript", "svg"]):
-                    tag.decompose()
-
-                # Convert HTML to clean structured markdown
-                md_text = markdownify.markdownify(str(soup), heading_style="ATX")
-
-                # Collapse excessive consecutive blank lines
-                cleaned_lines = []
-                prev_empty = False
-                for line in md_text.splitlines():
-                    stripped = line.strip()
-                    if not stripped:
-                        if not prev_empty:
-                            cleaned_lines.append("")
-                            prev_empty = True
-                    else:
-                        cleaned_lines.append(line)
-                        prev_empty = False
-                text = "\n".join(cleaned_lines).strip()
+                text, title = _extract_markdown_from_html(content)
 
                 # Cap extracted markdown at 32KB to prevent context bloat
                 MAX_CAP = 32 * 1024
@@ -260,7 +214,7 @@ def web_read(
                     result["text_truncated"] = True
 
                 result["extracted_text"] = text
-                result["title"] = soup.title.string.strip() if soup.title and soup.title.string else ""
+                result["title"] = title
 
             except Exception as e:
                 result["text_extraction_error"] = str(e)

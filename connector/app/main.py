@@ -232,6 +232,12 @@ app.include_router(system.router)
 app.include_router(auth.router)
 app.include_router(settings.router)
 
+# ponytail: B-16 root /health probe for external container/monitoring health checks
+@app.get("/health", tags=["system"])
+async def root_health():
+    """Root health probe delegating directly to get_system_health."""
+    return await system.get_system_health()
+
 # Backwards compatibility re-exports
 from app.routers.sessions import get_transcript as get_session_transcript_bridge  # noqa: F401
 

@@ -185,12 +185,8 @@ async def test_ui_backend_comprehensive_unit_suite():
             # Security: Upload path traversal rejection
             files_traversal = {"file": ("../../../malicious.txt", b"evil", "text/plain")}
             res = await client.post(f"/api/uploads/{test_sid}", files=files_traversal)
-            assert res.status_code == 200
-            up_path = res.json()["path"]
-            assert "malicious.txt" in up_path
-            assert ".." not in up_path
-            if os.path.exists(up_path):
-                os.remove(up_path)
+            assert res.status_code == 400
+            assert "path traversal detected" in res.json()["detail"]
 
             # -------------------------------------------------------------
             # 6. System Discovery Unit Tests

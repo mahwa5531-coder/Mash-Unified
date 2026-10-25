@@ -162,7 +162,7 @@ class PromptBuilder:
             return default_parts
 
         try:
-            context = self._build_template_context(runtime_context)
+            context = self._build_template_context(runtime_context, agent_config=agent_config)
 
             # When system_prompt is a list, render each item individually
             if isinstance(agent_config.system_prompt, list):
@@ -454,12 +454,22 @@ class PromptBuilder:
     def _build_template_context(
         self,
         runtime_context: dict[str, Any],
+        agent_config: "AgentConfig | None" = None,
     ) -> dict[str, Any]:
         """Build template context for prompt rendering."""
         context: dict[str, Any] = {}
 
         if runtime_context:
             context.update(runtime_context)
+
+        # ponytail: Auto-detect web capabilities from agent tools if not explicitly set in runtime context
+        if "web_research_enabled" not in context and agent_config and agent_config.tools:
+            tool_names = {
+                t.name if hasattr(t, "name") else (t.get("name") if isinstance(t, dict) else str(t))
+                for t in agent_config.tools
+            }
+            if "web_search" in tool_names or "web_fetch" in tool_names:
+                context["web_research_enabled"] = True
 
         return context
 

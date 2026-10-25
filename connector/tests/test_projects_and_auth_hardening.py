@@ -66,11 +66,9 @@ def test_delete_project_is_idempotent(client):
     assert del1.status_code == 200
     assert del1.json()["status"] == "success"
 
-    # 3. Second delete call -> succeeds idempotently without 404
+    # 3. Second delete call -> returns 404 (standardized contract per B-13)
     del2 = client.delete(f"/api/projects/{proj_id}")
-    assert del2.status_code == 200
-    assert del2.json()["status"] == "success"
-    assert "already removed" in del2.json()["message"]
+    assert del2.status_code == 404
 
 
 @pytest.mark.anyio
