@@ -237,7 +237,7 @@ class Executor:
         openai_client: Any,
         llm_config: LLMConfig,
         async_openai_client: Any | None = None,
-        max_iterations: int = 100,
+        max_iterations: int | None = None,
         max_context_tokens: int = 1048576,
         max_running_subagents: int = 5,
         retry_attempts: int = 5,
@@ -766,9 +766,9 @@ class Executor:
                 f"🔄 Starting iterative execution loop for agent '{self.agent_name}'",
             )
 
-            while iteration < self.max_iterations:
+            while self.max_iterations is None or iteration < self.max_iterations:
                 logger.info(
-                    f"🔄 Iteration {iteration + 1}/{self.max_iterations} for agent '{self.agent_name}'",
+                    f"🔄 Iteration {iteration + 1}/{self.max_iterations if self.max_iterations is not None else '∞'} for agent '{self.agent_name}'",
                 )
 
                 logger.info(
@@ -887,7 +887,7 @@ class Executor:
                         available_tokens,
                     )
 
-                if iteration == self.max_iterations - 2:
+                if self.max_iterations is not None and iteration == self.max_iterations - 2:
                     messages.append(
                         Message.user(
                             "[SYSTEM NOTICE: You have 2 operational turns remaining in your turn budget. "
@@ -895,7 +895,7 @@ class Executor:
                         )
                     )
 
-                if iteration == self.max_iterations - 1:
+                if self.max_iterations is not None and iteration == self.max_iterations - 1:
                     logger.info(
                         "🏁 Final synthesis iteration reached. Forcing text synthesis without tools.",
                     )
@@ -1049,7 +1049,7 @@ class Executor:
 
                 if tool_results:
                     # ponytail: Graceful last-turn wrap-up reminder. Prevents harsh max_iterations guillotine.
-                    if iteration >= self.max_iterations - 2:
+                    if self.max_iterations is not None and iteration >= self.max_iterations - 2:
                         tool_results += (
                             "\n\n[SYSTEM NOTICE: You are on your final turns of your turn budget. "
                             "On your next turn, you MUST synthesize all findings collected so far and output "
@@ -1165,7 +1165,7 @@ class Executor:
                 iteration += 1
 
             # Add note if max iterations reached
-            if iteration >= self.max_iterations:
+            if self.max_iterations is not None and iteration >= self.max_iterations:
                 force_stop_reason = AgentStopReason.MAX_ITERATIONS_REACHED
                 final_response += "\\n\\n[Note: Maximum iteration limit reached]"
 
@@ -1300,7 +1300,7 @@ class Executor:
             await self._prepare_async_execution(state)
 
             # 3.
-            while state.iteration < self.max_iterations:
+            while self.max_iterations is None or state.iteration < self.max_iterations:
                 if self.stop_signal:
                     stop_response = "Stop signal received."
                     stop_response, state.messages = await asyncio.to_thread(
@@ -1317,7 +1317,7 @@ class Executor:
                     break
 
             # 4.
-            if state.iteration >= self.max_iterations:
+            if self.max_iterations is not None and state.iteration >= self.max_iterations:
                 state.force_stop_reason = AgentStopReason.MAX_ITERATIONS_REACHED
                 state.final_response += "\\n\\n[Note: Maximum iteration limit reached]"
 
@@ -1509,7 +1509,7 @@ class Executor:
         desired_max_tokens = self.llm_config.max_tokens or 65536
         _ = max(1, min(desired_max_tokens, available_tokens))  # calculated_max_tokens (reserved for future use)
 
-        if state.iteration == self.max_iterations - 2:
+        if self.max_iterations is not None and state.iteration == self.max_iterations - 2:
             state.messages.append(
                 Message.user(
                     "[SYSTEM NOTICE: You have 2 operational turns remaining in your turn budget. "
@@ -1517,7 +1517,7 @@ class Executor:
                 )
             )
 
-        if state.iteration == self.max_iterations - 1:
+        if self.max_iterations is not None and state.iteration == self.max_iterations - 1:
             logger.info("🏁 Final synthesis iteration reached. Forcing text synthesis without tools.")
             tools_payload = None
             state.force_stop_reason = AgentStopReason.SUCCESS

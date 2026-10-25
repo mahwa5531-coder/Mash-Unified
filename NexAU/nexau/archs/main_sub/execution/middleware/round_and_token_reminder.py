@@ -134,13 +134,17 @@ class RoundAndTokenReminderMiddleware(Middleware):
         if not has_assistant:
             return HookResult.with_modifications(messages=[*hook_input.messages, *steering_blocks])
 
-        remaining_iterations = hook_input.max_iterations - hook_input.current_iteration
+        remaining_iterations = (
+            hook_input.max_iterations - hook_input.current_iteration
+            if hook_input.max_iterations is not None
+            else None
+        )
         current_tokens = self._count_tokens(hook_input)
         remaining_tokens = max((self.max_context_tokens or 0) - current_tokens, 0)
         max_ctx = self.max_context_tokens or 0
         warning_threshold = min(3 * self.desired_max_tokens, max(1, int(max_ctx * 0.20))) if max_ctx > 0 else 3 * self.desired_max_tokens
 
-        is_urgent = (remaining_iterations <= 1) or (remaining_tokens < warning_threshold)
+        is_urgent = (remaining_iterations is not None and remaining_iterations <= 1) or (remaining_tokens < warning_threshold)
 
         # On routine turns without urgent conditions, suppress reminder noise unless explicitly enabled
         if not self.enable_routine_reminders and not is_urgent:
@@ -149,7 +153,7 @@ class RoundAndTokenReminderMiddleware(Middleware):
             return HookResult.no_changes()
 
         hints = []
-        if self.enable_routine_reminders or remaining_iterations <= 1:
+        if hook_input.max_iterations is not None and (self.enable_routine_reminders or (remaining_iterations is not None and remaining_iterations <= 1)):
             hints.append(self._build_iteration_hint(
                 hook_input.current_iteration,
                 hook_input.max_iterations,

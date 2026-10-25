@@ -101,7 +101,7 @@ class TestExecutorInitialization:
 
         assert executor.agent_name == "test_agent"
         assert executor.agent_id == "test_id"
-        assert executor.max_iterations == 100  # default
+        assert executor.max_iterations is None  # default (unbounded execution until completion)
         assert executor.max_context_tokens in (128000, 1048576)  # default
         assert executor.max_running_subagents == 5  # default
         assert executor.stop_signal is False
@@ -905,6 +905,32 @@ class TestExecutorExecution:
 
                 # Should have made LLM calls
                 assert mock_call_llm.call_count >= 1
+
+    def test_execute_with_unbounded_iterations(self, mock_llm_config, agent_state):
+        """Test execution runs unbound until natural completion when max_iterations is None."""
+        executor = Executor(
+            agent_name="test_agent",
+            agent_id="test_id",
+            tool_registry=make_tool_registry(),
+            sub_agents={},
+            stop_tools=set(),
+            openai_client=Mock(),
+            llm_config=mock_llm_config,
+            max_iterations=None,
+        )
+        assert executor.max_iterations is None
+
+        with patch.object(executor.llm_caller, "call_llm") as mock_call_llm:
+            mock_call_llm.return_value = ModelResponse(content="Task completed")
+            with patch.object(executor.response_parser, "parse_response") as mock_parse:
+                mock_parse.return_value = ParsedResponse(
+                    original_response="Task completed",
+                    tool_calls=[],
+                )
+                history = make_history("System prompt", "Do work")
+                response, messages = executor.execute(history, agent_state)
+                assert response == "Task completed"
+                assert mock_call_llm.call_count == 1
 
     def test_execute_with_queued_messages(self, mock_llm_config, agent_state):
         """Test execution processes queued messages."""

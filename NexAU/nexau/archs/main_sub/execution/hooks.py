@@ -75,7 +75,7 @@ class BeforeModelHookInput:
     """
 
     agent_state: AgentState
-    max_iterations: int
+    max_iterations: int | None
     current_iteration: int
     messages: list[Message]
     # RFC-0026: outparam - MiddlewareManager publishes the typed history

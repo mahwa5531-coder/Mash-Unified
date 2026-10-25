@@ -483,7 +483,7 @@ class AgentConfig(
 class ExecutionConfig:
     """Configuration for agent execution environment and behavior."""
 
-    max_iterations: int = 100
+    max_iterations: int | None = None
     max_context_tokens: int = 1048576
     max_running_subagents: int = 5
     retry_attempts: int = 5
@@ -646,7 +646,7 @@ class AgentConfigBuilder:
         self.agent_params["initial_context"] = self.config.get("context", {})
 
         self.agent_params["stop_tools"] = set(self.config.get("stop_tools", []))
-        self.agent_params["max_iterations"] = self.config.get("max_iterations", 100)
+        self.agent_params["max_iterations"] = self.config.get("max_iterations")
         self.agent_params["tool_call_mode"] = self.config.get("tool_call_mode", "structured")
         self.agent_params["retry_attempts"] = self.config.get("retry_attempts", 5)
         self.agent_params["retry_backoff_max_seconds"] = self.config.get("retry_backoff_max_seconds", 30)

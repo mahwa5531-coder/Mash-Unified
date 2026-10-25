@@ -1,7 +1,7 @@
 type: agent
 name: nexau_main_auditor
 tool_call_mode: structured
-max_iterations: ${env.AGENT_MAX_ITERATIONS:-100}
+max_iterations: ${env.AGENT_MAX_ITERATIONS:-null}
 max_context_tokens: ${env.LLM_MAX_CONTEXT_TOKENS:-1048576}
 
 system_prompt: ../prompts/statutory_auditor.j2
