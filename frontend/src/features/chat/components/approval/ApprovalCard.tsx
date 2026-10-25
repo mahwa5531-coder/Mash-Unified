@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Terminal, FileEdit, Globe, Trash2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Terminal, FileEdit, Globe, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface ApprovalCardProps {
@@ -18,21 +18,11 @@ export interface ApprovalCardProps {
 }
 
 function getToolHeaderInfo(toolName: string, command?: string, args?: Record<string, any>) {
-  const isDestructive =
-    (command && /(rm\s+-|del\s+|Remove-Item|purge|drop\s+table)/i.test(command)) ||
-    (toolName === 'run_shell_command' && /(rm\s+|del\s+)/i.test(String(args?.command || '')));
-
-  if (isDestructive) {
-    return {
-      icon: Trash2,
-      iconColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
-      badgeBorder: 'border-rose-500/30',
-      defaultSummary: 'Destructive operation',
-      defaultAction: 'Purges or modifies system files that cannot be undone',
-    };
-  }
-
-  if (toolName === 'run_shell_command') {
+  if (
+    toolName === 'run_shell_command' ||
+    toolName === 'run_command' ||
+    Boolean(command)
+  ) {
     return {
       icon: Terminal,
       iconColor: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
