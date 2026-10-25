@@ -204,8 +204,9 @@ async def get_artifact(
     raise HTTPException(status_code=404, detail=f"Artifact file '{filename}' not found")
 
 
-@router.get("/files/content")
-@router.get("/api/files/content")
+# ponytail: Support both GET and HEAD per RFC 9110 for browser pre-flight checks (PdfViewer)
+@router.api_route("/files/content", methods=["GET", "HEAD"])
+@router.api_route("/api/files/content", methods=["GET", "HEAD"])
 async def get_file_content(
     path: str,
     raw: bool = False,
@@ -278,7 +279,6 @@ async def get_file_content(
             except Exception:
                 pass
 
-    eng = _get_engine(engine)
     if not is_path_in_base_roots(p):
         allowed_roots = await get_allowed_file_roots(eng)
         if not any(p == root or p.is_relative_to(root) for root in allowed_roots):

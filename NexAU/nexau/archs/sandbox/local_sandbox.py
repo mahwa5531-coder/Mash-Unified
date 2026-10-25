@@ -1062,12 +1062,26 @@ class LocalSandbox(BaseSandbox):
             if create_directories:
                 full_path.parent.mkdir(parents=True, exist_ok=True)
 
-            if binary:
-                with open(full_path, "wb") as f:
-                    f.write(content if isinstance(content, bytes) else content.encode(encoding))
-            else:
-                with open(full_path, "w", encoding=encoding) as f:
-                    f.write(content if isinstance(content, str) else content.decode(encoding))
+            # ponytail: atomic write via same-directory staging file + os.replace prevents 0-byte corruption on crash
+            temp_path = full_path.with_name(f".{full_path.name}.tmp_{os.getpid()}_{time.time_ns()}")
+            try:
+                if binary:
+                    with open(temp_path, "wb") as f:
+                        f.write(content if isinstance(content, bytes) else content.encode(encoding))
+                        f.flush()
+                        os.fsync(f.fileno())
+                else:
+                    with open(temp_path, "w", encoding=encoding) as f:
+                        f.write(content if isinstance(content, str) else content.decode(encoding))
+                        f.flush()
+                        os.fsync(f.fileno())
+                os.replace(temp_path, full_path)
+            finally:
+                if temp_path.exists():
+                    try:
+                        temp_path.unlink()
+                    except Exception:
+                        pass
 
             file_size = full_path.stat().st_size
 

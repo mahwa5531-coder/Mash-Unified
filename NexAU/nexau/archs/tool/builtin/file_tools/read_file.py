@@ -168,7 +168,24 @@ def _read_text_lossy(file_path: str, sandbox: BaseSandbox) -> str:
         raise RuntimeError(read_res.error or "Failed to read file")
 
     if isinstance(read_res.content, (bytes, bytearray)):
-        return bytes(read_res.content).decode("utf-8", errors="replace")
+        raw = bytes(read_res.content)
+        # ponytail: BOM-aware sniffing prevents null-byte corruption on Windows UTF-16/32 exports
+        if raw.startswith(b"\xef\xbb\xbf"):
+            return raw[3:].decode("utf-8", errors="replace")
+        if raw.startswith(b"\xff\xfe\x00\x00"):
+            return raw[4:].decode("utf-32-le", errors="replace")
+        if raw.startswith(b"\x00\x00\xfe\xff"):
+            return raw[4:].decode("utf-32-be", errors="replace")
+        if raw.startswith(b"\xff\xfe"):
+            return raw[2:].decode("utf-16-le", errors="replace")
+        if raw.startswith(b"\xfe\xff"):
+            return raw[2:].decode("utf-16-be", errors="replace")
+        if len(raw) >= 4 and raw[1] == 0 and raw[3] == 0 and raw[0] != 0:
+            try:
+                return raw.decode("utf-16-le")
+            except UnicodeDecodeError:
+                pass
+        return raw.decode("utf-8", errors="replace")
 
     # sandbox already returned str (e.g. remote sandbox decoded it)
     return read_res.content if isinstance(read_res.content, str) else ""

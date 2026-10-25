@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useId } from "react";
-import { X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { X, ZoomIn, ZoomOut, RotateCcw, RefreshCw, AlertCircle } from "lucide-react";
 import { useIsDarkMode } from "@/hooks/useIsDarkMode";
 import { useTurnViewport } from "@/features/chat/context/TurnViewportContext";
 
@@ -11,31 +11,125 @@ interface MermaidRendererProps {
 }
 
 function sanitizeSvg(svg: string): string {
-  if (!svg) return '';
+  if (!svg) return "";
   return svg
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/\bon\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '')
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/\bon\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, "")
     .replace(/href\s*=\s*(?:'javascript:[^']*'|"javascript:[^"]*")/gi, 'href="#"');
 }
 
-// auto-repair common LLM Mermaid syntax flaws (unquoted parentheses, special chars, dangling arrows)
+// Module-level Mermaid singleton loader and active theme tracking
+let mermaidModulePromise: Promise<any> | null = null;
+let activeTheme: "dark" | "default" | null = null;
+
+// Sequential rendering queue to eliminate concurrent DOM layout collisions
+let renderQueue: Promise<unknown> = Promise.resolve();
+
+function enqueueRender<T>(fn: () => Promise<T>): Promise<T> {
+  const next = renderQueue.then(fn, fn);
+  renderQueue = next.then(
+    () => {},
+    () => {}
+  );
+  return next;
+}
+
+// Global orphan cleanup to sweep temporary DOM measurement nodes
+function sweepMermaidOrphans(renderId?: string) {
+  if (typeof document === "undefined") return;
+  try {
+    if (renderId) {
+      document.getElementById(renderId)?.remove();
+      document.getElementById(`d${renderId}`)?.remove();
+    }
+    // Sweep any dangling scratch sandbox divs created by Mermaid layout calculations
+    const orphans = document.querySelectorAll('div[id^="dmermaid_"]');
+    orphans.forEach((el) => el.remove());
+  } catch {}
+}
+
+async function getInitializedMermaid(isDark: boolean) {
+  if (!mermaidModulePromise) {
+    mermaidModulePromise = import("mermaid").then((m) => m.default || m);
+  }
+  const mermaid = await mermaidModulePromise;
+
+  const targetTheme = isDark ? "dark" : "default";
+  if (activeTheme !== targetTheme) {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: targetTheme,
+      securityLevel: "strict",
+      fontFamily: "inherit",
+      themeVariables: {
+        darkMode: isDark,
+        background: isDark ? "#181818" : "#FFFFFF",
+        primaryColor: isDark ? "#1e293b" : "#e0f2fe",
+        primaryTextColor: isDark ? "#CCCCCC" : "#101010",
+        primaryBorderColor: "#007ACC",
+        lineColor: isDark ? "#858585" : "#6E6E6E",
+        secondaryColor: isDark ? "#222222" : "#F9F9F9",
+        tertiaryColor: isDark ? "#2A2A2A" : "#EFEFEF",
+      },
+    });
+    activeTheme = targetTheme;
+  }
+  return mermaid;
+}
+
+// Auto-repair common LLM Mermaid syntax flaws
 function repairMermaidSyntax(raw: string): string {
-  if (!raw) return '';
+  if (!raw) return "";
   let cleaned = raw
-    .replace(/```mermaid/gi, '')
-    .replace(/```/g, '')
+    .replace(/```(?:mermaid)?/gi, "")
+    .replace(/```/g, "")
     .trim();
 
-  // 1. Remove trailing dangling connectors (e.g. "A --> " at end of line)
-  cleaned = cleaned.replace(/(-->|--\s*\|[^|]*\|\s*-->?)\s*$/gm, '');
+  // 1. Replace C/C++ style // comments with Mermaid %% comments
+  cleaned = cleaned.replace(/^\s*\/\/(.*)$/gm, "%%$1");
 
-  // 1b. Fix arrows pointing directly into bracket without node id (e.g. "Z -->[✅ Complete Answer]")
+  // 2. Remove trailing dangling connectors (e.g. "A --> " at end of line)
+  cleaned = cleaned.replace(/(-->|---|==>|-\.->|--\s*\|[^|]*\|\s*-->?)\s*$/gm, "");
+
+  // 3. Auto-detect missing diagram declaration (e.g. LLM directly outputs "Client --> Server")
+  const nonCommentLines = cleaned
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("%%"));
+  if (nonCommentLines.length > 0) {
+    const firstLine = nonCommentLines[0].toLowerCase();
+    const validHeaders = [
+      "graph",
+      "flowchart",
+      "sequencediagram",
+      "classdiagram",
+      "statediagram",
+      "erdiagram",
+      "gantt",
+      "pie",
+      "gitgraph",
+      "journey",
+      "mindmap",
+      "quadrantchart",
+      "timeline",
+      "zenuml",
+      "sankey-beta",
+      "xychart-beta",
+      "block-beta",
+      "architecture-beta",
+    ];
+    if (!validHeaders.some((h) => firstLine.startsWith(h))) {
+      cleaned = "flowchart TD\n" + cleaned;
+    }
+  }
+
+  // 4. Fix arrows pointing directly into bracket without node id (e.g. "Z -->[Complete]")
   let autoId = 1;
-  cleaned = cleaned.replace(/(-->|---|==>)\s*\[([^"\]\n]+)\]/g, (_, arrow, inner) => {
+  cleaned = cleaned.replace(/(-->|---|==>|-\.->)\s*\[([^"\]\n]+)\]/g, (_, arrow, inner) => {
     return `${arrow} n_${autoId++}["${inner.replace(/"/g, "'").trim()}"]`;
   });
 
-  // 2. Ensure unquoted bracket labels [...] containing special characters ()[]&:$# are safely quoted
+  // 5. Ensure bracket labels [...] containing special characters ()[]&:$#/\ are safely quoted
   cleaned = cleaned.replace(/\[([^"\]\n]+)\]/g, (match, inner) => {
     if (/[()&:$#\/]|[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(inner)) {
       const escaped = inner.replace(/"/g, "'").trim();
@@ -44,7 +138,7 @@ function repairMermaidSyntax(raw: string): string {
     return match;
   });
 
-  // 3. Ensure unquoted parenthesis labels (...) containing special characters are safely quoted
+  // 6. Ensure parenthesis labels (...) containing special characters are safely quoted
   cleaned = cleaned.replace(/\(([^"()\n]+)\)/g, (match, inner) => {
     if (/[\[\]&:$#\/]/.test(inner)) {
       const escaped = inner.replace(/"/g, "'").trim();
@@ -56,10 +150,27 @@ function repairMermaidSyntax(raw: string): string {
   return cleaned;
 }
 
+// Fallback aggressive repair pass for diagrams that fail initial parse
+function fallbackSanitize(chart: string): string {
+  // Convert flowchart to graph for looser edge parsing
+  let s = chart.replace(/\bflowchart\b/i, "graph");
+  s = s.replace(/\[([^\]]*?)\]/g, (match, inner) => {
+    if (inner.includes('"')) {
+      const stripped = inner.replace(/^"|"$/g, "").replace(/"/g, "'");
+      return `["${stripped}"]`;
+    }
+    return match;
+  });
+  return s;
+}
+
+const LAYOUT_TIMEOUT_MS = 6000;
+
 export default function MermaidRenderer({ chart, isStreaming = false }: MermaidRendererProps) {
   const [svgContent, setSvgContent] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [retryKey, setRetryKey] = useState<number>(0);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [modalZoom, setModalZoom] = useState<number>(1);
   const isDark = useIsDarkMode();
@@ -74,6 +185,7 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
     let isMounted = true;
     renderCountRef.current += 1;
     const renderId = `mermaid_${uniqueId}_${renderCountRef.current}`;
+    let abortTimer: NodeJS.Timeout | null = null;
 
     async function renderChart() {
       if (!chart.trim()) return;
@@ -81,47 +193,44 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
       setError(null);
 
       try {
-        const mermaidModule = await import("mermaid");
-        const mermaid = mermaidModule.default || mermaidModule;
+        await enqueueRender(async () => {
+          if (!isMounted) return;
+          const mermaid = await getInitializedMermaid(isDark);
+          sweepMermaidOrphans(renderId);
 
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: isDark ? "dark" : "default",
-          securityLevel: "strict",
-          fontFamily: "inherit",
-          themeVariables: {
-            darkMode: isDark,
-            background: isDark ? "#181818" : "#FFFFFF",
-            primaryColor: isDark ? "#1e293b" : "#e0f2fe",
-            primaryTextColor: isDark ? "#CCCCCC" : "#101010",
-            primaryBorderColor: "#007ACC",
-            lineColor: isDark ? "#858585" : "#6E6E6E",
-            secondaryColor: isDark ? "#222222" : "#F9F9F9",
-            tertiaryColor: isDark ? "#2A2A2A" : "#EFEFEF",
-          },
+          const repairedChart = repairMermaidSyntax(chart);
+
+          // 6-second timeout race to prevent infinite hanging on dagre layout loops
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            abortTimer = setTimeout(() => {
+              reject(new Error("Diagram layout timed out (exceeded 6s threshold)"));
+            }, LAYOUT_TIMEOUT_MS);
+          });
+
+          const renderPromise = (async () => {
+            try {
+              return await mermaid.render(renderId, repairedChart);
+            } catch (firstErr) {
+              // Attempt self-healing fallback pass before failing
+              sweepMermaidOrphans(renderId);
+              const fallbackChart = fallbackSanitize(repairedChart);
+              return await mermaid.render(renderId, fallbackChart);
+            }
+          })();
+
+          const { svg } = await Promise.race([renderPromise, timeoutPromise]);
+          if (abortTimer) clearTimeout(abortTimer);
+
+          if (isMounted) {
+            setSvgContent(svg);
+            setError(null);
+            setLoading(false);
+          }
         });
-
-        // Clean up any existing orphan element before render to avoid DOM collision
-        const existing = document.getElementById(renderId);
-        if (existing) existing.remove();
-        const existingD = document.getElementById(`d${renderId}`);
-        if (existingD) existingD.remove();
-
-        const repairedChart = repairMermaidSyntax(chart);
-        const { svg } = await mermaid.render(renderId, repairedChart);
-        if (isMounted) {
-          setSvgContent(svg);
-          setError(null);
-          setLoading(false);
-        }
       } catch (err: any) {
+        if (abortTimer) clearTimeout(abortTimer);
+        sweepMermaidOrphans(renderId);
         console.warn("Mermaid render error:", err);
-        try {
-          const orphan = document.getElementById(renderId);
-          if (orphan) orphan.remove();
-          const dOrphan = document.getElementById(`d${renderId}`);
-          if (dOrphan) dOrphan.remove();
-        } catch {}
 
         if (isMounted) {
           setError(err?.message || "Failed to render diagram");
@@ -134,14 +243,10 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
 
     return () => {
       isMounted = false;
-      try {
-        const orphan = document.getElementById(renderId);
-        if (orphan) orphan.remove();
-        const dOrphan = document.getElementById(`d${renderId}`);
-        if (dOrphan) dOrphan.remove();
-      } catch {}
+      if (abortTimer) clearTimeout(abortTimer);
+      sweepMermaidOrphans(renderId);
     };
-  }, [chart, isDark, uniqueId, isNearViewport, svgContent]);
+  }, [chart, isDark, uniqueId, isNearViewport, retryKey]);
 
   // Handle escape key to close modal
   useEffect(() => {
@@ -166,8 +271,29 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
       );
     }
     return (
-      <div className="my-2 p-3 rounded-lg border border-rose-500/20 bg-rose-500/5 text-xs font-mono text-rose-500 whitespace-pre-wrap">
-        {chart}
+      <div className="my-2 rounded-lg border border-amber-500/20 bg-amber-500/5 dark:bg-amber-950/20 p-3 text-xs font-mono">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-amber-500/10 text-amber-600 dark:text-amber-400">
+          <div className="flex items-center gap-1.5">
+            <AlertCircle size={14} />
+            <span className="font-semibold text-[11px] uppercase tracking-wider">Mermaid Syntax Preview</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              setRetryKey((k) => k + 1);
+            }}
+            className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border border-amber-500/30 hover:bg-amber-500/10 transition-colors cursor-pointer text-amber-600 dark:text-amber-300"
+            title="Retry diagram render"
+          >
+            <RefreshCw size={11} />
+            <span>Retry</span>
+          </button>
+        </div>
+        <pre className="whitespace-pre-wrap text-foreground/80 overflow-x-auto text-[11px] leading-relaxed">
+          {chart}
+        </pre>
       </div>
     );
   }
