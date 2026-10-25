@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 from pathlib import Path
 
 import httpx
@@ -50,10 +50,12 @@ async def test_full_system_verification():
             assert "tasks" in res.json()
 
             # 5. Projects
+            scratch_proj_dir = Path(__file__).parent / "scratch_proj"
+            scratch_proj_dir.mkdir(parents=True, exist_ok=True)
             proj_res = await client.post("/api/projects", json={
                 "user_id": "test_verify_user",
                 "name": "Verify Project",
-                "local_folder_path": str(Path(__file__).parent / "scratch_proj")
+                "local_folder_path": str(scratch_proj_dir)
             })
             assert proj_res.status_code == 200
             proj_data = proj_res.json()

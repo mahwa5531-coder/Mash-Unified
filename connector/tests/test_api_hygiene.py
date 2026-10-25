@@ -210,7 +210,7 @@ def test_api_health_endpoints_return_200(client):
 
 def test_zero_doubled_api_routes():
     """Verify zero routes contain accidental '/api/api/' prefix doubling."""
-    routes = [r.path for r in app.routes]
+    routes = [r.path for r in app.routes if hasattr(r, "path")]
     doubled = [r for r in routes if "/api/api/" in r]
     assert len(doubled) == 0, f"Found doubled routes: {doubled}"
     assert "/health" in routes
