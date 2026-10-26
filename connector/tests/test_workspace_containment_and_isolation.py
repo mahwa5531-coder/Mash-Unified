@@ -108,15 +108,15 @@ async def test_cross_session_isolation_and_workspace_containment(tmp_path):
                 assert "without session authorization is forbidden" in res_no_session.json().get("detail", "")
 
                 # -------------------------------------------------------------
-                # 6. NTFS Case Insensitivity Verification:
-                #    Legitimate session can access file regardless of case
+                # 6. NTFS Case Insensitivity / Case Variation Verification:
+                #    On Windows (case-insensitive NTFS) 200/403; on Linux (case-sensitive ext4) 404
                 # -------------------------------------------------------------
                 res_upper_sess = await client.get("/files/content", params={
                     "path": f".user_uploaded/{secret_file_a.name}",
                     "session_id": session_a_id.upper(),
                 })
-                assert res_upper_sess.status_code in (200, 403)
-                # If session_id casing validation allows it on Windows, must match content
+                assert res_upper_sess.status_code in (200, 403, 404)
+                # If session_id casing matches on disk (e.g. Windows NTFS), content is verified
                 if res_upper_sess.status_code == 200:
                     assert "CONFIDENTIAL TAX RECORD" in res_upper_sess.json().get("content", "")
 
