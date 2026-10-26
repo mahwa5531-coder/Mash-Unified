@@ -24,9 +24,64 @@ interface SessionRightSidebarMemory {
   mode: 'explorer' | 'editor';
 }
 
-const MAX_VIEWER_TABS = 20;
-const MAX_SIDEBAR_MEMORY_SESSIONS = 6;
+export const MAX_VIEWER_TABS = 20;
+export const MAX_SIDEBAR_MEMORY_SESSIONS = 6;
 const globalRightSidebarMemory = new Map<string, SessionRightSidebarMemory>();
+
+export function computeNextOpenTabs(
+  prev: TabItem[],
+  tabId: string,
+  title: string,
+  type: 'file' | 'image' | 'terminal',
+  path?: string,
+  activeTabId?: string | null,
+  tabAccessTime?: Map<string, number>
+): { nextTabs: TabItem[]; evictedTabId: string | null } {
+  if (prev.some(t => t.id === tabId)) {
+    return { nextTabs: prev, evictedTabId: null };
+  }
+  let next = prev;
+  let evictedTabId: string | null = null;
+  if (next.length >= MAX_VIEWER_TABS) {
+    let oldestTime = Infinity;
+    let evictIdx = -1;
+    for (let i = 0; i < next.length; i++) {
+      if (next[i].id !== activeTabId) {
+        const lastAccess = tabAccessTime?.get(next[i].id) ?? 0;
+        if (lastAccess < oldestTime) {
+          oldestTime = lastAccess;
+          evictIdx = i;
+        }
+      }
+    }
+    if (evictIdx !== -1) {
+      evictedTabId = next[evictIdx].id;
+      next = next.filter((_, i) => i !== evictIdx);
+    }
+  }
+  return {
+    nextTabs: [...next, { id: tabId, title, type, ...(path ? { path } : {}) }],
+    evictedTabId,
+  };
+}
+
+export function computeCloseTab(
+  prev: TabItem[],
+  tabId: string,
+  activeTabId: string | null
+): { nextTabs: TabItem[]; nextActiveId: string | null } {
+  const targetIndex = prev.findIndex(t => t.id === tabId);
+  if (targetIndex === -1) {
+    return { nextTabs: prev, nextActiveId: activeTabId };
+  }
+  const nextTabs = prev.filter((_, i) => i !== targetIndex);
+  let nextActiveId = activeTabId;
+  if (activeTabId === tabId) {
+    const nextActive = nextTabs[targetIndex] || nextTabs[targetIndex - 1] || null;
+    nextActiveId = nextActive ? nextActive.id : null;
+  }
+  return { nextTabs, nextActiveId };
+}
 
 // ponytail: sessionStorage fallback guarantees tabs survive browser F5 reload per session
 function getPersistedSidebarMemory(sessionId: string): SessionRightSidebarMemory | null {
@@ -100,6 +155,12 @@ export function useViewerTabs(sessionId?: string) {
   tabContentRef.current = tabContent;
   const [isLoadingContent, setIsLoadingContent] = useState<boolean>(false);
   const tabAccessTimeRef = useRef<Map<string, number>>(new Map());
+
+  const openTabsRef = useRef(openTabs);
+  openTabsRef.current = openTabs;
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
+  const inFlightTabFetchesRef = useRef<Set<string>>(new Set());
 
   const prevSessionIdRef = useRef<string | undefined>(sessionId);
 
@@ -201,41 +262,31 @@ export function useViewerTabs(sessionId?: string) {
     tabAccessTimeRef.current.set(tabId, Date.now());
 
     setOpenTabs(prev => {
-      if (prev.some(t => t.id === tabId)) {
-        return prev;
+      const { nextTabs, evictedTabId } = computeNextOpenTabs(
+        prev,
+        tabId,
+        name,
+        isImg ? 'image' : 'file',
+        normalizedPath,
+        activeTabId,
+        tabAccessTimeRef.current
+      );
+      if (evictedTabId) {
+        tabAccessTimeRef.current.delete(evictedTabId);
+        setTabContent(c => {
+          if (!(evictedTabId in c)) return c;
+          const copy = { ...c };
+          delete copy[evictedTabId];
+          return copy;
+        });
+        setTabTruncated(t => {
+          if (!(evictedTabId in t)) return t;
+          const copy = { ...t };
+          delete copy[evictedTabId];
+          return copy;
+        });
       }
-      let next = prev;
-      if (next.length >= MAX_VIEWER_TABS) {
-        let oldestTime = Infinity;
-        let evictIdx = -1;
-        for (let i = 0; i < next.length; i++) {
-          if (next[i].id !== activeTabId) {
-            const lastAccess = tabAccessTimeRef.current.get(next[i].id) ?? 0;
-            if (lastAccess < oldestTime) {
-              oldestTime = lastAccess;
-              evictIdx = i;
-            }
-          }
-        }
-        if (evictIdx !== -1) {
-          const evictedId = next[evictIdx].id;
-          tabAccessTimeRef.current.delete(evictedId);
-          setTabContent(c => {
-            if (!(evictedId in c)) return c;
-            const copy = { ...c };
-            delete copy[evictedId];
-            return copy;
-          });
-          setTabTruncated(t => {
-            if (!(evictedId in t)) return t;
-            const copy = { ...t };
-            delete copy[evictedId];
-            return copy;
-          });
-          next = next.filter((_, i) => i !== evictIdx);
-        }
-      }
-      return [...next, { id: tabId, title: name, type: isImg ? 'image' : 'file', path: normalizedPath }];
+      return nextTabs;
     });
 
     setActiveTabId(tabId);
@@ -248,14 +299,22 @@ export function useViewerTabs(sessionId?: string) {
         setTabTruncated(t => ({ ...t, [tabId]: isFileTruncatedFromCache(normalizedPath, sessionId) }));
         setIsLoadingContent(false);
       } else {
+        const capturedSessionId = sessionId;
+        inFlightTabFetchesRef.current.add(tabId);
         setIsLoadingContent(true);
         fetchFileContent(normalizedPath, sessionId).then(content => {
+          // ponytail: discard stale fetch if tab was closed or session switched mid-flight
+          if (sessionIdRef.current !== capturedSessionId) return;
+          if (!openTabsRef.current.some(t => t.id === tabId)) return;
           setTabContent(c => ({ ...c, [tabId]: content }));
           setTabTruncated(t => ({ ...t, [tabId]: isFileTruncatedFromCache(normalizedPath, sessionId) }));
         }).catch(err => {
+          if (sessionIdRef.current !== capturedSessionId) return;
+          if (!openTabsRef.current.some(t => t.id === tabId)) return;
           setTabContent(c => ({ ...c, [tabId]: `Error loading file: ${err?.message || err}` }));
         }).finally(() => {
-          setIsLoadingContent(false);
+          inFlightTabFetchesRef.current.delete(tabId);
+          setIsLoadingContent(inFlightTabFetchesRef.current.size > 0);
         });
       }
     }
@@ -267,39 +326,31 @@ export function useViewerTabs(sessionId?: string) {
     tabAccessTimeRef.current.set(tabId, Date.now());
 
     setOpenTabs(prev => {
-      if (prev.some(t => t.id === tabId)) return prev;
-      let next = prev;
-      if (next.length >= MAX_VIEWER_TABS) {
-        let oldestTime = Infinity;
-        let evictIdx = -1;
-        for (let i = 0; i < next.length; i++) {
-          if (next[i].id !== activeTabId) {
-            const lastAccess = tabAccessTimeRef.current.get(next[i].id) ?? 0;
-            if (lastAccess < oldestTime) {
-              oldestTime = lastAccess;
-              evictIdx = i;
-            }
-          }
-        }
-        if (evictIdx !== -1) {
-          const evictedId = next[evictIdx].id;
-          tabAccessTimeRef.current.delete(evictedId);
-          setTabContent(c => {
-            if (!(evictedId in c)) return c;
-            const copy = { ...c };
-            delete copy[evictedId];
-            return copy;
-          });
-          setTabTruncated(t => {
-            if (!(evictedId in t)) return t;
-            const copy = { ...t };
-            delete copy[evictedId];
-            return copy;
-          });
-          next = next.filter((_, i) => i !== evictIdx);
-        }
+      const { nextTabs, evictedTabId } = computeNextOpenTabs(
+        prev,
+        tabId,
+        title,
+        'terminal',
+        undefined,
+        activeTabId,
+        tabAccessTimeRef.current
+      );
+      if (evictedTabId) {
+        tabAccessTimeRef.current.delete(evictedTabId);
+        setTabContent(c => {
+          if (!(evictedTabId in c)) return c;
+          const copy = { ...c };
+          delete copy[evictedTabId];
+          return copy;
+        });
+        setTabTruncated(t => {
+          if (!(evictedTabId in t)) return t;
+          const copy = { ...t };
+          delete copy[evictedTabId];
+          return copy;
+        });
       }
-      return [...next, { id: tabId, title, type: 'terminal' }];
+      return nextTabs;
     });
 
     setActiveTabId(tabId);
@@ -307,22 +358,30 @@ export function useViewerTabs(sessionId?: string) {
 
     setTabContent(prev => {
       if (prev[tabId] === undefined) {
+        const capturedSessionId = sessionId;
+        inFlightTabFetchesRef.current.add(tabId);
         setIsLoadingContent(true);
         fetchTaskLog(taskId).then(content => {
+          if (sessionIdRef.current !== capturedSessionId) return;
+          if (!openTabsRef.current.some(t => t.id === tabId)) return;
           setTabContent(c => ({ ...c, [tabId]: content }));
         }).catch(err => {
+          if (sessionIdRef.current !== capturedSessionId) return;
+          if (!openTabsRef.current.some(t => t.id === tabId)) return;
           setTabContent(c => ({ ...c, [tabId]: `Error loading log: ${err?.message || err}` }));
         }).finally(() => {
-          setIsLoadingContent(false);
+          inFlightTabFetchesRef.current.delete(tabId);
+          setIsLoadingContent(inFlightTabFetchesRef.current.size > 0);
         });
       }
       return prev;
     });
-  }, []);
+  }, [sessionId]);
 
   // Tab Close
   const handleCloseTab = useCallback((e: ReactMouseEvent, tabId: string) => {
     e.stopPropagation();
+    inFlightTabFetchesRef.current.delete(tabId);
     setTabContent(prev => {
       if (!(tabId in prev)) return prev;
       const next = { ...prev };
@@ -338,25 +397,20 @@ export function useViewerTabs(sessionId?: string) {
     });
 
     setOpenTabs(prev => {
-      const targetIndex = prev.findIndex(t => t.id === tabId);
-      if (targetIndex === -1) return prev;
-
-      const closedTab = prev[targetIndex];
+      const closedTab = prev.find(t => t.id === tabId);
       if (closedTab?.path) {
         invalidateFileCache(closedTab.path, sessionId);
       }
       tabAccessTimeRef.current.delete(tabId);
 
-      const newTabs = prev.filter((_, i) => i !== targetIndex);
-
+      const { nextTabs, nextActiveId } = computeCloseTab(prev, tabId, activeTabId);
       if (activeTabId === tabId) {
-        const nextActive = newTabs[targetIndex] || newTabs[targetIndex - 1] || null;
-        setActiveTabId(nextActive ? nextActive.id : null);
-        if (newTabs.length === 0) {
+        setActiveTabId(nextActiveId);
+        if (nextTabs.length === 0) {
           setViewMode('explorer');
         }
       }
-      return newTabs;
+      return nextTabs;
     });
   }, [activeTabId]);
 
@@ -371,15 +425,22 @@ export function useViewerTabs(sessionId?: string) {
 
     const cleanPath = targetTab.path.split('#')[0];
     invalidateFileCache(cleanPath, sessionId);
+    const capturedSessionId = sessionId;
+    inFlightTabFetchesRef.current.add(targetId);
     setIsLoadingContent(true);
     try {
       const content = await fetchFileContent(cleanPath, sessionId, true);
-      setTabContent(c => ({ ...c, [targetId]: content }));
-      setTabTruncated(t => ({ ...t, [targetId]: isFileTruncatedFromCache(cleanPath, sessionId) }));
+      if (sessionIdRef.current === capturedSessionId && openTabsRef.current.some(t => t.id === targetId)) {
+        setTabContent(c => ({ ...c, [targetId]: content }));
+        setTabTruncated(t => ({ ...t, [targetId]: isFileTruncatedFromCache(cleanPath, sessionId) }));
+      }
     } catch (err: any) {
-      setTabContent(c => ({ ...c, [targetId]: `Error loading file: ${err?.message || err}` }));
+      if (sessionIdRef.current === capturedSessionId && openTabsRef.current.some(t => t.id === targetId)) {
+        setTabContent(c => ({ ...c, [targetId]: `Error loading file: ${err?.message || err}` }));
+      }
     } finally {
-      setIsLoadingContent(false);
+      inFlightTabFetchesRef.current.delete(targetId);
+      setIsLoadingContent(inFlightTabFetchesRef.current.size > 0);
     }
   }, [activeTabId, openTabs, sessionId]);
 
@@ -404,14 +465,21 @@ export function useViewerTabs(sessionId?: string) {
           setTabTruncated(t => ({ ...t, [tabId]: isFileTruncatedFromCache(cleanPath, sessionId) }));
           setIsLoadingContent(false);
         } else {
+          const capturedSessionId = sessionId;
+          inFlightTabFetchesRef.current.add(tabId);
           setIsLoadingContent(true);
           fetchFileContent(cleanPath, sessionId, true).then(content => {
+            if (sessionIdRef.current !== capturedSessionId) return;
+            if (!openTabsRef.current.some(t => t.id === tabId)) return;
             setTabContent(c => ({ ...c, [tabId]: content }));
             setTabTruncated(t => ({ ...t, [tabId]: isFileTruncatedFromCache(cleanPath, sessionId) }));
           }).catch(err => {
+            if (sessionIdRef.current !== capturedSessionId) return;
+            if (!openTabsRef.current.some(t => t.id === tabId)) return;
             setTabContent(c => ({ ...c, [tabId]: `Error loading file: ${err?.message || err}` }));
           }).finally(() => {
-            setIsLoadingContent(false);
+            inFlightTabFetchesRef.current.delete(tabId);
+            setIsLoadingContent(inFlightTabFetchesRef.current.size > 0);
           });
         }
       }

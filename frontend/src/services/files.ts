@@ -4,12 +4,12 @@ import { BASE_URL, safeFetch } from './client';
 import { normalizePath } from '@/utils/normalizePath';
 
 // Client-side in-memory cache with LRU eviction: keeps active working-set tabs instantly accessible with 0ms network latency
-const MAX_FILE_CACHE_SIZE = 25;
+export const MAX_FILE_CACHE_SIZE = 25;
 const fileContentMemoryCache = new Map<string, string>();
 const fileTruncationMemoryCache = new Map<string, boolean>();
 const inFlightFileFetches = new Map<string, Promise<string>>();
 
-function makeCacheKey(filePath: string, sessionId?: string): string {
+export function makeCacheKey(filePath: string, sessionId?: string): string {
   const clean = normalizePath(filePath);
   const isAbs = clean.startsWith('/') || /^[a-zA-Z]:[/\\]/.test(clean);
   if (!isAbs && sessionId) {
@@ -18,7 +18,7 @@ function makeCacheKey(filePath: string, sessionId?: string): string {
   return clean;
 }
 
-function cacheFileContent(cacheKey: string, content: string, isTruncated: boolean = false): void {
+export function cacheFileContent(cacheKey: string, content: string, isTruncated: boolean = false): void {
   if (fileContentMemoryCache.has(cacheKey)) {
     fileContentMemoryCache.delete(cacheKey);
     fileTruncationMemoryCache.delete(cacheKey);

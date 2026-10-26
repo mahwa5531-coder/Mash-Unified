@@ -242,7 +242,7 @@ async def get_file_content(
             for b_folder in [".mash", ".nexau"]:
                 s_dir = (Path.home() / b_folder / "brain" / session_id).resolve()
                 if s_dir.is_dir():
-                    candidates.extend([
+                    for cp in [
                         s_dir / rel_path,
                         s_dir / f"{rel_path}.md",
                         s_dir / "working_papers" / rel_path,
@@ -250,18 +250,28 @@ async def get_file_content(
                         s_dir / "scratch" / rel_path,
                         s_dir / ".system_generated" / "tasks" / rel_path,
                         s_dir / ".system_generated" / "logs" / rel_path,
-                    ])
+                    ]:
+                        try:
+                            if cp.resolve().is_relative_to(s_dir):
+                                candidates.append(cp)
+                        except Exception:
+                            pass
             try:
                 ws = await resolve_session_workspace(eng, session_id)
                 if ws and ws.is_dir():
                     clean_sub = rel_path.replace("NexAU_Outputs/", "").replace("NexAU_Outputs\\", "").replace("Audit_Deliverables/", "").replace("Audit_Deliverables\\", "")
-                    candidates.extend([
+                    for cp in [
                         ws / rel_path,
                         ws / "Audit_Deliverables" / rel_path,
                         ws / "Audit_Deliverables" / clean_sub,
                         ws / "NexAU_Outputs" / rel_path,
                         ws / "NexAU_Outputs" / clean_sub,
-                    ])
+                    ]:
+                        try:
+                            if cp.resolve().is_relative_to(ws):
+                                candidates.append(cp)
+                        except Exception:
+                            pass
             except Exception:
                 pass
         candidates.extend([
@@ -278,6 +288,28 @@ async def get_file_content(
                 p = p.resolve()
             except Exception:
                 pass
+
+    # ponytail: Strict cross-session isolation. Direct path access to session brain
+    # directories must strictly match the authorized session_id to prevent cross-session leaks.
+    for b_folder in [".mash", ".nexau"]:
+        brain_root = (Path.home() / b_folder / "brain").resolve()
+        try:
+            if p == brain_root or p.is_relative_to(brain_root):
+                if not session_id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Access denied: Direct access to session brain files without session authorization is forbidden."
+                    )
+                authorized_session_dir = (brain_root / session_id).resolve()
+                if not (p == authorized_session_dir or p.is_relative_to(authorized_session_dir)):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Access denied: Cross-session file access is strictly forbidden."
+                    )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
 
     if not is_path_in_base_roots(p):
         allowed_roots = await get_allowed_file_roots(eng)
