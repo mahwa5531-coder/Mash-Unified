@@ -139,8 +139,9 @@ async def test_cross_session_isolation_and_workspace_containment(tmp_path):
                 # -------------------------------------------------------------
                 # 9. Out of bounds OS system directory escape -> MUST BE 403
                 # -------------------------------------------------------------
+                sys_target = "/etc/hosts" if Path("/etc/hosts").exists() else "C:/Windows/System32/drivers/etc/hosts"
                 res_sys_escape = await client.get("/files/content", params={
-                    "path": "C:/Windows/System32/drivers/etc/hosts",
+                    "path": sys_target,
                     "session_id": session_a_id,
                 })
                 assert res_sys_escape.status_code == 403
