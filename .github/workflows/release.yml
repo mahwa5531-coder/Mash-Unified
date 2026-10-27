@@ -82,7 +82,7 @@ jobs:
             dist/release/latest.yml
             dist/release/*.blockmap
 
-      - name: Publish GitHub Release (On Tag or Dispatch Flag)
+      - name: Publish GitHub Release (Internal/Team)
         if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release == true
         uses: softprops/action-gh-release@v2
         with:
@@ -91,3 +91,30 @@ jobs:
             dist/release/latest.yml
             dist/release/*.blockmap
           generate_release_notes: true
+
+      - name: Deploy Public Installer & Updates to Cloudflare R2
+        if: env.R2_SECRET_ACCESS_KEY != ''
+        shell: powershell
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          BUCKET: ${{ secrets.R2_BUCKET_NAME || 'mash-releases' }}
+        run: |
+          $endpoint = "https://${env:ACCOUNT_ID}.r2.cloudflarestorage.com"
+          Write-Host "Syncing release artifacts to Cloudflare R2 bucket: ${env:BUCKET}..."
+          
+          aws s3 sync dist/release s3://${env:BUCKET}/ `
+            --endpoint-url $endpoint `
+            --exclude "*" `
+            --include "*.exe" `
+            --include "latest.yml" `
+            --include "*.blockmap"
+          
+          $latestExe = (Get-ChildItem dist/release/*.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+          if ($latestExe) {
+            Write-Host "Publishing permanent generic installer Mash-Setup.exe..."
+            aws s3 cp "$latestExe" "s3://${env:BUCKET}/Mash-Setup.exe" --endpoint-url $endpoint
+          }
+          Write-Host "Successfully published to Cloudflare R2!"
