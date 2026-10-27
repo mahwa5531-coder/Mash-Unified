@@ -1,0 +1,8 @@
+name = "download"
+main = "src/index.js"
+compatibility_date = "2024-04-01"
+account_id = "e90d46c6d02731d46bd509ea67fa8875"
+workers_dev = true
+
+[vars]
+GITHUB_REPO = "mahwa5531-coder/mash"
