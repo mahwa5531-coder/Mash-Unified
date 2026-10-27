@@ -164,7 +164,7 @@ async function launchBackendSupervisor(port) {
 
   if (isPackaged) {
     command = path.join(process.resourcesPath, 'bin', 'connector', 'connector.exe');
-    cwd = path.join(process.resourcesPath, 'bin');
+    cwd = path.join(process.resourcesPath, 'bin', 'connector');
   } else {
     args = [path.resolve(__dirname, '../connector/run_server.py')];
   }
@@ -273,9 +273,23 @@ ipcMain.on('window-close', () => {
 
 // 8. Application Lifecycle
 app.whenReady().then(async () => {
-  // Protocol handler routing app://mash/* to frontend/out/*
+  // Protocol handler routing app://mash/* to frontend/out/* (works inside asar AND unpacked)
   const outDir = path.resolve(__dirname, '../frontend/out');
-  protocol.handle('app', (request) => {
+  const mimeTypes = {
+    '.html': 'text/html',
+    '.js': 'text/javascript',
+    '.css': 'text/css',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf',
+  };
+
+  protocol.handle('app', async (request) => {
     try {
       const parsed = new URL(request.url);
       let decodedPath = decodeURIComponent(parsed.pathname);
@@ -289,7 +303,15 @@ app.whenReady().then(async () => {
       if (!fs.existsSync(target)) {
         target = path.join(outDir, 'index.html');
       }
-      return net.fetch(urlModule.pathToFileURL(target).toString());
+
+      // Read via Node fs (which automatically penetrates app.asar transparently)
+      const data = fs.readFileSync(target);
+      const ext = path.extname(target).toLowerCase();
+      const contentType = mimeTypes[ext] || 'application/octet-stream';
+      return new Response(data, {
+        status: 200,
+        headers: { 'Content-Type': contentType },
+      });
     } catch (e) {
       console.error('[Protocol:app] Error resolving:', request.url, e);
       return new Response('Not Found', { status: 404 });

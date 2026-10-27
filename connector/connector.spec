@@ -46,6 +46,10 @@ hiddenimports = [
     'httpx',
     'duckduckgo_search',
     'duckdb',
+    'polars',
+    'sqlmodel',
+    'bs4',
+    'multipart',
 ]
 
 a = Analysis(
