@@ -271,6 +271,19 @@ ipcMain.on('window-close', () => {
   if (mainWindow) mainWindow.close();
 });
 
+ipcMain.on('mash-restart-and-install', () => {
+  terminateConnector();
+  if (app.isPackaged) {
+    try {
+      const { autoUpdater } = require('electron-updater');
+      autoUpdater.quitAndInstall(false, true);
+      return;
+    } catch (_) {}
+  }
+  app.relaunch();
+  app.exit(0);
+});
+
 // 8. Application Lifecycle
 app.whenReady().then(async () => {
   // Protocol handler routing app://mash/* to frontend/out/* (works inside asar AND unpacked)
@@ -331,6 +344,20 @@ app.whenReady().then(async () => {
     if (app.isPackaged) {
       try {
         const { autoUpdater } = require('electron-updater');
+        autoUpdater.on('download-progress', (progressObj) => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('mash-update-downloading', {
+              progress: Math.round(progressObj.percent),
+            });
+          }
+        });
+        autoUpdater.on('update-downloaded', (info) => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('mash-update-ready', {
+              version: info?.version,
+            });
+          }
+        });
         autoUpdater.checkForUpdatesAndNotify().catch((e) => console.log('[AutoUpdater] check skipped:', e?.message));
       } catch (e) {
         console.log('[AutoUpdater] init skipped:', e?.message);

@@ -9,11 +9,18 @@ try {
   backendUrl = ipcRenderer.sendSync('mash-get-api-url') || backendUrl;
 } catch (_) {}
 
-// Native window control bridge matching WindowTitleBar.tsx
+// Native window control bridge matching WindowTitleBar.tsx and useDesktopAutoUpdate.ts
 contextBridge.exposeInMainWorld('electronAPI', {
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
+  restartAndInstall: () => ipcRenderer.send('mash-restart-and-install'),
+  onUpdateDownloading: (callback) => {
+    ipcRenderer.on('mash-update-downloading', (_event, data) => callback(data));
+  },
+  onUpdateReady: (callback) => {
+    ipcRenderer.on('mash-update-ready', (_event, data) => callback(data));
+  },
 });
 
 // Expose desktop environment configuration to client transport
