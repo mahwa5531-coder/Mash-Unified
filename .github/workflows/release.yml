@@ -69,7 +69,7 @@ jobs:
 
       - name: Package Desktop Installer (Electron Builder)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           npx electron-builder --win nsis
 
@@ -82,10 +82,13 @@ jobs:
             dist/release/latest.yml
             dist/release/*.blockmap
 
-      - name: Publish GitHub Release (Internal/Team)
+      - name: Publish to Public Releases Repo (mahwa5531-coder/mash-releases)
         if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release == true
         uses: softprops/action-gh-release@v2
         with:
+          repository: mahwa5531-coder/mash-releases
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
           files: |
             dist/release/*.exe
             dist/release/latest.yml

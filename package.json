@@ -44,8 +44,9 @@
     ],
     "artifactName": "Mash-Setup-${version}.${ext}",
     "publish": {
-      "provider": "generic",
-      "url": "https://download.mash.ai"
+      "provider": "github",
+      "owner": "mahwa5531-coder",
+      "repo": "mash-releases"
     },
     "win": {
       "target": [
