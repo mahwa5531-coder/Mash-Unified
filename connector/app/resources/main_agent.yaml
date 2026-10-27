@@ -9,7 +9,7 @@ system_prompt_type: jinja
 
 llm_config:
   model: ${env.MASH_MODEL:-mash/auto}
-  base_url: ${env.CLOUD_GATEWAY_URL:-http://127.0.0.1:8080/v1}
+  base_url: ${env.CLOUD_GATEWAY_URL:-https://api.mash.ai/v1}
   api_key: ${env.MASH_API_KEY:-bearer-pending-auth}
   api_type: ${env.LLM_API_TYPE:-openai_chat_completion}
 
