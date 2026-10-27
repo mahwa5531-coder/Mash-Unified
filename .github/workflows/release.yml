@@ -1,0 +1,93 @@
+name: Release Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish to official GitHub Releases?'
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-release-windows:
+    name: Build & Package Windows Executable (.exe)
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Install Node dependencies
+        run: |
+          npm ci
+          npm --prefix frontend ci
+
+      - name: Build Frontend Static Export
+        run: npm run build:frontend
+
+      - name: Build Python Connector & Sandbox Sidecars
+        run: npm run build:backend
+
+      - name: Verify Compiled Sidecar Binaries
+        shell: powershell
+        run: |
+          if (-not (Test-Path "dist/bin/connector/connector.exe")) {
+            throw "dist/bin/connector/connector.exe was not created!"
+          }
+          if (-not (Test-Path "dist/bin/connector/python.exe")) {
+            throw "dist/bin/connector/python.exe was not created!"
+          }
+          Write-Host "Both connector.exe and python.exe compiled successfully!"
+
+      - name: Package Desktop Installer (Electron Builder)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx electron-builder --win nsis
+
+      - name: Upload Installer Artifacts to Workflow Run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mash-Windows-Installer
+          path: |
+            dist/release/*.exe
+            dist/release/latest.yml
+            dist/release/*.blockmap
+
+      - name: Publish GitHub Release (On Tag or Dispatch Flag)
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release == true
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/release/*.exe
+            dist/release/latest.yml
+            dist/release/*.blockmap
+          generate_release_notes: true

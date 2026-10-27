@@ -42,6 +42,12 @@
         ]
       }
     ],
+    "artifactName": "Mash-Setup-${version}.${ext}",
+    "publish": {
+      "provider": "github",
+      "owner": "mahwa5531-coder",
+      "repo": "mash"
+    },
     "win": {
       "target": [
         "nsis"

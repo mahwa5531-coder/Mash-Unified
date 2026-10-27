@@ -327,6 +327,15 @@ app.whenReady().then(async () => {
     if (coldDeepLink) {
       setTimeout(() => forwardDeepLinkToConnector(coldDeepLink), 500);
     }
+
+    if (app.isPackaged) {
+      try {
+        const { autoUpdater } = require('electron-updater');
+        autoUpdater.checkForUpdatesAndNotify().catch((e) => console.log('[AutoUpdater] check skipped:', e?.message));
+      } catch (e) {
+        console.log('[AutoUpdater] init skipped:', e?.message);
+      }
+    }
   } catch (err) {
     console.error('[Supervisor] Startup error:', err);
     terminateConnector();
