@@ -42,9 +42,11 @@ export default {
       });
     }
 
-    // 3. If requesting the installer (.exe) or root download
+    // 3. If requesting the installer (.exe), portable zip (.zip), or root download
     let targetAsset = null;
-    if (path === "/" || path === "/download" || path === "/latest" || path.endsWith(".exe")) {
+    if (path === "/portable" || path.endsWith(".zip")) {
+      targetAsset = release.assets.find(a => a.name.endsWith(".zip"));
+    } else if (path === "/" || path === "/download" || path === "/latest" || path.endsWith(".exe")) {
       targetAsset = release.assets.find(a => a.name.endsWith(".exe"));
     } else {
       const requestedFilename = path.split("/").pop();
