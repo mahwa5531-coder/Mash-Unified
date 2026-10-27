@@ -83,12 +83,13 @@ def _build_agent_config() -> AgentConfig:
 
     # The desktop connector communicates exclusively with the MASH Cloud API layer
     cloud_gateway = (
-        os.getenv("CLOUD_GATEWAY_URL")
+        os.getenv("MASH_API_BASE_URL")
+        or os.getenv("CLOUD_GATEWAY_URL")
         or os.getenv("GATEWAY_URL")
         or os.getenv("MASH_GATEWAY_URL")
-        or os.getenv("MASH_API_URL")
+        or os.getenv("NEXAU_CLOUD_API_URL")
         or app_cfg.model.gateway_url
-        or "http://127.0.0.1:8080"
+        or "https://api.mash.ai"
     )
 
     active_key = (

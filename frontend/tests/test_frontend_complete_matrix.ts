@@ -280,7 +280,9 @@ assert.strictEqual(formatDurationDisplay(45), '45s');
 assert.strictEqual(formatDurationDisplay(125), '2m 5s');
 
 const groupedTimeline = groupTimelineEntries(rawToolItems.map((t, idx) => parseToolItem(t, idx)));
-assert.strictEqual(groupedTimeline.length, 3, 'Consecutive tools grouped into timeline units');
+assert.strictEqual(groupedTimeline.length, 2, 'Consecutive tools grouped into timeline units (exploration_group + command)');
+assert.strictEqual(groupedTimeline[0].type, 'exploration_group');
+assert.strictEqual(groupedTimeline[1].type, 'command');
 console.log('  ✓ 2.3 Passed: TaskWorkLog accordion timeline parsing and running detection verified');
 
 // Test 2.4: Real Error Classification Contract

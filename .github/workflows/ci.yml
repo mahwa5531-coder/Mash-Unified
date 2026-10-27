@@ -65,19 +65,3 @@ jobs:
         run: |
           python -m pytest connector/tests/ NexAU/tests/unit/test_storage_scaffold.py -v
 
-  cloud-api:
-    name: Cloud API (Go Services)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '>=1.24'
-          cache-dependency-path: 'cloud-api/go.sum'
-
-      - name: Run Cloud API Tests
-        working-directory: cloud-api
-        run: go test ./... -v

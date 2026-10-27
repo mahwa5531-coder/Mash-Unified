@@ -18,6 +18,12 @@
   "build": {
     "appId": "com.mash.desktop",
     "productName": "Mash",
+    "protocols": [
+      {
+        "name": "Mash Protocol",
+        "schemes": ["mash"]
+      }
+    ],
     "electronLanguages": ["en-US", "en"],
     "asar": true,
     "directories": {

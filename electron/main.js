@@ -2,13 +2,22 @@
 // Orchestrates Python backend sidecar lifecycle, ephemeral port 0 binding,
 // custom frameless window management, and zero-zombie-process cleanup on Windows.
 
-const { app, BrowserWindow, ipcMain, protocol, net } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, net, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const urlModule = require('url');
 const netSocket = require('net');
 const http = require('http');
 const { spawn, execSync } = require('child_process');
+
+// Register custom deep link protocol: mash://auth/callback?code=...
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('mash', process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient('mash');
+}
 
 // Register custom privileged scheme for Next.js static asset resolution
 protocol.registerSchemesAsPrivileged([
@@ -31,6 +40,38 @@ let isQuitting = false;
 let restartCount = 0;
 const MAX_RESTARTS = 3;
 
+// Helper to deliver OAuth code from deep link to local connector
+function forwardDeepLinkToConnector(rawUrl) {
+  if (!rawUrl || !rawUrl.startsWith('mash://')) return;
+  try {
+    const parsed = new URL(rawUrl);
+    const code = parsed.searchParams.get('code');
+    if (!code) return;
+
+    const postData = JSON.stringify({ code });
+    const req = http.request(
+      `http://127.0.0.1:${assignedPort}/api/auth/login`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData),
+        },
+      },
+      (res) => {
+        console.log(`[DeepLink] Forwarded mcode to connector, status: ${res.statusCode}`);
+      }
+    );
+    req.on('error', (err) => {
+      console.warn('[DeepLink] Failed to forward mcode to connector:', err.message);
+    });
+    req.write(postData);
+    req.end();
+  } catch (err) {
+    console.warn('[DeepLink] Error parsing deep link:', err);
+  }
+}
+
 // 1. Single Instance Mutex: prevent duplicate processes locking SQLite
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -38,25 +79,35 @@ if (!gotTheLock) {
   process.exit(0);
 }
 
-app.on('second-instance', () => {
+app.on('second-instance', (event, commandLine) => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
   }
+
+  // Windows passes the custom protocol URL in commandLine arguments
+  const deepLink = commandLine.find((arg) => arg.startsWith('mash://'));
+  if (deepLink) {
+    forwardDeepLinkToConnector(deepLink);
+  }
 });
 
-// 2. Ephemeral Port 0 Allocation: kernel assigns free loopback port
+// 2. Ephemeral Port Allocation: tries standard loopback 8000 first, falls back to dynamic port
 function allocateEphemeralPort() {
-  return new Promise((resolve, reject) => {
-    const srv = netSocket.createServer();
-    srv.listen(0, '127.0.0.1', () => {
-      const port = srv.address().port;
-      srv.close((err) => {
-        if (err) reject(err);
-        else resolve(port);
+  return new Promise((resolve) => {
+    const testSrv = netSocket.createServer();
+    testSrv.once('error', () => {
+      // Port 8000 in use: assign dynamic ephemeral port
+      const dynamicSrv = netSocket.createServer();
+      dynamicSrv.listen(0, '127.0.0.1', () => {
+        const port = dynamicSrv.address().port;
+        dynamicSrv.close(() => resolve(port));
       });
     });
-    srv.on('error', reject);
+    testSrv.once('listening', () => {
+      testSrv.close(() => resolve(8000));
+    });
+    testSrv.listen(8000, '127.0.0.1');
   });
 }
 
@@ -126,7 +177,7 @@ async function launchBackendSupervisor(port) {
     ...process.env,
     PORT: String(port),
     HOST: '127.0.0.1',
-    MASH_API_URL: assignedApiUrl,
+    MASH_CONNECTOR_URL: assignedApiUrl,
     PYTHONUNBUFFERED: '1',
     MASH_PYTHON_RUNTIME_DIR: runtimeDir,
   };
@@ -180,6 +231,15 @@ async function createMainWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  // Open external links (such as Google OAuth) in the system browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http:') || url.startsWith('https:')) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
   });
 
   if (!app.isPackaged && process.env.MASH_DEV_URL) {
@@ -240,6 +300,11 @@ app.whenReady().then(async () => {
     const port = await allocateEphemeralPort();
     await launchBackendSupervisor(port);
     await createMainWindow();
+
+    const coldDeepLink = process.argv.find((arg) => arg.startsWith('mash://'));
+    if (coldDeepLink) {
+      setTimeout(() => forwardDeepLinkToConnector(coldDeepLink), 500);
+    }
   } catch (err) {
     console.error('[Supervisor] Startup error:', err);
     terminateConnector();
