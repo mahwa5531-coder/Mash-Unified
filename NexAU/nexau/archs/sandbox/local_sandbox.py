@@ -120,6 +120,7 @@ class LocalSandbox(BaseSandbox):
             candidates = [
                 base_dir / "runtime" / "python",
                 base_dir / "resources" / "python_runtime",
+                base_dir,
             ]
             for candidate in candidates:
                 if (candidate / "python.exe").is_file() or (candidate / "python").is_file():

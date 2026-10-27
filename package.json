@@ -1,22 +1,63 @@
 {
-  "name": "antigravity",
-  "productName": "Antigravity",
-  "version": "2.25.0",
-  "description": "Antigravity - Agentic Desktop Application",
-  "homepage": "https://antigravity.google",
+  "name": "mash",
+  "productName": "Mash",
+  "version": "1.0.0",
+  "description": "Mash — Autonomous Financial Forensic Auditor",
+  "homepage": "https://mash.ai",
   "author": {
-    "name": "Google",
-    "email": "antigravity-support@google.com"
+    "name": "Mash Team",
+    "email": "support@mash.ai"
   },
-  "main": "dist/main.js",
+  "main": "electron/main.js",
+  "scripts": {
+    "electron:dev": "electron electron/main.js",
+    "build:frontend": "npm run build --prefix frontend",
+    "build:backend": "python -m PyInstaller connector/connector.spec --distpath dist/bin --clean -y",
+    "build:desktop": "npm run build:frontend && npm run build:backend && electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.mash.desktop",
+    "productName": "Mash",
+    "electronLanguages": ["en-US", "en"],
+    "asar": true,
+    "directories": {
+      "output": "dist/release"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/bin/connector",
+        "to": "bin/connector",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Mash",
+      "uninstallDisplayName": "Mash"
+    }
+  },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.11.0",
-    "@connectrpc/connect": "^2.1.2",
-    "@connectrpc/connect-node": "^2.2.0",
-    "chrome-devtools-mcp": "^1.1.0",
     "electron-log": "^5.4.3",
-    "electron-updater": "^6.8.9",
-    "js-yaml": "^4.3.2",
-    "shell-env": "^4.0.3"
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^25.0.0"
   }
 }

@@ -3,22 +3,11 @@
 import type { Message } from '@/types/chat';
 import { BASE_URL, safeFetch } from '@/services/client';
 import { markSessionViewed, removeSessionQueueItem, renameSession } from '@/services/sessions';
-import { streamQuery } from '@/services/stream';
+import { streamQuery, formatErrorMessage } from '@/services/stream';
+export { formatErrorMessage } from '@/services/stream';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
 import { findTargetAssistantIdx, sessionStore, notifyStoreListeners } from '../state/sessionStore';
 import { createStreamCallbacks } from './streamToolManager';
-
-export function formatErrorMessage(rawErr: string): string {
-  if (!rawErr) return 'An unexpected error occurred during execution.';
-  const match = rawErr.match(/['"]message['"]:\s*['"]([^'"]+)['"]/);
-  const inner = match ? match[1] : null;
-  if (rawErr.includes('404') || (inner && inner.toLowerCase().includes('unavailable'))) return inner || 'The requested service or route is temporarily unavailable. Please try again shortly.';
-  if (rawErr.includes('429') || rawErr.toLowerCase().includes('rate limit') || rawErr.toLowerCase().includes('quota')) return inner || 'Plan token quota reached. Please wait for your renewal window or upgrade tier.';
-  if (rawErr.includes('401') || rawErr.toLowerCase().includes('unauthorized')) return 'API authentication failed. Please sign in to your MASH account.';
-  if (inner) return inner;
-  const cleaned = rawErr.replace(/^(Error:\s*)+/i, '').trim();
-  return cleaned.length > 200 ? cleaned.slice(0, 197) + '...' : cleaned;
-}
 
 export function classifyDisconnectError(err: any): string {
   const isOffline = typeof window !== 'undefined' && typeof navigator !== 'undefined' && !navigator.onLine;

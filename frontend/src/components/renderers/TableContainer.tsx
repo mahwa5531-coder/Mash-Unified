@@ -6,7 +6,7 @@ import React from "react";
 // Clean Table Container for Chat & Markdown Viewers
 // Zero clutter: stripped header layer, pure scrollable responsive table
 // ----------------------------------------------------------------------
-export default function TableContainer({ children }: { children: React.ReactNode }) {
+export default function TableContainer({ children }: { children?: React.ReactNode }) {
   return (
     <div className="my-3 rounded-lg border border-zinc-200 dark:border-white/[0.08] overflow-hidden bg-white dark:bg-[#111113]">
       <div className="overflow-x-auto select-text custom-scrollbar">

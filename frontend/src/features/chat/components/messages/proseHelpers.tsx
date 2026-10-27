@@ -21,11 +21,12 @@ export function formatFilePill(rawLabel: string, rawHref: string) {
   const parts = filePath.split(/[/\\]/);
   const basename = parts.pop() || filePath;
   const labelParts = safeDecodeURI(rawLabel || '').split(/[/\\]/);
-  const cleanLabel = labelParts.pop() || basename;
+  const cleanLabelRaw = labelParts.pop() || basename;
+  const cleanLabel = cleanLabelRaw.split('#')[0];
 
   let display = (cleanLabel && !cleanLabel.startsWith('file:') && cleanLabel !== '[object Object]' ? cleanLabel : basename).trim();
   if (lineAnchor && !/:(?:L)?\d+(?:-\d+)?$/i.test(display)) {
-    const cleanAnchor = lineAnchor.replace(/^[#L]+/, '');
+    const cleanAnchor = lineAnchor.replace(/^[#L]+/i, '').replace(/-L/i, '-');
     if (cleanAnchor) display = `${display}:${cleanAnchor}`;
   }
 

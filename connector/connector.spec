@@ -11,12 +11,15 @@ root_dir = Path(SPECPATH).parent.resolve()
 connector_dir = root_dir / 'connector'
 nexau_dir = root_dir / 'NexAU'
 
+from PyInstaller.utils.hooks import copy_metadata
+
 datas = [
     (str(connector_dir / 'app' / 'resources'), 'app/resources'),
     (str(connector_dir / 'app' / 'prompts'), 'app/prompts'),
     (str(nexau_dir / 'nexau' / 'agents'), 'nexau/agents'),
-    (str(nexau_dir / 'nexau' / 'archs' / 'tool' / 'builtin' / 'schemas'), 'nexau/archs/tool/builtin/schemas'),
-]
+    (str(nexau_dir / 'nexau' / 'archs'), 'nexau/archs'),
+    (str(nexau_dir / 'nexau' / 'db' / 'migrations'), 'nexau/db/migrations'),
+] + copy_metadata('duckdb') + copy_metadata('polars')
 
 hiddenimports = [
     'uvicorn',
@@ -32,12 +35,17 @@ hiddenimports = [
     'uvicorn.lifespan.on',
     'aiosqlite',
     'sqlalchemy.dialects.sqlite',
+    'alembic',
+    'alembic.runtime',
+    'alembic.runtime.migration',
+    'alembic.script',
     'pathspec',
     'jinja2',
     'pydantic',
     'openai',
     'httpx',
     'duckduckgo_search',
+    'duckdb',
 ]
 
 a = Analysis(
@@ -49,7 +57,21 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'matplotlib', 'scipy'],
+    excludes=[
+        'tkinter',
+        'matplotlib',
+        'scipy',
+        'botocore',
+        'boto3',
+        'pytest',
+        'unittest',
+        'IPython',
+        'jupyter',
+        'notebook',
+        'pyarrow',
+        'babel',
+        'primp',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -76,8 +98,27 @@ exe = EXE(
     entitlements_file=None,
 )
 
+py_exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='python',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+
 coll = COLLECT(
     exe,
+    py_exe,
     a.binaries,
     a.zipfiles,
     a.datas,

@@ -212,11 +212,13 @@ _cors_origins = [
     "http://127.0.0.1:8000",
     "tauri://localhost",
     "http://tauri.localhost",
+    "app://mash",
 ] + [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1)(:\d+)?|app://.*)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

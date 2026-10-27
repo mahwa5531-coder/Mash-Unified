@@ -69,17 +69,14 @@ def replace_file_content(
 
     s_line = StartLine if StartLine is not None else start_line
     e_line = EndLine if EndLine is not None else end_line
-    target_text = TargetContent if TargetContent is not None else old_string
-    replace_text = ReplacementContent if ReplacementContent is not None else new_string
+    target_text = TargetContent if TargetContent is not None else (
+        old_string if old_string is not None else kwargs.get("old_content", kwargs.get("Target", kwargs.get("target")))
+    )
+    replace_text = ReplacementContent if ReplacementContent is not None else (
+        new_string if new_string is not None else kwargs.get("new_content", kwargs.get("Replacement", kwargs.get("replacement")))
+    )
 
     allow_mult = AllowMultiple if AllowMultiple is not None else (allow_multiple if allow_multiple is not None else False)
-
-    if s_line is None or e_line is None:
-        return {
-            "content": "Error: Both 'StartLine' and 'EndLine' are required to bound the edit range.",
-            "returnDisplay": "Error: Missing StartLine/EndLine",
-            "isError": True,
-        }
 
     if target_text is None or replace_text is None:
         return {
@@ -88,7 +85,7 @@ def replace_file_content(
             "isError": True,
         }
 
-    if s_line > e_line:
+    if s_line is not None and e_line is not None and s_line > e_line:
         return {
             "content": f"Error: StartLine ({s_line}) cannot be greater than EndLine ({e_line}).",
             "returnDisplay": "Error: Invalid line range",
@@ -144,6 +141,12 @@ def replace_file_content(
     file_text = raw_bytes.decode("utf-8", errors="replace")
     lines = file_text.splitlines(keepends=True)
     total_lines = len(lines)
+
+    # Default missing line bounds to full file range
+    if s_line is None:
+        s_line = 1
+    if e_line is None:
+        e_line = max(1, total_lines)
 
     # Normalize line endings for internal computation
     normalized_file = file_text.replace("\r\n", "\n")

@@ -118,7 +118,7 @@ export function WorkspacesSection({
           ) : (
             entries.map(([repoName, repoSessions]) => {
               const match = registeredProjects.find((p) => p.name === repoName);
-              const folderOpen = openFolders[repoName] ?? true;
+              const folderOpen = openFolders[repoName] ?? false;
 
               return (
                 <WorkspaceFolderRow

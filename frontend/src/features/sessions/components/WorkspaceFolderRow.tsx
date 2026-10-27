@@ -126,9 +126,9 @@ export function WorkspaceFolderRow({
       
       {/* Nested Sessions under this Workspace Project */}
       {isOpen && (
-        <div className="flex flex-col pl-3 space-y-0.5 mt-0.5">
+        <div className="flex flex-col ml-3.5 pl-2.5 border-l border-zinc-200/80 dark:border-white/[0.08] space-y-0.5 mt-0.5">
           {repoSessions.length === 0 ? (
-            <div className="pl-6 py-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 italic select-none">
+            <div className="pl-2 py-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 italic select-none">
               No conversations yet
             </div>
           ) : (

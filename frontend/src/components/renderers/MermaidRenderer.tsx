@@ -10,7 +10,7 @@ interface MermaidRendererProps {
   isStreaming?: boolean;
 }
 
-function sanitizeSvg(svg: string): string {
+export function sanitizeSvg(svg: string): string {
   if (!svg) return "";
   return svg
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
@@ -78,7 +78,7 @@ async function getInitializedMermaid(isDark: boolean) {
 }
 
 // Auto-repair common LLM Mermaid syntax flaws
-function repairMermaidSyntax(raw: string): string {
+export function repairMermaidSyntax(raw: string): string {
   if (!raw) return "";
   let cleaned = raw
     .replace(/```(?:mermaid)?/gi, "")
@@ -151,7 +151,7 @@ function repairMermaidSyntax(raw: string): string {
 }
 
 // Fallback aggressive repair pass for diagrams that fail initial parse
-function fallbackSanitize(chart: string): string {
+export function fallbackSanitize(chart: string): string {
   // Convert flowchart to graph for looser edge parsing
   let s = chart.replace(/\bflowchart\b/i, "graph");
   s = s.replace(/\[([^\]]*?)\]/g, (match, inner) => {

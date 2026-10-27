@@ -18,11 +18,16 @@ export function useSseBufferFlusher({
   isAtBottomRef,
 }: UseSseBufferFlusherOptions) {
   const rafIdRef = useRef<number | null>(null);
+  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
 
   const flushActiveStreamBuffer = useCallback(() => {
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
+    }
+    if (timeoutIdRef.current !== null) {
+      clearTimeout(timeoutIdRef.current);
+      timeoutIdRef.current = null;
     }
     const curSid = activeSessionIdRef.current;
     if (!curSid) return;
@@ -121,6 +126,17 @@ export function useSseBufferFlusher({
   }, [activeSessionIdRef, isAtBottomRef, scrollRef, setChatMessages]);
 
   const scheduleFlush = useCallback(() => {
+    // ponytail: Fall back to 100ms timer when document.hidden to drain tokens while tab is backgrounded
+    if (typeof document !== 'undefined' && document.hidden) {
+      if (timeoutIdRef.current === null) {
+        timeoutIdRef.current = setTimeout(() => {
+          timeoutIdRef.current = null;
+          flushActiveStreamBuffer();
+        }, 100);
+      }
+      return;
+    }
+
     // Schedule flush aligned to display animation frames (~60fps)
     if (rafIdRef.current === null) {
       rafIdRef.current = requestAnimationFrame(() => {
@@ -132,10 +148,14 @@ export function useSseBufferFlusher({
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (typeof document !== 'undefined' && !document.hidden) {
+      if (typeof document !== 'undefined') {
         if (rafIdRef.current !== null) {
           cancelAnimationFrame(rafIdRef.current);
           rafIdRef.current = null;
+        }
+        if (timeoutIdRef.current !== null) {
+          clearTimeout(timeoutIdRef.current);
+          timeoutIdRef.current = null;
         }
         flushActiveStreamBuffer();
       }
@@ -147,6 +167,10 @@ export function useSseBufferFlusher({
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
+      if (timeoutIdRef.current !== null) {
+        clearTimeout(timeoutIdRef.current);
+        timeoutIdRef.current = null;
+      }
     };
   }, [flushActiveStreamBuffer]);
 
@@ -154,6 +178,10 @@ export function useSseBufferFlusher({
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
+    }
+    if (timeoutIdRef.current !== null) {
+      clearTimeout(timeoutIdRef.current);
+      timeoutIdRef.current = null;
     }
   }, []);
 

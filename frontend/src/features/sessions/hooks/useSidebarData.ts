@@ -139,11 +139,33 @@ export function useSidebarData({
     }
   };
 
-  // Folders expansion state
-  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
+  // Folders expansion state: persisted to localStorage to prevent unwanted decomposition on reload
+  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>(() => {
+    return loadCache<Record<string, boolean>>('mash_sidebar_open_folders', {});
+  });
+
   const toggleFolder = (folderName: string) => {
-    setOpenFolders(prev => ({ ...prev, [folderName]: !(prev[folderName] ?? true) }));
+    setOpenFolders(prev => {
+      const current = prev[folderName] ?? false;
+      const next = { ...prev, [folderName]: !current };
+      setCache('mash_sidebar_open_folders', next);
+      return next;
+    });
   };
+
+  // Auto-expand the active session workspace if it hasn't been explicitly collapsed
+  useEffect(() => {
+    if (selectedSessionRepo && selectedSessionRepo !== 'No Repo') {
+      setOpenFolders(prev => {
+        if (prev[selectedSessionRepo] === undefined) {
+          const next = { ...prev, [selectedSessionRepo]: true };
+          setCache('mash_sidebar_open_folders', next);
+          return next;
+        }
+        return prev;
+      });
+    }
+  }, [selectedSessionRepo]);
 
   // ponytail: Reconcile localStorage cached state with SQLite response without re-sorting jitter
   const refreshData = useCallback(async () => {

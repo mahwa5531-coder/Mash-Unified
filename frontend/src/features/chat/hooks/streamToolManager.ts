@@ -12,10 +12,7 @@ export function isSameToolId(idA?: string, idB?: string): boolean {
   return cleanA === cleanB || idA.endsWith(`_${idB}`) || idB.endsWith(`_${idA}`);
 }
 
-export function isToolRunning(tool?: ToolCall, isStreaming?: boolean): boolean {
-  if (!tool || tool.status === 'completed' || tool.status === 'failed') return false;
-  return tool.status === 'running' || !!(isStreaming && tool.output === undefined);
-}
+export { isToolRunning } from '../components/work-log/toolTimeline';
 
 export class InFlightToolTracker {
   toolArgBuffers: Record<string, string> = {};

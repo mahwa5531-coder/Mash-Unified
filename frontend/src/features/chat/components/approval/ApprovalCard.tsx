@@ -17,7 +17,7 @@ export interface ApprovalCardProps {
   className?: string;
 }
 
-function getToolHeaderInfo(toolName: string, command?: string, args?: Record<string, any>) {
+export function getToolHeaderInfo(toolName: string, command?: string, args?: Record<string, any>) {
   if (
     toolName === 'run_shell_command' ||
     toolName === 'run_command' ||

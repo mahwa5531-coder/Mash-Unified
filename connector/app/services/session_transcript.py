@@ -80,9 +80,9 @@ def generate_clean_session_title(raw_text: str, sid: str = "") -> str:
     if re.match(r"^([a-zA-Z]:[\\/]|/)", t) or ("\\" in t and " " not in t):
         parts = [p for p in re.split(r"[\\/]", t) if p]
         t = parts[-1].strip("\"'` \t\n\r,:;-\\]") if parts else t
-    if len(t) > 34:
-        sp = t[:34].rfind(" ")
-        t = (t[:sp] if sp > 12 else t[:34]).rstrip() + "..."
+    if len(t) > 32:
+        sp = t[:32].rfind(" ")
+        t = (t[:sp] if sp > 12 else t[:32]).rstrip() + "..."
     return t[:1].upper() + t[1:]
 
 

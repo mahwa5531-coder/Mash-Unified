@@ -1,6 +1,10 @@
 // HTTP transport core: base URL + safe fetch wrapper shared by all services.
 
-export const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
+export const BASE_URL = (
+  (typeof window !== 'undefined' && (window as any).__MASH_DESKTOP__?.apiUrl) ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://127.0.0.1:8000"
+).replace(/\/+$/, "");
 
 // ponytail: Eagerly purge legacy token from localStorage to guarantee zero browser token retention
 if (typeof window !== 'undefined') {

@@ -42,7 +42,7 @@ export interface AuditCalloutProps extends React.ComponentPropsWithoutRef<'block
   className?: string;
 }
 
-const STATUS_VARIANT_MAP: Record<string, AuditCalloutVariant> = {
+export const STATUS_VARIANT_MAP: Record<string, AuditCalloutVariant> = {
   'EXCEPTION': 'danger',
   'MATERIAL WEAKNESS': 'danger',
   'FAIL': 'danger',
@@ -69,7 +69,7 @@ const STATUS_VARIANT_MAP: Record<string, AuditCalloutVariant> = {
   'BLUE': 'info',
 };
 
-const VARIANT_CONFIG: Record<AuditCalloutVariant, {
+export const VARIANT_CONFIG: Record<AuditCalloutVariant, {
   border: string;
   titleColor: string;
   defaultLabel?: string;
@@ -125,7 +125,9 @@ export function AuditCallout({
     (normalizedStatus ? STATUS_VARIANT_MAP[normalizedStatus] || 'info' : 'neutral');
 
   const config = VARIANT_CONFIG[variant] || VARIANT_CONFIG.info;
-  const label = status || title;
+  const label = status && title && status !== title
+    ? `${status} — ${title}`
+    : (status || title);
 
   return (
     <blockquote

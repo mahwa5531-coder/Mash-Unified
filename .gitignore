@@ -54,4 +54,7 @@ stream_analytics.py
 apple_income_statement.json
 test_out.txt
 test-results/
+*_complete_prompts.txt
+tests/fixtures/
+
 

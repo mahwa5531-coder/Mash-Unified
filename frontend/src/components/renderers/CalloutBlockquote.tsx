@@ -6,7 +6,7 @@ import { AuditCallout } from '@/primitives/AuditCallout';
 // ----------------------------------------------------------------------
 // Strip alert/color tags from children nodes
 // ----------------------------------------------------------------------
-function cleanCalloutChildren(node: any, tag: string, title?: string, state = { stripped: false }): any {
+export function cleanCalloutChildren(node: any, tag: string, title?: string, state = { stripped: false }): any {
   if (!node || state.stripped) return node;
   if (typeof node === 'string') {
     const tagEscaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -28,7 +28,7 @@ function cleanCalloutChildren(node: any, tag: string, title?: string, state = { 
   return node;
 }
 
-function extractText(nodes: any): string {
+export function extractText(nodes: any): string {
   if (!nodes) return '';
   if (typeof nodes === 'string') return nodes;
   if (Array.isArray(nodes)) return nodes.map(extractText).join('');
@@ -42,7 +42,7 @@ function extractText(nodes: any): string {
  * Markdown renderer for blockquotes (> ...).
  * Delegates directly to the canonical AuditCallout primitive from src/primitives.
  */
-export function CalloutBlockquote({ children }: { children: React.ReactNode }) {
+export function CalloutBlockquote({ children }: { children?: React.ReactNode }) {
   const rawText = extractText(children);
 
   // 1. Check for statutory alert or color tags: [!EXCEPTION], [EXCEPTION], [!WARNING], [WARNING], etc.
@@ -52,7 +52,7 @@ export function CalloutBlockquote({ children }: { children: React.ReactNode }) {
     const trailingTitle = alertMatch[2]?.trim();
     const cleaned = cleanCalloutChildren(children, alertMatch[1], trailingTitle);
     return (
-      <AuditCallout status={tag}>
+      <AuditCallout status={tag} title={trailingTitle}>
         {cleaned}
       </AuditCallout>
     );

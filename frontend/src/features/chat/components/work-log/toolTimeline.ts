@@ -86,7 +86,7 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
       data: { tool: t, cmd: cleanCmd, fullCmd: String(rawCmd), toolSummary, toolAction }
     };
   } else if (name.includes('list_directory') || name.includes('list_dir') || name.includes('browse')) {
-    const p = args.DirectoryPath || args.dir_path || args.path || 'directory';
+    const p = args.DirectoryPath || args.dir_path || args.path || args.Path || 'directory';
     const fname = String(p).split(/[/\\]/).pop() || p;
     return {
       id: `tool-${tIdx}`,
@@ -94,7 +94,7 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
       data: { tool: t, foldername: fname, folderPath: String(p), toolSummary, toolAction }
     };
   } else if (name.includes('read_file') || name.includes('view_file') || name.includes('read_many_files') || name.includes('get_file')) {
-    const p = args.TargetFile || args.AbsolutePath || args.file_path || args.path || 'file';
+    const p = args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path || args.target_file || 'file';
     const fname = String(p).split(/[/\\]/).pop() || p;
     const isDir = !fname.includes('.') || name.includes('list');
     if (isDir) {
@@ -121,7 +121,7 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     name.includes('patch') ||
     name === 'write'
   ) {
-    const p = args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.target_file || args.filepath || 'file';
+    const p = args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path || args.target_file || args.filepath || 'file';
     const fname = String(p).split(/[/\\]/).pop() || p;
     let added = 0;
     let deleted = 0;
