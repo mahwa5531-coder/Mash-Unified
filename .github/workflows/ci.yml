@@ -31,6 +31,9 @@ jobs:
       - name: Build and verify TypeScript
         run: npm --prefix frontend run build
 
+      - name: Run Frontend Test Suite (QA-10 Fix)
+        run: npm --prefix frontend test
+
   python-backend:
     name: Python Backend (NexAU & Connector)
     runs-on: ubuntu-latest
@@ -54,7 +57,7 @@ jobs:
         run: |
           python -m ruff check NexAU/ connector/ --select E9,F821
 
-      - name: Run Connector and NexAU Tests
+      - name: Run Connector and NexAU Tests (QA-10 Fix)
         env:
           PYTHONPATH: "connector:NexAU"
           MASH_ENV: "test"
@@ -63,5 +66,5 @@ jobs:
           LLM_API_KEY: "ollama"
           LLM_API_TYPE: "openai_chat_completion"
         run: |
-          python -m pytest connector/tests/ NexAU/tests/unit/test_storage_scaffold.py -v
+          python -m pytest connector/tests/ NexAU/tests/ -v
 
