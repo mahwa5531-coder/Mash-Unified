@@ -6,11 +6,14 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# ponytail: Explicitly load .env file so new LLM settings apply
+# ponytail: Load single unified root .env file
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+_root_env = Path(__file__).resolve().parent.parent.parent / ".env"
+if _root_env.exists():
+    load_dotenv(_root_env)
+else:
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # Ensure NexAU engine is importable from sibling directory
 _nexau_dir = Path(__file__).resolve().parent.parent.parent / "NexAU"
