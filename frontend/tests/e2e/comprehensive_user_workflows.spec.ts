@@ -180,10 +180,13 @@ test.describe('MASH Desktop E2E Workflow Matrix', () => {
     await setupMockBackend(page, true);
     await page.goto('/');
 
-    // Expand the "Mash" workspace folder if collapsed (QA-BUG-5 Fix)
-    const mashFolder = page.getByRole('button', { name: /Mash/i }).first();
-    if (await mashFolder.isVisible()) {
+    // Expand the "Mash" workspace folder if collapsed (QA-03 Fix)
+    const mashFolder = page.locator('div, button').filter({ hasText: /^Mash$/i }).first();
+    try {
+      await mashFolder.waitFor({ state: 'visible', timeout: 3000 });
       await mashFolder.click();
+    } catch {
+      // Folder already expanded or not present
     }
 
     // Verify sessions appear in the sidebar list (matching with regex for ellipsis truncation)
@@ -291,10 +294,13 @@ test.describe('MASH Desktop E2E Workflow Matrix', () => {
     await setupMockBackend(page, true);
     await page.goto('/');
 
-    // Expand the "Mash" workspace folder if collapsed (QA-BUG-5 Fix)
-    const mashFolder = page.getByRole('button', { name: /Mash/i }).first();
-    if (await mashFolder.isVisible()) {
+    // Expand the "Mash" workspace folder if collapsed (QA-03 Fix)
+    const mashFolder = page.locator('div, button').filter({ hasText: /^Mash$/i }).first();
+    try {
+      await mashFolder.waitFor({ state: 'visible', timeout: 3000 });
       await mashFolder.click();
+    } catch {
+      // Folder already expanded or not present
     }
 
     // 1. Select Session A (Compiler Toolchain Diagnostic)

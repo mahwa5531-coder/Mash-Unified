@@ -67,9 +67,13 @@ Read-Host
 
 Write-Host "[*] Stopping servers..." -ForegroundColor Yellow
 if ($backendProcess -and -not $backendProcess.HasExited) {
+    # QA-12 Fix: Terminate entire process tree (kills uvicorn reload worker child processes)
+    & taskkill.exe /F /T /PID $backendProcess.Id 2>$null
     Stop-Process -Id $backendProcess.Id -Force -ErrorAction SilentlyContinue
 }
 if ($frontendProcess -and -not $frontendProcess.HasExited) {
+    # QA-12 Fix: Terminate entire process tree (kills cmd/node child processes)
+    & taskkill.exe /F /T /PID $frontendProcess.Id 2>$null
     Stop-Process -Id $frontendProcess.Id -Force -ErrorAction SilentlyContinue
 }
 Write-Host "[OK] All servers stopped." -ForegroundColor Green

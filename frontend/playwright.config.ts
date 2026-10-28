@@ -26,7 +26,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run start',
+    command: 'npx serve out -l 3000',
     cwd: path.resolve(__dirname),
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: true,

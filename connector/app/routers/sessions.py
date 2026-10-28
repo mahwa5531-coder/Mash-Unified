@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -52,6 +53,12 @@ class CreateSessionRequest(BaseModel):
     workspace_uri: str | None = None
     section: str | None = None
 
+    @property
+    def clean_title(self) -> str:
+        # QA-11: defense-in-depth HTML tag stripping
+        t = re.sub(r'<[^>]*>', '', self.title or "").strip()
+        return t or "New Chat"
+
 
 class RenameSessionPayload(BaseModel):
     custom_title: str | None = None
@@ -59,7 +66,9 @@ class RenameSessionPayload(BaseModel):
 
     @property
     def effective_title(self) -> str:
-        return (self.custom_title or self.title or "").strip()
+        raw = (self.custom_title or self.title or "").strip()
+        # QA-11: defense-in-depth HTML tag stripping
+        return re.sub(r'<[^>]*>', '', raw).strip()
 
 
 class UndoPayload(BaseModel):
@@ -87,7 +96,7 @@ async def list_sessions(engine: DatabaseEngineDep, include_benchmarks: bool = Fa
 async def create_session(request: CreateSessionRequest, engine: DatabaseEngineDep) -> dict[str, str]:
     return await create_new_session(
         engine=engine, user_id=request.user_id, session_id=request.session_id,
-        project_id=request.project_id, title=request.title,
+        project_id=request.project_id, title=request.clean_title,
         workspace_uri=request.workspace_uri, section=request.section,
     )
 
