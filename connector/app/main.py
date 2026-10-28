@@ -152,7 +152,7 @@ async def lifespan(app: FastAPI):
     from app.routers.auth import ensure_valid_token
 
     scaffold_nexau_system_storage()
-    engine = init_engine(_DB_ASYNC_URL)
+    engine = init_engine(f"sqlite+aiosqlite:///{get_database_path()}")
     await engine.setup_models([ProjectModel])
 
     # Automatic cold boot token refresh from vaulted refresh token

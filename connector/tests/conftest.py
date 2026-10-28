@@ -13,6 +13,14 @@ import json
 import httpx
 import respx
 
+# QA-01: Hermetic Test DB Isolation - Redirect all DB & home writes to isolated temp directory
+import tempfile
+import shutil
+
+_TEST_TMP_DIR = tempfile.mkdtemp(prefix="mash_test_iso_")
+os.environ["MASH_HOME"] = _TEST_TMP_DIR
+os.environ["MASH_DATABASE_PATH"] = str(Path(_TEST_TMP_DIR) / "database" / "mash.db")
+
 # Ensure test suite runs in isolated offline mock mode unless live LLM is explicitly requested
 # QA-BUG-4 Hermetic Test Contract: provide default offline mock keys so fresh clones pass 100%
 os.environ.setdefault("MOCK_LLM", "true")
@@ -60,7 +68,7 @@ def mock_llm_offline_environment():
 
 
 def pytest_sessionfinish(session, exitstatus):
-    """Clean up background SQLAlchemy / aiosqlite connection pools so Python exits immediately."""
+    """Clean up background SQLAlchemy / aiosqlite connection pools and isolated temp DB."""
     import asyncio
     try:
         import app.dependencies as deps
@@ -68,6 +76,12 @@ def pytest_sessionfinish(session, exitstatus):
             inner = deps._engine._inner
             if hasattr(inner, "_engine"):
                 asyncio.run(inner._engine.dispose())
+    except Exception:
+        pass
+
+    try:
+        if os.path.exists(_TEST_TMP_DIR):
+            shutil.rmtree(_TEST_TMP_DIR, ignore_errors=True)
     except Exception:
         pass
 
