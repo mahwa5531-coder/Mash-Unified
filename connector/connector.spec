@@ -16,10 +16,14 @@ from PyInstaller.utils.hooks import copy_metadata
 datas = [
     (str(connector_dir / 'app' / 'resources'), 'app/resources'),
     (str(connector_dir / 'app' / 'prompts'), 'app/prompts'),
+    (str(connector_dir / 'native_picker.ps1'), '.'),
     (str(nexau_dir / 'nexau' / 'agents'), 'nexau/agents'),
     (str(nexau_dir / 'nexau' / 'archs'), 'nexau/archs'),
     (str(nexau_dir / 'nexau' / 'db' / 'migrations'), 'nexau/db/migrations'),
-] + copy_metadata('duckdb') + copy_metadata('polars')
+]
+if (nexau_dir / 'bin' / 'rg.exe').exists():
+    datas.append((str(nexau_dir / 'bin' / 'rg.exe'), 'nexau/bin'))
+datas += copy_metadata('duckdb') + copy_metadata('polars')
 
 hiddenimports = [
     'uvicorn',
@@ -93,7 +97,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -111,7 +115,7 @@ py_exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,

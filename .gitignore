@@ -2,7 +2,8 @@
 node_modules/
 .next/
 out/
-build/
+build/*
+!build/icon.ico
 dist/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).

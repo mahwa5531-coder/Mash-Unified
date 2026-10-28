@@ -1,13 +1,24 @@
 /**
- * Safe URL policy for Agent Markdown.
- * Blocks executable schemes (javascript:, vbscript:) and dangerous data types (e.g. data:text/html),
- * while permitting safe base64 images and regular web/file links.
+ * Safe URL policy for Agent Markdown (QA-BUG-3 Hardening).
+ * Strict allowlist: permits http, https, mailto, relative anchors/paths,
+ * and safe base64 images, while blocking dangerous schemes (app://, file://,
+ * javascript:, vbscript:, etc.) to prevent local file reads and privilege escalation.
  */
 export function safeUrlTransform(url: string): string {
   if (!url) return '';
-  if (/^\s*(javascript|vbscript):/i.test(url)) return '';
-  if (/^\s*data:/i.test(url)) {
-    return /^\s*data:image\/(?:png|jpeg|jpg|webp|gif|svg\+xml|avif);base64,/i.test(url) ? url : '';
+  const trimmed = url.trim();
+
+  // Allow relative links (#anchor, /path, ./path)
+  if (/^([#/]|\.\/)/.test(trimmed)) return trimmed;
+
+  // Allow safe web & mail protocols
+  if (/^(https?|mailto):/i.test(trimmed)) return trimmed;
+
+  // Allow safe base64 images
+  if (/^data:image\/(?:png|jpeg|jpg|webp|gif|svg\+xml|avif);base64,/i.test(trimmed)) {
+    return trimmed;
   }
-  return url;
+
+  // Reject all other schemes (app://, file://, javascript:, vbscript:, data:, etc.)
+  return '';
 }

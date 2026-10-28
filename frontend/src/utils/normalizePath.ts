@@ -21,8 +21,14 @@ export function safeDecodeURI(raw: string): string {
  * backslash→forward slash, and optional #anchor stripping.
  */
 export function normalizePath(raw: string, stripAnchor = true): string {
-  const stripped = (raw || '').replace(/^file:\/\/\/?/i, '');
-  let p = safeDecodeURI(stripped);
+  let p = raw || '';
+  if (/^file:\/\//i.test(p)) {
+    p = p.replace(/^file:\/\//i, '');
+    // QA-BUG-2 Fix: Strip leading slash ONLY before Windows drive letters (/C: -> C:),
+    // preserving the root slash for POSIX absolute paths (/home/u/x.md)
+    p = p.replace(/^\/([a-zA-Z]:)/, '$1');
+  }
+  p = safeDecodeURI(p);
   p = p.replace(/^\/([a-zA-Z]:)/, '$1');
   p = p.replace(/\\/g, '/');
   if (stripAnchor) p = p.split('#')[0];

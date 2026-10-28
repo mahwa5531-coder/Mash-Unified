@@ -14,7 +14,11 @@ import httpx
 import respx
 
 # Ensure test suite runs in isolated offline mock mode unless live LLM is explicitly requested
+# QA-BUG-4 Hermetic Test Contract: provide default offline mock keys so fresh clones pass 100%
 os.environ.setdefault("MOCK_LLM", "true")
+os.environ.setdefault("LLM_API_KEY", "test-mock-key")
+os.environ.setdefault("LLM_BASE_URL", "http://127.0.0.1:9777/v1")
+os.environ.setdefault("LLM_MODEL", "mock-audit-v1")
 os.environ["MASH_BYPASS_AUTH"] = "false"
 
 @pytest.fixture

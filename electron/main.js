@@ -208,7 +208,14 @@ async function launchBackendSupervisor(port) {
   });
 
   await waitForBackendReady(port);
-  restartCount = 0; // Reset restart counter once healthy
+  // QA-BUG-9 Fix: Only reset restart counter after sustained healthy runtime (60s)
+  // to prevent rapid crash-loops from respawning indefinitely
+  const activeProc = connectorProcess;
+  setTimeout(() => {
+    if (connectorProcess === activeProc && !connectorProcess?.killed) {
+      restartCount = 0;
+    }
+  }, 60000);
 }
 
 // 6. Window Creation & Native Controls
@@ -237,9 +244,9 @@ async function createMainWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http:') || url.startsWith('https:')) {
       shell.openExternal(url);
-      return { action: 'deny' };
     }
-    return { action: 'allow' };
+    // Hardening (QA-BUG-3): deny all child window popups regardless of protocol
+    return { action: 'deny' };
   });
 
   if (!app.isPackaged && process.env.MASH_DEV_URL) {
@@ -310,15 +317,29 @@ app.whenReady().then(async () => {
         decodedPath = '/index.html';
       }
       let target = path.join(outDir, decodedPath);
-      if (!fs.existsSync(target) && !path.extname(target)) {
-        target = path.join(outDir, `${decodedPath}.html`);
+      // Clean HTML routing for Next.js static exports (QA-BUG-10c)
+      if (!fs.existsSync(target) || (fs.existsSync(target) && fs.statSync(target).isDirectory())) {
+        const cleanPath = decodedPath.replace(/\/+$/, '');
+        if (fs.existsSync(path.join(outDir, `${cleanPath}.html`))) {
+          target = path.join(outDir, `${cleanPath}.html`);
+        } else if (fs.existsSync(path.join(outDir, cleanPath, 'index.html'))) {
+          target = path.join(outDir, cleanPath, 'index.html');
+        } else {
+          target = path.join(outDir, 'index.html');
+        }
       }
-      if (!fs.existsSync(target)) {
-        target = path.join(outDir, 'index.html');
+
+      // Hard path traversal containment (QA-BUG-3):
+      // Target must resolve strictly within frontend/out
+      const resolvedTarget = path.resolve(target);
+      const normalizedOutDir = path.resolve(outDir);
+      if (!resolvedTarget.startsWith(normalizedOutDir + path.sep) && resolvedTarget !== normalizedOutDir && resolvedTarget !== path.join(normalizedOutDir, 'index.html')) {
+        console.warn('[Protocol:app] Traversal attempt blocked:', request.url);
+        return new Response('Forbidden', { status: 403 });
       }
 
       // Read via Node fs (which automatically penetrates app.asar transparently)
-      const data = fs.readFileSync(target);
+      const data = fs.readFileSync(resolvedTarget);
       const ext = path.extname(target).toLowerCase();
       const contentType = mimeTypes[ext] || 'application/octet-stream';
       return new Response(data, {
@@ -380,10 +401,18 @@ app.on('will-quit', () => {
   terminateConnector();
 });
 
+app.on('activate', async () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    if (!connectorProcess) {
+      const port = await allocateEphemeralPort();
+      await launchBackendSupervisor(port);
+    }
+    await createMainWindow();
+  }
+});
+
 app.on('window-all-closed', () => {
   isQuitting = true;
   terminateConnector();
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  app.quit();
 });

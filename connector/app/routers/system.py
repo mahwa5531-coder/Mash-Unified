@@ -131,7 +131,12 @@ def _open_folder_dialog() -> str | None:
 
     if sys.platform == "win32":
         # 1. Native IFileOpenDialog with FOS_PICKFOLDERS via native_picker.ps1 (Real modern File Explorer)
+        # 1. Native folder picker via native_picker.ps1 (QA-BUG-7)
         picker_script = Path(__file__).resolve().parent.parent / "native_picker.ps1"
+        if not picker_script.exists() and getattr(sys, "frozen", False):
+            picker_script = Path(sys.executable).parent / "native_picker.ps1"
+            if not picker_script.exists() and hasattr(sys, "_MEIPASS"):
+                picker_script = Path(sys._MEIPASS) / "native_picker.ps1"
         if picker_script.exists():
             try:
                 res = subprocess.run(

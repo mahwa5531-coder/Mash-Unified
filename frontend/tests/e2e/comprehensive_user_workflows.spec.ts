@@ -180,6 +180,12 @@ test.describe('MASH Desktop E2E Workflow Matrix', () => {
     await setupMockBackend(page, true);
     await page.goto('/');
 
+    // Expand the "Mash" workspace folder if collapsed (QA-BUG-5 Fix)
+    const mashFolder = page.getByRole('button', { name: /Mash/i }).first();
+    if (await mashFolder.isVisible()) {
+      await mashFolder.click();
+    }
+
     // Verify sessions appear in the sidebar list (matching with regex for ellipsis truncation)
     await expect(page.getByText(/Compiler Toolchain/i)).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/Direct Architectural/i)).toBeVisible();
@@ -284,6 +290,12 @@ test.describe('MASH Desktop E2E Workflow Matrix', () => {
   test('Workflow 8: Multi-Session Hot In-Memory Retention (Zero-Wipe Switching)', async ({ page }) => {
     await setupMockBackend(page, true);
     await page.goto('/');
+
+    // Expand the "Mash" workspace folder if collapsed (QA-BUG-5 Fix)
+    const mashFolder = page.getByRole('button', { name: /Mash/i }).first();
+    if (await mashFolder.isVisible()) {
+      await mashFolder.click();
+    }
 
     // 1. Select Session A (Compiler Toolchain Diagnostic)
     const sessionA = page.getByText(/Compiler Toolchain/i);

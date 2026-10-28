@@ -27,7 +27,8 @@ export function isHeartbeatComment(line: string): boolean {
 
 export function stripSentinels(rawToken: string): string {
   if (typeof rawToken !== 'string' || !rawToken) return '';
-  if (/^\[?(DONE|END|done|end|empty)\]?$/i.test(rawToken.trim())) return '';
+  // QA-BUG-1 Fix: Require brackets so ordinary words ("done", "end", "empty") are never dropped from chat
+  if (/^\[(DONE|END|done|end|empty)\]$/i.test(rawToken.trim())) return '';
   return rawToken
     .replace(/\[VERIFIED\]\s*/gi, '')
     .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '');
