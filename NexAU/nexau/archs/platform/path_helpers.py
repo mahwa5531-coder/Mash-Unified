@@ -21,7 +21,6 @@ POSIX-style paths on Windows.
 
 from __future__ import annotations
 
-import os
 import re
 import shutil
 import sys
@@ -55,12 +54,7 @@ def is_windows_host() -> bool:
 
 
 def get_nexau_home() -> Path:
-    """Return the global ~/.mash directory, or MASH_HOME / NEXAU_HOME override."""
-    env_home = os.environ.get("MASH_HOME") or os.environ.get("NEXAU_HOME")
-    if env_home:
-        p = Path(env_home).resolve()
-        p.mkdir(parents=True, exist_ok=True)
-        return p
+    """Return the global ~/.mash directory."""
     p = Path.home() / ".mash"
     p.mkdir(parents=True, exist_ok=True)
     return p
@@ -72,14 +66,7 @@ get_mash_home = get_nexau_home
 def get_database_path() -> Path:
     """Return the unified SQLite database path (~/.mash/database/mash.db).
     Automatically scaffolds ~/.mash/database/ and migrates legacy root DB files if present.
-    Supports MASH_DATABASE_PATH and NEXAU_DATABASE_PATH environment overrides for hermetic tests.
     """
-    env_override = os.environ.get("MASH_DATABASE_PATH") or os.environ.get("NEXAU_DATABASE_PATH")
-    if env_override:
-        p = Path(env_override).resolve()
-        p.parent.mkdir(parents=True, exist_ok=True)
-        return p
-
     db_dir = get_mash_home() / "database"
     db_dir.mkdir(parents=True, exist_ok=True)
     new_db = db_dir / "mash.db"
