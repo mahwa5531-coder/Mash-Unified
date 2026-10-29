@@ -11,6 +11,7 @@ import { FileViewerNotice } from './renderers/FileViewerNotice';
 import { ExcelViewerCard } from './renderers/ExcelViewerCard';
 import { AgentMarkdown } from '@/components/markdown/AgentMarkdown';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { fastFormatJsonLine } from '@/features/viewer/utils/fastJsonFormatter';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -98,11 +99,16 @@ export default function SafeFileViewer({
 
   const displayedContent = useMemo(() => {
     if (!content) return '// Empty file';
+    // Zero-AST single-pass line formatting for minified JSON/data files
+    // Injects newlines so Monaco's line virtualization handles massive files with 0 truncation
+    if (cleanName.endsWith('.json') || cleanName.endsWith('.jsonl')) {
+      return fastFormatJsonLine(content);
+    }
     if (content.length > 100_000 && !content.includes('\n')) {
       return content.slice(0, 5000) + '... [line truncated for browser safety]';
     }
     return content;
-  }, [content]);
+  }, [content, cleanName]);
 
   const sessionQuery = sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : '';
 
