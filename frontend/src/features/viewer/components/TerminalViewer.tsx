@@ -135,16 +135,17 @@ export function TerminalViewer({
 
         {visibleLines.map((line, offset) => {
           const idx = startIndex + offset;
+          const displayLine = line.length > 10000 ? line.slice(0, 10000) + '... [line truncated for browser safety]' : line;
           return (
             <div 
               key={idx} 
-              className="flex hover:bg-white/[0.02] py-0.5 px-1 rounded-sm h-[22px] items-center shrink-0"
+              className="flex hover:bg-white/[0.02] py-0.5 px-1 rounded-sm h-[22px] items-center shrink-0 min-w-full w-max"
             >
               <span className="select-none text-zinc-600 w-9 text-right pr-3.5 shrink-0 tabular-nums font-mono text-[11px]">
                 {idx + 1}
               </span>
-              <span className="flex-1 whitespace-pre text-zinc-200 overflow-hidden text-ellipsis">
-                {line}
+              <span className="whitespace-pre text-zinc-200 pr-4">
+                {displayLine}
               </span>
             </div>
           );

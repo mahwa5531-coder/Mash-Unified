@@ -3,7 +3,7 @@
 import { useState, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
 import { markSessionViewed, renameSession, deleteSession, markSessionDeleted, unmarkSessionDeleted, cleanupSessionStorage, SessionItem } from '@/services/sessions';
 import { ProjectItem, selectFolder, resolveFolder, createProject, deleteProject } from '@/services/projects';
-import { sessionStore } from '@/features/chat';
+import { sessionStore, isSessionStreaming } from '@/features/chat';
 import { evictRightSidebarMemory } from '@/features/viewer/hooks/useViewerTabs';
 import { invalidateFileCache } from '@/services/files';
 import { FailedToDeleteCard } from './FailedToDeleteCard';
@@ -380,6 +380,8 @@ export default function Sidebar({
         onOpenMenu={handleOpenMenu}
         onRenameSubmit={handleRenameSubmit}
         onCancelRename={handleRenameCancel}
+        isStreaming={isSessionStreaming(s.session_id)}
+        hasStoreUnread={Boolean(sessionStore.get(s.session_id)?.hasUnread)}
       />
     );
   };

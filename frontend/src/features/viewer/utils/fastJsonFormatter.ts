@@ -10,13 +10,13 @@
  */
 
 export function fastFormatJsonLine(raw: string, maxLen = 5_000_000): string {
-  if (!raw || raw.length > maxLen || raw.includes('\n')) {
+  if (!raw || raw.length > maxLen) {
     return raw;
   }
 
-  const trimmed = raw.trimStart();
-  // Quick pre-flight: only format if it begins with an object or array literal
-  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+  const trimmed = raw.trim();
+  // Quick pre-flight: if already formatted with newlines, or does not start with JSON structure, return immediately
+  if (!trimmed || trimmed.includes('\n') || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
     return raw;
   }
 
@@ -64,10 +64,15 @@ export function fastFormatJsonLine(raw: string, maxLen = 5_000_000): string {
     } else if (c === ',') {
       chunks.push(raw.slice(lastSlice, i + 1));
       chunks.push('\n' + indentStep.repeat(indent));
+      if (raw[i + 1] === ' ') {
+        i++;
+      }
       lastSlice = i + 1;
     } else if (c === ':') {
       chunks.push(raw.slice(lastSlice, i + 1));
-      chunks.push(' ');
+      if (raw[i + 1] !== ' ') {
+        chunks.push(' ');
+      }
       lastSlice = i + 1;
     }
   }

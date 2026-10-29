@@ -21,6 +21,8 @@ interface SessionItemRowProps {
   onRenameSubmit: (sessionId: string) => void;
   onCancelRename?: () => void;
   isSelectionResolved?: boolean;
+  isStreaming?: boolean;
+  hasStoreUnread?: boolean;
 }
 
 export const SessionItemRow = React.memo(function SessionItemRow({
@@ -35,6 +37,8 @@ export const SessionItemRow = React.memo(function SessionItemRow({
   onRenameSubmit,
   onCancelRename,
   isSelectionResolved,
+  isStreaming: propIsStreaming,
+  hasStoreUnread: propHasStoreUnread,
 }: SessionItemRowProps) {
   // ponytail: Suppress unread blue dot blinking during cold boot until initial session selection resolves
   const [localResolved, setLocalResolved] = useState(false);
@@ -48,8 +52,9 @@ export const SessionItemRow = React.memo(function SessionItemRow({
 
   const resolved = isSelectionResolved ?? localResolved;
   const storeState = sessionStore.get(s.session_id);
-  const showUnread = Boolean(resolved && !isSelected && (s.has_unread || Boolean(storeState?.hasUnread)));
-  const isStreaming = isSessionStreaming(s.session_id);
+  const isStreaming = propIsStreaming ?? isSessionStreaming(s.session_id);
+  const hasStoreUnread = propHasStoreUnread ?? Boolean(storeState?.hasUnread);
+  const showUnread = Boolean(resolved && !isSelected && (s.has_unread || hasStoreUnread));
 
   return (
     <div
@@ -133,12 +138,15 @@ export const SessionItemRow = React.memo(function SessionItemRow({
     prev.s.session_id === next.s.session_id &&
     prev.s.title === next.s.title &&
     prev.s.custom_title === next.s.custom_title &&
+    prev.s.updated_at === next.s.updated_at &&
     prev.s.has_unread === next.s.has_unread &&
     prev.isSelected === next.isSelected &&
     prev.isEditing === next.isEditing &&
     (!next.isEditing || prev.renameInput === next.renameInput) &&
     prev.isPinnedContext === next.isPinnedContext &&
-    prev.isSelectionResolved === next.isSelectionResolved
+    prev.isSelectionResolved === next.isSelectionResolved &&
+    prev.isStreaming === next.isStreaming &&
+    prev.hasStoreUnread === next.hasStoreUnread
   );
 });
 
