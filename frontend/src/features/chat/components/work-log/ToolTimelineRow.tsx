@@ -374,7 +374,9 @@ export function ToolTimelineRow({
   // 8. Generic Other Action
   if (entry.type === 'other') {
     const t = entry.data?.tool;
-    const displayName = t?.name && t?.name !== 'action' ? t.name : 'Action';
+    const displayName = t?.name && t?.name !== 'action'
+      ? t.name.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+      : 'Action';
     const isRunning = isToolRunning(t, isStreaming);
     const isCancelled = t?.status === 'cancelled';
     const isDenied = t?.status === 'denied' || t?.decision === 'deny';
