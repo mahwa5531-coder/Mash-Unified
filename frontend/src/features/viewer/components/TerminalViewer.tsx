@@ -138,12 +138,12 @@ export function TerminalViewer({
           return (
             <div 
               key={idx} 
-              className="flex hover:bg-white/[0.02] py-0.5 px-1 rounded-sm min-h-[22px] items-center"
+              className="flex hover:bg-white/[0.02] py-0.5 px-1 rounded-sm h-[22px] items-center shrink-0"
             >
               <span className="select-none text-zinc-600 w-9 text-right pr-3.5 shrink-0 tabular-nums font-mono text-[11px]">
                 {idx + 1}
               </span>
-              <span className="flex-1 whitespace-pre-wrap break-all text-zinc-200">
+              <span className="flex-1 whitespace-pre text-zinc-200 overflow-hidden text-ellipsis">
                 {line}
               </span>
             </div>

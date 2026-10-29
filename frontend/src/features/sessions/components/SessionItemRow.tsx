@@ -128,6 +128,18 @@ export const SessionItemRow = React.memo(function SessionItemRow({
       )}
     </div>
   );
+}, (prev, next) => {
+  return (
+    prev.s.session_id === next.s.session_id &&
+    prev.s.title === next.s.title &&
+    prev.s.custom_title === next.s.custom_title &&
+    prev.s.has_unread === next.s.has_unread &&
+    prev.isSelected === next.isSelected &&
+    prev.isEditing === next.isEditing &&
+    (!next.isEditing || prev.renameInput === next.renameInput) &&
+    prev.isPinnedContext === next.isPinnedContext &&
+    prev.isSelectionResolved === next.isSelectionResolved
+  );
 });
 
 export default SessionItemRow;

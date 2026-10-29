@@ -155,7 +155,7 @@ export default function Sidebar({
     await markSessionViewed(session.session_id);
   };
 
-  const handleOpenMenu = (e: ReactMouseEvent, sessionId: string) => {
+  const handleOpenMenu = useCallback((e: ReactMouseEvent, sessionId: string) => {
     e.stopPropagation();
     e.preventDefault();
     setActiveMenuSessionId(sessionId);
@@ -177,7 +177,7 @@ export default function Sidebar({
     }
 
     setMenuPos({ x, y });
-  };
+  }, []);
 
   const handleRenameSubmit = async (sessionId: string) => {
     const trimmed = renameInput.trim();
@@ -195,10 +195,10 @@ export default function Sidebar({
     setActiveMenuSessionId(null);
   };
 
-  const handleRenameCancel = () => {
+  const handleRenameCancel = useCallback(() => {
     setEditingSessionId(null);
     setActiveMenuSessionId(null);
-  };
+  }, []);
 
   const handleDeleteClick = (sessionId: string) => {
     setActiveMenuSessionId(null);

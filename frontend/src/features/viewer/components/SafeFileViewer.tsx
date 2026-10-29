@@ -102,7 +102,14 @@ export default function SafeFileViewer({
     // Zero-AST single-pass line formatting for minified JSON/data files
     // Injects newlines so Monaco's line virtualization handles massive files with 0 truncation
     if (cleanName.endsWith('.json') || cleanName.endsWith('.jsonl')) {
-      return fastFormatJsonLine(content);
+      if (content.length <= 5_000_000) {
+        return fastFormatJsonLine(content);
+      }
+      // For massive single-line JSON files (> 5MB), format initial 2MB preview chunk to prevent UI freeze
+      if (!content.includes('\n')) {
+        return fastFormatJsonLine(content.slice(0, 2_000_000)) + '\n\n// ... [Additional records loaded. Use Download Full File above for complete raw dataset]';
+      }
+      return content;
     }
     if (content.length > 100_000 && !content.includes('\n')) {
       return content.slice(0, 5000) + '... [line truncated for browser safety]';

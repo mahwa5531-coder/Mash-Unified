@@ -72,6 +72,7 @@ export default function RightSidebar({
     tabTruncated,
     isLoadingContent,
     openFileTab,
+    openTerminalTab,
     handleCloseTab,
     retryTabContent,
     activeTab,
@@ -165,6 +166,19 @@ export default function RightSidebar({
       onFileOpened?.();
     }
   }, [fileToOpen, openFileTab, onFileOpened]);
+
+  // Global listener to open background task terminal output in RightSidebar
+  useEffect(() => {
+    const handleOpenTerminal = (e: any) => {
+      if (e.detail?.taskId) {
+        const taskId = String(e.detail.taskId);
+        const title = e.detail.title || `Task #${taskId}`;
+        openTerminalTab(taskId, title);
+      }
+    };
+    window.addEventListener('mash:open-terminal', handleOpenTerminal);
+    return () => window.removeEventListener('mash:open-terminal', handleOpenTerminal);
+  }, [openTerminalTab]);
 
   return (
     <TooltipProvider delayDuration={150}>
