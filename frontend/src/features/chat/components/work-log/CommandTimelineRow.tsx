@@ -55,26 +55,18 @@ export function CommandTimelineRow({
       ? expandedCmds.has(toolId)
       : Boolean(expandedCmds?.[toolId]);
 
-  // ponytail: Defer JSON parsing and ANSI stripping of command output until user expands the terminal drawer
+  // ponytail: Defer JSON parsing of command output until user expands the terminal drawer
   let displayOutput = outputText;
-  if (isCmdExpanded) {
-    if (outputText.startsWith('{') && outputText.endsWith('}')) {
-      try {
-        const parsed = JSON.parse(outputText);
-        if (parsed && typeof parsed === 'object') {
-          const val = parsed.returnDisplay || parsed.content || parsed.output || parsed.stdout || parsed.stderr;
-          if (val !== undefined && val !== null) {
-            displayOutput = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
-          }
+  if (isCmdExpanded && outputText.startsWith('{') && outputText.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(outputText);
+      if (parsed && typeof parsed === 'object') {
+        const val = parsed.returnDisplay || parsed.content || parsed.output || parsed.stdout || parsed.stderr;
+        if (val !== undefined && val !== null) {
+          displayOutput = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
         }
-      } catch {}
-    }
-    // Strip terminal ANSI color/cursor escape codes for clean readable output
-    displayOutput = displayOutput.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-    // Cap runaway terminal output to 30KB to protect DOM performance
-    if (displayOutput.length > 30000) {
-      displayOutput = displayOutput.slice(0, 30000) + '\n... [output truncated for performance]';
-    }
+      }
+    } catch {}
   }
 
   const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
@@ -152,9 +144,7 @@ export function CommandTimelineRow({
           <div className="w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-950 p-2.5 font-mono text-[11px] text-zinc-200">
             <div className="text-zinc-400 mb-1.5 flex items-center justify-between border-b border-zinc-800 pb-1 text-[10.5px]">
               <div className="flex items-center gap-1.5 truncate">
-                <span className="text-zinc-500 truncate text-[10px] select-none font-mono">
-                  {entry.data?.cwd ? `...\\${String(entry.data.cwd).split(/[/\\]/).pop()} &gt;` : '&gt;'}
-                </span>
+                <span className="text-zinc-500 font-mono text-[10.5px] select-none shrink-0">&gt;</span>
                 <span className="text-zinc-200 font-medium truncate text-[10.5px]">{entry.data?.fullCmd || entry.data?.cmd}</span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">

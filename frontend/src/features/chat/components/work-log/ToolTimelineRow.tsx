@@ -129,13 +129,6 @@ export function ToolTimelineRow({
         <div className={cn(isDenied && "opacity-60")}>
           <FilePill path={filePath} onOpenFile={onOpenFile} />
         </div>
-        {!isRunning && !isDenied && !isCancelled && (Boolean(entry.data?.added) || Boolean(entry.data?.deleted)) && (
-          <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500 shrink-0 select-none">
-            {Boolean(entry.data?.added) && <span className="text-emerald-500/90 dark:text-emerald-400 font-medium">+{entry.data.added}</span>}
-            {Boolean(entry.data?.added && entry.data?.deleted) && ' '}
-            {Boolean(entry.data?.deleted) && <span className="text-rose-500/90 dark:text-rose-400 font-medium">-{entry.data.deleted}</span>}
-          </span>
-        )}
         {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
       </div>
     );
