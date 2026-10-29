@@ -13,7 +13,11 @@ except Exception:
     pass
 
 BASE_URL = "http://127.0.0.1:8000"
-DB_PATH = pathlib.Path.home() / ".nexau" / "database" / "nexau.db"
+DB_PATH = pathlib.Path.home() / ".mash" / "database" / "mash.db"
+if not DB_PATH.exists():
+    legacy_db = pathlib.Path.home() / ".nexau" / "database" / "nexau.db"
+    if legacy_db.exists():
+        DB_PATH = legacy_db
 SANDBOX_DIR = (pathlib.Path(__file__).resolve().parent.parent.parent / "scratch" / "sandbox").resolve()
 
 class NexAUTestEngineer:

@@ -66,17 +66,6 @@ export function useChatAttachments(
     const validFiles = Array.from(files);
     if (validFiles.length === 0) return;
 
-    // Check per-file size limit (30 MB)
-    const oversized = validFiles.find((f) => f.size > MAX_FILE_SIZE_BYTES);
-    if (oversized) {
-      const sizeMb = (oversized.size / (1024 * 1024)).toFixed(1);
-      const reason = `File "${oversized.name}" exceeds the 30 MB size limit (${sizeMb} MB).`;
-      setUploadError(reason);
-      setHasInvalidMedia(true);
-      onInvalidMedia?.(true, reason);
-      return;
-    }
-
     // ponytail: Single root guard protecting all 3 vectors (Drag & Drop, File Picker, Clipboard Paste)
     if (attachedFiles.length + validFiles.length > MAX_CHAT_ATTACHMENTS) {
       setHasInvalidMedia(true);
@@ -94,9 +83,42 @@ export function useChatAttachments(
 
     try {
       for (const file of filesToUpload) {
+        // ponytail: Native Electron desktop file path optimization.
+        // For local files (e.g. 500MB audit datasets), reference local path directly without redundant HTTP copying.
+        const nativePath =
+          (typeof window !== 'undefined' &&
+            ((window as any).electronAPI?.getPathForFile?.(file) || (file as any).path)) ||
+          null;
+
+        if (nativePath && typeof nativePath === 'string') {
+          const isImg = file.type?.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(file.name);
+          let previewUrl: string | undefined = undefined;
+          if (isImg && typeof URL !== 'undefined' && URL.createObjectURL) {
+            previewUrl = URL.createObjectURL(file);
+            createdBlobUrlsRef.current.add(previewUrl);
+          }
+          uploadedList.push({
+            name: file.name,
+            path: nativePath,
+            previewUrl,
+            size: file.size,
+          });
+          continue;
+        }
+
+        // Web fallback: Check per-file size limit (30 MB) and upload over HTTP
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+          const reason = `File "${file.name}" exceeds the 30 MB size limit (${sizeMb} MB).`;
+          setUploadError(reason);
+          setHasInvalidMedia(true);
+          onInvalidMedia?.(true, reason);
+          continue;
+        }
+
         const res = await uploadSessionFile(sid, file);
         if (res && res.path) {
-          const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(file.name);
+          const isImg = file.type?.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(file.name);
           let previewUrl: string | undefined = undefined;
           if (isImg && typeof URL !== 'undefined' && URL.createObjectURL) {
             previewUrl = URL.createObjectURL(file);

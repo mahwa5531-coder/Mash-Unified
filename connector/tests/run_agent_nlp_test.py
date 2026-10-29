@@ -6,7 +6,11 @@ import time
 import urllib.request
 
 BASE_URL = "http://127.0.0.1:8000"
-DB_PATH = pathlib.Path.home() / ".nexau" / "database" / "nexau.db"
+DB_PATH = pathlib.Path.home() / ".mash" / "database" / "mash.db"
+if not DB_PATH.exists():
+    legacy_db = pathlib.Path.home() / ".nexau" / "database" / "nexau.db"
+    if legacy_db.exists():
+        DB_PATH = legacy_db
 
 def inspect_database(tag="", session_id=None):
     print(f"\n{'='*20} DATABASE CHECK [{tag}] {'='*20}")

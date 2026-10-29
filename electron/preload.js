@@ -1,7 +1,7 @@
 // Mash Desktop Preload Script
 // Bridges native window controls and ephemeral API URL to renderer securely via contextBridge.
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 // Synchronously query the assigned ephemeral backend URL from Main process
 let backendUrl = 'http://127.0.0.1:8000';
@@ -15,6 +15,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximize: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
   openPath: (targetPath) => ipcRenderer.invoke('mash-open-path', targetPath),
+  getPathForFile: (file) => {
+    try {
+      if (webUtils && typeof webUtils.getPathForFile === 'function') {
+        return webUtils.getPathForFile(file);
+      }
+    } catch (_) {}
+    return file?.path || null;
+  },
   restartAndInstall: () => ipcRenderer.send('mash-restart-and-install'),
   onUpdateDownloading: (callback) => {
     ipcRenderer.on('mash-update-downloading', (_event, data) => callback(data));
