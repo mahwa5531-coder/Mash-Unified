@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
+  openPath: (targetPath) => ipcRenderer.invoke('mash-open-path', targetPath),
   restartAndInstall: () => ipcRenderer.send('mash-restart-and-install'),
   onUpdateDownloading: (callback) => {
     ipcRenderer.on('mash-update-downloading', (_event, data) => callback(data));

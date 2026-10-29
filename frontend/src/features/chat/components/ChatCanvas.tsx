@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
-import { ChevronDown } from 'lucide-react';
 import ChatComposer from '@/features/chat/components/ChatComposer';
 import { QuotaBanner, InvalidMediaBanner } from '@/primitives';
 import { classifyError } from '@/lib/errorClassification';
@@ -30,6 +29,7 @@ interface ChatCanvasProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   onSessionCreated: (newSessionId: string, title?: string, repoName?: string) => void;
+  onSelectProject?: (repoName: string, folderPath?: string) => void;
   isRightSidebarOpen?: boolean;
   onToggleRightSidebar?: () => void;
   onOpenFile?: (path: string) => void;
@@ -143,6 +143,7 @@ const MountedTurnRow = memo(function MountedTurnRow({
 export default function ChatCanvas({ 
   sessionId, sessionRepo, pendingWorkspacePath,
   onSessionCreated,
+  onSelectProject,
   onOpenFile,
   onOpenSettings,
 }: ChatCanvasProps) {
@@ -324,9 +325,6 @@ export default function ChatCanvas({
             retryLoadHistory={retryLoadHistory}
           />
 
-          {/* Fresh Hero View (Only for new session when no sessionId is active) */}
-          {!sessionId && chatMessages.length === 0 && <ChatHeroView />}
-
           {/* Messages Feed */}
           {chatMessages.length > 0 && (
             <div className="flex flex-col pt-3 space-y-3.5">
@@ -438,6 +436,17 @@ export default function ChatCanvas({
                 onOpenChange={setShowInvalidMediaBanner}
                 description={invalidMediaReason}
                 onDismiss={() => setShowInvalidMediaBanner(false)}
+              />
+            </div>
+          )}
+
+          {/* Left-aligned Project Scope Selector (Hero only: disappears on first message) */}
+          {!sessionId && chatMessages.length === 0 && (
+            <div className="w-full flex justify-start mb-1.5">
+              <ChatHeroView
+                selectedRepo={sessionRepo || 'No Repo'}
+                pendingWorkspacePath={pendingWorkspacePath}
+                onSelectProject={onSelectProject || (() => {})}
               />
             </div>
           )}

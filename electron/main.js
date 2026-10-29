@@ -233,6 +233,7 @@ async function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      plugins: true,
     },
   });
 
@@ -276,6 +277,15 @@ ipcMain.on('window-maximize', () => {
 
 ipcMain.on('window-close', () => {
   if (mainWindow) mainWindow.close();
+});
+
+ipcMain.handle('mash-open-path', async (_event, targetPath) => {
+  if (!targetPath || typeof targetPath !== 'string') return 'Invalid path';
+  try {
+    return await shell.openPath(targetPath);
+  } catch (err) {
+    return err?.message || 'Failed to open path';
+  }
 });
 
 ipcMain.on('mash-restart-and-install', () => {

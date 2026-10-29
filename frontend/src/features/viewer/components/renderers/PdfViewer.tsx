@@ -43,8 +43,8 @@ export function PdfViewer({ filename, path, sessionQuery = '' }: PdfViewerProps)
           const contentLength = res.headers.get('content-length');
           if (contentLength === '0') {
             setErrorMessage('PDF document is empty (0 bytes).');
-            setIsLoading(false);
           }
+          setIsLoading(false);
         }
       })
       .catch((err) => {
@@ -87,7 +87,6 @@ export function PdfViewer({ filename, path, sessionQuery = '' }: PdfViewerProps)
         src={pdfUrl}
         className="w-full h-full border-0 bg-white dark:bg-[#1a1a1d]"
         title={filename}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"
         onLoad={() => setIsLoading(false)}
       />
     </div>

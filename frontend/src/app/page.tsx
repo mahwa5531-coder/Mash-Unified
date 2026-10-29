@@ -222,6 +222,14 @@ export default function Home() {
     setFileToOpen(path);
   }, []);
 
+  useEffect(() => {
+    const handleGlobalOpenFile = (e: any) => {
+      if (e.detail?.path) handleOpenFile(e.detail.path);
+    };
+    window.addEventListener('mash:open-file', handleGlobalOpenFile);
+    return () => window.removeEventListener('mash:open-file', handleGlobalOpenFile);
+  }, [handleOpenFile]);
+
   if (isAuthLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#09090b] text-zinc-400">
@@ -323,11 +331,15 @@ export default function Home() {
                     sessionTitle={selectedSessionTitle}
                     sessionRepo={selectedSessionRepo}
                     pendingWorkspacePath={pendingWorkspacePath}
+                    onSelectProject={handleNewSession}
                     onSessionCreated={(id, title, repo) => {
                       setSelectedSessionId(id);
                       if (title) setSelectedSessionTitle(title);
                       if (repo) setSelectedSessionRepo(repo);
                       setPendingWorkspacePath(null);
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('nexau:projects-updated'));
+                      }
                     }}
                     onToggleRightSidebar={() => setIsRightSidebarOpen(prev => !prev)}
                     isRightSidebarOpen={isRightSidebarOpen}
