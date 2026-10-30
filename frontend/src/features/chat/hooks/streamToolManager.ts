@@ -184,11 +184,19 @@ export function completeAssistantThinking(messages: Message[], targetTurnId: str
 
 export function dismissPendingApprovals(messages: Message[]): Message[] {
   return messages.map((m) => {
-    if (!m.tools || !m.tools.some((t) => t.status === 'pending_approval' && !t.decision)) return m;
-    return {
-      ...m,
-      tools: m.tools.map((t) => t.status === 'pending_approval' && !t.decision ? { ...t, status: 'denied' as const, decision: 'deny' as const } : t),
-    };
+    let tools = m.tools;
+    if (tools && tools.some((t) => t.status === 'pending_approval' && !t.decision)) {
+      tools = tools.map((t) => t.status === 'pending_approval' && !t.decision ? { ...t, status: 'denied' as const, decision: 'deny' as const } : t);
+    }
+    let steps = m.steps;
+    if (steps && steps.some((st: any) => (st.status === 'pending_approval' || st.type === 'approval') && !st.decision)) {
+      steps = steps.map((st: any) =>
+        (st.status === 'pending_approval' || st.type === 'approval') && !st.decision
+          ? { ...st, status: 'denied', decision: 'deny' }
+          : st
+      );
+    }
+    return { ...m, tools, steps };
   });
 }
 

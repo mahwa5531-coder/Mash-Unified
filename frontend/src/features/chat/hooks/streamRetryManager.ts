@@ -52,11 +52,19 @@ export function prepareSteerTurn(messages: Message[]): Message[] {
   return messages.map((m) => {
     let updated = m;
     if (m.role === 'assistant' && m.status === 'running') updated = { ...updated, status: 'completed' as const };
-    if (m.tools && m.tools.some((t) => t.status === 'pending_approval' && !t.decision)) {
-      updated = {
-        ...updated,
-        tools: m.tools.map((t) => t.status === 'pending_approval' && !t.decision ? { ...t, status: 'failed' as const, decision: 'deny' as const } : t),
-      };
+    let tools = updated.tools;
+    if (tools && tools.some((t) => t.status === 'pending_approval' && !t.decision)) {
+      tools = tools.map((t) => t.status === 'pending_approval' && !t.decision ? { ...t, status: 'denied' as const, decision: 'deny' as const } : t);
+      updated = { ...updated, tools };
+    }
+    let steps = updated.steps;
+    if (steps && steps.some((st: any) => (st.status === 'pending_approval' || st.type === 'approval') && !st.decision)) {
+      steps = steps.map((st: any) =>
+        (st.status === 'pending_approval' || st.type === 'approval') && !st.decision
+          ? { ...st, status: 'denied', decision: 'deny' }
+          : st
+      );
+      updated = { ...updated, steps };
     }
     return updated;
   });
