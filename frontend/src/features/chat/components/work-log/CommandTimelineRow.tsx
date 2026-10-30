@@ -162,7 +162,11 @@ export function CommandTimelineRow({
               </div>
             </div>
             <pre className="text-zinc-300 whitespace-pre-wrap leading-tight max-h-36 overflow-y-auto custom-scrollbar font-mono text-[10.5px] select-text">
-              {displayOutput || <span className="text-zinc-500">Done (no output)</span>}
+              {displayOutput || (
+                <span className="text-zinc-500">
+                  {isRunning ? 'Running command...' : 'Done (no output)'}
+                </span>
+              )}
             </pre>
           </div>
         </div>
