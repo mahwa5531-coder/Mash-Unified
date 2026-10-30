@@ -1,27 +1,38 @@
 type: tool
 name: view_file
 description: |
-  View the contents of a file from the local filesystem. This tool supports text files and following binary files: image, pdf, video, audio.
+  View the contents of a file from the local filesystem. This tool supports source code/text files, directories, spreadsheets (.xlsx, .xls, .csv, .tsv), visual media (images & video), and PDF documents.
 
-  Text file usage:
-  - The lines of the file are 1-indexed
-  - You can view at most 800 lines at a time
-  - Specify StartLine and EndLine to view the lines of the file using slice notation:
-    - Omit both to view the entire file, or the first 800 lines of the file, whichever is smaller.
-    - Specify StartLine only to view the remaining lines of the file, or the next 800 lines, whichever is smaller
-    - Specify EndLine only to view the remaining preceding lines of the file, or the previous 800 lines, whichever is smaller
-    - Specify both to view a precise line range. This range must be smaller than 800 lines or only the first 800 lines of the range will be shown.
-  - Content is limited to 46080 bytes per view. If content is truncated, use the ContentOffset parameter to view the remaining content
-  PDF document (.pdf) usage:
-  - Supports all PDF documents directly via native high-resolution visual page rendering for multimodal perception.
-  - Specify StartLine and EndLine to view specific page ranges (e.g. StartLine=1, EndLine=50).
-  - ALWAYS call view_file directly for PDF documents; NEVER write custom scripts or use shell commands to parse PDFs.
-  Spreadsheet & Tabular Data (.xlsx, .xls, .csv, .parquet):
-  - Automatically routes through the Calamine & Polars ingestion engine.
-  - Small sheets (<=100 rows) are rendered directly as structured Markdown tables.
-  - Large sheets (>100 rows) return column schemas, 5 sample preview rows, and the queryable '.parquet' path for DuckDB.
-  Directory usage:
-  - If a directory path is provided, lists the files and folder structure.
+  SUPPORTED FILE TYPES:
+  - Text & Source Code: All plain text, code (.py, .ts, .js, .sql), JSON, YAML, Markdown, XML, config files.
+    - 1-indexed line numbers. Specify StartLine and EndLine to view specific line ranges (up to 800 lines per call).
+    - If unbounded, defaults to the first 100 lines.
+    - If content exceeds 46KB, use ContentOffset to paginate through raw bytes.
+  - PDF Documents (.pdf):
+    - Ingests all PDF documents via hybrid visual/text extraction (renders visual pages to 200 DPI images for multimodal perception).
+    - Specify StartLine and EndLine to view specific page ranges (e.g. StartLine=1, EndLine=20).
+    - ALWAYS call view_file directly for PDF documents; NEVER write custom scripts to parse PDFs.
+  - Spreadsheets & Tabular Data (.xlsx, .xls, .csv, .tsv):
+    - Automatically parses layout and renders a spatial Markdown preview for orientation.
+    - Pass sheet_name='<Name>' to inspect a specific Excel sheet directly.
+  - Images & Video (.png, .jpg, .jpeg, .webp, .bmp, .svg, .gif, .mp4, etc.):
+    - Delivered directly as multimodal visual image/video blocks.
+  - Directories:
+    - Lists folder structure and child files.
+
+  UNSUPPORTED FILE TYPES (DO NOT CALL view_file FOR THESE):
+  - Binary Columnar Datasets (.parquet, .feather, .arrow):
+    - NOT supported by view_file. Use run_shell_command with Python / DuckDB (e.g. `python -c "import duckdb; print(duckdb.read_parquet('file.parquet'))"`).
+  - Databases (.sqlite, .db, .duckdb):
+    - NOT supported by view_file. Use run_shell_command with sqlite3 or Python duckdb.
+  - Office Documents (.docx, .doc, .pptx, .ppt):
+    - NOT supported by view_file. Use run_shell_command with Python libraries (docx2txt, python-pptx) to extract text or convert pages to PNG, then inspect via view_file.
+  - Compressed Archives (.zip, .tar, .gz, .7z, .rar):
+    - NOT supported by view_file. Use run_shell_command with tar/unzip or Python zipfile.
+  - Compiled Binaries (.exe, .dll, .so, .dylib, .pyc, .bin, .iso):
+    - NOT supported.
+  - Audio Files (.mp3, .wav, .aac, .flac):
+    - NOT supported.
 
 input_schema:
   type: object
@@ -30,6 +41,9 @@ input_schema:
       type: string
       description: "Path to file or directory to view. Must be an absolute path or workspace-relative path."
     file_path:
+      type: string
+      description: "Alias for AbsolutePath."
+    path:
       type: string
       description: "Alias for AbsolutePath."
     StartLine:
@@ -48,6 +62,12 @@ input_schema:
       type: integer
       description: "Optional. Byte offset into the content. Use this to view content beyond the initial byte limit when the tool output indicates content was truncated."
     content_offset:
+      type: integer
+      description: "Alias for ContentOffset."
+    ByteOffset:
+      type: integer
+      description: "Alias for ContentOffset."
+    byte_offset:
       type: integer
       description: "Alias for ContentOffset."
     sheet_name:
