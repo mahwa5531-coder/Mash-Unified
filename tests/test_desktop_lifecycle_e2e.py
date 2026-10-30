@@ -59,8 +59,8 @@ def test_desktop_lifecycle_end_to_end():
         cmd,
         cwd=cwd,
         env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     
     pid = proc.pid

@@ -25,8 +25,11 @@ from pathlib import Path
 def test_distribution_package_e2e():
     root_dir = Path(__file__).resolve().parent.parent
     release_dir = root_dir / 'dist' / 'release'
-    installer_exe = release_dir / 'Mash Setup 1.0.0.exe'
-    blockmap_file = release_dir / 'Mash Setup 1.0.0.exe.blockmap'
+    installer_exe = release_dir / 'Mash-Setup-1.0.0.exe'
+    if not installer_exe.exists():
+        installer_exe = release_dir / 'Mash Setup 1.0.0.exe'
+    
+    blockmap_file = release_dir / f"{installer_exe.name}.blockmap"
     latest_yml = release_dir / 'latest.yml'
     
     unpacked_dir = release_dir / 'win-unpacked'
