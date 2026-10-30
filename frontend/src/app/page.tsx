@@ -158,7 +158,10 @@ export default function Home() {
     setAllSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
     sessionStore.delete(sessionId);
     if (selectedSessionId === sessionId) {
-      handleNewSession('No Repo');
+      const fallbackRepo = targetSession?.workspace_uri && targetSession.workspace_uri !== 'No Repo'
+        ? targetSession.workspace_uri
+        : 'No Repo';
+      handleNewSession(fallbackRepo);
     }
 
     try {

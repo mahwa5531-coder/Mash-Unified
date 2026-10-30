@@ -219,7 +219,10 @@ export default function Sidebar({
     sessionStore.delete(sessionId);
 
     if (selectedSessionId === sessionId) {
-      onNewSession();
+      const fallbackRepo = targetSession?.workspace_uri && targetSession.workspace_uri !== 'No Repo'
+        ? targetSession.workspace_uri
+        : 'No Repo';
+      onNewSession(fallbackRepo);
     }
 
     try {
