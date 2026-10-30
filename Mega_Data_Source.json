@@ -1,0 +1,7016 @@
+[
+  {
+    "id": "TXN1000",
+    "date": "2026-01-01",
+    "vendor": "Rent Property Mgmt",
+    "amount": 250.81,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1001",
+    "date": "2026-04-07",
+    "vendor": "Consultancy Group",
+    "amount": 1766.18,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1002",
+    "date": "2026-05-30",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 3871.9,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1003",
+    "date": "2026-02-07",
+    "vendor": "Rent Property Mgmt",
+    "amount": 7836.28,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1004",
+    "date": "2026-04-30",
+    "vendor": "Rent Property Mgmt",
+    "amount": 7858.58,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1005",
+    "date": "2026-01-04",
+    "vendor": "Microsoft Corp",
+    "amount": 9156.3,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1006",
+    "date": "2026-01-29",
+    "vendor": "Staples UK",
+    "amount": 4797.81,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1007",
+    "date": "2026-02-07",
+    "vendor": "Travel Agency",
+    "amount": 1519.74,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1008",
+    "date": "2026-05-01",
+    "vendor": "Amazon Web Services",
+    "amount": 1392.57,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1009",
+    "date": "2026-04-14",
+    "vendor": "Marketing Agency",
+    "amount": 959.3185873243706,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1010",
+    "date": "2026-05-25",
+    "vendor": "Rent Property Mgmt",
+    "amount": 5151.44,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1011",
+    "date": "2026-02-25",
+    "vendor": "Maintenance Pro",
+    "amount": 175.79,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1012",
+    "date": "2026-03-28",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 3135.47,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1013",
+    "date": "2026-01-14",
+    "vendor": "Insurance Corp",
+    "amount": 4590.97,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1014",
+    "date": "2026-04-09",
+    "vendor": "Microsoft Corp",
+    "amount": 9114.33,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1015",
+    "date": "2026-01-05",
+    "vendor": "Global Logistics",
+    "amount": 2895.65,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1016",
+    "date": "2026-01-05",
+    "vendor": "Shell Energy",
+    "amount": 2167.5,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1017",
+    "date": "2026-02-13",
+    "vendor": "Maintenance Pro",
+    "amount": 7486.93,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1018",
+    "date": "2026-02-15",
+    "vendor": "Travel Agency",
+    "amount": 835.78,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1019",
+    "date": "2026-05-18",
+    "vendor": "Staples UK",
+    "amount": 1944.22,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1020",
+    "date": "2026-05-25",
+    "vendor": "Insurance Corp",
+    "amount": 4355.55,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1021",
+    "date": "2026-05-08",
+    "vendor": "Rent Property Mgmt",
+    "amount": 9000.0,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1022",
+    "date": "2026-02-22",
+    "vendor": "Maintenance Pro",
+    "amount": 2333.6,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1023",
+    "date": "2026-05-31",
+    "vendor": "Marketing Agency",
+    "amount": 3410.97,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1024",
+    "date": "2026-04-16",
+    "vendor": "Dell Tech",
+    "amount": 9584.632578810737,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1025",
+    "date": "2026-03-05",
+    "vendor": "Microsoft Corp.",
+    "amount": 7896.6,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1026",
+    "date": "2026-05-11",
+    "vendor": "Shell Energy",
+    "amount": 5341.28,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1027",
+    "date": "2026-02-14",
+    "vendor": "Consultancy Group",
+    "amount": 4219.19,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1028",
+    "date": "2026-01-19",
+    "vendor": "Amazon Web Services",
+    "amount": 1233.86,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1029",
+    "date": "2026-02-12",
+    "vendor": "Microsoft Corp",
+    "amount": 2934.52,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1030",
+    "date": "2026-01-20",
+    "vendor": "Dell Tech",
+    "amount": 1421.63,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1031",
+    "date": "2026-05-18",
+    "vendor": "Maintenance Pro",
+    "amount": 9977.837135324,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1032",
+    "date": "2026-01-17",
+    "vendor": "Hardware Solutions",
+    "amount": 2585.66,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1033",
+    "date": "2026-03-15",
+    "vendor": "Microsoft Corp",
+    "amount": 639.78,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1034",
+    "date": "2026-02-21",
+    "vendor": "Staples UK",
+    "amount": 8546.96,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1035",
+    "date": "2026-03-14",
+    "vendor": "Amazon Web Services",
+    "amount": 1509.73,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1036",
+    "date": "2026-03-23",
+    "vendor": "Global Logistics",
+    "amount": 4779.54,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1037",
+    "date": "2026-02-19",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1969.48,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1038",
+    "date": "2026-05-08",
+    "vendor": "Marketing Agency",
+    "amount": 6222.69,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1039",
+    "date": "2026-01-06",
+    "vendor": "Staples UK",
+    "amount": 1305.54,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1040",
+    "date": "2026-03-16",
+    "vendor": "Dell Tech",
+    "amount": 9788.912713872205,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1041",
+    "date": "2026-03-28",
+    "vendor": "Staples UK",
+    "amount": 8224.93,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1042",
+    "date": "2026-05-21",
+    "vendor": "Rent Property Mgmt",
+    "amount": 2837.8,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1043",
+    "date": "2026-04-17",
+    "vendor": "Insurance Corp",
+    "amount": 5899.42,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1044",
+    "date": "2026-01-06",
+    "vendor": "Rent Property Mgmt",
+    "amount": 8356.78,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1045",
+    "date": "2026-01-13",
+    "vendor": "Travel Agency",
+    "amount": 1817.6,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1046",
+    "date": "2026-02-25",
+    "vendor": "Staples UK",
+    "amount": 9819.74,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1047",
+    "date": "2026-03-27",
+    "vendor": "Global Logistics",
+    "amount": 1547.9,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1048",
+    "date": "2026-04-07",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1764.25,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1049",
+    "date": "2026-01-19",
+    "vendor": "Hardware Solutions",
+    "amount": 3122.4,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1050",
+    "date": "2026-05-23",
+    "vendor": "Consultancy Group",
+    "amount": 9722.05437976329,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1051",
+    "date": "2026-01-29",
+    "vendor": "Consultancy Group",
+    "amount": 4414.41,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1052",
+    "date": "2026-05-26",
+    "vendor": "Marketing Agency",
+    "amount": 1835.92,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1053",
+    "date": "2026-01-30",
+    "vendor": "Amazon Web Services",
+    "amount": 2503.82,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1054",
+    "date": "2026-04-13",
+    "vendor": "Amazon Web Services",
+    "amount": 9905.424442728783,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1055",
+    "date": "2026-01-27",
+    "vendor": "Staples UK",
+    "amount": 1402.6,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1056",
+    "date": "2026-03-14",
+    "vendor": "Amazon Web Services",
+    "amount": 188.51,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1057",
+    "date": "2026-05-04",
+    "vendor": "Microsoft Corp",
+    "amount": 3747.25,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1058",
+    "date": "2026-05-08",
+    "vendor": "Amazon Web Services",
+    "amount": 3290.31,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1059",
+    "date": "2026-03-01",
+    "vendor": "Amazon Web Services",
+    "amount": 9632.776027492304,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1060",
+    "date": "2026-03-20",
+    "vendor": "Dell Tech",
+    "amount": 2612.88,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1061",
+    "date": "2026-05-30",
+    "vendor": "Hardware Solutions",
+    "amount": 1202.19,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1062",
+    "date": "2026-04-21",
+    "vendor": "Hardware Solutions",
+    "amount": 9184.66,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1063",
+    "date": "2026-05-24",
+    "vendor": "Hardware Solutions",
+    "amount": 8851.34,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1064",
+    "date": "2026-01-18",
+    "vendor": "Microsoft Corp",
+    "amount": 6000.0,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1065",
+    "date": "2026-05-11",
+    "vendor": "Dell Tech",
+    "amount": 1759.17,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1066",
+    "date": "2026-04-21",
+    "vendor": "Insurance Corp",
+    "amount": 2836.4,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1067",
+    "date": "2026-05-18",
+    "vendor": "Travel Agency",
+    "amount": 5000.0,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1068",
+    "date": "2026-03-22",
+    "vendor": "Marketing Agency",
+    "amount": 9776.771474934178,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1069",
+    "date": "2026-01-27",
+    "vendor": "Microsoft Corp",
+    "amount": 3476.68,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1070",
+    "date": "2026-03-06",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1501.56,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1071",
+    "date": "2026-02-11",
+    "vendor": "Microsoft Corp",
+    "amount": 1224.88,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1072",
+    "date": "2026-03-08",
+    "vendor": "Insurance Corp",
+    "amount": 3384.63,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1073",
+    "date": "2026-02-22",
+    "vendor": "Staples UK",
+    "amount": 684.76,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1074",
+    "date": "2026-02-10",
+    "vendor": "Microsoft Corp",
+    "amount": 3334.12,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1075",
+    "date": "2026-02-08",
+    "vendor": "Staples UK",
+    "amount": 3915.45,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1076",
+    "date": "2026-03-23",
+    "vendor": "Hardware Solutions",
+    "amount": 1000.0,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1077",
+    "date": "2026-05-21",
+    "vendor": "Dell Tech",
+    "amount": 8734.17,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1078",
+    "date": "2026-04-03",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1977.73,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1079",
+    "date": "2026-05-22",
+    "vendor": "Travel Agency",
+    "amount": 963.1793912447766,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1080",
+    "date": "2026-01-27",
+    "vendor": "Global Logistics",
+    "amount": 6330.71,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1081",
+    "date": "2026-01-04",
+    "vendor": "Global Logistics",
+    "amount": 10000.0,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1082",
+    "date": "2026-03-12",
+    "vendor": "Staples UK",
+    "amount": 9905.799440143159,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1083",
+    "date": "2026-03-16",
+    "vendor": "Marketing Agency",
+    "amount": 5112.5,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1084",
+    "date": "2026-04-29",
+    "vendor": "Steel-Fab Llt",
+    "amount": 983.4145106000263,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1085",
+    "date": "2026-04-23",
+    "vendor": "Dell Tech",
+    "amount": 3000.0,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1086",
+    "date": "2026-01-02",
+    "vendor": "Hardware Solutions",
+    "amount": 8795.16,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1087",
+    "date": "2026-01-10",
+    "vendor": "Hardware Solutions",
+    "amount": 916.704015159779,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1088",
+    "date": "2026-02-28",
+    "vendor": "Amazon Web Services",
+    "amount": 181.89,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1089",
+    "date": "2026-05-04",
+    "vendor": "Microsoft Corp",
+    "amount": 198.61,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1090",
+    "date": "2026-04-07",
+    "vendor": "Travel Agency",
+    "amount": 4883.56,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1091",
+    "date": "2026-02-17",
+    "vendor": "Travel Agency",
+    "amount": 8472.1,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1092",
+    "date": "2026-03-04",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1413.52,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1093",
+    "date": "2026-01-22",
+    "vendor": "Dell Tech",
+    "amount": 2103.15,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1094",
+    "date": "2026-03-15",
+    "vendor": "Dell Tech",
+    "amount": 3536.78,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1095",
+    "date": "2026-04-01",
+    "vendor": "Staples UK",
+    "amount": 7000.0,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1096",
+    "date": "2026-02-01",
+    "vendor": "Insurance Corp",
+    "amount": 2685.28,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1097",
+    "date": "2026-02-11",
+    "vendor": "Amazon Web Services",
+    "amount": 950.1413659971223,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1098",
+    "date": "2026-02-11",
+    "vendor": "Hardware Solutions",
+    "amount": 2203.98,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1099",
+    "date": "2026-03-23",
+    "vendor": "Global Logistics",
+    "amount": 6870.75,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1100",
+    "date": "2026-02-12",
+    "vendor": "Microsoft Corp.",
+    "amount": 9429.35,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1101",
+    "date": "2026-05-25",
+    "vendor": "Travel Agency",
+    "amount": 5102.92,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1102",
+    "date": "2026-03-22",
+    "vendor": "Shell Energy",
+    "amount": 736.19,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1103",
+    "date": "2026-02-15",
+    "vendor": "Insurance Corp",
+    "amount": 952.2737130319782,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1104",
+    "date": "2026-03-23",
+    "vendor": "Hardware Solutions",
+    "amount": 1996.95,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1105",
+    "date": "2026-01-12",
+    "vendor": "Insurance Corp",
+    "amount": 1444.47,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1106",
+    "date": "2026-05-08",
+    "vendor": "Microsoft Corp.",
+    "amount": 1109.72,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1107",
+    "date": "2026-01-20",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 2892.5,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1108",
+    "date": "2026-03-13",
+    "vendor": "Consultancy Group",
+    "amount": 5581.7,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1109",
+    "date": "2026-02-06",
+    "vendor": "Marketing Agency",
+    "amount": 5146.29,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1110",
+    "date": "2026-05-17",
+    "vendor": "Microsoft Corp",
+    "amount": 8350.99,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1111",
+    "date": "2026-03-20",
+    "vendor": "Insurance Corp",
+    "amount": 1863.95,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1112",
+    "date": "2026-02-12",
+    "vendor": "Microsoft Corp",
+    "amount": 1327.44,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1113",
+    "date": "2026-02-02",
+    "vendor": "Maintenance Pro",
+    "amount": 9788.26,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1114",
+    "date": "2026-05-23",
+    "vendor": "Microsoft Corp.",
+    "amount": 2890.93,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1115",
+    "date": "2026-01-08",
+    "vendor": "Staples UK",
+    "amount": 1415.19,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1116",
+    "date": "2026-04-09",
+    "vendor": "Maintenance Pro",
+    "amount": 4856.24,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1117",
+    "date": "2026-03-26",
+    "vendor": "Rent Property Mgmt",
+    "amount": 3884.52,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1118",
+    "date": "2026-01-22",
+    "vendor": "Shell Energy",
+    "amount": 1513.13,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1119",
+    "date": "2026-02-07",
+    "vendor": "Global Logistics",
+    "amount": 1842.58,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1120",
+    "date": "2026-01-16",
+    "vendor": "Microsoft Corp",
+    "amount": 5305.25,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1121",
+    "date": "2026-01-22",
+    "vendor": "Maintenance Pro",
+    "amount": 8745.45,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1122",
+    "date": "2026-04-28",
+    "vendor": "Global Logistics",
+    "amount": 5119.81,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1123",
+    "date": "2026-03-26",
+    "vendor": "Hardware Solutions",
+    "amount": 2327.19,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1124",
+    "date": "2026-01-28",
+    "vendor": "Consultancy Group",
+    "amount": 1513.62,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1125",
+    "date": "2026-02-08",
+    "vendor": "Consultancy Group",
+    "amount": 5356.73,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1126",
+    "date": "2026-04-29",
+    "vendor": "Global Logistics",
+    "amount": 7587.8,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1127",
+    "date": "2026-04-24",
+    "vendor": "Hardware Solutions",
+    "amount": 941.4587938580854,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1128",
+    "date": "2026-05-26",
+    "vendor": "Microsoft Corp.",
+    "amount": 419.14,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1129",
+    "date": "2026-01-15",
+    "vendor": "Amazon Web Services",
+    "amount": 6797.39,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1130",
+    "date": "2026-02-13",
+    "vendor": "Global Logistics",
+    "amount": 5993.55,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1131",
+    "date": "2026-01-15",
+    "vendor": "Insurance Corp",
+    "amount": 8733.63,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1132",
+    "date": "2026-04-10",
+    "vendor": "Dell Tech",
+    "amount": 1522.37,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1133",
+    "date": "2026-03-05",
+    "vendor": "Microsoft Corp.",
+    "amount": 917.76,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1134",
+    "date": "2026-01-15",
+    "vendor": "Staples UK",
+    "amount": 161.36,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1135",
+    "date": "2026-02-17",
+    "vendor": "Shell Energy",
+    "amount": 1315.44,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1136",
+    "date": "2026-05-26",
+    "vendor": "Travel Agency",
+    "amount": 1969.7,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1137",
+    "date": "2026-01-03",
+    "vendor": "Steel-Fab Llt",
+    "amount": 4920.35,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1138",
+    "date": "2026-05-31",
+    "vendor": "Global Logistics",
+    "amount": 334.33,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1139",
+    "date": "2026-04-13",
+    "vendor": "Marketing Agency",
+    "amount": 5363.8,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1140",
+    "date": "2026-02-28",
+    "vendor": "Marketing Agency",
+    "amount": 4000.0,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1141",
+    "date": "2026-05-31",
+    "vendor": "Consultancy Group",
+    "amount": 6707.25,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1142",
+    "date": "2026-05-04",
+    "vendor": "Hardware Solutions",
+    "amount": 725.19,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1143",
+    "date": "2026-01-19",
+    "vendor": "Consultancy Group",
+    "amount": 270.6,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1144",
+    "date": "2026-02-10",
+    "vendor": "Hardware Solutions",
+    "amount": 936.3494848533909,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1145",
+    "date": "2026-03-18",
+    "vendor": "Dell Tech",
+    "amount": 9605.99,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1146",
+    "date": "2026-04-25",
+    "vendor": "Staples UK",
+    "amount": 1487.44,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1147",
+    "date": "2026-04-04",
+    "vendor": "Microsoft Corp",
+    "amount": 2588.89,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1148",
+    "date": "2026-03-15",
+    "vendor": "Maintenance Pro",
+    "amount": 7644.76,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1149",
+    "date": "2026-01-12",
+    "vendor": "Staples UK",
+    "amount": 4497.32,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1150",
+    "date": "2026-04-01",
+    "vendor": "Consultancy Group",
+    "amount": 9677.750162566159,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1151",
+    "date": "2026-02-27",
+    "vendor": "Microsoft Corp.",
+    "amount": 9727.4,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1152",
+    "date": "2026-03-13",
+    "vendor": "Microsoft Corp",
+    "amount": 3721.3,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1153",
+    "date": "2026-04-13",
+    "vendor": "Microsoft Corp",
+    "amount": 6000.0,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1154",
+    "date": "2026-03-25",
+    "vendor": "Maintenance Pro",
+    "amount": 9938.28,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1155",
+    "date": "2026-03-29",
+    "vendor": "Global Logistics",
+    "amount": 7881.3,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1156",
+    "date": "2026-04-10",
+    "vendor": "Microsoft Corp.",
+    "amount": 5515.75,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1157",
+    "date": "2026-05-09",
+    "vendor": "Global Logistics",
+    "amount": 6696.78,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1158",
+    "date": "2026-01-15",
+    "vendor": "Microsoft Corp.",
+    "amount": 1644.49,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1159",
+    "date": "2026-01-30",
+    "vendor": "Microsoft Corp.",
+    "amount": 9891.603158159658,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1160",
+    "date": "2026-04-25",
+    "vendor": "Maintenance Pro",
+    "amount": 1728.44,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1161",
+    "date": "2026-02-25",
+    "vendor": "Hardware Solutions",
+    "amount": 126.12,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1162",
+    "date": "2026-04-22",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1510.3,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1163",
+    "date": "2026-02-22",
+    "vendor": "Consultancy Group",
+    "amount": 9853.27,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1164",
+    "date": "2026-03-28",
+    "vendor": "Dell Tech",
+    "amount": 1284.23,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1165",
+    "date": "2026-04-27",
+    "vendor": "Travel Agency",
+    "amount": 5141.46,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1166",
+    "date": "2026-04-02",
+    "vendor": "Hardware Solutions",
+    "amount": 3242.93,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1167",
+    "date": "2026-04-16",
+    "vendor": "Rent Property Mgmt",
+    "amount": 2765.89,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1168",
+    "date": "2026-02-06",
+    "vendor": "Maintenance Pro",
+    "amount": 6926.84,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1169",
+    "date": "2026-05-16",
+    "vendor": "Shell Energy",
+    "amount": 2165.82,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1170",
+    "date": "2026-01-21",
+    "vendor": "Dell Tech",
+    "amount": 10000.0,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1171",
+    "date": "2026-04-14",
+    "vendor": "Global Logistics",
+    "amount": 1550.97,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1172",
+    "date": "2026-02-23",
+    "vendor": "Staples UK",
+    "amount": 964.3443569174302,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1173",
+    "date": "2026-01-22",
+    "vendor": "Rent Property Mgmt",
+    "amount": 3118.32,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1174",
+    "date": "2026-05-14",
+    "vendor": "Amazon Web Services",
+    "amount": 1998.31,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1175",
+    "date": "2026-05-23",
+    "vendor": "Hardware Solutions",
+    "amount": 1152.26,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1176",
+    "date": "2026-03-07",
+    "vendor": "Global Logistics",
+    "amount": 9348.26,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1177",
+    "date": "2026-05-26",
+    "vendor": "Travel Agency",
+    "amount": 1901.1,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1178",
+    "date": "2026-05-31",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1788.21,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1179",
+    "date": "2026-01-01",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1618.87,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1180",
+    "date": "2026-03-26",
+    "vendor": "Maintenance Pro",
+    "amount": 3103.93,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1181",
+    "date": "2026-05-16",
+    "vendor": "Insurance Corp",
+    "amount": 2108.16,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1182",
+    "date": "2026-03-07",
+    "vendor": "Travel Agency",
+    "amount": 4353.75,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1183",
+    "date": "2026-02-20",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1977.91,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1184",
+    "date": "2026-01-29",
+    "vendor": "Consultancy Group",
+    "amount": 1438.75,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1185",
+    "date": "2026-05-12",
+    "vendor": "Staples UK",
+    "amount": 9602.57,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1186",
+    "date": "2026-05-16",
+    "vendor": "Dell Tech",
+    "amount": 3000.0,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1187",
+    "date": "2026-01-13",
+    "vendor": "Microsoft Corp",
+    "amount": 4581.1,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1188",
+    "date": "2026-04-18",
+    "vendor": "Microsoft Corp",
+    "amount": 2904.85,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1189",
+    "date": "2026-03-02",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 3000.0,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1190",
+    "date": "2026-05-23",
+    "vendor": "Travel Agency",
+    "amount": 7741.73,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1191",
+    "date": "2026-03-12",
+    "vendor": "Travel Agency",
+    "amount": 4955.28,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1192",
+    "date": "2026-03-23",
+    "vendor": "Maintenance Pro",
+    "amount": 3470.63,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1193",
+    "date": "2026-01-30",
+    "vendor": "Travel Agency",
+    "amount": 2189.76,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1194",
+    "date": "2026-05-02",
+    "vendor": "Hardware Solutions",
+    "amount": 3834.39,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1195",
+    "date": "2026-04-30",
+    "vendor": "Microsoft Corp.",
+    "amount": 1804.11,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1196",
+    "date": "2026-02-20",
+    "vendor": "Microsoft Corp.",
+    "amount": 5269.4,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1197",
+    "date": "2026-03-30",
+    "vendor": "Amazon Web Services",
+    "amount": 5799.97,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1198",
+    "date": "2026-01-16",
+    "vendor": "Shell Energy",
+    "amount": 1315.0,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1199",
+    "date": "2026-05-14",
+    "vendor": "Insurance Corp",
+    "amount": 286.91,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1200",
+    "date": "2026-04-28",
+    "vendor": "Hardware Solutions",
+    "amount": 1480.44,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1201",
+    "date": "2026-05-02",
+    "vendor": "Amazon Web Services",
+    "amount": 1701.73,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1202",
+    "date": "2026-01-06",
+    "vendor": "Shell Energy",
+    "amount": 9169.9,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1203",
+    "date": "2026-01-09",
+    "vendor": "Shell Energy",
+    "amount": 4252.2,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1204",
+    "date": "2026-01-07",
+    "vendor": "Rent Property Mgmt",
+    "amount": 5593.45,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1205",
+    "date": "2026-05-19",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 5941.28,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1206",
+    "date": "2026-02-26",
+    "vendor": "Global Logistics",
+    "amount": 3307.78,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1207",
+    "date": "2026-02-18",
+    "vendor": "Staples UK",
+    "amount": 6787.22,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1208",
+    "date": "2026-02-16",
+    "vendor": "Global Logistics",
+    "amount": 6959.22,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1209",
+    "date": "2026-05-31",
+    "vendor": "Shell Energy",
+    "amount": 685.5,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1210",
+    "date": "2026-04-03",
+    "vendor": "Dell Tech",
+    "amount": 2244.24,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1211",
+    "date": "2026-02-15",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 4520.71,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1212",
+    "date": "2026-03-16",
+    "vendor": "Microsoft Corp.",
+    "amount": 3312.2,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1213",
+    "date": "2026-03-07",
+    "vendor": "Microsoft Corp.",
+    "amount": 988.2494904897183,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1214",
+    "date": "2026-05-24",
+    "vendor": "Global Logistics",
+    "amount": 3144.1,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1215",
+    "date": "2026-01-04",
+    "vendor": "Dell Tech",
+    "amount": 1528.19,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1216",
+    "date": "2026-02-13",
+    "vendor": "Consultancy Group",
+    "amount": 413.47,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1217",
+    "date": "2026-03-26",
+    "vendor": "Maintenance Pro",
+    "amount": 3901.5,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1218",
+    "date": "2026-02-23",
+    "vendor": "Amazon Web Services",
+    "amount": 4597.13,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1219",
+    "date": "2026-05-07",
+    "vendor": "Global Logistics",
+    "amount": 8651.31,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1220",
+    "date": "2026-03-16",
+    "vendor": "Rent Property Mgmt",
+    "amount": 2153.66,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1221",
+    "date": "2026-02-03",
+    "vendor": "Global Logistics",
+    "amount": 740.0,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1222",
+    "date": "2026-03-15",
+    "vendor": "Insurance Corp",
+    "amount": 3732.75,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1223",
+    "date": "2026-03-09",
+    "vendor": "Hardware Solutions",
+    "amount": 6872.28,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1224",
+    "date": "2026-03-01",
+    "vendor": "Global Logistics",
+    "amount": 3706.45,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1225",
+    "date": "2026-05-12",
+    "vendor": "Microsoft Corp.",
+    "amount": 7454.27,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1226",
+    "date": "2026-04-08",
+    "vendor": "Staples UK",
+    "amount": 9967.11714083617,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1227",
+    "date": "2026-03-23",
+    "vendor": "Rent Property Mgmt",
+    "amount": 99.36,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1228",
+    "date": "2026-05-14",
+    "vendor": "Consultancy Group",
+    "amount": 7576.97,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1229",
+    "date": "2026-04-09",
+    "vendor": "Microsoft Corp",
+    "amount": 5550.44,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1230",
+    "date": "2026-01-08",
+    "vendor": "Microsoft Corp",
+    "amount": 2726.43,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1231",
+    "date": "2026-02-15",
+    "vendor": "Microsoft Corp",
+    "amount": 1495.5,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1232",
+    "date": "2026-02-27",
+    "vendor": "Hardware Solutions",
+    "amount": 3466.0,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1233",
+    "date": "2026-01-12",
+    "vendor": "Travel Agency",
+    "amount": 1612.4,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1234",
+    "date": "2026-03-03",
+    "vendor": "Shell Energy",
+    "amount": 1242.95,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1235",
+    "date": "2026-03-02",
+    "vendor": "Shell Energy",
+    "amount": 9616.77,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1236",
+    "date": "2026-01-08",
+    "vendor": "Insurance Corp",
+    "amount": 3909.91,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1237",
+    "date": "2026-03-15",
+    "vendor": "Dell Tech",
+    "amount": 3586.63,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1238",
+    "date": "2026-05-10",
+    "vendor": "Amazon Web Services",
+    "amount": 2792.58,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1239",
+    "date": "2026-01-10",
+    "vendor": "Amazon Web Services",
+    "amount": 7383.59,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1240",
+    "date": "2026-02-02",
+    "vendor": "Marketing Agency",
+    "amount": 9829.86,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1241",
+    "date": "2026-01-23",
+    "vendor": "Marketing Agency",
+    "amount": 2787.55,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1242",
+    "date": "2026-01-06",
+    "vendor": "Steel-Fab Llt",
+    "amount": 6847.3,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1243",
+    "date": "2026-02-27",
+    "vendor": "Consultancy Group",
+    "amount": 7954.13,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1244",
+    "date": "2026-01-24",
+    "vendor": "Microsoft Corp",
+    "amount": 3273.75,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1245",
+    "date": "2026-04-16",
+    "vendor": "Steel-Fab Llt",
+    "amount": 9000.0,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1246",
+    "date": "2026-03-12",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 3693.84,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1247",
+    "date": "2026-03-10",
+    "vendor": "Shell Energy",
+    "amount": 2413.84,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1248",
+    "date": "2026-01-13",
+    "vendor": "Insurance Corp",
+    "amount": 2764.72,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1249",
+    "date": "2026-01-14",
+    "vendor": "Staples UK",
+    "amount": 5265.63,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1250",
+    "date": "2026-03-25",
+    "vendor": "Shell Energy",
+    "amount": 1859.22,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1251",
+    "date": "2026-04-26",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 2798.93,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1252",
+    "date": "2026-05-11",
+    "vendor": "Amazon Web Services",
+    "amount": 4136.87,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1253",
+    "date": "2026-02-26",
+    "vendor": "Consultancy Group",
+    "amount": 4438.48,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1254",
+    "date": "2026-04-29",
+    "vendor": "Staples UK",
+    "amount": 2302.88,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1255",
+    "date": "2026-01-08",
+    "vendor": "Consultancy Group",
+    "amount": 998.3386733256802,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1256",
+    "date": "2026-01-05",
+    "vendor": "Insurance Corp",
+    "amount": 3945.11,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1257",
+    "date": "2026-04-25",
+    "vendor": "Microsoft Corp.",
+    "amount": 6538.5,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1258",
+    "date": "2026-03-14",
+    "vendor": "Hardware Solutions",
+    "amount": 362.14,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1259",
+    "date": "2026-02-11",
+    "vendor": "Dell Tech",
+    "amount": 5214.51,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1260",
+    "date": "2026-04-12",
+    "vendor": "Maintenance Pro",
+    "amount": 2565.83,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1261",
+    "date": "2026-02-14",
+    "vendor": "Hardware Solutions",
+    "amount": 910.8744407729239,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1262",
+    "date": "2026-04-28",
+    "vendor": "Global Logistics",
+    "amount": 2678.17,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1263",
+    "date": "2026-02-12",
+    "vendor": "Microsoft Corp",
+    "amount": 9683.923682087203,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1264",
+    "date": "2026-01-02",
+    "vendor": "Hardware Solutions",
+    "amount": 7986.28,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1265",
+    "date": "2026-02-03",
+    "vendor": "Insurance Corp",
+    "amount": 1265.4,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1266",
+    "date": "2026-03-25",
+    "vendor": "Insurance Corp",
+    "amount": 1944.76,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1267",
+    "date": "2026-03-06",
+    "vendor": "Consultancy Group",
+    "amount": 7905.27,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1268",
+    "date": "2026-02-11",
+    "vendor": "Amazon Web Services",
+    "amount": 6692.24,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1269",
+    "date": "2026-01-23",
+    "vendor": "Dell Tech",
+    "amount": 9332.78,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1270",
+    "date": "2026-05-27",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 4105.43,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1271",
+    "date": "2026-04-17",
+    "vendor": "Consultancy Group",
+    "amount": 1577.48,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1272",
+    "date": "2026-01-05",
+    "vendor": "Staples UK",
+    "amount": 2682.71,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1273",
+    "date": "2026-01-15",
+    "vendor": "Maintenance Pro",
+    "amount": 1854.6,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1274",
+    "date": "2026-03-16",
+    "vendor": "Microsoft Corp",
+    "amount": 6000.0,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1275",
+    "date": "2026-03-29",
+    "vendor": "Microsoft Corp.",
+    "amount": 10000.0,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1276",
+    "date": "2026-02-27",
+    "vendor": "Dell Tech",
+    "amount": 9000.0,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1277",
+    "date": "2026-01-27",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 8952.89,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1278",
+    "date": "2026-04-19",
+    "vendor": "Amazon Web Services",
+    "amount": 1965.79,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1279",
+    "date": "2026-05-10",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 8991.56,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1280",
+    "date": "2026-02-17",
+    "vendor": "Dell Tech",
+    "amount": 2874.7,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1281",
+    "date": "2026-05-01",
+    "vendor": "Travel Agency",
+    "amount": 2364.52,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1282",
+    "date": "2026-01-10",
+    "vendor": "Microsoft Corp.",
+    "amount": 1472.71,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1283",
+    "date": "2026-03-09",
+    "vendor": "Maintenance Pro",
+    "amount": 2317.69,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1284",
+    "date": "2026-05-18",
+    "vendor": "Amazon Web Services",
+    "amount": 171.92,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1285",
+    "date": "2026-05-29",
+    "vendor": "Staples UK",
+    "amount": 1139.1,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1286",
+    "date": "2026-01-05",
+    "vendor": "Dell Tech",
+    "amount": 8329.96,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1287",
+    "date": "2026-05-29",
+    "vendor": "Marketing Agency",
+    "amount": 4865.89,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1288",
+    "date": "2026-01-08",
+    "vendor": "Microsoft Corp.",
+    "amount": 5619.77,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1289",
+    "date": "2026-01-17",
+    "vendor": "Steel-Fab Llt",
+    "amount": 930.1364034946334,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1290",
+    "date": "2026-05-26",
+    "vendor": "Insurance Corp",
+    "amount": 1239.24,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1291",
+    "date": "2026-04-21",
+    "vendor": "Microsoft Corp.",
+    "amount": 8947.63,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1292",
+    "date": "2026-05-01",
+    "vendor": "Consultancy Group",
+    "amount": 8680.72,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1293",
+    "date": "2026-03-08",
+    "vendor": "Marketing Agency",
+    "amount": 1245.24,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1294",
+    "date": "2026-01-08",
+    "vendor": "Insurance Corp",
+    "amount": 2893.62,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1295",
+    "date": "2026-01-26",
+    "vendor": "Insurance Corp",
+    "amount": 2299.57,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1296",
+    "date": "2026-02-23",
+    "vendor": "Microsoft Corp.",
+    "amount": 946.4328799544076,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1297",
+    "date": "2026-02-01",
+    "vendor": "Staples UK",
+    "amount": 2594.15,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1298",
+    "date": "2026-05-18",
+    "vendor": "Rent Property Mgmt",
+    "amount": 147.39,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1299",
+    "date": "2026-01-24",
+    "vendor": "Shell Energy",
+    "amount": 960.8299534202649,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1300",
+    "date": "2026-03-22",
+    "vendor": "Maintenance Pro",
+    "amount": 9774.39,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1301",
+    "date": "2026-01-09",
+    "vendor": "Travel Agency",
+    "amount": 260.63,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1302",
+    "date": "2026-02-15",
+    "vendor": "Global Logistics",
+    "amount": 1446.87,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1303",
+    "date": "2026-05-10",
+    "vendor": "Insurance Corp",
+    "amount": 586.34,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1304",
+    "date": "2026-03-09",
+    "vendor": "Insurance Corp",
+    "amount": 960.0189202063941,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1305",
+    "date": "2026-01-20",
+    "vendor": "Insurance Corp",
+    "amount": 8740.22,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1306",
+    "date": "2026-01-10",
+    "vendor": "Global Logistics",
+    "amount": 9806.45,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1307",
+    "date": "2026-02-27",
+    "vendor": "Staples UK",
+    "amount": 934.17,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1308",
+    "date": "2026-03-16",
+    "vendor": "Travel Agency",
+    "amount": 5838.23,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1309",
+    "date": "2026-01-22",
+    "vendor": "Marketing Agency",
+    "amount": 3163.29,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1310",
+    "date": "2026-05-04",
+    "vendor": "Maintenance Pro",
+    "amount": 7979.3,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1311",
+    "date": "2026-01-06",
+    "vendor": "Dell Tech",
+    "amount": 1898.56,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1312",
+    "date": "2026-05-05",
+    "vendor": "Dell Tech",
+    "amount": 2193.9,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1313",
+    "date": "2026-04-29",
+    "vendor": "Global Logistics",
+    "amount": 2953.98,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1314",
+    "date": "2026-05-05",
+    "vendor": "Amazon Web Services",
+    "amount": 3000.0,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1315",
+    "date": "2026-02-27",
+    "vendor": "Maintenance Pro",
+    "amount": 5390.8,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1316",
+    "date": "2026-01-28",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1837.94,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1317",
+    "date": "2026-02-12",
+    "vendor": "Shell Energy",
+    "amount": 7321.44,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1318",
+    "date": "2026-03-18",
+    "vendor": "Shell Energy",
+    "amount": 2520.31,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1319",
+    "date": "2026-04-06",
+    "vendor": "Consultancy Group",
+    "amount": 368.53,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1320",
+    "date": "2026-03-11",
+    "vendor": "Insurance Corp",
+    "amount": 162.14,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1321",
+    "date": "2026-03-05",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1127.42,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1322",
+    "date": "2026-01-29",
+    "vendor": "Shell Energy",
+    "amount": 9508.368688161438,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1323",
+    "date": "2026-04-09",
+    "vendor": "Shell Energy",
+    "amount": 1582.14,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1324",
+    "date": "2026-01-25",
+    "vendor": "Maintenance Pro",
+    "amount": 6432.66,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1325",
+    "date": "2026-05-11",
+    "vendor": "Dell Tech",
+    "amount": 9689.953437476588,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1326",
+    "date": "2026-01-29",
+    "vendor": "Marketing Agency",
+    "amount": 7692.23,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1327",
+    "date": "2026-04-23",
+    "vendor": "Amazon Web Services",
+    "amount": 156.48,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1328",
+    "date": "2026-01-10",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 244.28,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1329",
+    "date": "2026-05-09",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 3305.8,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1330",
+    "date": "2026-04-02",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1183.97,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1331",
+    "date": "2026-04-26",
+    "vendor": "Steel-Fab Llt",
+    "amount": 9619.470399120262,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1332",
+    "date": "2026-03-11",
+    "vendor": "Travel Agency",
+    "amount": 1666.5,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1333",
+    "date": "2026-02-16",
+    "vendor": "Hardware Solutions",
+    "amount": 22.2,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1334",
+    "date": "2026-05-04",
+    "vendor": "Consultancy Group",
+    "amount": 1332.31,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1335",
+    "date": "2026-03-22",
+    "vendor": "Consultancy Group",
+    "amount": 3288.38,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1336",
+    "date": "2026-03-02",
+    "vendor": "Hardware Solutions",
+    "amount": 6479.74,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1337",
+    "date": "2026-03-04",
+    "vendor": "Travel Agency",
+    "amount": 832.0,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1338",
+    "date": "2026-03-07",
+    "vendor": "Global Logistics",
+    "amount": 6452.31,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1339",
+    "date": "2026-01-27",
+    "vendor": "Steel-Fab Llt",
+    "amount": 2212.43,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1340",
+    "date": "2026-04-02",
+    "vendor": "Global Logistics",
+    "amount": 1667.57,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1341",
+    "date": "2026-04-17",
+    "vendor": "Insurance Corp",
+    "amount": 4567.31,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1342",
+    "date": "2026-05-28",
+    "vendor": "Marketing Agency",
+    "amount": 6630.61,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1343",
+    "date": "2026-02-28",
+    "vendor": "Marketing Agency",
+    "amount": 845.18,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1344",
+    "date": "2026-01-16",
+    "vendor": "Staples UK",
+    "amount": 9292.24,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1345",
+    "date": "2026-02-15",
+    "vendor": "Hardware Solutions",
+    "amount": 3284.35,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1346",
+    "date": "2026-04-29",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 5939.47,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1347",
+    "date": "2026-04-27",
+    "vendor": "Microsoft Corp",
+    "amount": 9732.28083751388,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1348",
+    "date": "2026-01-16",
+    "vendor": "Staples UK",
+    "amount": 1594.39,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1349",
+    "date": "2026-05-01",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1725.6,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1350",
+    "date": "2026-01-08",
+    "vendor": "Shell Energy",
+    "amount": 3324.38,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1351",
+    "date": "2026-05-21",
+    "vendor": "Maintenance Pro",
+    "amount": 2648.75,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1352",
+    "date": "2026-02-24",
+    "vendor": "Rent Property Mgmt",
+    "amount": 967.0367641547055,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1353",
+    "date": "2026-03-22",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1899.12,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1354",
+    "date": "2026-05-25",
+    "vendor": "Maintenance Pro",
+    "amount": 1147.19,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1355",
+    "date": "2026-05-04",
+    "vendor": "Marketing Agency",
+    "amount": 9498.59,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1356",
+    "date": "2026-01-30",
+    "vendor": "Hardware Solutions",
+    "amount": 1686.44,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1357",
+    "date": "2026-04-05",
+    "vendor": "Staples UK",
+    "amount": 3853.61,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1358",
+    "date": "2026-03-08",
+    "vendor": "Dell Tech",
+    "amount": 1978.41,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1359",
+    "date": "2026-03-06",
+    "vendor": "Hardware Solutions",
+    "amount": 1236.7,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1360",
+    "date": "2026-04-08",
+    "vendor": "Maintenance Pro",
+    "amount": 4394.62,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1361",
+    "date": "2026-05-25",
+    "vendor": "Microsoft Corp.",
+    "amount": 3652.9,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1362",
+    "date": "2026-05-06",
+    "vendor": "Global Logistics",
+    "amount": 4400.97,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1363",
+    "date": "2026-03-20",
+    "vendor": "Consultancy Group",
+    "amount": 2954.66,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1364",
+    "date": "2026-03-22",
+    "vendor": "Microsoft Corp.",
+    "amount": 7874.14,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1365",
+    "date": "2026-04-26",
+    "vendor": "Hardware Solutions",
+    "amount": 9599.73,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1366",
+    "date": "2026-01-22",
+    "vendor": "Microsoft Corp.",
+    "amount": 2381.4,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1367",
+    "date": "2026-04-12",
+    "vendor": "Staples UK",
+    "amount": 9967.64361100127,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1368",
+    "date": "2026-01-05",
+    "vendor": "Travel Agency",
+    "amount": 4518.65,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1369",
+    "date": "2026-05-11",
+    "vendor": "Microsoft Corp",
+    "amount": 9941.03976904301,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1370",
+    "date": "2026-02-22",
+    "vendor": "Travel Agency",
+    "amount": 5687.16,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1371",
+    "date": "2026-02-07",
+    "vendor": "Amazon Web Services",
+    "amount": 1437.16,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1372",
+    "date": "2026-04-01",
+    "vendor": "Insurance Corp",
+    "amount": 8846.62,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1373",
+    "date": "2026-05-12",
+    "vendor": "Microsoft Corp.",
+    "amount": 5395.9,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1374",
+    "date": "2026-03-08",
+    "vendor": "Amazon Web Services",
+    "amount": 2926.12,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1375",
+    "date": "2026-04-25",
+    "vendor": "Dell Tech",
+    "amount": 8181.84,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1376",
+    "date": "2026-05-09",
+    "vendor": "Rent Property Mgmt",
+    "amount": 5310.43,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1377",
+    "date": "2026-01-17",
+    "vendor": "Insurance Corp",
+    "amount": 6562.73,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1378",
+    "date": "2026-04-16",
+    "vendor": "Rent Property Mgmt",
+    "amount": 7345.47,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1379",
+    "date": "2026-01-29",
+    "vendor": "Microsoft Corp",
+    "amount": 1497.77,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1380",
+    "date": "2026-04-15",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1238.41,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1381",
+    "date": "2026-02-19",
+    "vendor": "Maintenance Pro",
+    "amount": 9736.687654502746,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1382",
+    "date": "2026-04-20",
+    "vendor": "Microsoft Corp",
+    "amount": 1965.88,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1383",
+    "date": "2026-05-01",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1503.8,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1384",
+    "date": "2026-02-04",
+    "vendor": "Staples UK",
+    "amount": 3656.17,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1385",
+    "date": "2026-02-16",
+    "vendor": "Dell Tech",
+    "amount": 1979.0,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1386",
+    "date": "2026-01-03",
+    "vendor": "Marketing Agency",
+    "amount": 169.57,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1387",
+    "date": "2026-03-16",
+    "vendor": "Consultancy Group",
+    "amount": 2853.11,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1388",
+    "date": "2026-05-05",
+    "vendor": "Microsoft Corp",
+    "amount": 6949.38,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1389",
+    "date": "2026-02-27",
+    "vendor": "Maintenance Pro",
+    "amount": 3876.69,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1390",
+    "date": "2026-04-02",
+    "vendor": "Insurance Corp",
+    "amount": 4000.0,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1391",
+    "date": "2026-03-18",
+    "vendor": "Microsoft Corp.",
+    "amount": 9935.395893764186,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1392",
+    "date": "2026-03-13",
+    "vendor": "Microsoft Corp",
+    "amount": 2990.2,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1393",
+    "date": "2026-03-17",
+    "vendor": "Marketing Agency",
+    "amount": 966.1967293741372,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1394",
+    "date": "2026-03-08",
+    "vendor": "Global Logistics",
+    "amount": 2000.0,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1395",
+    "date": "2026-02-28",
+    "vendor": "Shell Energy",
+    "amount": 1764.51,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1396",
+    "date": "2026-04-16",
+    "vendor": "Marketing Agency",
+    "amount": 5740.62,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1397",
+    "date": "2026-04-25",
+    "vendor": "Dell Tech",
+    "amount": 7590.41,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1398",
+    "date": "2026-03-25",
+    "vendor": "Dell Tech",
+    "amount": 8728.59,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1399",
+    "date": "2026-02-18",
+    "vendor": "Consultancy Group",
+    "amount": 38.13,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1400",
+    "date": "2026-05-25",
+    "vendor": "Insurance Corp",
+    "amount": 9512.575652143154,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1401",
+    "date": "2026-02-18",
+    "vendor": "Shell Energy",
+    "amount": 902.2314507059262,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1402",
+    "date": "2026-05-31",
+    "vendor": "Marketing Agency",
+    "amount": 5176.69,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1403",
+    "date": "2026-02-21",
+    "vendor": "Travel Agency",
+    "amount": 7720.41,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1404",
+    "date": "2026-03-30",
+    "vendor": "Steel-Fab Llt",
+    "amount": 214.31,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1405",
+    "date": "2026-03-06",
+    "vendor": "Consultancy Group",
+    "amount": 4448.97,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1406",
+    "date": "2026-01-16",
+    "vendor": "Marketing Agency",
+    "amount": 7139.6,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1407",
+    "date": "2026-03-25",
+    "vendor": "Staples UK",
+    "amount": 1105.52,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1408",
+    "date": "2026-02-06",
+    "vendor": "Amazon Web Services",
+    "amount": 9790.583679691415,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1409",
+    "date": "2026-03-12",
+    "vendor": "Global Logistics",
+    "amount": 3451.4,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1410",
+    "date": "2026-01-18",
+    "vendor": "Amazon Web Services",
+    "amount": 9000.0,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1411",
+    "date": "2026-04-22",
+    "vendor": "Microsoft Corp",
+    "amount": 1825.83,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1412",
+    "date": "2026-02-21",
+    "vendor": "Travel Agency",
+    "amount": 5703.37,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1413",
+    "date": "2026-01-05",
+    "vendor": "Travel Agency",
+    "amount": 5505.18,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1414",
+    "date": "2026-01-31",
+    "vendor": "Global Logistics",
+    "amount": 1928.8,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1415",
+    "date": "2026-05-22",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 3588.52,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1416",
+    "date": "2026-02-02",
+    "vendor": "Steel-Fab Llt",
+    "amount": 9829.53,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1417",
+    "date": "2026-05-03",
+    "vendor": "Hardware Solutions",
+    "amount": 2696.45,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1418",
+    "date": "2026-03-18",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1300.14,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1419",
+    "date": "2026-03-22",
+    "vendor": "Marketing Agency",
+    "amount": 21.15,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1420",
+    "date": "2026-03-11",
+    "vendor": "Hardware Solutions",
+    "amount": 1216.8,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1421",
+    "date": "2026-05-30",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 153.97,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1422",
+    "date": "2026-05-21",
+    "vendor": "Maintenance Pro",
+    "amount": 620.64,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1423",
+    "date": "2026-01-21",
+    "vendor": "Global Logistics",
+    "amount": 7753.48,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1424",
+    "date": "2026-03-26",
+    "vendor": "Insurance Corp",
+    "amount": 1591.6,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1425",
+    "date": "2026-05-06",
+    "vendor": "Microsoft Corp.",
+    "amount": 2892.76,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1426",
+    "date": "2026-03-24",
+    "vendor": "Shell Energy",
+    "amount": 3487.49,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1427",
+    "date": "2026-01-22",
+    "vendor": "Marketing Agency",
+    "amount": 3452.86,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1428",
+    "date": "2026-03-15",
+    "vendor": "Amazon Web Services",
+    "amount": 7780.1,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1429",
+    "date": "2026-01-02",
+    "vendor": "Steel-Fab Llt",
+    "amount": 8729.67,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1430",
+    "date": "2026-05-22",
+    "vendor": "Staples UK",
+    "amount": 4300.79,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1431",
+    "date": "2026-03-16",
+    "vendor": "Microsoft Corp.",
+    "amount": 6000.0,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1432",
+    "date": "2026-04-16",
+    "vendor": "Global Logistics",
+    "amount": 161.24,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1433",
+    "date": "2026-02-22",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1489.67,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1434",
+    "date": "2026-01-10",
+    "vendor": "Dell Tech",
+    "amount": 157.25,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1435",
+    "date": "2026-02-12",
+    "vendor": "Consultancy Group",
+    "amount": 9240.45,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1436",
+    "date": "2026-01-29",
+    "vendor": "Marketing Agency",
+    "amount": 1612.14,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1437",
+    "date": "2026-05-26",
+    "vendor": "Shell Energy",
+    "amount": 177.8,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1438",
+    "date": "2026-05-12",
+    "vendor": "Rent Property Mgmt",
+    "amount": 837.3,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1439",
+    "date": "2026-02-11",
+    "vendor": "Rent Property Mgmt",
+    "amount": 6688.51,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1440",
+    "date": "2026-05-27",
+    "vendor": "Consultancy Group",
+    "amount": 903.5443469691797,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1441",
+    "date": "2026-05-18",
+    "vendor": "Staples UK",
+    "amount": 8935.21,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1442",
+    "date": "2026-05-21",
+    "vendor": "Consultancy Group",
+    "amount": 5975.99,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1443",
+    "date": "2026-05-15",
+    "vendor": "Steel-Fab Llt",
+    "amount": 9508.499315794186,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1444",
+    "date": "2026-02-03",
+    "vendor": "Global Logistics",
+    "amount": 1930.12,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1445",
+    "date": "2026-04-20",
+    "vendor": "Consultancy Group",
+    "amount": 1860.98,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1446",
+    "date": "2026-05-19",
+    "vendor": "Amazon Web Services",
+    "amount": 1652.1,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1447",
+    "date": "2026-03-29",
+    "vendor": "Steel-Fab Llt",
+    "amount": 6134.36,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1448",
+    "date": "2026-01-17",
+    "vendor": "Hardware Solutions",
+    "amount": 1386.61,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1449",
+    "date": "2026-03-31",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 7579.39,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1450",
+    "date": "2026-01-23",
+    "vendor": "Travel Agency",
+    "amount": 1840.83,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1451",
+    "date": "2026-01-04",
+    "vendor": "Maintenance Pro",
+    "amount": 3271.79,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1452",
+    "date": "2026-05-24",
+    "vendor": "Travel Agency",
+    "amount": 5410.12,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1453",
+    "date": "2026-05-20",
+    "vendor": "Insurance Corp",
+    "amount": 7991.32,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1454",
+    "date": "2026-05-29",
+    "vendor": "Maintenance Pro",
+    "amount": 15.11,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1455",
+    "date": "2026-04-26",
+    "vendor": "Marketing Agency",
+    "amount": 1683.32,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1456",
+    "date": "2026-05-16",
+    "vendor": "Shell Energy",
+    "amount": 1885.11,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1457",
+    "date": "2026-04-23",
+    "vendor": "Consultancy Group",
+    "amount": 2410.84,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1458",
+    "date": "2026-03-06",
+    "vendor": "Hardware Solutions",
+    "amount": 9761.891936069454,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1459",
+    "date": "2026-03-21",
+    "vendor": "Maintenance Pro",
+    "amount": 20.36,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1460",
+    "date": "2026-03-15",
+    "vendor": "Global Logistics",
+    "amount": 3851.42,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1461",
+    "date": "2026-05-19",
+    "vendor": "Dell Tech",
+    "amount": 8790.61,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1462",
+    "date": "2026-03-04",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 2299.88,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1463",
+    "date": "2026-02-25",
+    "vendor": "Rent Property Mgmt",
+    "amount": 977.4302707330937,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1464",
+    "date": "2026-01-06",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 4156.39,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1465",
+    "date": "2026-05-10",
+    "vendor": "Global Logistics",
+    "amount": 9878.882182467567,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1466",
+    "date": "2026-03-17",
+    "vendor": "Maintenance Pro",
+    "amount": 5000.0,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1467",
+    "date": "2026-02-11",
+    "vendor": "Travel Agency",
+    "amount": 1348.72,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1468",
+    "date": "2026-05-25",
+    "vendor": "Travel Agency",
+    "amount": 6547.56,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1469",
+    "date": "2026-04-12",
+    "vendor": "Amazon Web Services",
+    "amount": 7637.81,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1470",
+    "date": "2026-02-10",
+    "vendor": "Amazon Web Services",
+    "amount": 2652.45,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1471",
+    "date": "2026-04-12",
+    "vendor": "Staples UK",
+    "amount": 4406.22,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1472",
+    "date": "2026-05-29",
+    "vendor": "Marketing Agency",
+    "amount": 8609.95,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1473",
+    "date": "2026-04-01",
+    "vendor": "Shell Energy",
+    "amount": 1535.89,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1474",
+    "date": "2026-05-31",
+    "vendor": "Microsoft Corp.",
+    "amount": 1194.15,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1475",
+    "date": "2026-01-12",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1789.3,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1476",
+    "date": "2026-01-08",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 847.59,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1477",
+    "date": "2026-03-12",
+    "vendor": "Marketing Agency",
+    "amount": 9850.28117857413,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1478",
+    "date": "2026-05-25",
+    "vendor": "Microsoft Corp",
+    "amount": 8190.26,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1479",
+    "date": "2026-05-22",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 987.3570802853855,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1480",
+    "date": "2026-01-31",
+    "vendor": "Shell Energy",
+    "amount": 2691.5,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1481",
+    "date": "2026-02-27",
+    "vendor": "Microsoft Corp.",
+    "amount": 9714.367290035145,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1482",
+    "date": "2026-04-26",
+    "vendor": "Staples UK",
+    "amount": 4536.89,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1483",
+    "date": "2026-04-16",
+    "vendor": "Marketing Agency",
+    "amount": 1457.29,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1484",
+    "date": "2026-01-25",
+    "vendor": "Global Logistics",
+    "amount": 9783.141279843203,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1485",
+    "date": "2026-02-10",
+    "vendor": "Rent Property Mgmt",
+    "amount": 24.0,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1486",
+    "date": "2026-04-22",
+    "vendor": "Maintenance Pro",
+    "amount": 4105.4,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1487",
+    "date": "2026-04-24",
+    "vendor": "Dell Tech",
+    "amount": 9863.097735824696,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1488",
+    "date": "2026-02-08",
+    "vendor": "Travel Agency",
+    "amount": 1784.95,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1489",
+    "date": "2026-03-08",
+    "vendor": "Travel Agency",
+    "amount": 7181.3,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1490",
+    "date": "2026-01-10",
+    "vendor": "Insurance Corp",
+    "amount": 8721.53,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1491",
+    "date": "2026-02-09",
+    "vendor": "Shell Energy",
+    "amount": 9327.74,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1492",
+    "date": "2026-04-21",
+    "vendor": "Dell Tech",
+    "amount": 1650.75,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1493",
+    "date": "2026-02-21",
+    "vendor": "Shell Energy",
+    "amount": 3216.42,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1494",
+    "date": "2026-05-11",
+    "vendor": "Maintenance Pro",
+    "amount": 3823.72,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1495",
+    "date": "2026-04-27",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 290.83,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1496",
+    "date": "2026-05-03",
+    "vendor": "Marketing Agency",
+    "amount": 6305.13,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1497",
+    "date": "2026-04-29",
+    "vendor": "Staples UK",
+    "amount": 8839.82,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1498",
+    "date": "2026-01-19",
+    "vendor": "Insurance Corp",
+    "amount": 513.22,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1499",
+    "date": "2026-02-20",
+    "vendor": "Consultancy Group",
+    "amount": 3230.44,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1500",
+    "date": "2026-03-04",
+    "vendor": "Shell Energy",
+    "amount": 1826.31,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1501",
+    "date": "2026-01-26",
+    "vendor": "Rent Property Mgmt",
+    "amount": 987.8755369327934,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1502",
+    "date": "2026-01-25",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1458.95,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1503",
+    "date": "2026-01-18",
+    "vendor": "Rent Property Mgmt",
+    "amount": 5571.4,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1504",
+    "date": "2026-02-26",
+    "vendor": "Maintenance Pro",
+    "amount": 1632.65,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1505",
+    "date": "2026-04-23",
+    "vendor": "Maintenance Pro",
+    "amount": 2536.83,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1506",
+    "date": "2026-01-31",
+    "vendor": "Maintenance Pro",
+    "amount": 147.36,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1507",
+    "date": "2026-02-21",
+    "vendor": "Global Logistics",
+    "amount": 5234.42,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1508",
+    "date": "2026-03-09",
+    "vendor": "Consultancy Group",
+    "amount": 8000.0,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1509",
+    "date": "2026-01-16",
+    "vendor": "Staples UK",
+    "amount": 512.58,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1510",
+    "date": "2026-04-02",
+    "vendor": "Consultancy Group",
+    "amount": 3458.93,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1511",
+    "date": "2026-05-06",
+    "vendor": "Consultancy Group",
+    "amount": 3406.3,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1512",
+    "date": "2026-05-03",
+    "vendor": "Microsoft Corp",
+    "amount": 3140.57,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1513",
+    "date": "2026-03-26",
+    "vendor": "Dell Tech",
+    "amount": 4570.96,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1514",
+    "date": "2026-04-26",
+    "vendor": "Rent Property Mgmt",
+    "amount": 3311.16,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1515",
+    "date": "2026-04-28",
+    "vendor": "Consultancy Group",
+    "amount": 1217.55,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1516",
+    "date": "2026-02-09",
+    "vendor": "Steel-Fab Llt",
+    "amount": 6776.44,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1517",
+    "date": "2026-05-27",
+    "vendor": "Rent Property Mgmt",
+    "amount": 3962.84,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1518",
+    "date": "2026-01-28",
+    "vendor": "Dell Tech",
+    "amount": 5564.0,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1519",
+    "date": "2026-01-11",
+    "vendor": "Dell Tech",
+    "amount": 10000.0,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1520",
+    "date": "2026-05-14",
+    "vendor": "Global Logistics",
+    "amount": 2541.5,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1521",
+    "date": "2026-03-09",
+    "vendor": "Staples UK",
+    "amount": 8000.0,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1522",
+    "date": "2026-03-15",
+    "vendor": "Marketing Agency",
+    "amount": 9946.94,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1523",
+    "date": "2026-03-20",
+    "vendor": "Dell Tech",
+    "amount": 1217.42,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1524",
+    "date": "2026-03-16",
+    "vendor": "Microsoft Corp",
+    "amount": 1544.15,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1525",
+    "date": "2026-03-25",
+    "vendor": "Amazon Web Services",
+    "amount": 9472.91,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1526",
+    "date": "2026-02-06",
+    "vendor": "Rent Property Mgmt",
+    "amount": 6993.3,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1527",
+    "date": "2026-04-28",
+    "vendor": "Shell Energy",
+    "amount": 8815.86,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1528",
+    "date": "2026-03-02",
+    "vendor": "Maintenance Pro",
+    "amount": 6796.52,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1529",
+    "date": "2026-05-01",
+    "vendor": "Microsoft Corp.",
+    "amount": 5329.76,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1530",
+    "date": "2026-04-12",
+    "vendor": "Microsoft Corp.",
+    "amount": 861.97,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1531",
+    "date": "2026-05-04",
+    "vendor": "Travel Agency",
+    "amount": 6000.0,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1532",
+    "date": "2026-02-17",
+    "vendor": "Microsoft Corp",
+    "amount": 114.92,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1533",
+    "date": "2026-02-17",
+    "vendor": "Microsoft Corp",
+    "amount": 5630.89,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1534",
+    "date": "2026-01-03",
+    "vendor": "Consultancy Group",
+    "amount": 1556.21,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1535",
+    "date": "2026-05-20",
+    "vendor": "Microsoft Corp",
+    "amount": 116.71,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1536",
+    "date": "2026-02-26",
+    "vendor": "Shell Energy",
+    "amount": 1507.3,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1537",
+    "date": "2026-05-03",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 6672.36,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1538",
+    "date": "2026-05-26",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 2603.31,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1539",
+    "date": "2026-02-12",
+    "vendor": "Hardware Solutions",
+    "amount": 7372.75,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1540",
+    "date": "2026-04-23",
+    "vendor": "Microsoft Corp",
+    "amount": 1981.28,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1541",
+    "date": "2026-01-10",
+    "vendor": "Hardware Solutions",
+    "amount": 1156.76,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1542",
+    "date": "2026-02-03",
+    "vendor": "Consultancy Group",
+    "amount": 1434.22,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1543",
+    "date": "2026-04-23",
+    "vendor": "Travel Agency",
+    "amount": 2730.23,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1544",
+    "date": "2026-05-14",
+    "vendor": "Global Logistics",
+    "amount": 5862.12,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1545",
+    "date": "2026-05-05",
+    "vendor": "Insurance Corp",
+    "amount": 1000.0,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1546",
+    "date": "2026-03-06",
+    "vendor": "Consultancy Group",
+    "amount": 7680.53,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1547",
+    "date": "2026-04-11",
+    "vendor": "Microsoft Corp",
+    "amount": 2571.45,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1548",
+    "date": "2026-05-24",
+    "vendor": "Insurance Corp",
+    "amount": 1217.38,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1549",
+    "date": "2026-05-13",
+    "vendor": "Travel Agency",
+    "amount": 951.3990989730547,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1550",
+    "date": "2026-05-16",
+    "vendor": "Microsoft Corp",
+    "amount": 1804.42,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1551",
+    "date": "2026-01-21",
+    "vendor": "Staples UK",
+    "amount": 9552.737429774028,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1552",
+    "date": "2026-03-04",
+    "vendor": "Steel-Fab Llt",
+    "amount": 4134.98,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1553",
+    "date": "2026-02-05",
+    "vendor": "Rent Property Mgmt",
+    "amount": 7676.21,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1554",
+    "date": "2026-02-27",
+    "vendor": "Global Logistics",
+    "amount": 3370.1,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1555",
+    "date": "2026-03-01",
+    "vendor": "Insurance Corp",
+    "amount": 1641.75,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1556",
+    "date": "2026-05-10",
+    "vendor": "Rent Property Mgmt",
+    "amount": 7400.22,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1557",
+    "date": "2026-04-28",
+    "vendor": "Hardware Solutions",
+    "amount": 9181.82,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1558",
+    "date": "2026-05-18",
+    "vendor": "Microsoft Corp",
+    "amount": 9921.132668492703,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1559",
+    "date": "2026-01-09",
+    "vendor": "Dell Tech",
+    "amount": 1720.43,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1560",
+    "date": "2026-01-20",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1677.65,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1561",
+    "date": "2026-01-12",
+    "vendor": "Microsoft Corp",
+    "amount": 1907.16,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1562",
+    "date": "2026-01-11",
+    "vendor": "Consultancy Group",
+    "amount": 7555.33,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1563",
+    "date": "2026-01-12",
+    "vendor": "Travel Agency",
+    "amount": 1714.92,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1564",
+    "date": "2026-05-23",
+    "vendor": "Global Logistics",
+    "amount": 2619.17,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1565",
+    "date": "2026-01-29",
+    "vendor": "Travel Agency",
+    "amount": 43.29,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1566",
+    "date": "2026-03-01",
+    "vendor": "Shell Energy",
+    "amount": 4706.85,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1567",
+    "date": "2026-01-13",
+    "vendor": "Dell Tech",
+    "amount": 3262.9,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1568",
+    "date": "2026-03-23",
+    "vendor": "Travel Agency",
+    "amount": 9000.0,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1569",
+    "date": "2026-05-16",
+    "vendor": "Rent Property Mgmt",
+    "amount": 2172.83,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1570",
+    "date": "2026-01-31",
+    "vendor": "Travel Agency",
+    "amount": 4392.76,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1571",
+    "date": "2026-01-17",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1132.94,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1572",
+    "date": "2026-04-10",
+    "vendor": "Insurance Corp",
+    "amount": 517.44,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1573",
+    "date": "2026-04-12",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 2166.88,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1574",
+    "date": "2026-03-28",
+    "vendor": "Steel-Fab Llt",
+    "amount": 161.3,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1575",
+    "date": "2026-02-12",
+    "vendor": "Shell Energy",
+    "amount": 471.68,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1576",
+    "date": "2026-04-14",
+    "vendor": "Amazon Web Services",
+    "amount": 960.1963174507958,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1577",
+    "date": "2026-05-04",
+    "vendor": "Microsoft Corp.",
+    "amount": 3133.18,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1578",
+    "date": "2026-01-23",
+    "vendor": "Maintenance Pro",
+    "amount": 2588.39,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1579",
+    "date": "2026-05-07",
+    "vendor": "Hardware Solutions",
+    "amount": 7621.4,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1580",
+    "date": "2026-05-05",
+    "vendor": "Marketing Agency",
+    "amount": 1514.59,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1581",
+    "date": "2026-05-05",
+    "vendor": "Marketing Agency",
+    "amount": 4791.6,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1582",
+    "date": "2026-04-25",
+    "vendor": "Amazon Web Services",
+    "amount": 1549.3,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1583",
+    "date": "2026-03-03",
+    "vendor": "Insurance Corp",
+    "amount": 6383.85,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1584",
+    "date": "2026-05-14",
+    "vendor": "Consultancy Group",
+    "amount": 2360.82,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1585",
+    "date": "2026-02-24",
+    "vendor": "Steel-Fab Llt",
+    "amount": 9119.98,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1586",
+    "date": "2026-05-18",
+    "vendor": "Shell Energy",
+    "amount": 2000.0,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1587",
+    "date": "2026-04-16",
+    "vendor": "Microsoft Corp.",
+    "amount": 1696.62,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1588",
+    "date": "2026-05-22",
+    "vendor": "Microsoft Corp",
+    "amount": 277.4,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1589",
+    "date": "2026-01-14",
+    "vendor": "Consultancy Group",
+    "amount": 3942.33,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1590",
+    "date": "2026-05-21",
+    "vendor": "Travel Agency",
+    "amount": 4462.13,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1591",
+    "date": "2026-05-22",
+    "vendor": "Marketing Agency",
+    "amount": 1260.2,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1592",
+    "date": "2026-05-09",
+    "vendor": "Consultancy Group",
+    "amount": 2728.94,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1593",
+    "date": "2026-02-23",
+    "vendor": "Rent Property Mgmt",
+    "amount": 2323.2,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1594",
+    "date": "2026-05-27",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 9807.73,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1595",
+    "date": "2026-05-20",
+    "vendor": "Microsoft Corp",
+    "amount": 1960.94,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1596",
+    "date": "2026-01-02",
+    "vendor": "Microsoft Corp",
+    "amount": 135.62,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1597",
+    "date": "2026-04-11",
+    "vendor": "Maintenance Pro",
+    "amount": 4263.69,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1598",
+    "date": "2026-04-13",
+    "vendor": "Consultancy Group",
+    "amount": 1853.4,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1599",
+    "date": "2026-05-27",
+    "vendor": "Marketing Agency",
+    "amount": 8683.29,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1600",
+    "date": "2026-05-26",
+    "vendor": "Shell Energy",
+    "amount": 9732.821846779121,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1601",
+    "date": "2026-05-22",
+    "vendor": "Hardware Solutions",
+    "amount": 9692.738720243347,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1602",
+    "date": "2026-03-31",
+    "vendor": "Insurance Corp",
+    "amount": 4000.0,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1603",
+    "date": "2026-02-05",
+    "vendor": "Microsoft Corp.",
+    "amount": 1373.71,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1604",
+    "date": "2026-02-03",
+    "vendor": "Insurance Corp",
+    "amount": 2208.61,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1605",
+    "date": "2026-02-12",
+    "vendor": "Staples UK",
+    "amount": 1165.97,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1606",
+    "date": "2026-02-27",
+    "vendor": "Hardware Solutions",
+    "amount": 37.29,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1607",
+    "date": "2026-01-07",
+    "vendor": "Travel Agency",
+    "amount": 114.6,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1608",
+    "date": "2026-01-10",
+    "vendor": "Dell Tech",
+    "amount": 116.8,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1609",
+    "date": "2026-02-14",
+    "vendor": "Maintenance Pro",
+    "amount": 9572.098571170169,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1610",
+    "date": "2026-05-20",
+    "vendor": "Microsoft Corp",
+    "amount": 240.79,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1611",
+    "date": "2026-05-22",
+    "vendor": "Shell Energy",
+    "amount": 1330.61,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1612",
+    "date": "2026-03-19",
+    "vendor": "Marketing Agency",
+    "amount": 1953.85,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1613",
+    "date": "2026-01-12",
+    "vendor": "Hardware Solutions",
+    "amount": 2809.24,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1614",
+    "date": "2026-01-09",
+    "vendor": "Consultancy Group",
+    "amount": 2497.56,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1615",
+    "date": "2026-04-01",
+    "vendor": "Amazon Web Services",
+    "amount": 9635.184061499413,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1616",
+    "date": "2026-05-20",
+    "vendor": "Staples UK",
+    "amount": 4512.79,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1617",
+    "date": "2026-04-22",
+    "vendor": "Maintenance Pro",
+    "amount": 7547.83,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1618",
+    "date": "2026-03-16",
+    "vendor": "Steel-Fab Llt",
+    "amount": 2830.26,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1619",
+    "date": "2026-05-05",
+    "vendor": "Global Logistics",
+    "amount": 1216.4,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1620",
+    "date": "2026-03-25",
+    "vendor": "Staples UK",
+    "amount": 1723.24,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1621",
+    "date": "2026-01-09",
+    "vendor": "Microsoft Corp.",
+    "amount": 1171.33,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1622",
+    "date": "2026-01-17",
+    "vendor": "Shell Energy",
+    "amount": 8544.9,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1623",
+    "date": "2026-04-20",
+    "vendor": "Microsoft Corp",
+    "amount": 9326.26,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1624",
+    "date": "2026-03-16",
+    "vendor": "Hardware Solutions",
+    "amount": 1463.16,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1625",
+    "date": "2026-02-03",
+    "vendor": "Travel Agency",
+    "amount": 826.17,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1626",
+    "date": "2026-05-23",
+    "vendor": "Microsoft Corp.",
+    "amount": 2876.83,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1627",
+    "date": "2026-02-22",
+    "vendor": "Shell Energy",
+    "amount": 2428.95,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1628",
+    "date": "2026-05-14",
+    "vendor": "Steel-Fab Llt",
+    "amount": 3863.12,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1629",
+    "date": "2026-03-19",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1377.84,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1630",
+    "date": "2026-03-24",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 3252.65,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1631",
+    "date": "2026-02-14",
+    "vendor": "Hardware Solutions",
+    "amount": 7383.99,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1632",
+    "date": "2026-05-31",
+    "vendor": "Staples UK",
+    "amount": 1621.73,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1633",
+    "date": "2026-01-08",
+    "vendor": "Rent Property Mgmt",
+    "amount": 9686.913259879708,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1634",
+    "date": "2026-04-19",
+    "vendor": "Insurance Corp",
+    "amount": 1436.51,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1635",
+    "date": "2026-04-13",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1419.48,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1636",
+    "date": "2026-02-18",
+    "vendor": "Travel Agency",
+    "amount": 8476.0,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1637",
+    "date": "2026-04-26",
+    "vendor": "Maintenance Pro",
+    "amount": 9532.133252298287,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1638",
+    "date": "2026-01-21",
+    "vendor": "Consultancy Group",
+    "amount": 3544.52,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1639",
+    "date": "2026-02-05",
+    "vendor": "Maintenance Pro",
+    "amount": 5473.34,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1640",
+    "date": "2026-03-09",
+    "vendor": "Hardware Solutions",
+    "amount": 2508.38,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1641",
+    "date": "2026-03-15",
+    "vendor": "Global Logistics",
+    "amount": 8473.43,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1642",
+    "date": "2026-03-29",
+    "vendor": "Hardware Solutions",
+    "amount": 1150.44,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1643",
+    "date": "2026-01-02",
+    "vendor": "Hardware Solutions",
+    "amount": 3639.74,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1644",
+    "date": "2026-01-30",
+    "vendor": "Amazon Web Services",
+    "amount": 135.84,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1645",
+    "date": "2026-03-26",
+    "vendor": "Amazon Web Services",
+    "amount": 4861.82,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1646",
+    "date": "2026-03-06",
+    "vendor": "Travel Agency",
+    "amount": 8486.45,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1647",
+    "date": "2026-02-01",
+    "vendor": "Amazon Web Services",
+    "amount": 9553.858655374393,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1648",
+    "date": "2026-01-20",
+    "vendor": "Hardware Solutions",
+    "amount": 9259.11,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1649",
+    "date": "2026-03-28",
+    "vendor": "Staples UK",
+    "amount": 1106.68,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1650",
+    "date": "2026-04-05",
+    "vendor": "Travel Agency",
+    "amount": 9268.91,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1651",
+    "date": "2026-04-25",
+    "vendor": "Insurance Corp",
+    "amount": 5161.74,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1652",
+    "date": "2026-05-25",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1509.4,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1653",
+    "date": "2026-02-06",
+    "vendor": "Dell Tech",
+    "amount": 3636.98,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1654",
+    "date": "2026-05-22",
+    "vendor": "Insurance Corp",
+    "amount": 921.7091169385687,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1655",
+    "date": "2026-01-25",
+    "vendor": "Hardware Solutions",
+    "amount": 2176.48,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1656",
+    "date": "2026-02-11",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1996.44,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1657",
+    "date": "2026-04-25",
+    "vendor": "Microsoft Corp",
+    "amount": 4738.85,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1658",
+    "date": "2026-01-31",
+    "vendor": "Dell Tech",
+    "amount": 1749.49,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1659",
+    "date": "2026-04-16",
+    "vendor": "Dell Tech",
+    "amount": 8734.23,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1660",
+    "date": "2026-05-17",
+    "vendor": "Shell Energy",
+    "amount": 6000.0,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1661",
+    "date": "2026-03-05",
+    "vendor": "Shell Energy",
+    "amount": 998.7357265130026,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1662",
+    "date": "2026-05-24",
+    "vendor": "Dell Tech",
+    "amount": 2133.81,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1663",
+    "date": "2026-04-25",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1581.42,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1664",
+    "date": "2026-05-28",
+    "vendor": "Shell Energy",
+    "amount": 1339.33,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1665",
+    "date": "2026-05-09",
+    "vendor": "Insurance Corp",
+    "amount": 9857.286369566518,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1666",
+    "date": "2026-03-25",
+    "vendor": "Hardware Solutions",
+    "amount": 1788.87,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1667",
+    "date": "2026-02-13",
+    "vendor": "Global Logistics",
+    "amount": 2391.48,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1668",
+    "date": "2026-04-13",
+    "vendor": "Hardware Solutions",
+    "amount": 4654.15,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1669",
+    "date": "2026-04-12",
+    "vendor": "Global Logistics",
+    "amount": 2453.97,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1670",
+    "date": "2026-05-22",
+    "vendor": "Microsoft Corp.",
+    "amount": 971.7606416161278,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1671",
+    "date": "2026-02-28",
+    "vendor": "Consultancy Group",
+    "amount": 9809.282079237088,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1672",
+    "date": "2026-04-23",
+    "vendor": "Shell Energy",
+    "amount": 6206.4,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1673",
+    "date": "2026-03-03",
+    "vendor": "Staples UK",
+    "amount": 129.67,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1674",
+    "date": "2026-05-23",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 9884.1,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1675",
+    "date": "2026-03-19",
+    "vendor": "Staples UK",
+    "amount": 269.13,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1676",
+    "date": "2026-05-19",
+    "vendor": "Consultancy Group",
+    "amount": 1255.0,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1677",
+    "date": "2026-05-01",
+    "vendor": "Maintenance Pro",
+    "amount": 1255.15,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1678",
+    "date": "2026-01-26",
+    "vendor": "Insurance Corp",
+    "amount": 3643.49,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1679",
+    "date": "2026-01-30",
+    "vendor": "Steel-Fab Llt",
+    "amount": 6372.72,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1680",
+    "date": "2026-05-30",
+    "vendor": "Microsoft Corp",
+    "amount": 9986.912749392966,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1681",
+    "date": "2026-02-21",
+    "vendor": "Staples UK",
+    "amount": 2241.31,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1682",
+    "date": "2026-02-26",
+    "vendor": "Travel Agency",
+    "amount": 1460.79,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1683",
+    "date": "2026-05-04",
+    "vendor": "Hardware Solutions",
+    "amount": 6975.1,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1684",
+    "date": "2026-01-19",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 7513.48,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1685",
+    "date": "2026-02-18",
+    "vendor": "Travel Agency",
+    "amount": 9842.871326980292,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1686",
+    "date": "2026-03-20",
+    "vendor": "Insurance Corp",
+    "amount": 9861.060088791583,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1687",
+    "date": "2026-02-08",
+    "vendor": "Microsoft Corp",
+    "amount": 6521.83,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1688",
+    "date": "2026-05-13",
+    "vendor": "Hardware Solutions",
+    "amount": 4246.99,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1689",
+    "date": "2026-05-07",
+    "vendor": "Marketing Agency",
+    "amount": 10000.0,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1690",
+    "date": "2026-04-18",
+    "vendor": "Rent Property Mgmt",
+    "amount": 8880.24,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1691",
+    "date": "2026-01-11",
+    "vendor": "Consultancy Group",
+    "amount": 3528.99,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1692",
+    "date": "2026-04-07",
+    "vendor": "Microsoft Corp.",
+    "amount": 2291.21,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1693",
+    "date": "2026-02-24",
+    "vendor": "Steel-Fab Llt",
+    "amount": 571.2,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1694",
+    "date": "2026-04-06",
+    "vendor": "Hardware Solutions",
+    "amount": 3125.55,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1695",
+    "date": "2026-01-18",
+    "vendor": "Consultancy Group",
+    "amount": 1378.93,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1696",
+    "date": "2026-03-28",
+    "vendor": "Microsoft Corp",
+    "amount": 2885.84,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1697",
+    "date": "2026-02-20",
+    "vendor": "Dell Tech",
+    "amount": 4740.57,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1698",
+    "date": "2026-03-02",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 2298.89,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1699",
+    "date": "2026-03-12",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 189.11,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1700",
+    "date": "2026-03-19",
+    "vendor": "Dell Tech",
+    "amount": 8776.2,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1701",
+    "date": "2026-02-22",
+    "vendor": "Insurance Corp",
+    "amount": 6586.5,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1702",
+    "date": "2026-02-15",
+    "vendor": "Consultancy Group",
+    "amount": 169.35,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1703",
+    "date": "2026-04-18",
+    "vendor": "Consultancy Group",
+    "amount": 5839.69,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1704",
+    "date": "2026-03-24",
+    "vendor": "Amazon Web Services",
+    "amount": 89.4,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1705",
+    "date": "2026-04-17",
+    "vendor": "Dell Tech",
+    "amount": 1547.9,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1706",
+    "date": "2026-05-24",
+    "vendor": "Maintenance Pro",
+    "amount": 2509.68,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1707",
+    "date": "2026-04-19",
+    "vendor": "Insurance Corp",
+    "amount": 995.4398463586117,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1708",
+    "date": "2026-01-28",
+    "vendor": "Insurance Corp",
+    "amount": 9510.89,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1709",
+    "date": "2026-04-04",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1186.34,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1710",
+    "date": "2026-02-02",
+    "vendor": "Consultancy Group",
+    "amount": 911.6432709193949,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1711",
+    "date": "2026-04-21",
+    "vendor": "Microsoft Corp.",
+    "amount": 2405.0,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1712",
+    "date": "2026-01-01",
+    "vendor": "Amazon Web Services",
+    "amount": 1360.49,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1713",
+    "date": "2026-05-23",
+    "vendor": "Insurance Corp",
+    "amount": 6671.4,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1714",
+    "date": "2026-01-15",
+    "vendor": "Maintenance Pro",
+    "amount": 6476.19,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1715",
+    "date": "2026-05-10",
+    "vendor": "Microsoft Corp",
+    "amount": 945.2822315822901,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1716",
+    "date": "2026-02-27",
+    "vendor": "Travel Agency",
+    "amount": 4650.55,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1717",
+    "date": "2026-02-05",
+    "vendor": "Hardware Solutions",
+    "amount": 3766.38,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1718",
+    "date": "2026-01-22",
+    "vendor": "Dell Tech",
+    "amount": 4906.74,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1719",
+    "date": "2026-01-18",
+    "vendor": "Microsoft Corp.",
+    "amount": 2000.0,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1720",
+    "date": "2026-01-19",
+    "vendor": "Staples UK",
+    "amount": 7271.97,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1721",
+    "date": "2026-01-06",
+    "vendor": "Steel-Fab Llt",
+    "amount": 9372.84,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1722",
+    "date": "2026-05-22",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 2681.75,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1723",
+    "date": "2026-01-29",
+    "vendor": "Shell Energy",
+    "amount": 1902.5,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1724",
+    "date": "2026-01-22",
+    "vendor": "Microsoft Corp",
+    "amount": 5174.51,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1725",
+    "date": "2026-01-21",
+    "vendor": "Consultancy Group",
+    "amount": 1870.6,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1726",
+    "date": "2026-03-15",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1143.85,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1727",
+    "date": "2026-03-25",
+    "vendor": "Staples UK",
+    "amount": 1389.0,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1728",
+    "date": "2026-04-27",
+    "vendor": "Hardware Solutions",
+    "amount": 1566.26,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1729",
+    "date": "2026-03-07",
+    "vendor": "Shell Energy",
+    "amount": 5639.81,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1730",
+    "date": "2026-04-02",
+    "vendor": "Amazon Web Services",
+    "amount": 2217.31,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1731",
+    "date": "2026-05-14",
+    "vendor": "Steel-Fab Llt",
+    "amount": 9962.72,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1732",
+    "date": "2026-02-14",
+    "vendor": "Insurance Corp",
+    "amount": 7877.86,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1733",
+    "date": "2026-01-23",
+    "vendor": "Insurance Corp",
+    "amount": 2588.59,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1734",
+    "date": "2026-04-26",
+    "vendor": "Marketing Agency",
+    "amount": 1716.73,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1735",
+    "date": "2026-03-23",
+    "vendor": "Insurance Corp",
+    "amount": 5321.86,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1736",
+    "date": "2026-05-05",
+    "vendor": "Dell Tech",
+    "amount": 1552.65,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1737",
+    "date": "2026-02-18",
+    "vendor": "Amazon Web Services",
+    "amount": 2864.79,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1738",
+    "date": "2026-05-30",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 2474.33,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1739",
+    "date": "2026-05-11",
+    "vendor": "Dell Tech",
+    "amount": 9816.329930006945,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1740",
+    "date": "2026-05-13",
+    "vendor": "Steel-Fab Llt",
+    "amount": 3999.11,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1741",
+    "date": "2026-05-08",
+    "vendor": "Staples UK",
+    "amount": 2000.0,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1742",
+    "date": "2026-05-31",
+    "vendor": "Marketing Agency",
+    "amount": 9565.808557916884,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1743",
+    "date": "2026-01-01",
+    "vendor": "Shell Energy",
+    "amount": 5695.2,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1744",
+    "date": "2026-04-09",
+    "vendor": "Maintenance Pro",
+    "amount": 172.4,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1745",
+    "date": "2026-04-21",
+    "vendor": "Global Logistics",
+    "amount": 8195.7,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1746",
+    "date": "2026-02-11",
+    "vendor": "Staples UK",
+    "amount": 1192.57,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1747",
+    "date": "2026-05-23",
+    "vendor": "Staples UK",
+    "amount": 135.39,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1748",
+    "date": "2026-04-04",
+    "vendor": "Rent Property Mgmt",
+    "amount": 734.33,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1749",
+    "date": "2026-02-17",
+    "vendor": "Maintenance Pro",
+    "amount": 9447.77,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1750",
+    "date": "2026-02-22",
+    "vendor": "Amazon Web Services",
+    "amount": 8000.0,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1751",
+    "date": "2026-03-12",
+    "vendor": "Travel Agency",
+    "amount": 1627.1,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1752",
+    "date": "2026-01-16",
+    "vendor": "Maintenance Pro",
+    "amount": 58.26,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1753",
+    "date": "2026-01-14",
+    "vendor": "Hardware Solutions",
+    "amount": 9473.23,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1754",
+    "date": "2026-01-18",
+    "vendor": "Hardware Solutions",
+    "amount": 8178.92,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1755",
+    "date": "2026-05-17",
+    "vendor": "Amazon Web Services",
+    "amount": 4359.66,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1756",
+    "date": "2026-02-25",
+    "vendor": "Global Logistics",
+    "amount": 3375.38,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1757",
+    "date": "2026-03-01",
+    "vendor": "Marketing Agency",
+    "amount": 4725.51,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1758",
+    "date": "2026-01-07",
+    "vendor": "Dell Tech",
+    "amount": 4773.41,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1759",
+    "date": "2026-05-16",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 9908.604283227522,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1760",
+    "date": "2026-05-16",
+    "vendor": "Shell Energy",
+    "amount": 281.98,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1761",
+    "date": "2026-01-18",
+    "vendor": "Consultancy Group",
+    "amount": 5000.0,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1762",
+    "date": "2026-02-24",
+    "vendor": "Staples UK",
+    "amount": 1839.78,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1763",
+    "date": "2026-05-02",
+    "vendor": "Rent Property Mgmt",
+    "amount": 10000.0,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1764",
+    "date": "2026-04-12",
+    "vendor": "Microsoft Corp",
+    "amount": 2000.0,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1765",
+    "date": "2026-02-21",
+    "vendor": "Steel-Fab Llt",
+    "amount": 2260.13,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1766",
+    "date": "2026-03-11",
+    "vendor": "Microsoft Corp",
+    "amount": 125.26,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1767",
+    "date": "2026-02-27",
+    "vendor": "Steel-Fab Llt",
+    "amount": 595.15,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1768",
+    "date": "2026-04-25",
+    "vendor": "Travel Agency",
+    "amount": 9627.17,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1769",
+    "date": "2026-03-28",
+    "vendor": "Global Logistics",
+    "amount": 3735.25,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1770",
+    "date": "2026-02-02",
+    "vendor": "Steel-Fab Llt",
+    "amount": 8420.99,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1771",
+    "date": "2026-02-02",
+    "vendor": "Maintenance Pro",
+    "amount": 6979.2,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1772",
+    "date": "2026-05-14",
+    "vendor": "Insurance Corp",
+    "amount": 9629.613750157094,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1773",
+    "date": "2026-05-11",
+    "vendor": "Travel Agency",
+    "amount": 4452.28,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1774",
+    "date": "2026-03-28",
+    "vendor": "Amazon Web Services",
+    "amount": 5274.16,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1775",
+    "date": "2026-03-16",
+    "vendor": "Microsoft Corp",
+    "amount": 2238.66,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1776",
+    "date": "2026-05-30",
+    "vendor": "Staples UK",
+    "amount": 5281.48,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1777",
+    "date": "2026-01-20",
+    "vendor": "Dell Tech",
+    "amount": 2116.4,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1778",
+    "date": "2026-05-17",
+    "vendor": "Global Logistics",
+    "amount": 1762.51,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1779",
+    "date": "2026-01-10",
+    "vendor": "Dell Tech",
+    "amount": 8460.46,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1780",
+    "date": "2026-03-16",
+    "vendor": "Global Logistics",
+    "amount": 7174.27,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1781",
+    "date": "2026-01-21",
+    "vendor": "Hardware Solutions",
+    "amount": 1684.53,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1782",
+    "date": "2026-05-21",
+    "vendor": "Maintenance Pro",
+    "amount": 1203.61,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1783",
+    "date": "2026-04-04",
+    "vendor": "Insurance Corp",
+    "amount": 6311.6,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1784",
+    "date": "2026-04-19",
+    "vendor": "Amazon Web Services",
+    "amount": 1947.14,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1785",
+    "date": "2026-03-14",
+    "vendor": "Microsoft Corp.",
+    "amount": 1512.1,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1786",
+    "date": "2026-03-27",
+    "vendor": "Marketing Agency",
+    "amount": 1942.38,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1787",
+    "date": "2026-05-12",
+    "vendor": "Rent Property Mgmt",
+    "amount": 8345.47,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1788",
+    "date": "2026-05-04",
+    "vendor": "Amazon Web Services",
+    "amount": 39.15,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1789",
+    "date": "2026-04-29",
+    "vendor": "Consultancy Group",
+    "amount": 2968.5,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1790",
+    "date": "2026-02-24",
+    "vendor": "Dell Tech",
+    "amount": 2391.58,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1791",
+    "date": "2026-04-24",
+    "vendor": "Insurance Corp",
+    "amount": 2302.93,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1792",
+    "date": "2026-02-12",
+    "vendor": "Consultancy Group",
+    "amount": 1390.38,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1793",
+    "date": "2026-02-19",
+    "vendor": "Insurance Corp",
+    "amount": 1176.55,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1794",
+    "date": "2026-03-23",
+    "vendor": "Amazon Web Services",
+    "amount": 4421.13,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1795",
+    "date": "2026-04-08",
+    "vendor": "Dell Tech",
+    "amount": 8597.4,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1796",
+    "date": "2026-03-25",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1983.75,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1797",
+    "date": "2026-05-13",
+    "vendor": "Amazon Web Services",
+    "amount": 7348.64,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1798",
+    "date": "2026-03-12",
+    "vendor": "Amazon Web Services",
+    "amount": 3793.32,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1799",
+    "date": "2026-04-15",
+    "vendor": "Travel Agency",
+    "amount": 1841.56,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1800",
+    "date": "2026-01-26",
+    "vendor": "Amazon Web Services",
+    "amount": 4834.82,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1801",
+    "date": "2026-03-03",
+    "vendor": "Insurance Corp",
+    "amount": 3950.43,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1802",
+    "date": "2026-02-13",
+    "vendor": "Consultancy Group",
+    "amount": 4119.64,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1803",
+    "date": "2026-04-07",
+    "vendor": "Marketing Agency",
+    "amount": 2441.54,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1804",
+    "date": "2026-03-17",
+    "vendor": "Microsoft Corp.",
+    "amount": 9771.057495335674,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1805",
+    "date": "2026-04-18",
+    "vendor": "Staples UK",
+    "amount": 9953.82,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1806",
+    "date": "2026-05-12",
+    "vendor": "Global Logistics",
+    "amount": 5000.0,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1807",
+    "date": "2026-04-06",
+    "vendor": "Microsoft Corp.",
+    "amount": 2681.68,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1808",
+    "date": "2026-05-19",
+    "vendor": "Travel Agency",
+    "amount": 251.44,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1809",
+    "date": "2026-01-29",
+    "vendor": "Marketing Agency",
+    "amount": 9661.460618388268,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1810",
+    "date": "2026-02-14",
+    "vendor": "Hardware Solutions",
+    "amount": 1554.54,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1811",
+    "date": "2026-04-24",
+    "vendor": "Shell Energy",
+    "amount": 8972.41,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1812",
+    "date": "2026-05-06",
+    "vendor": "Hardware Solutions",
+    "amount": 3788.14,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1813",
+    "date": "2026-05-03",
+    "vendor": "Dell Tech",
+    "amount": 4555.39,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1814",
+    "date": "2026-05-18",
+    "vendor": "Amazon Web Services",
+    "amount": 1477.32,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1815",
+    "date": "2026-01-31",
+    "vendor": "Insurance Corp",
+    "amount": 3000.0,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1816",
+    "date": "2026-02-07",
+    "vendor": "Microsoft Corp",
+    "amount": 9947.530835892787,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1817",
+    "date": "2026-03-04",
+    "vendor": "Hardware Solutions",
+    "amount": 9526.214713971449,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1818",
+    "date": "2026-02-10",
+    "vendor": "Microsoft Corp.",
+    "amount": 9592.79,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1819",
+    "date": "2026-03-28",
+    "vendor": "Insurance Corp",
+    "amount": 1772.72,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1820",
+    "date": "2026-03-22",
+    "vendor": "Maintenance Pro",
+    "amount": 2267.12,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1821",
+    "date": "2026-03-28",
+    "vendor": "Amazon Web Services",
+    "amount": 1962.98,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1822",
+    "date": "2026-05-05",
+    "vendor": "Shell Energy",
+    "amount": 3150.98,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1823",
+    "date": "2026-02-13",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 4410.87,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1824",
+    "date": "2026-04-13",
+    "vendor": "Staples UK",
+    "amount": 4382.58,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1825",
+    "date": "2026-02-16",
+    "vendor": "Insurance Corp",
+    "amount": 1506.25,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1826",
+    "date": "2026-04-29",
+    "vendor": "Amazon Web Services",
+    "amount": 7478.64,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1827",
+    "date": "2026-05-25",
+    "vendor": "Marketing Agency",
+    "amount": 795.44,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1828",
+    "date": "2026-02-03",
+    "vendor": "Insurance Corp",
+    "amount": 3907.1,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1829",
+    "date": "2026-02-02",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1568.67,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1830",
+    "date": "2026-05-18",
+    "vendor": "Hardware Solutions",
+    "amount": 1443.82,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1831",
+    "date": "2026-05-28",
+    "vendor": "Staples UK",
+    "amount": 1941.57,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1832",
+    "date": "2026-05-14",
+    "vendor": "Hardware Solutions",
+    "amount": 8193.8,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1833",
+    "date": "2026-04-21",
+    "vendor": "Insurance Corp",
+    "amount": 5988.79,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1834",
+    "date": "2026-01-15",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1787.47,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1835",
+    "date": "2026-02-03",
+    "vendor": "Travel Agency",
+    "amount": 4352.5,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1836",
+    "date": "2026-04-20",
+    "vendor": "Microsoft Corp",
+    "amount": 1328.89,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1837",
+    "date": "2026-04-22",
+    "vendor": "Hardware Solutions",
+    "amount": 2000.0,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1838",
+    "date": "2026-04-27",
+    "vendor": "Rent Property Mgmt",
+    "amount": 8458.38,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1839",
+    "date": "2026-01-07",
+    "vendor": "Staples UK",
+    "amount": 4687.8,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1840",
+    "date": "2026-01-13",
+    "vendor": "Steel-Fab Llt",
+    "amount": 9897.434089135475,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1841",
+    "date": "2026-04-22",
+    "vendor": "Hardware Solutions",
+    "amount": 1934.16,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1842",
+    "date": "2026-01-23",
+    "vendor": "Microsoft Corp.",
+    "amount": 1284.57,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1843",
+    "date": "2026-01-03",
+    "vendor": "Travel Agency",
+    "amount": 8862.38,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1844",
+    "date": "2026-03-18",
+    "vendor": "Dell Tech",
+    "amount": 1410.81,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1845",
+    "date": "2026-03-02",
+    "vendor": "Insurance Corp",
+    "amount": 3710.72,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1846",
+    "date": "2026-05-30",
+    "vendor": "Global Logistics",
+    "amount": 4126.45,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1847",
+    "date": "2026-05-23",
+    "vendor": "Microsoft Corp.",
+    "amount": 1446.2,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1848",
+    "date": "2026-02-14",
+    "vendor": "Amazon Web Services",
+    "amount": 957.9796331405457,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1849",
+    "date": "2026-04-29",
+    "vendor": "Maintenance Pro",
+    "amount": 4278.3,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1850",
+    "date": "2026-03-16",
+    "vendor": "Staples UK",
+    "amount": 8387.48,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1851",
+    "date": "2026-03-01",
+    "vendor": "Hardware Solutions",
+    "amount": 6937.36,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1852",
+    "date": "2026-03-20",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1000.0,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1853",
+    "date": "2026-01-14",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 8885.42,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1854",
+    "date": "2026-05-27",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 360.15,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1855",
+    "date": "2026-03-05",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1130.71,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1856",
+    "date": "2026-05-19",
+    "vendor": "Marketing Agency",
+    "amount": 9834.478102128427,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1857",
+    "date": "2026-04-09",
+    "vendor": "Consultancy Group",
+    "amount": 3226.52,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1858",
+    "date": "2026-04-22",
+    "vendor": "Staples UK",
+    "amount": 1351.24,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1859",
+    "date": "2026-01-20",
+    "vendor": "Microsoft Corp",
+    "amount": 4381.1,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1860",
+    "date": "2026-05-19",
+    "vendor": "Maintenance Pro",
+    "amount": 905.2709991930286,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1861",
+    "date": "2026-01-30",
+    "vendor": "Shell Energy",
+    "amount": 2181.45,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1862",
+    "date": "2026-03-11",
+    "vendor": "Maintenance Pro",
+    "amount": 919.9797356628128,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1863",
+    "date": "2026-04-06",
+    "vendor": "Global Logistics",
+    "amount": 1285.11,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1864",
+    "date": "2026-02-16",
+    "vendor": "Insurance Corp",
+    "amount": 8350.25,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1865",
+    "date": "2026-04-02",
+    "vendor": "Maintenance Pro",
+    "amount": 3645.4,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1866",
+    "date": "2026-04-28",
+    "vendor": "Staples UK",
+    "amount": 2281.93,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1867",
+    "date": "2026-02-10",
+    "vendor": "Dell Tech",
+    "amount": 10000.0,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1868",
+    "date": "2026-04-25",
+    "vendor": "Microsoft Corp",
+    "amount": 2715.56,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1869",
+    "date": "2026-05-21",
+    "vendor": "Global Logistics",
+    "amount": 1461.47,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1870",
+    "date": "2026-03-16",
+    "vendor": "Marketing Agency",
+    "amount": 2233.1,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1871",
+    "date": "2026-04-17",
+    "vendor": "Staples UK",
+    "amount": 227.37,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1872",
+    "date": "2026-04-09",
+    "vendor": "Insurance Corp",
+    "amount": 9909.52,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1873",
+    "date": "2026-04-09",
+    "vendor": "Maintenance Pro",
+    "amount": 6485.17,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1874",
+    "date": "2026-04-01",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1594.2,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1875",
+    "date": "2026-04-30",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1274.63,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1876",
+    "date": "2026-05-11",
+    "vendor": "Consultancy Group",
+    "amount": 1419.98,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1877",
+    "date": "2026-04-21",
+    "vendor": "Dell Tech",
+    "amount": 904.3862491502163,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1878",
+    "date": "2026-04-30",
+    "vendor": "Steel-Fab Llt",
+    "amount": 9895.15,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1879",
+    "date": "2026-01-21",
+    "vendor": "Rent Property Mgmt",
+    "amount": 4214.81,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1880",
+    "date": "2026-04-15",
+    "vendor": "Marketing Agency",
+    "amount": 2000.0,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1881",
+    "date": "2026-04-07",
+    "vendor": "Marketing Agency",
+    "amount": 1829.4,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1882",
+    "date": "2026-02-07",
+    "vendor": "Amazon Web Services",
+    "amount": 142.3,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1883",
+    "date": "2026-05-25",
+    "vendor": "Amazon Web Services",
+    "amount": 6216.8,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1884",
+    "date": "2026-02-07",
+    "vendor": "Global Logistics",
+    "amount": 4000.0,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1885",
+    "date": "2026-04-02",
+    "vendor": "Microsoft Corp",
+    "amount": 5398.31,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1886",
+    "date": "2026-05-22",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 6427.13,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1887",
+    "date": "2026-03-29",
+    "vendor": "Shell Energy",
+    "amount": 2126.96,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1888",
+    "date": "2026-03-21",
+    "vendor": "Marketing Agency",
+    "amount": 1529.29,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1889",
+    "date": "2026-05-02",
+    "vendor": "Hardware Solutions",
+    "amount": 1523.18,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1890",
+    "date": "2026-02-04",
+    "vendor": "Maintenance Pro",
+    "amount": 9646.18,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1891",
+    "date": "2026-04-30",
+    "vendor": "Global Logistics",
+    "amount": 932.216146889557,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1892",
+    "date": "2026-03-13",
+    "vendor": "Global Logistics",
+    "amount": 7379.17,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1893",
+    "date": "2026-01-20",
+    "vendor": "Global Logistics",
+    "amount": 5508.26,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1894",
+    "date": "2026-02-15",
+    "vendor": "Travel Agency",
+    "amount": 3808.11,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1895",
+    "date": "2026-04-02",
+    "vendor": "Marketing Agency",
+    "amount": 4233.37,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1896",
+    "date": "2026-05-11",
+    "vendor": "Maintenance Pro",
+    "amount": 394.28,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1897",
+    "date": "2026-04-03",
+    "vendor": "Marketing Agency",
+    "amount": 349.79,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1898",
+    "date": "2026-01-03",
+    "vendor": "Travel Agency",
+    "amount": 1577.59,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1899",
+    "date": "2026-05-11",
+    "vendor": "Insurance Corp",
+    "amount": 909.8722556245484,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1900",
+    "date": "2026-04-16",
+    "vendor": "Rent Property Mgmt",
+    "amount": 8327.48,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1901",
+    "date": "2026-04-09",
+    "vendor": "Insurance Corp",
+    "amount": 8470.67,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1902",
+    "date": "2026-03-09",
+    "vendor": "Rent Property Mgmt",
+    "amount": 1177.52,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1903",
+    "date": "2026-05-19",
+    "vendor": "Consultancy Group",
+    "amount": 1418.58,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1904",
+    "date": "2026-02-07",
+    "vendor": "Travel Agency",
+    "amount": 1452.76,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1905",
+    "date": "2026-05-02",
+    "vendor": "Maintenance Pro",
+    "amount": 1464.2,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1906",
+    "date": "2026-02-01",
+    "vendor": "Maintenance Pro",
+    "amount": 7263.46,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1907",
+    "date": "2026-05-16",
+    "vendor": "Dell Tech",
+    "amount": 2643.64,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1908",
+    "date": "2026-04-16",
+    "vendor": "Hardware Solutions",
+    "amount": 1927.79,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1909",
+    "date": "2026-04-04",
+    "vendor": "Global Logistics",
+    "amount": 1298.83,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1910",
+    "date": "2026-03-05",
+    "vendor": "Maintenance Pro",
+    "amount": 9911.433909343687,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1911",
+    "date": "2026-01-16",
+    "vendor": "Steel-Fab Llt",
+    "amount": 7583.24,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1912",
+    "date": "2026-04-21",
+    "vendor": "Dell Tech",
+    "amount": 2265.62,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1913",
+    "date": "2026-05-17",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 9718.004641521185,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1914",
+    "date": "2026-05-17",
+    "vendor": "Travel Agency",
+    "amount": 511.1,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1915",
+    "date": "2026-04-01",
+    "vendor": "Travel Agency",
+    "amount": 1287.83,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1916",
+    "date": "2026-03-17",
+    "vendor": "Steel-Fab Llt",
+    "amount": 7759.3,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1917",
+    "date": "2026-04-15",
+    "vendor": "Maintenance Pro",
+    "amount": 2469.42,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1918",
+    "date": "2026-03-05",
+    "vendor": "Marketing Agency",
+    "amount": 1298.87,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1919",
+    "date": "2026-04-04",
+    "vendor": "Global Logistics",
+    "amount": 1924.41,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1920",
+    "date": "2026-03-01",
+    "vendor": "Staples UK",
+    "amount": 6000.0,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1921",
+    "date": "2026-01-05",
+    "vendor": "Dell Tech",
+    "amount": 4190.81,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1922",
+    "date": "2026-05-14",
+    "vendor": "Staples UK",
+    "amount": 1450.22,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1923",
+    "date": "2026-03-17",
+    "vendor": "Amazon Web Services",
+    "amount": 1985.43,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1924",
+    "date": "2026-03-20",
+    "vendor": "Steel-Fab Llt",
+    "amount": 925.6052684705795,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1925",
+    "date": "2026-05-29",
+    "vendor": "Microsoft Corp.",
+    "amount": 929.3007018536276,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1926",
+    "date": "2026-01-07",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 8822.72,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1927",
+    "date": "2026-01-19",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1219.2,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1928",
+    "date": "2026-03-03",
+    "vendor": "Microsoft Corp",
+    "amount": 947.559022385789,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1929",
+    "date": "2026-01-04",
+    "vendor": "Maintenance Pro",
+    "amount": 5191.55,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1930",
+    "date": "2026-04-07",
+    "vendor": "Steel-Fab Llt",
+    "amount": 6212.29,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1931",
+    "date": "2026-05-08",
+    "vendor": "Consultancy Group",
+    "amount": 662.97,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1932",
+    "date": "2026-01-13",
+    "vendor": "Marketing Agency",
+    "amount": 3105.64,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1933",
+    "date": "2026-02-24",
+    "vendor": "Steel-Fab Llt",
+    "amount": 2780.21,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1934",
+    "date": "2026-04-12",
+    "vendor": "Amazon Web Services",
+    "amount": 313.76,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1935",
+    "date": "2026-03-23",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1588.34,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1936",
+    "date": "2026-01-26",
+    "vendor": "Insurance Corp",
+    "amount": 456.55,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1937",
+    "date": "2026-02-02",
+    "vendor": "Staples UK",
+    "amount": 1748.6,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1938",
+    "date": "2026-04-26",
+    "vendor": "Maintenance Pro",
+    "amount": 2645.92,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1939",
+    "date": "2026-01-20",
+    "vendor": "Microsoft Corp.",
+    "amount": 36.3,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1940",
+    "date": "2026-03-20",
+    "vendor": "Travel Agency",
+    "amount": 5805.59,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1941",
+    "date": "2026-03-31",
+    "vendor": "Staples UK",
+    "amount": 1759.2,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1942",
+    "date": "2026-02-20",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 4634.89,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1943",
+    "date": "2026-02-28",
+    "vendor": "Staples UK",
+    "amount": 2797.21,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1944",
+    "date": "2026-04-13",
+    "vendor": "Staples UK",
+    "amount": 1456.8,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1945",
+    "date": "2026-05-21",
+    "vendor": "Staples UK",
+    "amount": 9964.59,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1946",
+    "date": "2026-04-04",
+    "vendor": "Amazon Web Services",
+    "amount": 1508.14,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1947",
+    "date": "2026-04-12",
+    "vendor": "Microsoft Corp",
+    "amount": 8121.41,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1948",
+    "date": "2026-01-30",
+    "vendor": "Consultancy Group",
+    "amount": 2367.5,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1949",
+    "date": "2026-05-06",
+    "vendor": "Insurance Corp",
+    "amount": 8156.25,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1950",
+    "date": "2026-02-22",
+    "vendor": "Staples UK",
+    "amount": 4869.17,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1951",
+    "date": "2026-01-05",
+    "vendor": "Shell Energy",
+    "amount": 10000.0,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1952",
+    "date": "2026-01-22",
+    "vendor": "Marketing Agency",
+    "amount": 1645.23,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1953",
+    "date": "2026-02-15",
+    "vendor": "Dell Tech",
+    "amount": 913.6938034072027,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1954",
+    "date": "2026-02-22",
+    "vendor": "Insurance Corp",
+    "amount": 869.24,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1955",
+    "date": "2026-05-08",
+    "vendor": "Travel Agency",
+    "amount": 375.12,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1956",
+    "date": "2026-01-23",
+    "vendor": "Rent Property Mgmt",
+    "amount": 7182.23,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1957",
+    "date": "2026-01-04",
+    "vendor": "Global Logistics",
+    "amount": 4488.9,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1958",
+    "date": "2026-03-24",
+    "vendor": "Marketing Agency",
+    "amount": 187.47,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1959",
+    "date": "2026-02-28",
+    "vendor": "Dell Tech",
+    "amount": 1857.85,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1960",
+    "date": "2026-01-09",
+    "vendor": "Amazon Web Services",
+    "amount": 4874.5,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1961",
+    "date": "2026-05-07",
+    "vendor": "Marketing Agency",
+    "amount": 2524.19,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1962",
+    "date": "2026-01-24",
+    "vendor": "Travel Agency",
+    "amount": 3000.0,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1963",
+    "date": "2026-04-19",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 3580.59,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1964",
+    "date": "2026-01-06",
+    "vendor": "Rent Property Mgmt",
+    "amount": 4951.91,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1965",
+    "date": "2026-05-21",
+    "vendor": "Hardware Solutions",
+    "amount": 1817.36,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1966",
+    "date": "2026-03-21",
+    "vendor": "Microsoft Corp.",
+    "amount": 3645.37,
+    "category": "Utilities"
+  },
+  {
+    "id": "TXN1967",
+    "date": "2026-03-31",
+    "vendor": "Dell Tech",
+    "amount": 3759.85,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1968",
+    "date": "2026-02-14",
+    "vendor": "Insurance Corp",
+    "amount": 2945.59,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1969",
+    "date": "2026-03-16",
+    "vendor": "Microsoft Corp.",
+    "amount": 6857.59,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1970",
+    "date": "2026-02-07",
+    "vendor": "Shell Energy",
+    "amount": 915.4558926724611,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1971",
+    "date": "2026-02-18",
+    "vendor": "Shell Energy",
+    "amount": 6971.29,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1972",
+    "date": "2026-01-21",
+    "vendor": "Marketing Agency",
+    "amount": 371.15,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1973",
+    "date": "2026-05-18",
+    "vendor": "Insurance Corp",
+    "amount": 1841.94,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1974",
+    "date": "2026-01-25",
+    "vendor": "Microsoft Corp",
+    "amount": 4686.59,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1975",
+    "date": "2026-05-14",
+    "vendor": "Amazon Web Services",
+    "amount": 9522.123828955064,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1976",
+    "date": "2026-05-30",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1383.67,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1977",
+    "date": "2026-04-25",
+    "vendor": "Marketing Agency",
+    "amount": 1670.66,
+    "category": "Software"
+  },
+  {
+    "id": "TXN1978",
+    "date": "2026-01-20",
+    "vendor": "Travel Agency",
+    "amount": 33.9,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1979",
+    "date": "2026-01-05",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 1521.82,
+    "category": "Production"
+  },
+  {
+    "id": "TXN1980",
+    "date": "2026-03-06",
+    "vendor": "Staples UK",
+    "amount": 3520.95,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1981",
+    "date": "2026-04-16",
+    "vendor": "Staples UK",
+    "amount": 4400.81,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1982",
+    "date": "2026-05-15",
+    "vendor": "Steel-Fab Llt",
+    "amount": 1216.82,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1983",
+    "date": "2026-03-24",
+    "vendor": "Microsoft Corp.",
+    "amount": 5515.23,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1984",
+    "date": "2026-04-10",
+    "vendor": "Global Logistics",
+    "amount": 1306.55,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1985",
+    "date": "2026-02-14",
+    "vendor": "Microsoft Corp",
+    "amount": 2306.43,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1986",
+    "date": "2026-05-26",
+    "vendor": "Microsoft Corp.",
+    "amount": 2124.61,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1987",
+    "date": "2026-05-21",
+    "vendor": "Hardware Solutions",
+    "amount": 1639.57,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1988",
+    "date": "2026-05-21",
+    "vendor": "Consultancy Group",
+    "amount": 1958.99,
+    "category": "IT Infrastructure"
+  },
+  {
+    "id": "TXN1989",
+    "date": "2026-01-21",
+    "vendor": "Shell Energy",
+    "amount": 3264.72,
+    "category": "Travel"
+  },
+  {
+    "id": "TXN1990",
+    "date": "2026-05-04",
+    "vendor": "Marketing Agency",
+    "amount": 1964.4,
+    "category": "Supplies"
+  },
+  {
+    "id": "TXN1991",
+    "date": "2026-05-01",
+    "vendor": "Insurance Corp",
+    "amount": 8630.75,
+    "category": "Professional Fees"
+  },
+  {
+    "id": "TXN1992",
+    "date": "2026-05-18",
+    "vendor": "Amazon Web Services",
+    "amount": 2703.1,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1993",
+    "date": "2026-04-09",
+    "vendor": "Marketing Agency",
+    "amount": 2934.5,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1994",
+    "date": "2026-04-17",
+    "vendor": "Insurance Corp",
+    "amount": 4823.6,
+    "category": "Shipping"
+  },
+  {
+    "id": "TXN1995",
+    "date": "2026-04-22",
+    "vendor": "Staples UK",
+    "amount": 2617.56,
+    "category": "Raw Materials"
+  },
+  {
+    "id": "TXN1996",
+    "date": "2026-05-30",
+    "vendor": "Rent Property Mgmt",
+    "amount": 3880.57,
+    "category": "Rent"
+  },
+  {
+    "id": "TXN1997",
+    "date": "2026-02-02",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 6508.6,
+    "category": "Marketing"
+  },
+  {
+    "id": "TXN1998",
+    "date": "2026-04-05",
+    "vendor": "Microsoft Corp",
+    "amount": 3858.1,
+    "category": "Maintenance"
+  },
+  {
+    "id": "TXN1999",
+    "date": "2026-01-15",
+    "vendor": "Dell Tech",
+    "amount": 5162.12,
+    "category": "Software"
+  },
+  {
+    "id": "TXN-SPLIT-A",
+    "date": "2026-05-10",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 4500.0,
+    "category": "Production"
+  },
+  {
+    "id": "TXN-SPLIT-B",
+    "date": "2026-05-10",
+    "vendor": "Steel-Fab Ltd",
+    "amount": 5100.0,
+    "category": "Production"
+  }
+]
