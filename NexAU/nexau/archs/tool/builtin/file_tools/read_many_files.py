@@ -25,26 +25,9 @@ DEFAULT_ENCODING = "utf-8"
 MAX_TOTAL_OUTPUT_CHARS = 25_000  # Total output budget to protect LLM context window (~6,000 tokens)
 
 # Default exclusion patterns
-DEFAULT_EXCLUDES = [
-    "node_modules/**",
-    ".git/**",
-    "__pycache__/**",
-    "venv/**",
-    ".venv/**",
-    "dist/**",
-    "build/**",
-    ".tox/**",
-    ".eggs/**",
-    "*.egg-info/**",
-    "*.pyc",
-    "*.pyo",
-    "*.so",
-    "*.o",
-    "*.a",
-    "*.lib",
-    "*.dll",
-    "*.exe",
-]
+from nexau.archs.platform.constants import DEFAULT_FILE_EXCLUDE_PATTERNS, DEFAULT_SEARCH_EXCLUDES
+
+DEFAULT_EXCLUDES = [f"{d}/**" for d in DEFAULT_SEARCH_EXCLUDES] + list(DEFAULT_FILE_EXCLUDE_PATTERNS)
 
 # Supported binary file types
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}

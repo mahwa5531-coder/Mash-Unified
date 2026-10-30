@@ -21,21 +21,9 @@ from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 # Configuration constants
 DEFAULT_TOTAL_MAX_MATCHES = 50  # Hard-capped at 50 matches (matches Antigravity & OpenHands standard)
 DEFAULT_SEARCH_TIMEOUT_MS = 30000
-DEFAULT_EXCLUDES = [
-    "node_modules",
-    ".git",
-    "__pycache__",
-    "venv",
-    ".venv",
-    "dist",
-    "build",
-    ".tox",
-    ".eggs",
-    ".next",
-    "bifrost_data",
-    ".gemini",
-    ".nexau",
-]
+from nexau.archs.platform.constants import DEFAULT_SEARCH_EXCLUDES
+
+DEFAULT_EXCLUDES = list(DEFAULT_SEARCH_EXCLUDES)
 
 BINARY_EXTENSIONS = {
     ".parquet", ".xlsx", ".xls", ".db", ".db-wal", ".db-shm",

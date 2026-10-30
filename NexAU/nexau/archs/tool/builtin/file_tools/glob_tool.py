@@ -21,22 +21,9 @@ from nexau.archs.sandbox import BaseSandbox, SandboxStatus
 from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 
 # Default exclusions matching gemini-cli & high-performance dev filters
-DEFAULT_EXCLUDES = [
-    "node_modules",
-    ".git",
-    "__pycache__",
-    "venv",
-    ".venv",
-    "dist",
-    "build",
-    ".tox",
-    ".eggs",
-    "*.egg-info",
-    ".next",
-    "bifrost_data",
-    ".gemini",
-    ".nexau",
-]
+from nexau.archs.platform.constants import DEFAULT_SEARCH_EXCLUDES
+
+DEFAULT_EXCLUDES = list(DEFAULT_SEARCH_EXCLUDES)
 
 MAX_GLOB_MATCHES = 100
 

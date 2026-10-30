@@ -78,7 +78,7 @@ The agent environment is equipped with 11 production-hardened tools:
 | `replace_file_content` | Surgical multi-line block replacements (prevents rewriting entire files). |
 | `run_shell_command` | Execute shell commands in sandbox with timeout and background task tracking. |
 | `background_task_manage_tool` | List, inspect status, or kill active background tasks (`action`, `pid`). |
-| `search_file_content` | Fast ripgrep pattern search across codebase with `Query` and `SearchPath` aliases. |
+| `search_file_content` | Fast ripgrep pattern search across codebase (`pattern`, `dir_path`, `include`). |
 | `audit_skill_tool` | Domain engine for executing domain audit procedures and regulatory checks. |
 | `ask_user` | Interactive structured questions for clarifying user requirements. |
 | `save_memory` | Long-term memory store for cross-session knowledge retention. |
