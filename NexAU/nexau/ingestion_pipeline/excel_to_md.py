@@ -70,7 +70,7 @@ def _detect_block_type(grid: list[list[Any]]) -> str:
     if min_pop >= (ncols * 0.6) and nrows >= 2:
         return "dense_table"
 
-    return "unstructured_table"
+    return "spreadsheet_grid"
 
 def _render_dense_table_markdown(grid: list[list[Any]]) -> str:
     """Render a dense table with header and rows."""
@@ -99,7 +99,7 @@ def _render_kv_vertical_markdown(grid: list[list[Any]]) -> str:
             lines.append(f"| {label} | {val} |")
     return "\n".join(lines)
 
-def _render_unstructured_coordinate_grid(grid: list[list[Any]], start_row: int, start_col: int) -> str:
+def _render_coordinate_grid(grid: list[list[Any]], start_row: int, start_col: int) -> str:
     """Render a 2D Visual Coordinate Grid with Excel column letters and row numbers."""
     ncols = len(grid[0]) if grid else 0
     col_letters = [_col_index_to_letter(start_col + i) for i in range(ncols)]
@@ -142,10 +142,31 @@ def parse_excel_to_markdown(
     else:
         cache_dir = Path.home() / ".nexau" / "cache" / bundle_name
 
+    grounding_note = (
+        "> [!NOTE] Spatial Layout & Structural Orientation Preview\n"
+        "> This Markdown preview displays sheet layouts and column headers for orientation. It is not an exact computational ground truth.\n"
+        "> For unrounded calculations, exact audit balances, or large ledgers, query the file or Parquet cache directly using Python / DuckDB via `run_shell_command`.\n"
+    )
+
     try:
         wb = python_calamine.CalamineWorkbook.from_path(str(path_obj))
         sheet_names = wb.sheet_names
-        sheets_data = [(name, wb.get_sheet_by_name(name).to_python()) for name in sheet_names]
+        if sheet_name:
+            req_norm = sheet_name.strip().lower()
+            matched_names = [name for name in sheet_names if name.strip().lower() == req_norm]
+            if not matched_names:
+                matched_names = [
+                    name for name in sheet_names
+                    if req_norm.startswith(name.strip().lower())
+                    or name.strip().lower().startswith(req_norm)
+                    or name.strip().lower() in req_norm
+                ]
+            if not matched_names:
+                available = ", ".join(f"'{s}'" for s in sheet_names)
+                return f"Sheet '{sheet_name}' not found in workbook '{path_obj.name}'. Available sheets ({len(sheet_names)}): {available}"
+            sheets_data = [(matched_names[0], wb.get_sheet_by_name(matched_names[0]).to_python())]
+        else:
+            sheets_data = [(name, wb.get_sheet_by_name(name).to_python()) for name in sheet_names]
     except Exception as e:
         # Fallback for HTML-disguised .xls files (e.g. government/tax portal exports)
         try:
@@ -157,31 +178,22 @@ def parse_excel_to_markdown(
                 headers = [str(c) for c in df.columns]
                 rows = [headers] + df.values.tolist()
                 sheets_data.append((name, rows))
+            if sheet_name:
+                req_norm = sheet_name.strip().lower()
+                sheets_data = [(name, grid) for name, grid in sheets_data if req_norm in name.strip().lower()]
         except Exception:
             return f"Error reading file: {e}"
 
     if sheet_name:
-        req_norm = sheet_name.strip().lower()
-        matched = [(name, grid) for name, grid in sheets_data if name.strip().lower() == req_norm]
-        if not matched:
-            # Handle Excel's 31-character truncation or substring match
-            matched = [
-                (name, grid) for name, grid in sheets_data
-                if req_norm.startswith(name.strip().lower())
-                or name.strip().lower().startswith(req_norm)
-                or name.strip().lower() in req_norm
-            ]
-        if not matched:
-            available = ", ".join(f"'{s}'" for s in sheet_names)
-            return f"Sheet '{sheet_name}' not found in workbook '{path_obj.name}'. Available sheets ({len(sheet_names)}): {available}"
-        sheets_data = matched
         output_parts = [
-            f"# Excel Sheet: {matched[0][0]} (from {path_obj.name})",
+            f"# Excel Sheet: {sheets_data[0][0]} (from {path_obj.name})\n",
+            grounding_note,
             f"**Workbook Total Sheets ({len(sheet_names)}):** {', '.join(sheet_names[:10])}{'...' if len(sheet_names) > 10 else ''}\n",
         ]
     else:
         output_parts = [
-            f"# Excel Workbook: {path_obj.name}",
+            f"# Excel Workbook: {path_obj.name}\n",
+            grounding_note,
             f"**Sheets ({len(sheet_names)}):** {', '.join(sheet_names)}\n",
         ]
 
@@ -232,7 +244,7 @@ def parse_excel_to_markdown(
 
         output_parts.append(f"## Sheet {s_idx}: {sheet_name} ({total_rows} rows, {total_cols} cols)")
         output_parts.append(f"**Location:** `{loc_str}`")
-        output_parts.append(f"**Type:** `{block_type}`")
+        output_parts.append(f"**Layout:** `{block_type}`")
 
         if block_type == "dense_table":
             if total_rows <= max_inline_rows:
@@ -271,8 +283,8 @@ def parse_excel_to_markdown(
                 output_parts.append(f"> [!TIP]\n> Query this dataset with DuckDB in Python:\n> `duckdb.read_parquet(r'{parquet_path}')`\n")
         elif block_type == "kv_vertical":
             output_parts.append(_render_kv_vertical_markdown(bounded_grid))
-        elif block_type == "unstructured_table":
-            output_parts.append(_render_unstructured_coordinate_grid(bounded_grid, min_r, min_c))
+        elif block_type in ("spreadsheet_grid", "unstructured_table"):
+            output_parts.append(_render_coordinate_grid(bounded_grid, min_r, min_c))
         else: # text_block
             for r in bounded_grid:
                 val = " ".join(_clean_val(c) for c in r if _clean_val(c))
@@ -289,7 +301,7 @@ def parse_excel_to_markdown(
         output_parts.append(
             f"\n> [!IMPORTANT]\n"
             f"> The table above is a summary index of remaining sheets. You do NOT have the data rows for these sheets in context yet.\n"
-            f"> To read the data from any indexed sheet, call: `read_file(file_path=\"{file_path}\", sheet_name=\"<Sheet Name>\")`\n"
+            f"> To read the data from any indexed sheet, call: `view_file(AbsolutePath=\"{file_path}\", sheet_name=\"<Sheet Name>\")`\n"
             f"> NEVER guess or hallucinate financial numbers without inspecting the specific sheet!\n"
         )
 

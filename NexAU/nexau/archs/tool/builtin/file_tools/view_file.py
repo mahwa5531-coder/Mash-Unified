@@ -29,7 +29,7 @@ DEFAULT_WINDOW_SIZE = 100  # SWE-agent windowing discipline
 MAX_LINES_PER_VIEW = 800
 MAX_BYTES_PER_VIEW = 46_080
 
-TABULAR_EXTENSIONS = {".xlsx", ".xls", ".csv", ".tsv", ".parquet"}
+TABULAR_EXTENSIONS = {".xlsx", ".xls", ".csv", ".tsv"}
 VISUAL_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".svg",
     ".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".m4v",
@@ -44,21 +44,27 @@ def _is_visual_file(file_path: str) -> bool:
 def view_file(
     AbsolutePath: str | None = None,
     file_path: str | None = None,
+    path: str | None = None,
+    file: str | None = None,
     StartLine: int | None = None,
     start_line: int | None = None,
     EndLine: int | None = None,
     end_line: int | None = None,
     ContentOffset: int | None = None,
     content_offset: int | None = None,
+    ByteOffset: int | None = None,
+    byte_offset: int | None = None,
+    offset: int | None = None,
     sheet_name: str | None = None,
     toolAction: str | None = None,
     toolSummary: str | None = None,
     agent_state: AgentState | None = None,
     sandbox: BaseSandbox | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Polymorphic file viewer supporting text, code, spreadsheets, directories, and visual media."""
 
-    target_path = AbsolutePath if AbsolutePath is not None else file_path
+    target_path = AbsolutePath or file_path or path or file
     if not target_path:
         return {
             "content": "Error: 'AbsolutePath' parameter is required for view_file.",
@@ -69,7 +75,12 @@ def view_file(
     # Normalize aliases
     start = StartLine if StartLine is not None else start_line
     end = EndLine if EndLine is not None else end_line
-    offset = ContentOffset if ContentOffset is not None else content_offset
+    offset_val = (
+        ContentOffset if ContentOffset is not None
+        else (content_offset if content_offset is not None
+        else (ByteOffset if ByteOffset is not None
+        else (byte_offset if byte_offset is not None else offset)))
+    )
 
     # 1. Check for Batch / Glob Wildcard patterns (*, ?, [)
     if any(char in target_path for char in ["*", "?", "["]):
@@ -88,12 +99,18 @@ def view_file(
             "isError": True,
         }
 
-    # 2. Check if target is a Directory
+    # 2. Check if target is a Directory (Fast stat check without 64KB chardet read)
     try:
-        if sandbox.file_exists(resolved_path):
+        is_dir = False
+        if Path(resolved_path).is_dir():
+            is_dir = True
+        elif hasattr(sandbox, "_resolve_path") and sandbox._resolve_path(resolved_path).is_dir():
+            is_dir = True
+        elif sandbox.file_exists(resolved_path):
             info = sandbox.get_file_info(resolved_path)
-            if info.is_directory:
-                return list_directory(dir_path=target_path, agent_state=agent_state)
+            is_dir = getattr(info, "is_directory", False)
+        if is_dir:
+            return list_directory(dir_path=target_path, agent_state=agent_state)
     except Exception:
         pass
 
@@ -266,7 +283,17 @@ def view_file(
         ".pyc", ".pyo", ".pyd", ".class", ".o", ".obj", ".lib", ".a",
         ".db", ".sqlite", ".sqlite3", ".db-wal", ".db-shm", ".sst",
         ".mp3", ".wav", ".aac", ".flac", ".ogg",
+        ".parquet",
     }
+    if ext == ".parquet":
+        return {
+            "content": (
+                f"Viewing binary columnar file '{Path(target_path).name}' directly is not supported. "
+                "Use run_shell_command with Python, DuckDB, or Polars (e.g. python -c \"import duckdb; print(duckdb.read_parquet('...'))\") to query this dataset."
+            ),
+            "returnDisplay": f"Binary columnar format: {ext} (query via DuckDB/Python)",
+            "isError": True,
+        }
     if ext in unsupported_binary_exts:
         return {
             "content": (
@@ -297,74 +324,90 @@ def view_file(
 
     total_bytes = len(raw_bytes)
 
-    # Apply byte ContentOffset if provided
-    byte_start = max(0, offset or 0)
-    if byte_start >= total_bytes and total_bytes > 0:
+    # Case A: Line-based indexing (when offset_val is None)
+    if offset_val is None:
+        text_content = raw_bytes.decode("utf-8", errors="replace")
+        all_lines = text_content.splitlines(keepends=True)
+        total_lines = len(all_lines)
+
+        is_unbounded = (start is None and end is None)
+        req_start = max(1, start) if start is not None else 1
+        if end is not None:
+            req_end = min(total_lines, end)
+        elif is_unbounded and total_lines > DEFAULT_WINDOW_SIZE:
+            req_end = min(total_lines, DEFAULT_WINDOW_SIZE)
+        else:
+            req_end = min(total_lines, req_start + MAX_LINES_PER_VIEW - 1)
+
+        if req_end < req_start:
+            req_end = req_start
+
+        if (req_end - req_start + 1) > MAX_LINES_PER_VIEW:
+            req_end = req_start + MAX_LINES_PER_VIEW - 1
+
+        selected_lines = all_lines[req_start - 1 : req_end]
+
+        formatted_chunks = []
+        if req_start > 1:
+            formatted_chunks.append(f"[({req_start - 1} lines above)]")
+
+        accumulated_chars = 0
+        truncated_due_to_budget = False
+        for idx, line in enumerate(selected_lines):
+            line_no = req_start + idx
+            clean_line = line.rstrip("\r\n")
+            chunk = f"{line_no:5d} | {clean_line}"
+            accumulated_chars += len(chunk) + 1
+            if accumulated_chars > MAX_BYTES_PER_VIEW and idx > 0:
+                truncated_due_to_budget = True
+                break
+            formatted_chunks.append(chunk)
+
+        if truncated_due_to_budget:
+            formatted_chunks.append(f"\n[Output reached {MAX_BYTES_PER_VIEW} byte limit. Specify narrower StartLine/EndLine window.]")
+        elif req_end < total_lines:
+            remaining = total_lines - req_end
+            next_start = req_end + 1
+            next_end = min(total_lines, next_start + DEFAULT_WINDOW_SIZE - 1)
+            formatted_chunks.append(
+                f"\n[({remaining} more lines below. Use StartLine={next_start}, EndLine={next_end} to view next window)]"
+            )
+
+        output_text = "\n".join(formatted_chunks)
+        display_info = f"Viewed {target_path}"
+        if total_lines > 0:
+            display_info += f" (lines {req_start}-{req_end} of {total_lines})"
+
         return {
-            "content": f"[ContentOffset {byte_start} exceeds total file size ({total_bytes} bytes).]",
-            "returnDisplay": f"End of file reached ({total_bytes} bytes)",
+            "content": output_text,
+            "returnDisplay": display_info,
         }
-
-    # Slice raw bytes within 46KB window
-    byte_chunk = raw_bytes[byte_start : byte_start + MAX_BYTES_PER_VIEW]
-    is_byte_truncated = (byte_start + len(byte_chunk)) < total_bytes
-
-    # Lossless/lossy UTF-8 decode
-    text_content = byte_chunk.decode("utf-8", errors="replace")
-    all_lines = text_content.splitlines(keepends=True)
-    total_lines = len(all_lines)
-
-    # Handle line slicing (1-indexed)
-    # SWE-agent windowing discipline: if unbounded, default to DEFAULT_WINDOW_SIZE (100 lines)
-    is_unbounded = (start is None and end is None)
-    req_start = max(1, start) if start is not None else 1
-    if end is not None:
-        req_end = min(total_lines, end)
-    elif is_unbounded and total_lines > DEFAULT_WINDOW_SIZE:
-        req_end = min(total_lines, DEFAULT_WINDOW_SIZE)
     else:
-        req_end = min(total_lines, req_start + MAX_LINES_PER_VIEW - 1)
+        # Case B: Byte-based indexing (when ContentOffset / ByteOffset is explicitly provided)
+        byte_start = max(0, offset_val)
+        if byte_start >= total_bytes and total_bytes > 0:
+            return {
+                "content": f"[ContentOffset {byte_start} exceeds total file size ({total_bytes} bytes).]",
+                "returnDisplay": f"End of file reached ({total_bytes} bytes)",
+            }
 
-    if req_end < req_start:
-        req_end = req_start
+        byte_chunk = raw_bytes[byte_start : byte_start + MAX_BYTES_PER_VIEW]
+        is_byte_truncated = (byte_start + len(byte_chunk)) < total_bytes
 
-    # Enforce hard ceiling of 800 lines per single call
-    if (req_end - req_start + 1) > MAX_LINES_PER_VIEW:
-        req_end = req_start + MAX_LINES_PER_VIEW - 1
+        text_content = byte_chunk.decode("utf-8", errors="replace")
+        all_lines = text_content.splitlines(keepends=True)
+        total_lines = len(all_lines)
 
-    selected_lines = all_lines[req_start - 1 : req_end]
+        formatted_chunks = []
+        for idx, line in enumerate(all_lines):
+            clean_line = line.rstrip("\r\n")
+            formatted_chunks.append(clean_line)
 
-    # Format lines with 1-indexed numbers and SWE-agent spatial markers
-    formatted_chunks = []
+        if is_byte_truncated:
+            next_offset = byte_start + len(byte_chunk)
+            formatted_chunks.append(f"\n[Byte content truncated at {next_offset}/{total_bytes} bytes. Use ContentOffset={next_offset} to view next chunk.]")
 
-    # Spatial marker above
-    if req_start > 1:
-        formatted_chunks.append(f"[({req_start - 1} lines above)]")
-
-    for idx, line in enumerate(selected_lines):
-        line_no = req_start + idx
-        clean_line = line.rstrip("\r\n")
-        formatted_chunks.append(f"{line_no:5d} | {clean_line}")
-
-    # Spatial marker below
-    if req_end < total_lines:
-        remaining = total_lines - req_end
-        next_start = req_end + 1
-        next_end = min(total_lines, next_start + DEFAULT_WINDOW_SIZE - 1)
-        formatted_chunks.append(
-            f"\n[({remaining} more lines below. Use StartLine={next_start}, EndLine={next_end} to view next window)]"
-        )
-    elif is_byte_truncated:
-        next_offset = byte_start + len(byte_chunk)
-        formatted_chunks.append(f"\n[Byte content truncated at {next_offset}/{total_bytes} bytes.]")
-
-    output_text = "\n".join(formatted_chunks)
-
-    display_info = f"Viewed {target_path}"
-    if total_lines > 0:
-        display_info += f" (lines {req_start}-{req_end} of {total_lines})"
-
-    return {
-        "content": output_text,
-        "returnDisplay": display_info,
-    }
+        return {
+            "content": "\n".join(formatted_chunks),
+            "returnDisplay": f"Viewed {target_path} (bytes {byte_start}-{byte_start + len(byte_chunk)} of {total_bytes})",
+        }
