@@ -36,7 +36,6 @@ DEFAULT_EXCLUDES = [
     "bifrost_data",
     ".gemini",
     ".nexau",
-    "reports",
 ]
 
 MAX_GLOB_MATCHES = 100

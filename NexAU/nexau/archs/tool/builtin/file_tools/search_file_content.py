@@ -35,7 +35,6 @@ DEFAULT_EXCLUDES = [
     "bifrost_data",
     ".gemini",
     ".nexau",
-    "reports",
 ]
 
 BINARY_EXTENSIONS = {
@@ -379,6 +378,17 @@ def search_file_content(
         dir_path = SearchPath
     elif path is not None:
         dir_path = path
+
+    if not pattern:
+        error_msg = 'Missing required search pattern (specify "pattern" or "Query")'
+        return {
+            "content": error_msg,
+            "returnDisplay": "Error: Missing search pattern.",
+            "error": {
+                "message": error_msg,
+                "type": "MISSING_PATTERN",
+            },
+        }
 
     if Includes is not None and include is None:
         if isinstance(Includes, list):

@@ -72,6 +72,12 @@ def view_file(
             "isError": True,
         }
 
+    # RFC-0019: permission check in review / restrictive modes (DEF-05)
+    ctx = kwargs.get("ctx")
+    if ctx is not None:
+        from nexau.archs.permissions.helpers import check_path_permission
+        check_path_permission(ctx, target_path)
+
     # Normalize aliases
     start = StartLine if StartLine is not None else start_line
     end = EndLine if EndLine is not None else end_line
@@ -92,6 +98,12 @@ def view_file(
 
     try:
         resolved_path = resolve_path(target_path, sandbox)
+    except PermissionError as e:
+        return {
+            "content": str(e),
+            "returnDisplay": "Error: Permission denied",
+            "isError": True,
+        }
     except Exception as e:
         return {
             "content": f"Error resolving path: {e}",
