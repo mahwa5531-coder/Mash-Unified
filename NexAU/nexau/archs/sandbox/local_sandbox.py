@@ -881,6 +881,8 @@ class LocalSandbox(BaseSandbox):
                             lf.write(f"\n[TASK {pid}] Status: KILLED (SIGKILL)\n")
                 except Exception:
                     pass
+            # Evict terminated task from active tracking
+            self._background_tasks.pop(pid, None)
             return CommandResult(
                 status=SandboxStatus.SUCCESS,
                 stdout=f"Background task (pid={pid}) killed successfully",
