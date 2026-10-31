@@ -68,10 +68,17 @@ def web_fetch(
     Returns gemini-cli format: content, returnDisplay.
     """
     try:
-        target_url: str | None = None
-        prompt_text = prompt or ""
+        target_url: str | None = (
+            url
+            or kwargs.get("Url")
+            or kwargs.get("URL")
+            or kwargs.get("target_url")
+            or kwargs.get("link")
+            or kwargs.get("Link")
+        )
+        prompt_text = prompt or kwargs.get("Prompt") or ""
 
-        if not url and not (prompt or "").strip():
+        if not target_url and not str(prompt_text).strip():
             return {
                 "content": "Prompt or URL is required and must be non-empty.",
                 "returnDisplay": "Error: Empty prompt.",
@@ -81,8 +88,8 @@ def web_fetch(
                 },
             }
 
-        if url and url.strip():
-            target_url = url.strip()
+        if target_url and str(target_url).strip():
+            target_url = str(target_url).strip()
         elif prompt and prompt.strip():
             valid_urls, errors = _parse_url_from_prompt(prompt)
             if errors:

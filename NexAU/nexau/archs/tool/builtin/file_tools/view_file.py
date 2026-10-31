@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from nexau.archs.main_sub.agent_state import AgentState
+from nexau.archs.main_sub.framework_context import FrameworkContext
 from nexau.archs.sandbox import BaseSandbox, SandboxStatus
 from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 from nexau.archs.tool.builtin.file_tools.list_directory import list_directory
@@ -60,11 +61,23 @@ def view_file(
     toolSummary: str | None = None,
     agent_state: AgentState | None = None,
     sandbox: BaseSandbox | None = None,
+    ctx: FrameworkContext | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Polymorphic file viewer supporting text, code, spreadsheets, directories, and visual media."""
 
-    target_path = AbsolutePath or file_path or path or file
+    target_path = (
+        AbsolutePath
+        or file_path
+        or path
+        or file
+        or kwargs.get("Path")
+        or kwargs.get("File")
+        or kwargs.get("filePath")
+        or kwargs.get("filepath")
+        or kwargs.get("target_path")
+        or kwargs.get("target_file")
+    )
     if not target_path:
         return {
             "content": "Error: 'AbsolutePath' parameter is required for view_file.",
@@ -73,7 +86,7 @@ def view_file(
         }
 
     # RFC-0019: permission check in review / restrictive modes (DEF-05)
-    ctx = kwargs.get("ctx")
+    ctx = ctx or kwargs.get("ctx")
     if ctx is not None:
         from nexau.archs.permissions.helpers import check_path_permission
         check_path_permission(ctx, target_path)

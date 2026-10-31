@@ -50,12 +50,23 @@ def _find_rg_executable() -> str:
     return "rg"
 
 
+def _normalize_pattern(pattern: str) -> str:
+    """Normalize glob patterns for cross-platform forward-slash consistency."""
+    clean = pattern.replace("\\", "/").strip()
+    while clean.startswith("./"):
+        clean = clean[2:]
+    if clean.startswith("/") and not clean.startswith("//"):
+        clean = clean.lstrip("/")
+    return clean
+
+
 def _rg_glob(
     pattern: str,
     search_dir: str,
     case_sensitive: bool,
     max_matches: int,
     sandbox: BaseSandbox,
+    respect_git_ignore: bool = True,
 ) -> list[str]:
     """Execute fast file listing via ripgrep."""
     exe = _find_rg_executable()
@@ -64,47 +75,57 @@ def _rg_glob(
         "--color",
         "never",
     ]
+    if not case_sensitive:
+        cmd.append("--glob-case-insensitive")
+    if not respect_git_ignore:
+        cmd.append("--no-ignore")
 
-    # Excludes: glob negatives
+    # Excludes: glob negatives matching at any depth (DEF-01)
     for ex in DEFAULT_EXCLUDES:
-        if ex.startswith("*"):
-            cmd.extend(["--glob", f"!{ex}"])
+        clean_ex = ex.strip().strip("/")
+        if clean_ex.startswith("*"):
+            cmd.extend(["--glob", f"!{clean_ex}", "--glob", f"!**/{clean_ex}"])
         else:
-            cmd.extend(["--glob", f"!{ex}/**"])
+            cmd.extend(["--glob", f"!{clean_ex}/**", "--glob", f"!**/{clean_ex}/**", "--glob", f"!**/{clean_ex}"])
 
     # Include pattern
-    clean_pat = pattern.strip()
+    clean_pat = _normalize_pattern(pattern)
     if clean_pat and clean_pat not in ("*", "**/*", "**"):
         cmd.extend(["--glob", clean_pat])
 
-    cmd.append(sandbox.to_shell_path(search_dir))
+    cmd.append(".")
 
     prefix = "& " if sys.platform == "win32" else ""
     cmd_str = f'{prefix}"{exe}" ' + " ".join(shlex.quote(x) for x in cmd)
-    res = sandbox.execute_shell(cmd_str, timeout=10000)
+    res = sandbox.execute_shell(cmd_str, cwd=search_dir, timeout=10000)
 
     if res.exit_code not in (0, 1) and res.status != SandboxStatus.SUCCESS:
         raise RuntimeError(res.stderr or "rg --files failed")
 
     lines = [line.strip() for line in (res.stdout or "").splitlines() if line.strip()]
-    return lines[:max_matches]
+    resolved_matches = [
+        os.path.normpath(os.path.join(search_dir, line)).replace("\\", "/")
+        for line in lines
+    ]
+    return resolved_matches[:max_matches]
 
 
 def _python_glob(
     pattern: str,
     search_dir: str,
     max_matches: int,
+    case_sensitive: bool = False,
 ) -> list[str]:
     """Fallback fast os.walk with root-level directory pruning."""
     matches: list[str] = []
     t0 = time.time()
     MAX_TIME_SECS = 5.0
 
-    clean_pat = pattern.strip()
-    if clean_pat.startswith("**/"):
-        clean_pat = clean_pat[3:]
+    clean_pat = _normalize_pattern(pattern)
+    pat_has_path = "/" in clean_pat
+    norm_search_dir = os.path.normpath(search_dir)
 
-    for root, dirnames, filenames in os.walk(search_dir):
+    for root, dirnames, filenames in os.walk(norm_search_dir):
         # Prune heavy folders at root so we never walk into them
         dirnames[:] = [
             d for d in dirnames
@@ -116,8 +137,23 @@ def _python_glob(
             break
 
         for fname in filenames:
-            if fnmatch.fnmatch(fname, clean_pat) or fnmatch.fnmatch(fname.lower(), clean_pat.lower()):
-                full_path = os.path.join(root, fname)
+            full_path = os.path.join(root, fname)
+            rel_path = os.path.relpath(full_path, norm_search_dir).replace("\\", "/")
+
+            if not pat_has_path:
+                is_match = (
+                    fnmatch.fnmatch(fname, clean_pat)
+                    if case_sensitive
+                    else fnmatch.fnmatch(fname.lower(), clean_pat.lower())
+                )
+            else:
+                target_rel = rel_path if case_sensitive else rel_path.lower()
+                test_pat = clean_pat if case_sensitive else clean_pat.lower()
+                is_match = fnmatch.fnmatch(target_rel, test_pat)
+                if not is_match and test_pat.startswith("**/"):
+                    is_match = fnmatch.fnmatch(target_rel, test_pat[3:])
+
+            if is_match:
                 matches.append(full_path.replace("\\", "/"))
                 if len(matches) >= max_matches:
                     break
@@ -197,6 +233,7 @@ def glob(
                 case_sensitive=case_sensitive,
                 max_matches=MAX_GLOB_MATCHES,
                 sandbox=sandbox,
+                respect_git_ignore=respect_git_ignore,
             )
         except Exception:
             strategy = "os.walk fallback"
@@ -204,6 +241,7 @@ def glob(
                 pattern=pattern,
                 search_dir=search_dir,
                 max_matches=MAX_GLOB_MATCHES,
+                case_sensitive=case_sensitive,
             )
 
         if not matches:

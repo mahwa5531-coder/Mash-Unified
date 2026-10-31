@@ -59,9 +59,8 @@ def background_task_manage_tool(
     Returns:
         Dict containing the action result
     """
-    assert agent_state is not None, "background_task_tool invoked, but agent_state is not passed."
-    sandbox: BaseSandbox | None = agent_state.get_sandbox()
-    assert sandbox is not None, "background_task_tool invoked, but sandbox is not initialized."
+    from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
+    sandbox: BaseSandbox = get_sandbox(agent_state)
 
     # Normalize action and pid aliases
     if "Action" in kwargs and kwargs["Action"]:

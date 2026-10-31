@@ -116,6 +116,9 @@ def _execute_foreground_command(
 
         current_result = sandbox.get_background_task_status(background_pid)
         if current_result.status != SandboxStatus.RUNNING:
+            # DEF-03: Evict foreground command from background task registry
+            if hasattr(sandbox, "_background_tasks"):
+                sandbox._background_tasks.pop(background_pid, None)
             return current_result
 
         latest_result = current_result
@@ -179,9 +182,10 @@ def run_shell_command(
         Dict with content and returnDisplay matching gemini-cli format
     """
     # Clean parameter resolution (canonical schema keys first, legacy aliases as fallback)
-    command = command or CommandLine or kwargs.get("command") or ""
-    if Cwd is not None or "cwd" in kwargs:
-        dir_path = Cwd or kwargs.get("cwd") or dir_path
+    command = command or CommandLine or kwargs.get("command") or kwargs.get("Command") or kwargs.get("cmd") or kwargs.get("Cmd") or ""
+# DEF-02: Prefer explicit user/schema param (cwd or dir_path) over injected default Cwd
+    explicit_dir = kwargs.get("cwd") or dir_path or (Cwd if Cwd != "." else None)
+    dir_path = explicit_dir or Cwd or "."
     if toolSummary or toolAction:
         description = toolSummary or toolAction or description
     if IsDaemon is not None or "is_background" in kwargs:

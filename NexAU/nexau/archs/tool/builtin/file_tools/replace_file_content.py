@@ -55,7 +55,15 @@ def replace_file_content(
     """Surgically edits a file with strict line-bounding and global uniqueness safety."""
 
     # 1. Parameter normalization
-    target_file = TargetFile or file_path
+    target_file = (
+        TargetFile
+        or file_path
+        or kwargs.get("Path")
+        or kwargs.get("path")
+        or kwargs.get("filePath")
+        or kwargs.get("filepath")
+        or kwargs.get("target_file")
+    )
     if not target_file:
         return {
             "content": "Error: 'TargetFile' parameter is required for replace_file_content.",

@@ -28,7 +28,7 @@ _TOOL_DIR = Path(__file__).parent
 
 _ALL_TOOL_NAMES: list[str] = [
     "spawn_teammate",
-    # "remove_teammate"
+    "remove_teammate",
     "message",
     "broadcast",
     "list_teammates",

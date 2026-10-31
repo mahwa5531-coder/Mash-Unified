@@ -16,13 +16,22 @@ input_schema:
     url:
       type: string
       description: "The HTTP or HTTPS URL to fetch and read content from."
+    prompt:
+      type: string
+      description: "Optional natural language prompt containing the target URL."
+    timeout:
+      type: integer
+      description: "Optional timeout in seconds (defaults to 100)."
+    use_html_parser:
+      type: boolean
+      description: "Whether to convert HTML to clean markdown (default: true)."
     toolAction:
       type: string
-      description: "Brief 2-5 word phrase in -ing form describing the specific action. Capitalize like a sentence. Some examples: 'Analyzing directory', 'Searching the web', 'Checking git status', 'Running tests', 'Searching code'."
+      description: "Brief 2-5 word phrase in -ing form describing the specific action."
     toolSummary:
       type: string
-      description: "Brief 2-5 word noun phrase describing the specific task. Capitalize like a sentence. Some examples: 'Directory analysis', 'Web search', 'Git status check', 'Test execution', 'Code search'."
+      description: "Brief 2-5 word noun phrase describing the specific task."
   required:
     - url
-  additionalProperties: false
+  additionalProperties: true
   $schema: http://json-schema.org/draft-07/schema#

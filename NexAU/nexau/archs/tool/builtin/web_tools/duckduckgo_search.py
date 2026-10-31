@@ -44,9 +44,11 @@ def _format_citations(results: list[dict[str, Any]]) -> str:
 
 
 def duckduckgo_web_search(
-    query: str,
+    query: str | None = None,
     domain: str | None = None,
     num_results: int = 4,
+    *,
+    Query: str | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Search the web using DuckDuckGo with domain prioritization and clean citations.
@@ -56,14 +58,17 @@ def duckduckgo_web_search(
         domain: Optional domain to restrict the search (e.g., 'arxiv.org', 'github.com').
         num_results: Maximum results to return (default: 4).
     """
-    if not query or not query.strip():
+    query_str = Query or query or kwargs.get("search_query") or kwargs.get("q") or ""
+    if not str(query_str).strip():
         return {
             "content": "The 'query' parameter cannot be empty.",
             "returnDisplay": "Error: Empty search query.",
             "error": {"message": "The 'query' parameter cannot be empty.", "type": "INVALID_QUERY"},
         }
 
-    search_query = query.strip()
+    domain = domain or kwargs.get("Domain") or kwargs.get("site")
+    num_results = num_results or kwargs.get("limit") or kwargs.get("max_results") or 4
+    search_query = str(query_str).strip()
     if DDGS is None:
         return {
             "content": "Web search is unavailable: 'ddgs' package is not installed.",

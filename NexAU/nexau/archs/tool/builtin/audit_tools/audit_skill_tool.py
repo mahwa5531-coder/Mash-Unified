@@ -48,7 +48,7 @@ def _index_skills() -> dict[str, Path]:
 
 
 def audit_skill_tool(
-    action: str,
+    action: str | None = None,
     skill_name: str | None = None,
     domain: str | None = None,
     query: str | None = None,
@@ -56,17 +56,26 @@ def audit_skill_tool(
     ctx: FrameworkContext | None = None,
     toolAction: str | None = None,
     toolSummary: str | None = None,
+    *,
+    Action: str | None = None,
+    SkillName: str | None = None,
+    Domain: str | None = None,
+    Query: str | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Execute statutory audit skill lookup, retrieval, or searching."""
-    if not action or not action.strip():
+    action_val = Action or action or kwargs.get("action")
+    if not action_val or not str(action_val).strip():
         return {
             "content": "Error: 'action' parameter is required. Available actions: 'get_skill', 'list_skills', 'search_skills', 'get_guide'.",
             "returnDisplay": "Error: Missing action.",
             "error": {"message": "Missing action", "type": "INVALID_ARGUMENT"},
         }
 
-    action_clean = action.strip().lower()
+    action_clean = str(action_val).strip().lower()
+    skill_name = SkillName or skill_name or kwargs.get("skill") or kwargs.get("Skill")
+    domain = Domain or domain or kwargs.get("category")
+    query = Query or query or kwargs.get("q")
     skills_index = _index_skills()
 
     # --------------------------------------------------------------------------

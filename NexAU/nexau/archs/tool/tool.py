@@ -631,7 +631,12 @@ class Tool:
             if impl is None:
                 raise ValueError(f"Tool '{self.name}' has no implementation")
 
-            raw_result: Any = impl(**filtered_params)
+            call_params = (
+                {k: v for k, v in filtered_params.items() if k in sig.parameters}
+                if not any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+                else filtered_params
+            )
+            raw_result: Any = impl(**call_params)
 
             # Support async tool implementations.
             # impl coroutine,:
@@ -744,14 +749,20 @@ class Tool:
             if impl is None:
                 raise ValueError(f"Tool '{self.name}' has no implementation")
 
+            call_params = (
+                {k: v for k, v in filtered_params.items() if k in sig.parameters}
+                if not any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+                else filtered_params
+            )
+
             # type: async await, sync to_thread
             if inspect.iscoroutinefunction(impl):
-                raw_result: Any = await impl(**filtered_params)
+                raw_result: Any = await impl(**call_params)
             else:
                 # asyncio.to_thread (Python 3.12+) contextvars
                 # worker, TraceContext contextvar .
                 # copy_context.
-                raw_result = await asyncio.to_thread(impl, **filtered_params)
+                raw_result = await asyncio.to_thread(impl, **call_params)
 
             # Ensure result is a dictionary
             final_result: dict[str, Any]
@@ -789,15 +800,18 @@ class Tool:
         props = (self.input_schema or {}).get("properties", {})
 
         # CommandLine / command / cmd aliases
-        cmd_val = params.get("CommandLine") or params.get("command") or params.get("cmd")
+        cmd_val = params.get("CommandLine") or params.get("command") or params.get("cmd") or params.get("Cmd")
         if cmd_val is not None:
             if "CommandLine" in props:
                 params["CommandLine"] = cmd_val
             if "command" in props:
                 params["command"] = cmd_val
 
-        # File path aliases: AbsolutePath / file_path / TargetFile / target_file / path
-        path_aliases = ("AbsolutePath", "file_path", "TargetFile", "target_file", "path")
+        # File path aliases: AbsolutePath / file_path / TargetFile / target_file / path / Path / filePath / FilePath / file / File
+        path_aliases = (
+            "AbsolutePath", "file_path", "TargetFile", "target_file", "path", "Path",
+            "filePath", "FilePath", "file", "File", "target_path", "TargetPath"
+        )
         path_val = next((params[k] for k in path_aliases if params.get(k) is not None), None)
         if path_val is not None:
             if "AbsolutePath" in props:
@@ -808,22 +822,48 @@ class Tool:
                 params["TargetFile"] = path_val
             if "target_file" in props:
                 params["target_file"] = path_val
+            if "path" in props:
+                params["path"] = path_val
+            if "Path" in props:
+                params["Path"] = path_val
 
-        # Content / CodeContent aliases
-        content_val = params.get("content") or params.get("CodeContent") or params.get("code_content")
+        # Cwd / dir_path / dir / path aliases for directory-based tools
+        dir_aliases = (
+            "dir_path", "dir", "Dir", "dirPath", "DirPath", "cwd", "Cwd", "SearchPath", "search_path", "path", "Path"
+        )
+        dir_val = next((params[k] for k in dir_aliases if params.get(k) is not None), None)
+        if dir_val is not None:
+            if "dir_path" in props and "dir_path" not in params:
+                params["dir_path"] = dir_val
+            if "cwd" in props and "cwd" not in params:
+                params["cwd"] = dir_val
+            if "Cwd" in props and "Cwd" not in params:
+                params["Cwd"] = dir_val
+
+        # Content / CodeContent / text / code aliases
+        content_aliases = ("content", "Content", "CodeContent", "code_content", "text", "code")
+        content_val = next((params[k] for k in content_aliases if params.get(k) is not None), None)
         if content_val is not None:
             if "content" in props:
                 params["content"] = content_val
             if "CodeContent" in props:
                 params["CodeContent"] = content_val
 
-        # Cwd / dir_path aliases
-        cwd_val = params.get("Cwd") or params.get("dir_path") or params.get("cwd")
-        if cwd_val is not None:
-            if "Cwd" in props:
-                params["Cwd"] = cwd_val
-            if "dir_path" in props:
-                params["dir_path"] = cwd_val
+        # Pattern / Query / search_query / regex aliases
+        pattern_aliases = ("pattern", "Pattern", "query", "Query", "search_query", "q", "regex", "Regex")
+        pattern_val = next((params[k] for k in pattern_aliases if params.get(k) is not None), None)
+        if pattern_val is not None:
+            if "pattern" in props:
+                params["pattern"] = pattern_val
+            if "query" in props:
+                params["query"] = pattern_val
+
+        # SkillName / skill_name / name aliases
+        skill_aliases = ("skill_name", "SkillName", "skill", "name", "Name")
+        skill_val = next((params[k] for k in skill_aliases if params.get(k) is not None), None)
+        if skill_val is not None:
+            if "skill_name" in props:
+                params["skill_name"] = skill_val
 
         # Action aliases: action / Action
         action_val = params.get("action") or params.get("Action")
@@ -848,8 +888,13 @@ class Tool:
             if "task_id" in props:
                 params["task_id"] = str(pid_val)
 
+        # Array wrapping: if property is array type and model passed a single string (e.g. include="*.py" in read_many_files)
+        for key, prop_schema in props.items():
+            if isinstance(prop_schema, dict) and prop_schema.get("type") == "array" and key in params and isinstance(params[key], str):
+                params[key] = [params[key]]
+
         if self.name == "run_shell_command":
-            if "Cwd" not in params:
+            if "Cwd" not in params and "cwd" not in params and "dir_path" not in params:
                 params["Cwd"] = "."
             if "toolAction" not in params:
                 params["toolAction"] = "Running shell command"
@@ -858,7 +903,7 @@ class Tool:
             if "WaitMsBeforeAsync" not in params:
                 params["WaitMsBeforeAsync"] = 5000
 
-        if self.name in ("view_file", "write_file", "replace_file_content"):
+        if self.name in ("view_file", "write_file", "replace_file_content", "replace", "multiedit_tool"):
             if "toolAction" not in params and "toolAction" in props:
                 params["toolAction"] = "File operation"
             if "toolSummary" not in params and "toolSummary" in props:

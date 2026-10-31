@@ -141,12 +141,13 @@ def _rg_grep(
         str(max_matches),
     ]
 
-    # Excludes: best-effort glob negatives.
+    # Excludes: best-effort glob negatives matching at any depth (DEF-01)
     for ex in excludes:
-        if ex.startswith("*"):
-            cmd.extend(["--glob", f"!{ex}"])
+        clean_ex = ex.strip().strip("/")
+        if clean_ex.startswith("*"):
+            cmd.extend(["--glob", f"!{clean_ex}", "--glob", f"!**/{clean_ex}"])
         else:
-            cmd.extend(["--glob", f"!{ex}/**"])
+            cmd.extend(["--glob", f"!{clean_ex}/**", "--glob", f"!**/{clean_ex}/**", "--glob", f"!**/{clean_ex}"])
 
     if include:
         cmd.extend(["--glob", include])
@@ -361,11 +362,26 @@ def search_file_content(
         Dict with content and returnDisplay matching gemini-cli format
     """
     # ponytail: universal parameter alias normalization for cross-model resilience
-    pattern = Query or query or pattern or ""
+    pattern = (
+        Query
+        or query
+        or pattern
+        or kwargs.get("Pattern")
+        or kwargs.get("regex")
+        or kwargs.get("Regex")
+        or kwargs.get("q")
+        or ""
+    )
     if SearchPath is not None:
         dir_path = SearchPath
     elif path is not None:
         dir_path = path
+    elif "Path" in kwargs and kwargs["Path"]:
+        dir_path = str(kwargs["Path"])
+    elif "dir" in kwargs and kwargs["dir"]:
+        dir_path = str(kwargs["dir"])
+    elif "Dir" in kwargs and kwargs["Dir"]:
+        dir_path = str(kwargs["Dir"])
 
     if not pattern:
         error_msg = 'Missing required search pattern (specify "pattern" or "Query")'

@@ -92,8 +92,28 @@ def write_file(
         Dict with content and returnDisplay matching gemini-cli format
     """
     # ponytail: universal parameter alias normalization for cross-model resilience
-    file_path = TargetFile or file_path or ""
-    content = CodeContent if CodeContent is not None else (content if content is not None else "")
+    file_path = (
+        TargetFile
+        or file_path
+        or kwargs.get("Path")
+        or kwargs.get("path")
+        or kwargs.get("filePath")
+        or kwargs.get("filepath")
+        or kwargs.get("target_file")
+        or ""
+    )
+    if content is None and CodeContent is None:
+        content = (
+            kwargs.get("Content")
+            or kwargs.get("content")
+            or kwargs.get("text")
+            or kwargs.get("code")
+            or ""
+        )
+    elif CodeContent is not None:
+        content = CodeContent
+    else:
+        content = content or ""
 
     # RFC-0019: permission check
     if ctx is not None:
