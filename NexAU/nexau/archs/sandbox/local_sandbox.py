@@ -67,7 +67,7 @@ _ENCODING_PROBE_MAX_BYTES = 64 * 1024
 
 @dataclass(kw_only=True)
 class LocalSandbox(BaseSandbox):
-    _shared_background_tasks: ClassVar[dict[int, Any]] = {}
+    _registry_by_session: ClassVar[dict[str, dict[int, Any]]] = {}
     """
     Local sandbox implementation that executes commands directly on the host system.
 
@@ -82,8 +82,18 @@ class LocalSandbox(BaseSandbox):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        self._background_tasks = LocalSandbox._shared_background_tasks
+        # DEF-03: Scope background tasks by sandbox_id/session instead of process-global
+        session_key = str(self.sandbox_id or "default")
+        if session_key not in LocalSandbox._registry_by_session:
+            LocalSandbox._registry_by_session[session_key] = {}
+        self._background_tasks = LocalSandbox._registry_by_session[session_key]
         self._shell_backend = create_shell_backend()
+
+    @classmethod
+    def clear_session_tasks(cls, session_id: str | None = None) -> None:
+        """Clear background task tracking for a specific session or default."""
+        session_key = str(session_id or "default")
+        cls._registry_by_session.pop(session_key, None)
 
     def get_temp_dir(self) -> str:
         """Return the local host temp directory managed by NexAU."""

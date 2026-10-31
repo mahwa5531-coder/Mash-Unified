@@ -19,7 +19,7 @@ from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 
 # Configuration constants (matching Antigravity / modern agent limits)
 DEFAULT_TIMEOUT_MS = 600000  # 10 minutes default timeout (prevents premature termination of builds/installs)
-TRUNCATE_OUTPUT_THRESHOLD = 64_000  # Truncate when output exceeds 64KB (~16,000 tokens)
+TRUNCATE_OUTPUT_THRESHOLD = 10_000  # Matched to sandbox output threshold (DEF-06)
 TRUNCATE_OUTPUT_LINES = 300  # Keep last 300 lines when truncating
 MAX_TRUNCATED_LINE_WIDTH = 1000  # Max chars per line in truncated output
 MAX_TRUNCATED_CHARS = 4000  # Keep last N chars for single massive line

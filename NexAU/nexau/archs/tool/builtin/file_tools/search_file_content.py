@@ -7,6 +7,7 @@ Based on gemini-cli's grep.ts implementation.
 Uses prioritized strategies: git grep -> system grep -> JavaScript fallback.
 """
 
+import fnmatch
 import re
 import shlex
 import shutil
@@ -153,11 +154,12 @@ def _rg_grep(
         cmd.extend(["--glob", include])
 
     cmd.append(pattern)
-    cmd.append(sandbox.to_shell_path(search_path))
+    cmd.append(".")
 
     prefix = "& " if sys.platform == "win32" else ""
     cmd_str = f'{prefix}"{exe}" ' + " ".join(shlex.quote(x) for x in cmd)
-    res = sandbox.execute_shell(cmd_str, timeout=DEFAULT_SEARCH_TIMEOUT_MS)
+    # DEF-01: Run ripgrep inside search_path so glob exclusions are rooted at search directory
+    res = sandbox.execute_shell(cmd_str, cwd=search_path, timeout=DEFAULT_SEARCH_TIMEOUT_MS)
 
     if res.status == SandboxStatus.TIMEOUT:
         raise TimeoutError("search_file_content timed out")
@@ -172,6 +174,10 @@ def _rg_grep(
     for line in (res.stdout or "").splitlines():
         parsed = _parse_grep_line(line, search_path)
         if parsed:
+            # DEF-01: Defensive post-filtering guarantees node_modules/.git never leak
+            rel_parts = Path(parsed["filePath"]).parts
+            if any(any(fnmatch.fnmatch(part.lower(), ex.strip("*/").lower()) for ex in excludes) for part in rel_parts):
+                continue
             matches.append(parsed)
             if len(matches) >= max_matches:
                 break

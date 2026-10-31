@@ -11,7 +11,7 @@
 
 """Native Statutory Audit Skills Tool for NexAU.
 
-Enables on-demand retrieval of 73 Indian Statutory Audit skills across 17 domains:
+Enables on-demand retrieval of 72 Indian Statutory Audit skills across 17 domains:
 - SA Standards (ICAI Standards on Auditing)
 - CARO 2020 verification checklists
 - Companies Act 2013 Schedule III compliance
@@ -42,6 +42,8 @@ def _index_skills() -> dict[str, Path]:
 
     for md_file in SKILLS_DIR.rglob("*.md"):
         slug = md_file.stem.lower()
+        if slug in ["skill", "readme"]:
+            continue
         skill_map[slug] = md_file
         skill_map[slug.replace("-", "_")] = md_file
     return skill_map
@@ -84,7 +86,7 @@ def audit_skill_tool(
     if action_clean in ["get_guide", "guide"]:
         guide_text = (
             "# Indian Statutory Audit Skills — Master Navigation Guide\n\n"
-            "This repository contains 73 specialized audit procedures across 17 domains:\n"
+            "This repository contains 72 specialized audit procedures across 17 domains:\n"
             "1. `01-engagement-and-planning`: Materiality (SA 320), Risk Assessment (SA 315), Sampling, Trial Balance.\n"
             "2. `02-revenue-and-receivables`: Cut-off, AR Confirmation (SA 505), Revenue Recognition (Ind AS 115).\n"
             "3. `03-procurement-and-payables`: Accounts Payable, 3-Way Match, Purchase Cut-off.\n"

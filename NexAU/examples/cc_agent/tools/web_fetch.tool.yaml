@@ -31,7 +31,10 @@ input_schema:
     toolSummary:
       type: string
       description: "Brief 2-5 word noun phrase describing the specific task."
-  required:
-    - url
+  anyOf:
+    - required:
+        - url
+    - required:
+        - prompt
   additionalProperties: true
   $schema: http://json-schema.org/draft-07/schema#

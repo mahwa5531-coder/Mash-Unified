@@ -60,7 +60,7 @@ def background_task_manage_tool(
         Dict containing the action result
     """
     from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
-    sandbox: BaseSandbox = get_sandbox(agent_state)
+    sandbox: BaseSandbox = kwargs.get("sandbox") or get_sandbox(agent_state)
 
     # Normalize action and pid aliases
     if "Action" in kwargs and kwargs["Action"]:
@@ -83,11 +83,12 @@ def background_task_manage_tool(
     if action == "list":
         task_list: list[dict[str, object]] = []
         for task_pid, task_info in bg_tasks.items():
+            # DEF-03 / Schema promise: killed tasks no longer appear in the list
+            if task_info.get("status") == "killed":
+                continue
             cmd_result = sandbox.get_background_task_status(task_pid)
             task_status: str
-            if task_info.get("status") == "killed":
-                task_status = "killed"
-            elif cmd_result.status == SandboxStatus.RUNNING:
+            if cmd_result.status == SandboxStatus.RUNNING:
                 task_status = "running"
             elif cmd_result.status == SandboxStatus.SUCCESS:
                 task_status = "success"
@@ -177,6 +178,8 @@ def background_task_manage_tool(
         cmd_result = sandbox.kill_background_task(pid)
 
         if cmd_result.status == SandboxStatus.SUCCESS:
+            if hasattr(sandbox, "_background_tasks"):
+                sandbox._background_tasks.pop(pid, None)
             logger.info(f"Background task killed: pid={pid}")
             return {
                 "status": "success",

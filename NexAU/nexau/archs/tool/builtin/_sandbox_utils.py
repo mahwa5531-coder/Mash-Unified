@@ -14,14 +14,20 @@ from nexau.archs.main_sub.agent_state import AgentState
 from nexau.archs.sandbox import BaseSandbox
 
 
+_DEFAULT_LOCAL_SANDBOX: BaseSandbox | None = None
+
+
 def get_sandbox(agent_state: AgentState | None) -> BaseSandbox:
-    """Get sandbox from agent_state, or fallback to LocalSandbox."""
+    """Get sandbox from agent_state, or fallback to default LocalSandbox singleton."""
     if agent_state is not None:
         sandbox = agent_state.get_sandbox()
         if sandbox is not None:
             return sandbox
-    from nexau.archs.sandbox.local_sandbox import LocalSandbox
-    return LocalSandbox(work_dir=Path.cwd())
+    global _DEFAULT_LOCAL_SANDBOX
+    if _DEFAULT_LOCAL_SANDBOX is None or getattr(_DEFAULT_LOCAL_SANDBOX, "work_dir", None) != Path.cwd():
+        from nexau.archs.sandbox.local_sandbox import LocalSandbox
+        _DEFAULT_LOCAL_SANDBOX = LocalSandbox(work_dir=Path.cwd())
+    return _DEFAULT_LOCAL_SANDBOX
 
 
 

@@ -103,10 +103,16 @@ def _rg_glob(
         raise RuntimeError(res.stderr or "rg --files failed")
 
     lines = [line.strip() for line in (res.stdout or "").splitlines() if line.strip()]
+
+    def _is_excluded(p: str) -> bool:
+        parts = Path(p).parts
+        return any(any(fnmatch.fnmatch(part.lower(), ex.strip("*/").lower()) for ex in DEFAULT_EXCLUDES) for part in parts)
+
     resolved_matches = [
         os.path.normpath(os.path.join(search_dir, line)).replace("\\", "/")
         for line in lines
     ]
+    resolved_matches = [p for p in resolved_matches if not _is_excluded(p)]
     return resolved_matches[:max_matches]
 
 
@@ -142,16 +148,16 @@ def _python_glob(
 
             if not pat_has_path:
                 is_match = (
-                    fnmatch.fnmatch(fname, clean_pat)
+                    fnmatch.fnmatchcase(fname, clean_pat)
                     if case_sensitive
                     else fnmatch.fnmatch(fname.lower(), clean_pat.lower())
                 )
             else:
                 target_rel = rel_path if case_sensitive else rel_path.lower()
                 test_pat = clean_pat if case_sensitive else clean_pat.lower()
-                is_match = fnmatch.fnmatch(target_rel, test_pat)
+                is_match = fnmatch.fnmatchcase(target_rel, test_pat) if case_sensitive else fnmatch.fnmatch(target_rel, test_pat)
                 if not is_match and test_pat.startswith("**/"):
-                    is_match = fnmatch.fnmatch(target_rel, test_pat[3:])
+                    is_match = fnmatch.fnmatchcase(target_rel, test_pat[3:]) if case_sensitive else fnmatch.fnmatch(target_rel, test_pat[3:])
 
             if is_match:
                 matches.append(full_path.replace("\\", "/"))
@@ -195,6 +201,10 @@ def glob(
 
     if CaseSensitive is not None:
         case_sensitive = CaseSensitive
+    elif "case_sensitive" in kwargs:
+        case_sensitive = bool(kwargs["case_sensitive"])
+    elif "caseSensitive" in kwargs:
+        case_sensitive = bool(kwargs["caseSensitive"])
 
     try:
         sandbox: BaseSandbox = get_sandbox(agent_state)
@@ -250,7 +260,10 @@ def glob(
                 "returnDisplay": "No files found",
             }
 
+        # Fulfill schema promise: sort by modification time (newest first)
+        matches.sort(key=lambda p: os.path.getmtime(p) if os.path.exists(p) else 0, reverse=True)
         was_capped = len(matches) >= MAX_GLOB_MATCHES
+        matches = matches[:MAX_GLOB_MATCHES]
         capped_note = f" (results capped at {MAX_GLOB_MATCHES} matches for performance)" if was_capped else ""
         file_list = "\n".join(matches)
 
