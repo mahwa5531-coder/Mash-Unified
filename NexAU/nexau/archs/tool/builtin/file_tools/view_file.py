@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 
 from nexau.archs.main_sub.agent_state import AgentState
-from nexau.archs.main_sub.framework_context import FrameworkContext
 from nexau.archs.sandbox import BaseSandbox, SandboxStatus
 from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 from nexau.archs.tool.builtin.file_tools.list_directory import list_directory
@@ -61,7 +60,6 @@ def view_file(
     toolSummary: str | None = None,
     agent_state: AgentState | None = None,
     sandbox: BaseSandbox | None = None,
-    ctx: FrameworkContext | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Polymorphic file viewer supporting text, code, spreadsheets, directories, and visual media."""
@@ -86,7 +84,7 @@ def view_file(
         }
 
     # RFC-0019: permission check in review / restrictive modes (DEF-05)
-    ctx = ctx or kwargs.get("ctx")
+    ctx = kwargs.get("ctx")
     if ctx is not None:
         from nexau.archs.permissions.helpers import check_path_permission
         check_path_permission(ctx, target_path)
