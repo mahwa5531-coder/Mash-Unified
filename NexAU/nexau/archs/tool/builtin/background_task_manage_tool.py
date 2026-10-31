@@ -86,7 +86,9 @@ def background_task_manage_tool(
         for task_pid, task_info in bg_tasks.items():
             cmd_result = sandbox.get_background_task_status(task_pid)
             task_status: str
-            if cmd_result.status == SandboxStatus.RUNNING:
+            if task_info.get("status") == "killed":
+                task_status = "killed"
+            elif cmd_result.status == SandboxStatus.RUNNING:
                 task_status = "running"
             elif cmd_result.status == SandboxStatus.SUCCESS:
                 task_status = "success"

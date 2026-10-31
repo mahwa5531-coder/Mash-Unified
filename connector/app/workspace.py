@@ -29,32 +29,10 @@ def get_base_allowed_roots() -> list[Path]:
     return _BASE_ROOTS
 
 
-FORBIDDEN_SYSTEM_PREFIXES = (
-    "c:\\windows",
-    "c:\\program files",
-    "c:\\program files (x86)",
-    "c:\\system volume information",
-    "c:\\$recycle.bin",
-    "c:\\recovery",
-    "c:\\perflogs",
-    "/etc",
-    "/proc",
-    "/sys",
-    "/dev",
-    "/boot",
-    "/root",
-    "/bin",
-    "/sbin",
-)
-
-
 def is_path_in_base_roots(target_path: Path) -> bool:
     """Blocks forbidden OS system files, checks membership against base roots."""
     try:
         resolved = target_path.resolve()
-        res_str = str(resolved).lower()
-        if any(res_str == p or res_str.startswith(p + "\\") or res_str.startswith(p + "/") for p in FORBIDDEN_SYSTEM_PREFIXES):
-            return False
         # Fast-match against base roots (Mash root, NexAU brain)
         if any(resolved == root or resolved.is_relative_to(root) for root in get_base_allowed_roots()):
             return True

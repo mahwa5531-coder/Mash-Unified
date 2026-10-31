@@ -69,7 +69,7 @@ Open `http://localhost:3000`.
 
 ## Architecture & Registered Tools
 
-The agent environment is equipped with 11 production-hardened tools:
+The agent environment is equipped with 10 production-hardened tools:
 
 | Tool Name | Capability & File Mapping |
 |:---|:---|
@@ -79,10 +79,9 @@ The agent environment is equipped with 11 production-hardened tools:
 | `run_shell_command` | Execute shell commands in sandbox with timeout and background task tracking. |
 | `background_task_manage_tool` | List, inspect status, or kill active background tasks (`action`, `pid`). |
 | `search_file_content` | Fast ripgrep pattern search across codebase (`pattern`, `dir_path`, `include`). |
+| `glob` | Find files and directories matching wildcard patterns across the workspace. |
 | `audit_skill_tool` | Domain engine for executing domain audit procedures and regulatory checks. |
-| `ask_user` | Interactive structured questions for clarifying user requirements. |
-| `save_memory` | Long-term memory store for cross-session knowledge retention. |
-| `web_search` | Real-time Google search for current external information. |
+| `web_search` | Real-time web search for current external information (powered by DuckDuckGo). |
 | `web_fetch` | Markdown scraper for web documentation and URLs. |
 
 ---

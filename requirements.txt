@@ -20,3 +20,6 @@ sqlalchemy>=2.0.35,<2.1.0
 
 # Free Web Search
 duckduckgo_search>=6.0.0
+
+# Testing & Property-based Fuzzing
+hypothesis>=6.100.0

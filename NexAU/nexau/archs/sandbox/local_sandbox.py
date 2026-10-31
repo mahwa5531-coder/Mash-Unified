@@ -525,12 +525,17 @@ class LocalSandbox(BaseSandbox):
                     "std_output_dir": output_dir,
                     "stdout_file": fout,
                     "stderr_file": ferr,
+                    "cwd": cwd or str(work_dir),
+                    "sandbox_id": self.sandbox_id,
+                    "status": "running",
                 }
 
                 def _wait_process(proc: subprocess.Popen[bytes], info: dict[str, Any]) -> None:
                     try:
                         exit_code = proc.wait()
                         info["exit_code"] = exit_code
+                        if info.get("status") != "killed":
+                            info["status"] = "completed" if exit_code == 0 else "failed"
                         if exit_code != 0:
                             info["error"] = f"Command failed with exit code {exit_code}"
                     except Exception as exc:
@@ -855,7 +860,17 @@ class LocalSandbox(BaseSandbox):
             if t is not None:
                 t.join(timeout=2)
             duration_ms = int((time.time() - task_info["start_time"]) * 1000)
-            del self._background_tasks[pid]
+            task_info["finished"] = True
+            task_info["status"] = "killed"
+            task_info["exit_code"] = -9
+            if task_info.get("task_log_path"):
+                try:
+                    p_log = Path(task_info["task_log_path"])
+                    if p_log.exists():
+                        with open(p_log, "a", encoding="utf-8") as lf:
+                            lf.write(f"\n[TASK {pid}] Status: KILLED (SIGKILL)\n")
+                except Exception:
+                    pass
             return CommandResult(
                 status=SandboxStatus.SUCCESS,
                 stdout=f"Background task (pid={pid}) killed successfully",

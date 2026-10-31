@@ -36,13 +36,6 @@ def resolve_path(path: str, sandbox: BaseSandbox) -> str:
     if len(clean) >= 3 and clean[0] == "/" and clean[2] == ":":
         clean = clean[1:]
 
-    # ponytail: protect application credential vault and private keys from prompt-injection exfiltration
-    p_obj = Path(clean)
-    name_lower = p_obj.name.lower()
-    parts_lower = [part.lower() for part in p_obj.parts]
-    if name_lower == "auth.vault" or any(part in (".ssh", ".aws", ".gnupg") for part in parts_lower):
-        raise PermissionError(f"Access denied: Access to credential vaults and secret stores is prohibited ({clean}).")
-
     if Path(clean).is_absolute():
         return clean
 

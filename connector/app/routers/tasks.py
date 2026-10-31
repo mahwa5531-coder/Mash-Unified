@@ -37,6 +37,10 @@ async def list_active_tasks(session_id: str | None = None):
         sandbox = LocalSandbox(work_dir=Path(session_work_dir) if session_work_dir else Path.cwd())
         bg_tasks = sandbox.list_background_tasks()
         for pid, info in bg_tasks.items():
+            task_sid = info.get("sandbox_id", "")
+            if session_id and task_sid and task_sid != session_id:
+                continue
+
             task_cwd = info.get("cwd", "")
             if session_work_dir and task_cwd:
                 try:
@@ -47,10 +51,14 @@ async def list_active_tasks(session_id: str | None = None):
 
             cmd_result = sandbox.get_background_task_status(pid)
             status = "running"
-            if cmd_result.status == SandboxStatus.SUCCESS:
+            if info.get("status") == "killed":
+                status = "killed"
+            elif cmd_result.status == SandboxStatus.SUCCESS:
                 status = "completed"
             elif cmd_result.status == SandboxStatus.ERROR:
                 status = "failed"
+            else:
+                status = info.get("status", "running")
             cmd = info.get("command", "")
             seen_commands.add(cmd)
             tasks_list.append({

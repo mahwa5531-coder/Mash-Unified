@@ -181,7 +181,7 @@ test.describe('MASH Desktop E2E Workflow Matrix', () => {
     await page.goto('/');
 
     // Expand the "Mash" workspace folder if collapsed (QA-03 Fix)
-    const mashFolder = page.locator('div, button').filter({ hasText: /^Mash$/i }).first();
+    const mashFolder = page.locator('[class*="group/folder"]').filter({ hasText: /^Mash$/i }).first();
     try {
       await mashFolder.waitFor({ state: 'visible', timeout: 3000 });
       await mashFolder.click();
@@ -295,7 +295,7 @@ test.describe('MASH Desktop E2E Workflow Matrix', () => {
     await page.goto('/');
 
     // Expand the "Mash" workspace folder if collapsed (QA-03 Fix)
-    const mashFolder = page.locator('div, button').filter({ hasText: /^Mash$/i }).first();
+    const mashFolder = page.locator('[class*="group/folder"]').filter({ hasText: /^Mash$/i }).first();
     try {
       await mashFolder.waitFor({ state: 'visible', timeout: 3000 });
       await mashFolder.click();
