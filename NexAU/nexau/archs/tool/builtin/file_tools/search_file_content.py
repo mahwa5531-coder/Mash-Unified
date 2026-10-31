@@ -142,7 +142,7 @@ def _rg_grep(
         str(max_matches),
     ]
 
-    # Excludes: best-effort glob negatives matching at any depth (DEF-01)
+    # Excludes: glob negatives matching at any depth
     for ex in excludes:
         clean_ex = ex.strip().strip("/")
         if clean_ex.startswith("*"):
@@ -158,7 +158,7 @@ def _rg_grep(
 
     prefix = "& " if sys.platform == "win32" else ""
     cmd_str = f'{prefix}"{exe}" ' + " ".join(shlex.quote(x) for x in cmd)
-    # DEF-01: Run ripgrep inside search_path so glob exclusions are rooted at search directory
+    # Run ripgrep inside search_path so glob exclusions are rooted at search directory
     res = sandbox.execute_shell(cmd_str, cwd=search_path, timeout=DEFAULT_SEARCH_TIMEOUT_MS)
 
     if res.status == SandboxStatus.TIMEOUT:
@@ -174,7 +174,7 @@ def _rg_grep(
     for line in (res.stdout or "").splitlines():
         parsed = _parse_grep_line(line, search_path)
         if parsed:
-            # DEF-01: Defensive post-filtering guarantees node_modules/.git never leak
+            # Defensive post-filtering guarantees excluded directories never leak
             rel_parts = Path(parsed["filePath"]).parts
             if any(any(fnmatch.fnmatch(part.lower(), ex.strip("*/").lower()) for ex in excludes) for part in rel_parts):
                 continue

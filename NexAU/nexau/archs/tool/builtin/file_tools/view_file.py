@@ -83,7 +83,7 @@ def view_file(
             "isError": True,
         }
 
-    # RFC-0019: permission check in review / restrictive modes (DEF-05)
+    # RFC-0019: permission check in review / restrictive modes
     ctx = kwargs.get("ctx")
     if ctx is not None:
         from nexau.archs.permissions.helpers import check_path_permission

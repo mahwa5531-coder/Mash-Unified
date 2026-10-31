@@ -51,6 +51,19 @@ def test_def_06_run_shell_truncation_threshold():
     assert TRUNCATE_OUTPUT_THRESHOLD == 10_000
 
 
+def test_foreground_command_timeout_eviction():
+    """Verify foreground commands killed by timeout are strictly evicted from task tracking."""
+    sandbox = LocalSandbox(work_dir=Path.cwd(), sandbox_id="test-timeout-evict")
+    res = run_shell_command(
+        command='python -c "import time; time.sleep(10)"',
+        timeout_ms=500,
+        sandbox=sandbox,
+    )
+    assert "timed out" in res["content"].lower() or "timed out" in str(res.get("error", "")).lower()
+    assert len(sandbox._background_tasks) == 0
+    LocalSandbox.clear_session_tasks("test-timeout-evict")
+
+
 def test_def_03_background_task_session_isolation():
     """Verify background tasks are scoped per session and do NOT leak across sessions."""
     sandbox_a = LocalSandbox(work_dir=Path.cwd(), sandbox_id="session-alpha")

@@ -19,7 +19,7 @@ from nexau.archs.tool.builtin._sandbox_utils import get_sandbox, resolve_path
 
 # Configuration constants (matching Antigravity / modern agent limits)
 DEFAULT_TIMEOUT_MS = 600000  # 10 minutes default timeout (prevents premature termination of builds/installs)
-TRUNCATE_OUTPUT_THRESHOLD = 10_000  # Matched to sandbox output threshold (DEF-06)
+TRUNCATE_OUTPUT_THRESHOLD = 10_000  # Matched to sandbox output threshold
 TRUNCATE_OUTPUT_LINES = 300  # Keep last 300 lines when truncating
 MAX_TRUNCATED_LINE_WIDTH = 1000  # Max chars per line in truncated output
 MAX_TRUNCATED_CHARS = 4000  # Keep last N chars for single massive line
@@ -103,36 +103,38 @@ def _execute_foreground_command(
         return start_result
 
     latest_result: CommandResult | None = None
-    while True:
-        if execution is not None and execution.is_shutting_down():
-            sandbox.kill_background_task(background_pid)
-            duration_ms = int((time.monotonic() - start_time) * 1000)
-            return _build_terminal_command_result(
-                status=SandboxStatus.STOPPED,
-                duration_ms=duration_ms,
-                error_message="Command interrupted by stop request",
-                latest_result=latest_result,
-            )
+    try:
+        while True:
+            if execution is not None and execution.is_shutting_down():
+                sandbox.kill_background_task(background_pid)
+                duration_ms = int((time.monotonic() - start_time) * 1000)
+                return _build_terminal_command_result(
+                    status=SandboxStatus.STOPPED,
+                    duration_ms=duration_ms,
+                    error_message="Command interrupted by stop request",
+                    latest_result=latest_result,
+                )
 
-        current_result = sandbox.get_background_task_status(background_pid)
-        if current_result.status != SandboxStatus.RUNNING:
-            # DEF-03: Evict foreground command from background task registry
-            if hasattr(sandbox, "_background_tasks"):
-                sandbox._background_tasks.pop(background_pid, None)
-            return current_result
+            current_result = sandbox.get_background_task_status(background_pid)
+            if current_result.status != SandboxStatus.RUNNING:
+                return current_result
 
-        latest_result = current_result
-        if timeout_ms is not None and int((time.monotonic() - start_time) * 1000) >= timeout_ms:
-            sandbox.kill_background_task(background_pid)
-            duration_ms = int((time.monotonic() - start_time) * 1000)
-            return _build_terminal_command_result(
-                status=SandboxStatus.TIMEOUT,
-                duration_ms=duration_ms,
-                error_message=f"Command timed out after {timeout_ms}ms",
-                latest_result=latest_result,
-            )
+            latest_result = current_result
+            if timeout_ms is not None and int((time.monotonic() - start_time) * 1000) >= timeout_ms:
+                sandbox.kill_background_task(background_pid)
+                duration_ms = int((time.monotonic() - start_time) * 1000)
+                return _build_terminal_command_result(
+                    status=SandboxStatus.TIMEOUT,
+                    duration_ms=duration_ms,
+                    error_message=f"Command timed out after {timeout_ms}ms",
+                    latest_result=latest_result,
+                )
 
-        time.sleep(FOREGROUND_COMMAND_POLL_INTERVAL_SECONDS)
+            time.sleep(FOREGROUND_COMMAND_POLL_INTERVAL_SECONDS)
+    finally:
+        # Foreground commands are ephemeral; guarantee eviction on normal exit, timeout, or stop
+        if hasattr(sandbox, "_background_tasks"):
+            sandbox._background_tasks.pop(background_pid, None)
 
 
 def run_shell_command(
@@ -183,7 +185,7 @@ def run_shell_command(
     """
     # Clean parameter resolution (canonical schema keys first, legacy aliases as fallback)
     command = command or CommandLine or kwargs.get("command") or kwargs.get("Command") or kwargs.get("cmd") or kwargs.get("Cmd") or ""
-# DEF-02: Prefer explicit user/schema param (cwd or dir_path) over injected default Cwd
+    # Prefer explicit user/schema param (cwd or dir_path) over injected default Cwd
     explicit_dir = kwargs.get("cwd") or dir_path or (Cwd if Cwd != "." else None)
     dir_path = explicit_dir or Cwd or "."
     if toolSummary or toolAction:

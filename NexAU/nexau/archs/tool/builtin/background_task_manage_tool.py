@@ -83,7 +83,7 @@ def background_task_manage_tool(
     if action == "list":
         task_list: list[dict[str, object]] = []
         for task_pid, task_info in bg_tasks.items():
-            # DEF-03 / Schema promise: killed tasks no longer appear in the list
+            # Killed tasks no longer appear in active list
             if task_info.get("status") == "killed":
                 continue
             cmd_result = sandbox.get_background_task_status(task_pid)

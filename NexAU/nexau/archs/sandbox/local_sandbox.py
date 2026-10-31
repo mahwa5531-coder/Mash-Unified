@@ -82,7 +82,7 @@ class LocalSandbox(BaseSandbox):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        # DEF-03: Scope background tasks by sandbox_id/session instead of process-global
+        # Scope background tasks by sandbox_id/session instead of process-global
         session_key = str(self.sandbox_id or "default")
         if session_key not in LocalSandbox._registry_by_session:
             LocalSandbox._registry_by_session[session_key] = {}

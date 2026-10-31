@@ -80,7 +80,7 @@ def _rg_glob(
     if not respect_git_ignore:
         cmd.append("--no-ignore")
 
-    # Excludes: glob negatives matching at any depth (DEF-01)
+    # Excludes: glob negatives matching at any depth
     for ex in DEFAULT_EXCLUDES:
         clean_ex = ex.strip().strip("/")
         if clean_ex.startswith("*"):

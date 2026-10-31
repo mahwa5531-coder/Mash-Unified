@@ -45,7 +45,7 @@ def resolve_path(path: str, sandbox: BaseSandbox) -> str:
     if Path(clean).is_absolute():
         return clean
 
-    # DEF-08: Resolve relative uploaded files (.user_uploaded/) to session brain directory
+    # Resolve relative uploaded files (.user_uploaded/) to session brain directory
     session_id = getattr(sandbox, "sandbox_id", None)
     if session_id:
         try:
