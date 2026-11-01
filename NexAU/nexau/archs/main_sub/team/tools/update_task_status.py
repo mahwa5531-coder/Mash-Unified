@@ -57,11 +57,14 @@ async def update_task_status(
                         code="invalid_state",
                     )
 
-    await ts.task_board.update_status(
-        task_id=task_id,
-        status=status,
-        result_summary=result_summary,
-    )
+    try:
+        await ts.task_board.update_status(
+            task_id=task_id,
+            status=status,
+            result_summary=result_summary,
+        )
+    except ValueError as e:
+        return ToolError(error=str(e), code="invalid_state")
 
     # RFC-0002: completed leader, forever-run
     if status == "completed" and not ts.is_leader:

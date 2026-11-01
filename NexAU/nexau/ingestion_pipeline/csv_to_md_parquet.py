@@ -34,10 +34,32 @@ def parse_csv_to_markdown(
     else:
         cache_dir = Path.home() / ".nexau" / "cache" / bundle_name
 
+    # Check for binary file before attempting tabular parsing
+    try:
+        with open(path_obj, "rb") as probe_f:
+            header_sample = probe_f.read(4096)
+            if b"\x00" in header_sample:
+                return f"Error reading CSV {file_path}: File appears to be binary, not tabular text"
+    except Exception as e:
+        return f"Error reading CSV {file_path}: {e}"
+
+    # ponytail: sniff delimiter for TSV/CSV (; \t , |)
+    sep = "\t" if path_obj.suffix.lower() == ".tsv" else ","
+    if sep != "\t" and header_sample:
+        try:
+            import csv
+            first_line = header_sample.decode("utf-8", errors="replace").splitlines()[0]
+            if first_line:
+                dialect = csv.Sniffer().sniff(first_line, delimiters=[",", "\t", ";", "|"])
+                sep = dialect.delimiter
+        except Exception:
+            sep = ","
+
     # Read with Polars with automatic encoding & ragged line handling
     try:
         df = pl.read_csv(
             str(path_obj),
+            separator=sep,
             infer_schema_length=10000,
             ignore_errors=True,
             truncate_ragged_lines=True,
@@ -46,6 +68,7 @@ def parse_csv_to_markdown(
         try:
             df = pl.read_csv(
                 str(path_obj),
+                separator=sep,
                 encoding="latin1",
                 infer_schema_length=10000,
                 ignore_errors=True,

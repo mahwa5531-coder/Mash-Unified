@@ -34,9 +34,8 @@ def get_sandbox(agent_state: AgentState | None) -> BaseSandbox:
 def resolve_path(path: str, sandbox: BaseSandbox) -> str:
     """Resolve relative paths against sandbox work_dir or session brain uploads."""
     clean = str(path).strip().strip("'\"")
-    if clean.startswith("file:///"):
-        clean = clean[8:]
-    elif clean.startswith("file://"):
+    # ponytail: RFC-8089 file URI prefix stripping preserving root slash for POSIX absolute paths
+    if clean.startswith("file://"):
         clean = clean[7:]
     clean = unquote(clean)
     if len(clean) >= 3 and clean[0] == "/" and clean[2] == ":":

@@ -283,6 +283,10 @@ class TaskBoard:
             task_id=task_id,
         ):
             task = await self._get_task(task_id)
+            # ponytail: validate state machine transitions (pending -> in_progress -> completed)
+            valid_transitions = {"pending": {"in_progress"}, "in_progress": {"completed", "pending"}, "completed": set()}
+            if status != task.status and status not in valid_transitions.get(task.status, set()):
+                raise ValueError(f"Invalid task status transition from '{task.status}' to '{status}' for task {task_id}")
             task.status = status
             if result_summary is not None:
                 task.result_summary = result_summary

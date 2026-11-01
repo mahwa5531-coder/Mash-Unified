@@ -40,7 +40,8 @@ _ALL_TOOL_NAMES: list[str] = [
     "finish_team",
 ]
 
-_LEADER_ONLY: set[str] = {"spawn_teammate", "remove_teammate", "create_task", "claim_task", "finish_team"}
+# ponytail: claim_task is available to both leader and teammates (self-claim)
+_LEADER_ONLY: set[str] = {"spawn_teammate", "remove_teammate", "create_task", "finish_team"}
 
 
 def _load_tool(name: str) -> Tool:

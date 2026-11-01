@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import fnmatch
+import posixpath
 import re
 import shlex
 from typing import TYPE_CHECKING
@@ -224,35 +225,38 @@ def check_path_permission(ctx: FrameworkContext, path: str) -> None:
     CC:  (.git, .bashrc )  allow  ask.
      write_file / replace / apply_patch / multiedit_tool .
     """
+    # ponytail: normalize path to prevent traversal attacks like 'work/../.git/config'
+    norm_path = posixpath.normpath(str(path).replace("\\", "/"))
+
     # 1. "**" = ( ask)
-    if _WILDCARD in ctx.allow_rules and not _is_protected_path(path):
+    if _WILDCARD in ctx.allow_rules and not _is_protected_path(norm_path):
         return
 
     # 2. deny (gitignore )
     if ctx.deny_rules:
         deny_spec = pathspec.PathSpec.from_lines("gitwildmatch", ctx.deny_rules)
-        if deny_spec.match_file(path):
+        if deny_spec.match_file(norm_path):
             raise PermissionDenied(
-                reason=f" {path} ",
-                permission_key=path,
+                reason=f" {norm_path} ",
+                permission_key=norm_path,
             )
 
     # 3. allow (gitignore )
     if ctx.allow_rules:
         allow_spec = pathspec.PathSpec.from_lines("gitwildmatch", ctx.allow_rules)
-        if allow_spec.match_file(path):
+        if allow_spec.match_file(norm_path):
             # CC: allow ask
-            if _is_protected_path(path):
+            if _is_protected_path(norm_path):
                 raise AskPermission(
-                    prompt=f" {path} ?",
-                    permission_key=path,
+                    prompt=f" {norm_path} ?",
+                    permission_key=norm_path,
                 )
             return
 
     # 4. → ask (CC: permission_key glob)
-    dir_glob = _path_to_dir_glob(path)
+    dir_glob = _path_to_dir_glob(norm_path)
     raise AskPermission(
-        prompt=f" {path} ?",
+        prompt=f" {norm_path} ?",
         permission_key=dir_glob,
     )
 

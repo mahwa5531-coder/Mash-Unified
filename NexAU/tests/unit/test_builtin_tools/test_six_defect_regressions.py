@@ -11,6 +11,7 @@ Regression test suite for the 6 architectural defects from Mash-Unified Tool Tes
 """
 
 import tempfile
+import pytest
 from pathlib import Path
 from nexau.archs.sandbox.local_sandbox import LocalSandbox
 from nexau.archs.tool.builtin.file_tools.search_file_content import search_file_content
@@ -111,7 +112,7 @@ def test_def_03_killed_tasks_evicted_from_list():
 
 def test_def_04_web_fetch_schema_allows_prompt_only():
     """Verify web_fetch schema accepts prompt without url and parses target URL."""
-    schema_path = Path("NexAU/nexau/archs/tool/builtin/schemas/web_fetch.tool.yaml")
+    schema_path = Path(__file__).resolve().parents[3] / "nexau" / "archs" / "tool" / "builtin" / "schemas" / "web_fetch.tool.yaml"
     tool = Tool.from_yaml(str(schema_path), "nexau.archs.tool.builtin.web_tools.web_fetch:web_fetch")
 
     # Validation must succeed for prompt only
@@ -134,3 +135,101 @@ def test_def_09_glob_case_sensitive():
         res_sensitive = glob(pattern="*.MD", dir_path=str(root), case_sensitive=True)
         assert "report.md" not in res_sensitive["content"]
         assert "No files found" in res_sensitive["returnDisplay"]
+
+
+def test_d01_path_traversal_permission_denied():
+    """Verify check_path_permission normalizes path traversal preventing bypass."""
+    import pytest
+    from nexau.archs.main_sub.framework_context import FrameworkContext
+    from nexau.archs.permissions.helpers import check_path_permission
+    from nexau.archs.permissions.types import PermissionDenied
+
+    ctx = FrameworkContext.for_testing(
+        allow_rules=["work/**"],
+        deny_rules=[".git/**"],
+    )
+    with pytest.raises(PermissionDenied):
+        check_path_permission(ctx, "work/../.git/config")
+
+
+def test_d04_claim_task_available_to_teammates():
+    """Verify claim_task is included in teammate tools for self-claim."""
+    from nexau.archs.main_sub.team.tools import get_teammate_tools
+    tools = get_teammate_tools()
+    tool_names = [t.name for t in tools]
+    assert "claim_task" in tool_names
+
+
+@pytest.mark.anyio
+async def test_d05_task_status_transition_validation():
+    """Verify task board validates state transitions (pending -> in_progress -> completed)."""
+    import pytest
+    from nexau.archs.main_sub.team.task_board import TaskBoard
+    from nexau.archs.session.models.team_task import TeamTaskModel
+    from nexau.archs.session.models.team_task_lock import TeamTaskLockModel
+    from nexau.archs.session.orm import InMemoryDatabaseEngine
+    from nexau.archs.session.task_lock_service import TaskLockService
+
+    engine = InMemoryDatabaseEngine()
+    await engine.setup_models([TeamTaskModel, TeamTaskLockModel])
+    lock_svc = TaskLockService(engine=engine)
+    board = TaskBoard(
+        engine=engine,
+        task_lock_service=lock_svc,
+        user_id="u1",
+        session_id="s1",
+        team_id="t1",
+    )
+    info = await board.create_task(title="Test", created_by="leader")
+    task_id = info.task_id
+
+    # Disallow pending -> completed directly
+    with pytest.raises(ValueError, match="Invalid task status transition"):
+        await board.update_status(task_id=task_id, status="completed")
+
+    # Allow pending -> in_progress
+    await board.update_status(task_id=task_id, status="in_progress")
+    t = await board._get_task(task_id)
+    assert t.status == "in_progress"
+
+    # Allow in_progress -> completed
+    await board.update_status(task_id=task_id, status="completed")
+    t = await board._get_task(task_id)
+    assert t.status == "completed"
+
+    # Disallow completed -> pending
+    with pytest.raises(ValueError, match="Invalid task status transition"):
+        await board.update_status(task_id=task_id, status="pending")
+
+
+def test_d06_d08_csv_delimiter_and_binary_rejection():
+    """Verify delimiter detection for TSV/semicolon and rejection of binary files."""
+    from nexau.ingestion_pipeline.csv_to_md_parquet import parse_csv_to_markdown
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # TSV
+        tsv_path = Path(tmpdir) / "data.tsv"
+        tsv_path.write_text("name\tage\tcity\nAlice\t30\tParis\nBob\t25\tRome", encoding="utf-8")
+        tsv_res = parse_csv_to_markdown(str(tsv_path))
+        assert "3 columns" in tsv_res
+        assert "Alice" in tsv_res
+
+        # Semicolon CSV
+        semi_path = Path(tmpdir) / "data.csv"
+        semi_path.write_text("colA;colB;colC\n1;2;3\n4;5;6", encoding="utf-8")
+        semi_res = parse_csv_to_markdown(str(semi_path))
+        assert "3 columns" in semi_res
+
+        # Binary file with .csv extension
+        bin_path = Path(tmpdir) / "corrupt.csv"
+        bin_path.write_bytes(b"\x00\x01\x02\xffbinarydata")
+        bin_res = parse_csv_to_markdown(str(bin_path))
+        assert "appears to be binary" in bin_res
+
+
+def test_d07_resolve_path_rfc8089_file_uri():
+    """Verify resolve_path retains root slash for POSIX file:/// paths."""
+    from nexau.archs.tool.builtin._sandbox_utils import resolve_path
+    from nexau.archs.sandbox.local_sandbox import LocalSandbox
+    sandbox = LocalSandbox(work_dir=Path("/workspace"))
+    res = resolve_path("file:///etc/hosts", sandbox)
+    assert res in ("/etc/hosts", "\\etc\\hosts", "C:\\etc\\hosts")

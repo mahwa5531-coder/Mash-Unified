@@ -34,40 +34,43 @@ async def list_active_tasks(session_id: str | None = None):
                 pass
 
         from nexau.archs.sandbox.local_sandbox import LocalSandbox
-        sandbox = LocalSandbox(work_dir=Path(session_work_dir) if session_work_dir else Path.cwd())
-        bg_tasks = sandbox.list_background_tasks()
-        for pid, info in bg_tasks.items():
-            task_sid = info.get("sandbox_id", "")
-            if session_id and task_sid and task_sid != session_id:
-                continue
+        target_sids = [session_id] if session_id else (list(LocalSandbox._registry_by_session.keys()) or ["default"])
+        all_sandboxes = [LocalSandbox(sandbox_id=sid, work_dir=Path(session_work_dir) if session_work_dir else Path.cwd()) for sid in target_sids]
 
-            task_cwd = info.get("cwd", "")
-            if session_work_dir and task_cwd:
-                try:
-                    if Path(task_cwd).resolve() != Path(session_work_dir).resolve():
-                        continue
-                except Exception:
-                    pass
+        for sandbox in all_sandboxes:
+            bg_tasks = sandbox.list_background_tasks()
+            for pid, info in bg_tasks.items():
+                task_sid = info.get("sandbox_id", "")
+                if session_id and task_sid and task_sid != session_id:
+                    continue
 
-            cmd_result = sandbox.get_background_task_status(pid)
-            status = "running"
-            if info.get("status") == "killed":
-                status = "killed"
-            elif cmd_result.status == SandboxStatus.SUCCESS:
-                status = "completed"
-            elif cmd_result.status == SandboxStatus.ERROR:
-                status = "failed"
-            else:
-                status = info.get("status", "running")
-            cmd = info.get("command", "")
-            seen_commands.add(cmd)
-            tasks_list.append({
-                "pid": pid,
-                "command": cmd,
-                "status": status,
-                "duration_ms": cmd_result.duration_ms,
-                "cwd": task_cwd,
-            })
+                task_cwd = info.get("cwd", "")
+                if session_work_dir and task_cwd:
+                    try:
+                        if Path(task_cwd).resolve() != Path(session_work_dir).resolve():
+                            continue
+                    except Exception:
+                        pass
+
+                cmd_result = sandbox.get_background_task_status(pid)
+                status = "running"
+                if info.get("status") == "killed":
+                    status = "killed"
+                elif cmd_result.status == SandboxStatus.SUCCESS:
+                    status = "completed"
+                elif cmd_result.status == SandboxStatus.ERROR:
+                    status = "failed"
+                else:
+                    status = info.get("status", "running")
+                cmd = info.get("command", "")
+                seen_commands.add(cmd)
+                tasks_list.append({
+                    "pid": pid,
+                    "command": cmd,
+                    "status": status,
+                    "duration_ms": cmd_result.duration_ms,
+                    "cwd": task_cwd,
+                })
     except Exception:
         pass
 
@@ -83,8 +86,18 @@ async def kill_task(pid: int):
         import sys
 
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
+        from nexau.archs.sandbox.local_sandbox import LocalSandbox
         from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
-        sandbox = get_sandbox(None)
+
+        # Check all registered sandbox sessions to find the sandbox owning pid
+        sandbox = None
+        for sid in list(LocalSandbox._registry_by_session.keys()):
+            sb = LocalSandbox(sandbox_id=sid)
+            if pid in sb.list_background_tasks():
+                sandbox = sb
+                break
+        if sandbox is None:
+            sandbox = get_sandbox(None)
         res = sandbox.kill_background_task(pid)
         is_success = (res.status == SandboxStatus.SUCCESS)
 
@@ -134,13 +147,21 @@ async def get_task_log(task_id: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Check active sandbox directly first if task_id is an active PID
+    # Check active sandboxes across all sessions directly first if task_id is an active PID
     try:
+        from nexau.archs.sandbox.local_sandbox import LocalSandbox
         from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
-        sandbox = get_sandbox(None)
         if pid is not None:
-            if pid in sandbox.list_background_tasks():
-                status_res = sandbox.get_background_task_status(pid)
+            active_sb = None
+            for sid in list(LocalSandbox._registry_by_session.keys()):
+                sb = LocalSandbox(sandbox_id=sid)
+                if pid in sb.list_background_tasks():
+                    active_sb = sb
+                    break
+            if active_sb is None:
+                active_sb = get_sandbox(None)
+            if pid in active_sb.list_background_tasks():
+                status_res = active_sb.get_background_task_status(pid)
                 combined = (status_res.stdout or "") + ("\n" + status_res.stderr if status_res.stderr else "")
                 if combined.strip():
                     return {"content": combined}
