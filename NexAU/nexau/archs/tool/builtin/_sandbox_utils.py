@@ -7,8 +7,9 @@ NexAU's BaseSandbox abstraction (e.g. LocalSandbox/E2B).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, unquote_to_bytes
 
 from nexau.archs.main_sub.agent_state import AgentState
 from nexau.archs.sandbox import BaseSandbox
@@ -34,12 +35,19 @@ def get_sandbox(agent_state: AgentState | None) -> BaseSandbox:
 def resolve_path(path: str, sandbox: BaseSandbox) -> str:
     """Resolve relative paths against sandbox work_dir or session brain uploads."""
     clean = str(path).strip().strip("'\"")
-    # ponytail: RFC-8089 file URI prefix stripping preserving root slash for POSIX absolute paths
-    if clean.startswith("file://"):
-        clean = clean[7:]
-    clean = unquote(clean)
-    if len(clean) >= 3 and clean[0] == "/" and clean[2] == ":":
-        clean = clean[1:]
+    # RFC-8089 file URI conversion (standard CPython pathlib.Path.from_uri specification)
+    if clean.startswith("file:"):
+        clean = clean.split("#")[0].split("?")[0]
+        p = clean[5:]
+        if p[:3] == "///":
+            p = p[2:]
+        elif p[:12] == "//localhost/":
+            p = p[11:]
+        if p[:3] == "///" or (p[:1] == "/" and p[2:3] in (":", "|")):
+            p = p[1:]
+        if p[1:2] == "|":
+            p = p[:1] + ":" + p[2:]
+        clean = os.fsdecode(unquote_to_bytes(p))
 
     if Path(clean).is_absolute():
         return clean

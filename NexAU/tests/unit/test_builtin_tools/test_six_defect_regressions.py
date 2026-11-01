@@ -227,9 +227,30 @@ def test_d06_d08_csv_delimiter_and_binary_rejection():
 
 
 def test_d07_resolve_path_rfc8089_file_uri():
-    """Verify resolve_path retains root slash for POSIX file:/// paths."""
+    """Verify resolve_path handles all RFC-8089 URI variants (localhost, C|, percent-encoding, single slash)."""
     from nexau.archs.tool.builtin._sandbox_utils import resolve_path
     from nexau.archs.sandbox.local_sandbox import LocalSandbox
     sandbox = LocalSandbox(work_dir=Path("/workspace"))
+
+    # POSIX triple slash
     res = resolve_path("file:///etc/hosts", sandbox)
     assert res in ("/etc/hosts", "\\etc\\hosts", "C:\\etc\\hosts")
+
+    # POSIX localhost authority
+    res_local = resolve_path("file://localhost/etc/hosts", sandbox)
+    assert res_local in ("/etc/hosts", "\\etc\\hosts", "C:\\etc\\hosts")
+
+    # POSIX single-slash
+    res_single = resolve_path("file:/etc/hosts", sandbox)
+    assert res_single in ("/etc/hosts", "\\etc\\hosts", "C:\\etc\\hosts")
+
+    # Windows DOS drive and legacy pipe syntax
+    res_win = resolve_path("file:///C:/Users/test.py", sandbox)
+    assert "C:" in res_win and "test.py" in res_win
+
+    res_pipe = resolve_path("file:///C|/Users/test.py", sandbox)
+    assert "C:" in res_pipe and "test.py" in res_pipe
+
+    # Percent encoding and query/fragment stripping
+    res_enc = resolve_path("file:///home/user/my%20data/test.py?foo=1#line5", sandbox)
+    assert "my data" in res_enc and "foo=" not in res_enc and "#line5" not in res_enc
