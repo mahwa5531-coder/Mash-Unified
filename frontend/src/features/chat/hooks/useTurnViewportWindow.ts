@@ -137,18 +137,18 @@ export function useTurnViewportWindow(
 ): UseTurnViewportWindowResult {
   let containerRef: React.RefObject<HTMLDivElement | null>;
   let turns: Turn[];
-  let isStreaming: boolean;
+  let _isStreaming: boolean;
   let overscanScreens: number;
 
   if (containerRefOrOptions && 'containerRef' in containerRefOrOptions) {
     containerRef = containerRefOrOptions.containerRef;
     turns = containerRefOrOptions.turns || [];
-    isStreaming = Boolean(containerRefOrOptions.isStreaming);
+    _isStreaming = Boolean(containerRefOrOptions.isStreaming);
     overscanScreens = containerRefOrOptions.overscanScreens ?? 2;
   } else {
     containerRef = containerRefOrOptions as React.RefObject<HTMLDivElement | null>;
     turns = turnsArg || [];
-    isStreaming = Boolean(isStreamingArg);
+    _isStreaming = Boolean(isStreamingArg);
     overscanScreens = 2;
   }
 
@@ -168,8 +168,7 @@ export function useTurnViewportWindow(
     }
   }, []);
 
-  const updateWindow = useCallback(() => {
-    const container = containerRef.current;
+  const updateWindow = useCallback((container: HTMLDivElement | null) => {
     const newRange = computeVisibleRange(container, turns, turnHeightCacheRef.current, overscanScreens);
     setRange((prev) => {
       if (prev.startIndex === newRange.startIndex && prev.endIndex === newRange.endIndex) {
@@ -177,7 +176,7 @@ export function useTurnViewportWindow(
       }
       return newRange;
     });
-  }, [containerRef, turns, overscanScreens]);
+  }, [turns, overscanScreens]);
 
   // Scroll & resize listeners with 60 FPS RAF throttling
   useEffect(() => {
@@ -189,7 +188,7 @@ export function useTurnViewportWindow(
       if (rafId !== null) return;
       rafId = requestAnimationFrame(() => {
         rafId = null;
-        updateWindow();
+        updateWindow(container);
       });
     };
 
@@ -201,20 +200,38 @@ export function useTurnViewportWindow(
     container.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onResize, { passive: true });
 
+    // ponytail: observe desktop container width directly (detects panel splitter and workspace resizing)
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      let lastWidth = container.clientWidth;
+      ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const width = Math.round(entry.contentRect.width);
+          if (Math.abs(width - lastWidth) > 8) {
+            lastWidth = width;
+            turnHeightCacheRef.current.clear();
+            onScroll();
+          }
+        }
+      });
+      ro.observe(container);
+    }
+
     // Initial calculation on mount/attachment
-    updateWindow();
+    updateWindow(container);
 
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
       container.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
+      ro?.disconnect();
     };
   }, [containerRef, updateWindow]);
 
   // Update window when turns change
   useEffect(() => {
-    updateWindow();
-  }, [turns, updateWindow]);
+    updateWindow(containerRef.current);
+  }, [containerRef, turns, updateWindow]);
 
   return {
     startIndex: range.startIndex,

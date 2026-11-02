@@ -117,11 +117,12 @@ export function TimelineRow(props: TimelineRowProps) {
       <div
         key={entry.id}
         className={cn(
-          "flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 font-sans my-0.5",
-          isChild ? "pl-1 py-0.5" : "my-0.5"
+          "flex items-center gap-2 text-xs font-sans my-1 text-zinc-500 dark:text-zinc-400 select-text",
+          isChild ? "pl-2 py-0.5" : "py-0.5"
         )}
       >
-        <span className="font-sans text-[12px] text-zinc-500 dark:text-zinc-400 italic">
+        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400/60 dark:bg-zinc-500/60 shrink-0" />
+        <span className="font-sans text-[12px] text-zinc-600 dark:text-zinc-300 leading-snug">
           {text}
         </span>
       </div>

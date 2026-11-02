@@ -34,17 +34,12 @@ function enqueueRender<T>(fn: () => Promise<T>): Promise<T> {
   return next;
 }
 
-// Global orphan cleanup to sweep temporary DOM measurement nodes
+// Specific orphan cleanup to sweep only the targeted completed render node
 function sweepMermaidOrphans(renderId?: string) {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined" || !renderId) return;
   try {
-    if (renderId) {
-      document.getElementById(renderId)?.remove();
-      document.getElementById(`d${renderId}`)?.remove();
-    }
-    // Sweep any dangling scratch sandbox divs created by Mermaid layout calculations
-    const orphans = document.querySelectorAll('div[id^="dmermaid_"]');
-    orphans.forEach((el) => el.remove());
+    document.getElementById(renderId)?.remove();
+    document.getElementById(`d${renderId}`)?.remove();
   } catch {}
 }
 
@@ -198,8 +193,6 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
           const mermaid = await getInitializedMermaid(isDark);
           sweepMermaidOrphans(renderId);
 
-          const repairedChart = repairMermaidSyntax(chart);
-
           // 6-second timeout race to prevent infinite hanging on dagre layout loops
           const timeoutPromise = new Promise<never>((_, reject) => {
             abortTimer = setTimeout(() => {
@@ -208,13 +201,21 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
           });
 
           const renderPromise = (async () => {
+            // 1. Try rendering chart directly without regex alterations
             try {
-              return await mermaid.render(renderId, repairedChart);
-            } catch (firstErr) {
-              // Attempt self-healing fallback pass before failing
+              return await mermaid.render(renderId, chart.trim());
+            } catch {
+              // 2. If direct render failed, attempt gentle syntax repair
               sweepMermaidOrphans(renderId);
-              const fallbackChart = fallbackSanitize(repairedChart);
-              return await mermaid.render(renderId, fallbackChart);
+              try {
+                const repairedChart = repairMermaidSyntax(chart);
+                return await mermaid.render(renderId, repairedChart);
+              } catch {
+                // 3. Fallback sanitize for edge cases
+                sweepMermaidOrphans(renderId);
+                const fallbackChart = fallbackSanitize(chart);
+                return await mermaid.render(renderId, fallbackChart);
+              }
             }
           })();
 

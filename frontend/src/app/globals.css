@@ -88,6 +88,7 @@ body {
 
 
 @import "katex/dist/katex.min.css";
+@import "streamdown/styles.css";
 
 /* Universal Scrollbar Removal - Completely remove all scrollbars across the entire app */
 html,

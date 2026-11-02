@@ -1,50 +1,8 @@
 import assert from 'node:assert';
 
-// 1. Emulate buildTurns from lib/turns.ts
-function buildTurns(chatMessages) {
-  const result = [];
-  let flatIdx = 0;
-  for (let i = 0; i < chatMessages.length; i++) {
-    const msg = chatMessages[i];
-    if (msg.role === 'user') {
-      const stableId = msg.turnId || `turn_${msg.sessionId || 'sid'}_${flatIdx}_${msg.content.slice(0, 16).replace(/\s+/g, '_')}`;
-      result.push({ 
-        id: stableId,
-        turnId: msg.turnId,
-        status: msg.status,
-        userMsg: msg, 
-        aiMsgs: [], 
-        flatIdx,
-      });
-    } else if (result.length > 0) {
-      const currentTurn = result[result.length - 1];
-      currentTurn.aiMsgs.push(msg);
-      if (msg.status) {
-        currentTurn.status = msg.status;
-      }
-    } else {
-      const stableId = msg.turnId || `turn_ctx_0`;
-      result.push({
-        id: stableId,
-        turnId: msg.turnId,
-        status: msg.status,
-        userMsg: { role: 'user', content: '[Earlier Context]' },
-        aiMsgs: [msg],
-        flatIdx: 0,
-      });
-    }
-    flatIdx++;
-  }
-  return result;
-}
-
-// 2. Emulate isToolRunning from TaskWorkLogAccordion.tsx
-function isToolRunning(tool, isStreaming) {
-  if (!tool) return false;
-  if (tool.status === 'completed' || tool.status === 'failed') return false;
-  if (tool.status === 'running') return true;
-  return !!(isStreaming && tool.output === undefined);
-}
+// Real production imports (zero duplicate mock emulation)
+import { buildTurns } from '../src/features/chat/utils/turns.ts';
+import { isToolRunning } from '../src/features/chat/components/work-log/toolTimeline.ts';
 
 console.log("======================================================================");
 console.log("STARTING FRONTEND CHAT RENDERING & TURN ISOLATION TESTS");

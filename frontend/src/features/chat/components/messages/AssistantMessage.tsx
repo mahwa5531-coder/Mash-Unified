@@ -181,6 +181,10 @@ const AssistantMessage = memo(function AssistantMessage({
   return (
     prev.isLast === next.isLast &&
     prev.isStreaming === next.isStreaming &&
+    prev.onRetry === next.onRetry &&
+    prev.onContinue === next.onContinue &&
+    prev.onApproveTool === next.onApproveTool &&
+    prev.onOpenFile === next.onOpenFile &&
     prev.msg.status === next.msg.status &&
     prev.msg.content === next.msg.content &&
     prev.msg.timestamp === next.msg.timestamp &&

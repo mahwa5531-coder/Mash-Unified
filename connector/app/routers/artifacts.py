@@ -499,7 +499,9 @@ async def get_file_content(
             }
         except Exception as csv_err:
             try:
-                return {"content": p.read_text(encoding="utf-8", errors="replace")}
+                raw_text = p.read_text(encoding="utf-8", errors="replace")
+                clean_text = raw_text.replace("\r\r\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
+                return {"content": clean_text}
             except Exception:
                 return {"content": f"Error loading CSV file '{p.name}': {csv_err}", "error": str(csv_err)}
 
@@ -522,7 +524,9 @@ async def get_file_content(
                 "total_bytes": file_size,
                 "preview_bytes": len(text_chunk.encode("utf-8")),
             }
-        return {"content": p.read_text(encoding="utf-8", errors="replace")}
+        raw_text = p.read_text(encoding="utf-8", errors="replace")
+        clean_text = raw_text.replace("\r\r\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
+        return {"content": clean_text}
     except Exception as e:
         return {"content": f"Error reading file: {e}"}
 

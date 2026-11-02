@@ -11,7 +11,8 @@ export function isToolRunning(tool?: ToolCallItem, isStreaming?: boolean): boole
     tool.status === 'denied'
   ) return false;
   if (tool.status === 'running') return true;
-  return !!(isStreaming && tool.output === undefined);
+  // ponytail: explicit status preferred; fallback only when streaming and output has not arrived
+  return !!(isStreaming && tool.output === undefined && tool.status !== 'completed');
 }
 
 export function extractLineRange(args?: Record<string, any>): string | null {
@@ -36,6 +37,71 @@ export function formatDurationDisplay(secs: number): string {
   return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
 }
 
+// ponytail: Keyed Slot Registry for O(1) canonical tool category dispatch (replaces 160-line substring regex ladder)
+const EXACT_TOOL_CATEGORY_MAP: Record<string, TimelineEntry['type']> = {
+  run_shell_command: 'command',
+  run_command: 'command',
+  shell: 'command',
+  bash: 'command',
+  run_code: 'command',
+  terminal: 'command',
+
+  read_file: 'file_read',
+  view_file: 'file_read',
+  read_many_files: 'file_read',
+  get_file: 'file_read',
+
+  list_directory: 'folder_view',
+  list_dir: 'folder_view',
+  browse: 'folder_view',
+
+  write_file: 'edit',
+  write_to_file: 'edit',
+  write: 'edit',
+  replace: 'edit',
+  replace_file_content: 'edit',
+  edit_file: 'edit',
+  multiedit: 'edit',
+  apply_patch: 'edit',
+  patch: 'edit',
+
+  search_web: 'web_search',
+  web_search: 'web_search',
+
+  web_fetch: 'web_fetch',
+  read_url_content: 'web_fetch',
+  fetch_url: 'web_fetch',
+
+  search_file_content: 'code_search',
+  grep: 'code_search',
+  find_by_name: 'code_search',
+  glob: 'code_search',
+  find: 'code_search',
+
+  invoke_subagent: 'subagent',
+  define_subagent: 'subagent',
+
+  manage_task: 'task',
+  task: 'task',
+  schedule: 'task',
+};
+
+export function resolveToolCategory(name: string): TimelineEntry['type'] {
+  const lower = (name || '').toLowerCase();
+  if (EXACT_TOOL_CATEGORY_MAP[lower]) return EXACT_TOOL_CATEGORY_MAP[lower];
+  // Fallback for namespaced / prefixed tools (e.g. "mcp__run_command" or "custom_read_file")
+  if (lower.includes('command') || lower.includes('shell') || lower.includes('terminal')) return 'command';
+  if (lower.includes('edit') || lower.includes('patch') || lower.includes('write')) return 'edit';
+  if (lower.includes('read') || lower.includes('view') || lower.includes('cat')) return 'file_read';
+  if (lower.includes('list') || lower.includes('browse')) return 'folder_view';
+  if (lower.includes('web') && lower.includes('search')) return 'web_search';
+  if (lower.includes('web') || lower.includes('fetch') || lower.includes('url')) return 'web_fetch';
+  if (lower.includes('search') || lower.includes('grep') || lower.includes('glob')) return 'code_search';
+  if (lower.includes('subagent')) return 'subagent';
+  if (lower.includes('task')) return 'task';
+  return 'other';
+}
+
 export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineEntry {
   const name = (t.name || '').toLowerCase();
   let args = t.args || {};
@@ -43,16 +109,16 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     try { args = JSON.parse(args); } catch { args = {}; }
   }
 
-  const rawSummary = args.toolSummary || args.tool_summary || args.summary || args.description || t.toolSummary || (t as any).summary || null;
+  const rawSummary = t.toolSummary || args.toolSummary || args.tool_summary || args.summary || args.description || (t as any).summary || null;
   const toolSummary = rawSummary ? String(rawSummary).trim() : null;
-  const rawAction = args.toolAction || args.tool_action || t.toolAction || null;
+  const rawAction = t.toolAction || args.toolAction || args.tool_action || null;
   const toolAction = rawAction ? String(rawAction).trim() : null;
 
   // The interactive approval card is ONLY rendered while waiting for human permission.
   // As soon as the user makes a decision (allow/deny) or status transitions, the card vanishes
   // and the tool call renders as its normal canonical timeline item (command, file_view, etc.).
   if (t.status === 'pending_approval' && !t.decision) {
-    const rawCmd = args.CommandLine || args.command || args.cmd || '';
+    const rawCmd = (t as any).command || args.CommandLine || args.command || args.cmd || '';
     return {
       id: `tool-${tIdx}`,
       type: 'approval',
@@ -70,168 +136,156 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     };
   }
 
-  if (
-    name.includes('run_shell_command') || 
-    name.includes('run_command') || 
-    name.includes('shell') || 
-    name.includes('run_code') ||
-    name.includes('bash') ||
-    name.includes('terminal')
-  ) {
-    const rawCmd = args.CommandLine || args.command || args.cmd || args.code || args.source_code || (typeof args === 'string' ? args : 'command');
-    const cleanCmd = String(rawCmd).replace(/^powershell\s+-Command\s+/i, '').trim();
-    return {
-      id: `tool-${tIdx}`,
-      type: 'command',
-      data: { tool: t, cmd: cleanCmd, fullCmd: String(rawCmd), toolSummary, toolAction }
-    };
-  } else if (name.includes('list_directory') || name.includes('list_dir') || name.includes('browse')) {
-    const p = args.DirectoryPath || args.dir_path || args.path || args.Path || 'directory';
-    const fname = String(p).split(/[/\\]/).pop() || p;
-    return {
-      id: `tool-${tIdx}`,
-      type: 'folder_view',
-      data: { tool: t, foldername: fname, folderPath: String(p), toolSummary, toolAction }
-    };
-  } else if (name.includes('read_file') || name.includes('view_file') || name.includes('read_many_files') || name.includes('get_file')) {
-    const p = args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path || args.target_file || 'file';
-    const fname = String(p).split(/[/\\]/).pop() || p;
-    const isDir = !fname.includes('.') || name.includes('list');
-    if (isDir) {
+  const category = resolveToolCategory(name);
+
+  switch (category) {
+    case 'command': {
+      const rawCmd = (t as any).command || args.CommandLine || args.command || args.cmd || args.code || args.source_code || (typeof args === 'string' ? args : 'command');
+      const cleanCmd = String(rawCmd).replace(/^powershell\s+-Command\s+/i, '').trim();
+      return {
+        id: `tool-${tIdx}`,
+        type: 'command',
+        data: { tool: t, cmd: cleanCmd, fullCmd: String(rawCmd), toolSummary, toolAction }
+      };
+    }
+    case 'folder_view': {
+      const p = (t as any).path || args.DirectoryPath || args.dir_path || args.path || args.Path || 'directory';
+      const fname = String(p).split(/[/\\]/).pop() || p;
       return {
         id: `tool-${tIdx}`,
         type: 'folder_view',
         data: { tool: t, foldername: fname, folderPath: String(p), toolSummary, toolAction }
       };
-    } else {
+    }
+    case 'file_read': {
+      const p = (t as any).path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path || args.target_file || 'file';
+      const fname = String(p).split(/[/\\]/).pop() || p;
+      const isDir = !fname.includes('.') || name.includes('list');
+      if (isDir) {
+        return {
+          id: `tool-${tIdx}`,
+          type: 'folder_view',
+          data: { tool: t, foldername: fname, folderPath: String(p), toolSummary, toolAction }
+        };
+      } else {
+        return {
+          id: `tool-${tIdx}`,
+          type: 'file_read',
+          data: { tool: t, filename: fname, filePath: String(p), lineRange: extractLineRange(args), toolSummary, toolAction }
+        };
+      }
+    }
+    case 'edit': {
+      const p = (t as any).path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path || args.target_file || args.filepath || 'file';
+      const fname = String(p).split(/[/\\]/).pop() || p;
+      let added = 0;
+      let deleted = 0;
+
+      if (args.ReplacementContent !== undefined && args.TargetContent !== undefined) {
+        added = String(args.ReplacementContent).split('\n').length;
+        deleted = String(args.TargetContent).split('\n').length;
+      } else if (args.new_string !== undefined && args.old_string !== undefined) {
+        added = String(args.new_string).split('\n').length;
+        deleted = String(args.old_string).split('\n').length;
+      } else if (Array.isArray(args.edits)) {
+        for (const edit of args.edits) {
+          if (edit?.new_string) added += String(edit.new_string).split('\n').length;
+          if (edit?.old_string) deleted += String(edit.old_string).split('\n').length;
+        }
+        added = Math.max(1, added);
+      } else if (args.patch || args.input) {
+        const patchLines = String(args.patch || args.input).split('\n');
+        for (const line of patchLines) {
+          if (line.startsWith('+') && !line.startsWith('+++')) added++;
+          else if (line.startsWith('-') && !line.startsWith('---')) deleted++;
+        }
+        added = Math.max(1, added);
+      } else if (args.CodeContent !== undefined || args.content !== undefined) {
+        added = String(args.CodeContent ?? args.content ?? '').split('\n').length;
+        deleted = 0;
+      }
+
       return {
         id: `tool-${tIdx}`,
-        type: 'file_read',
-        data: { tool: t, filename: fname, filePath: String(p), lineRange: extractLineRange(args), toolSummary, toolAction }
+        type: 'edit',
+        data: { 
+          tool: t, 
+          filename: fname, 
+          filePath: String(p), 
+          added, 
+          deleted, 
+          lineRange: extractLineRange(args),
+          toolSummary,
+          toolAction,
+        }
       };
     }
-  } else if (
-    name === 'replace' ||
-    name.includes('replace_file_content') ||
-    name.includes('write_file') ||
-    name.includes('write_to_file') ||
-    name.includes('edit_file') ||
-    name.includes('multiedit') ||
-    name.includes('apply_patch') ||
-    name.includes('patch') ||
-    name === 'write'
-  ) {
-    const p = args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path || args.target_file || args.filepath || 'file';
-    const fname = String(p).split(/[/\\]/).pop() || p;
-    let added = 0;
-    let deleted = 0;
-
-    if (args.ReplacementContent !== undefined && args.TargetContent !== undefined) {
-      added = String(args.ReplacementContent).split('\n').length;
-      deleted = String(args.TargetContent).split('\n').length;
-    } else if (args.new_string !== undefined && args.old_string !== undefined) {
-      added = String(args.new_string).split('\n').length;
-      deleted = String(args.old_string).split('\n').length;
-    } else if (Array.isArray(args.edits)) {
-      for (const edit of args.edits) {
-        if (edit?.new_string) added += String(edit.new_string).split('\n').length;
-        if (edit?.old_string) deleted += String(edit.old_string).split('\n').length;
+    case 'web_search': {
+      const query = args.Query || args.query || args.search_term || args.pattern || '*';
+      return {
+        id: `tool-${tIdx}`,
+        type: 'web_search',
+        data: { tool: t, query: String(query), toolSummary, toolAction }
+      };
+    }
+    case 'web_fetch': {
+      const url = args.Url || args.url || args.target_url || args.link || 'url';
+      return {
+        id: `tool-${tIdx}`,
+        type: 'web_fetch',
+        data: { tool: t, url: String(url), toolSummary, toolAction }
+      };
+    }
+    case 'code_search': {
+      const pattern = args.Query || args.Pattern || args.pattern || args.query || args.search_term || '*';
+      let countStr = '';
+      if (t.output) {
+        const lines = t.output.split('\n').filter((l) => l.trim().length > 0);
+        countStr = `${lines.length} result${lines.length !== 1 ? 's' : ''}`;
       }
-      added = Math.max(1, added);
-    } else if (args.patch || args.input) {
-      const patchLines = String(args.patch || args.input).split('\n');
-      for (const line of patchLines) {
-        if (line.startsWith('+') && !line.startsWith('+++')) added++;
-        else if (line.startsWith('-') && !line.startsWith('---')) deleted++;
+      return {
+        id: `tool-${tIdx}`,
+        type: 'code_search',
+        data: { tool: t, pattern: String(pattern), countStr, toolSummary, toolAction }
+      };
+    }
+    case 'subagent': {
+      let subagentRoles: string[] = [];
+      if (Array.isArray(args.Subagents)) {
+        subagentRoles = args.Subagents.map((s: any) => s.Role || s.TypeName || 'Subagent');
+      } else if (args.Role || args.TypeName) {
+        subagentRoles = [args.Role || args.TypeName];
       }
-      added = Math.max(1, added);
-    } else if (args.CodeContent !== undefined || args.content !== undefined) {
-      added = String(args.CodeContent ?? args.content ?? '').split('\n').length;
-      deleted = 0;
+      const roleLabel = subagentRoles.length > 0 ? subagentRoles.join(', ') : (toolSummary || 'Subagent');
+      return {
+        id: `tool-${tIdx}`,
+        type: 'subagent',
+        data: { tool: t, roleLabel, args, toolSummary, toolAction }
+      };
     }
-
-    return {
-      id: `tool-${tIdx}`,
-      type: 'edit',
-      data: { 
-        tool: t, 
-        filename: fname, 
-        filePath: String(p), 
-        added, 
-        deleted, 
-        lineRange: extractLineRange(args),
-        toolSummary,
-        toolAction,
+    case 'task': {
+      const isStatusCheck = args.Action === 'status';
+      let taskName = toolSummary || args.Prompt || '';
+      if (!taskName) {
+        if (args.Action === 'list') taskName = 'Running background tasks';
+        else if (args.Action === 'status') taskName = args.TaskId ? `task ${args.TaskId}` : 'task';
+        else if (args.Action === 'kill') taskName = `Cancel task ${args.TaskId || ''}`.trim();
+        else if (args.TaskId) taskName = `Task ${args.TaskId}`;
+        else taskName = 'Background task';
       }
-    };
-  } else if (name.includes('search_web') || (name.includes('web') && name.includes('search'))) {
-    const query = args.Query || args.query || args.search_term || args.pattern || '*';
-    return {
-      id: `tool-${tIdx}`,
-      type: 'web_search',
-      data: { tool: t, query: String(query), toolSummary, toolAction }
-    };
-  } else if (name.includes('web_fetch') || name.includes('read_url_content') || name.includes('fetch_url') || (name.includes('web') && name.includes('fetch'))) {
-    const url = args.Url || args.url || args.target_url || args.link || 'url';
-    return {
-      id: `tool-${tIdx}`,
-      type: 'web_fetch',
-      data: { tool: t, url: String(url), toolSummary, toolAction }
-    };
-  } else if (
-    name.includes('search') || 
-    name.includes('glob') || 
-    name.includes('grep') || 
-    name.includes('find')
-  ) {
-    const pattern = args.Query || args.Pattern || args.pattern || args.query || args.search_term || '*';
-    let countStr = '';
-    if (t.output) {
-      const lines = t.output.split('\n').filter((l) => l.trim().length > 0);
-      countStr = `${lines.length} result${lines.length !== 1 ? 's' : ''}`;
+      return {
+        id: `tool-${tIdx}`,
+        type: 'task',
+        data: { tool: t, taskName: String(taskName), isStatusCheck, action: args.Action, toolSummary, toolAction }
+      };
     }
-    return {
-      id: `tool-${tIdx}`,
-      type: 'code_search',
-      data: { tool: t, pattern: String(pattern), countStr, toolSummary, toolAction }
-    };
-  } else if (name.includes('invoke_subagent') || name.includes('define_subagent') || (name.includes('subagent') && !name.includes('manage'))) {
-    let subagentRoles: string[] = [];
-    if (Array.isArray(args.Subagents)) {
-      subagentRoles = args.Subagents.map((s: any) => s.Role || s.TypeName || 'Subagent');
-    } else if (args.Role || args.TypeName) {
-      subagentRoles = [args.Role || args.TypeName];
+    default: {
+      return {
+        id: `tool-${tIdx}`,
+        type: 'other',
+        data: { tool: t, toolSummary, toolAction }
+      };
     }
-    const roleLabel = subagentRoles.length > 0 ? subagentRoles.join(', ') : (toolSummary || 'Subagent');
-    return {
-      id: `tool-${tIdx}`,
-      type: 'subagent',
-      data: { tool: t, roleLabel, args, toolSummary, toolAction }
-    };
-  } else if (
-    name.includes('task') || 
-    name.includes('manage_task')
-  ) {
-    const isStatusCheck = args.Action === 'status';
-    let taskName = toolSummary || args.Prompt || '';
-    if (!taskName) {
-      if (args.Action === 'list') taskName = 'Running background tasks';
-      else if (args.Action === 'status') taskName = args.TaskId ? `task ${args.TaskId}` : 'task';
-      else if (args.Action === 'kill') taskName = `Cancel task ${args.TaskId || ''}`.trim();
-      else if (args.TaskId) taskName = `Task ${args.TaskId}`;
-      else taskName = 'Background task';
-    }
-    return {
-      id: `tool-${tIdx}`,
-      type: 'task',
-      data: { tool: t, taskName: String(taskName), isStatusCheck, action: args.Action, toolSummary, toolAction }
-    };
-  } else {
-    return {
-      id: `tool-${tIdx}`,
-      type: 'other',
-      data: { tool: t, toolSummary, toolAction }
-    };
   }
 }
 

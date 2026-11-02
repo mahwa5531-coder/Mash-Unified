@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { fetchTranscript } from '@/services/sessions';
 import { parseSessionHistory } from '@/features/chat/utils/turns';
 import { sessionStore, type SessionRuntimeState } from '../state/sessionStore';
@@ -28,6 +28,8 @@ export function useSessionHistory({
   const [hasEarlierTurns, setHasEarlierTurns] = useState<boolean>(false);
   const [remainingEarlierCount, setRemainingEarlierCount] = useState<number>(0);
   const [isLoadingEarlier, setIsLoadingEarlier] = useState<boolean>(false);
+  const [earlierLoadError, setEarlierLoadError] = useState<boolean>(false);
+  const isFetchingEarlierRef = useRef(false);
   const [historyRetryNonce, setHistoryRetryNonce] = useState(0);
 
   const updatePaginationState = useCallback((s: SessionRuntimeState) => {
@@ -44,14 +46,16 @@ export function useSessionHistory({
     const curSid = activeSessionIdRef.current;
     if (!curSid) return;
     const s = sessionStore.get(curSid);
-    if (!s || isLoadingEarlier) return;
+    if (!s || isLoadingEarlier || isFetchingEarlierRef.current) return;
     if (s.loadedRawCount >= s.totalHistoryCount) {
       setHasEarlierTurns(false);
       setRemainingEarlierCount(0);
       return;
     }
 
+    isFetchingEarlierRef.current = true;
     setIsLoadingEarlier(true);
+    setEarlierLoadError(false);
     try {
       const container = scrollContainerRef?.current;
       const prevScrollHeight = container ? container.scrollHeight : 0;
@@ -90,7 +94,11 @@ export function useSessionHistory({
       }
     } catch (err) {
       console.warn("Failed to load earlier transcript turns:", err);
+      if (activeSessionIdRef.current === curSid) {
+        setEarlierLoadError(true);
+      }
     } finally {
+      isFetchingEarlierRef.current = false;
       setIsLoadingEarlier(false);
     }
   }, [activeSessionIdRef, isLoadingEarlier, scrollContainerRef, updatePaginationState]);
@@ -105,6 +113,7 @@ export function useSessionHistory({
     remainingEarlierCount,
     setRemainingEarlierCount,
     isLoadingEarlier,
+    earlierLoadError,
     historyRetryNonce,
     retryLoadHistory,
     updatePaginationState,

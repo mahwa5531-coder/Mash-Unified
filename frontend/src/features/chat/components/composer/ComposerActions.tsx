@@ -30,6 +30,8 @@ export function ComposerActions({
   permissionMode = 'default',
   onPermissionModeChange,
 }: ComposerActionsProps) {
+  const hasContentToSubmit = Boolean(localPrompt.trim() || attachedFilesCount > 0);
+
   return (
     <TooltipProvider delayDuration={150}>
       <div className="flex items-center justify-between gap-2 pt-0.5">
@@ -65,19 +67,22 @@ export function ComposerActions({
             />
           )}
           {isStreaming ? (
-            localPrompt.trim() ? (
+            hasContentToSubmit ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     onClick={onSend}
-                    className="w-7 h-7 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                    disabled={isUploading || disabled}
+                    className="w-7 h-7 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-[#242424] dark:disabled:text-zinc-600 disabled:opacity-40 flex items-center justify-center transition-all cursor-pointer disabled:cursor-not-allowed shadow-sm"
                     aria-label="Queue message"
                   >
                     <ArrowUp size={13} />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="top">Queue message</TooltipContent>
+                <TooltipContent side="top">
+                  {isUploading ? "Uploading files..." : "Queue message"}
+                </TooltipContent>
               </Tooltip>
             ) : (
               <Tooltip>
@@ -100,7 +105,7 @@ export function ComposerActions({
                 <button 
                   type="button"
                   onClick={onSend}
-                  disabled={(!localPrompt.trim() && attachedFilesCount === 0) || disabled || isUploading}
+                  disabled={!hasContentToSubmit || disabled || isUploading}
                   className="w-7 h-7 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-[#242424] dark:disabled:text-zinc-600 disabled:opacity-40 flex items-center justify-center transition-all cursor-pointer disabled:cursor-not-allowed shadow-sm"
                   aria-label="Send prompt"
                 >

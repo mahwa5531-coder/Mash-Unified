@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useMemo } from 'react';
+import { cn } from '@/lib/utils';
 import {
   FilePill,
   PathPill,
   ExtensionBadge,
   WebLink
 } from '@/primitives';
-import TableContainer from '@/components/renderers/TableContainer';
 import CalloutBlockquote from '@/components/renderers/CalloutBlockquote';
 import { normalizePath } from '@/utils/normalizePath';
 import { BASE_URL } from '@/services/client';
@@ -84,16 +84,11 @@ export function useAgentMarkdownComponents({
       return <CalloutBlockquote {...props}>{children}</CalloutBlockquote>;
     },
 
-    /** Workpaper table container with Excel copy + CSV export (feature parity). */
-    table({ children, node: _node, ...props }: any) {
-      return <TableContainer {...props}>{children}</TableContainer>;
-    },
-
     p({ children, node: _node, ...props }: any) {
       return (
         <p className={isChat
-          ? "mb-3.5 text-[13.5px] leading-[1.75] text-zinc-900 dark:text-zinc-100 last:mb-0"
-          : "mb-4 text-[13.5px] leading-[1.75] text-zinc-900 dark:text-zinc-100 last:mb-0"
+          ? "mb-3 text-[13.5px] leading-[1.75] text-zinc-900 dark:text-zinc-100 last:mb-0 [li>&]:mb-0 [li>&]:my-0.5"
+          : "mb-3.5 text-[13.5px] leading-[1.75] text-zinc-900 dark:text-zinc-100 last:mb-0 [li>&]:mb-0 [li>&]:my-0.5"
         } {...props}>
           {processTextNodes(children, onOpenFile)}
         </p>
@@ -102,7 +97,7 @@ export function useAgentMarkdownComponents({
 
     ul({ children, node: _node, ...props }: any) {
       return (
-        <ul className="my-2.5 pl-5 list-disc space-y-1.5 text-zinc-900 dark:text-zinc-100 marker:text-zinc-400 dark:marker:text-zinc-500 [&_ul]:mt-1 [&_ul]:mb-0.5 [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:mt-1 [&_ol]:mb-0.5 [&_ol]:pl-4 [&_ol]:space-y-1" {...props}>
+        <ul className="my-2 pl-5 list-disc space-y-1 text-zinc-900 dark:text-zinc-100 marker:text-zinc-400 dark:marker:text-zinc-500 [&_ul]:my-0.5 [&_ul]:pl-4 [&_ol]:my-0.5 [&_ol]:pl-4" {...props}>
           {children}
         </ul>
       );
@@ -110,7 +105,7 @@ export function useAgentMarkdownComponents({
 
     ol({ children, node: _node, ...props }: any) {
       return (
-        <ol className="my-2.5 pl-5 list-decimal space-y-1.5 text-zinc-900 dark:text-zinc-100 marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400 [&_ul]:mt-1 [&_ul]:mb-0.5 [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:mt-1 [&_ol]:mb-0.5 [&_ol]:pl-4 [&_ol]:space-y-1" {...props}>
+        <ol className="my-2 pl-5 list-decimal space-y-1 text-zinc-900 dark:text-zinc-100 marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400 [&_ul]:my-0.5 [&_ul]:pl-4 [&_ol]:my-0.5 [&_ol]:pl-4" {...props}>
           {children}
         </ol>
       );
@@ -124,7 +119,7 @@ export function useAgentMarkdownComponents({
 
     li({ children, node: _node, ...props }: any) {
       return (
-        <li className="my-1 text-[13.5px] leading-[1.68] text-zinc-900 dark:text-zinc-100 [&_p]:mt-1 [&_p]:mb-1 [&_p:last-child]:mb-0" {...props}>
+        <li className="my-0.5 text-[13.5px] leading-[1.68] text-zinc-900 dark:text-zinc-100 [&_p]:mb-0 [&_p]:my-0.5" {...props}>
           {processTextNodes(children, onOpenFile)}
         </li>
       );
@@ -172,19 +167,54 @@ export function useAgentMarkdownComponents({
       return <strong className="text-zinc-950 dark:text-white font-semibold" {...props}>{children}</strong>;
     },
 
-    td({ children, node: _node, ...props }: any) {
+    /** Pure minimalist responsive table with subtle vertical hairlines — zero extra card/frame, zero clutter buttons */
+    table({ children, node: _node, className, ...props }: any) {
+      return (
+        <div className="my-3 overflow-x-auto select-text custom-scrollbar">
+          <table className={cn("w-full border-collapse text-[13px] text-zinc-900 dark:text-zinc-100", className)} {...props}>
+            {children}
+          </table>
+        </div>
+      );
+    },
+
+    thead({ children, node: _node, className, ...props }: any) {
+      return (
+        <thead className={cn("border-b border-zinc-200 dark:border-white/[0.1] bg-zinc-50/50 dark:bg-white/[0.02]", className)} {...props}>
+          {children}
+        </thead>
+      );
+    },
+
+    tbody({ children, node: _node, className, ...props }: any) {
+      return (
+        <tbody className={cn("divide-y divide-zinc-200/60 dark:divide-white/[0.06]", className)} {...props}>
+          {children}
+        </tbody>
+      );
+    },
+
+    tr({ children, node: _node, className, ...props }: any) {
+      return (
+        <tr className={cn("hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors", className)} {...props}>
+          {children}
+        </tr>
+      );
+    },
+
+    td({ children, node: _node, className, ...props }: any) {
       const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
       return (
-        <td className={`py-2 px-3.5 text-zinc-900 dark:text-zinc-100 tabular-nums ${alignClass} text-[12.5px]`} {...props}>
+        <td className={cn("px-3.5 py-2 text-zinc-900 dark:text-zinc-100 tabular-nums text-[13px] border-r border-zinc-200/40 dark:border-white/[0.04] last:border-r-0", alignClass, className)} {...props}>
           {processTextNodes(children, onOpenFile)}
         </td>
       );
     },
 
-    th({ children, node: _node, ...props }: any) {
+    th({ children, node: _node, className, ...props }: any) {
       const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
       return (
-        <th className={`py-2.5 px-3.5 font-semibold text-zinc-900 dark:text-zinc-100 text-[11.5px] uppercase tracking-wider ${alignClass}`} {...props}>
+        <th className={cn("px-3.5 py-2 font-semibold text-zinc-900 dark:text-zinc-100 text-[12px] uppercase tracking-wider text-left border-r border-zinc-200/60 dark:border-white/[0.05] last:border-r-0", alignClass, className)} {...props}>
           {children}
         </th>
       );

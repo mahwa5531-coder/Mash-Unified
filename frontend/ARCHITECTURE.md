@@ -32,7 +32,7 @@ frontend/src/
 │   │   │   └── work-log/     TimelineRow, FilePill, toolTimeline (pure),
 │   │   │                     types
 │   │   ├── hooks/            useChatStream (orchestration), useScrollToBottom
-│   │   ├── state/            sessionStore (multi-session runtime state, LRU-25)
+│   │   ├── state/            sessionStore (multi-session runtime state, LRU-6)
 │   │   ├── utils/            turns (transcript → turns parsing)
 │   │   └── index.ts          PUBLIC API of the feature
 │   ├── artifacts/  components/ (ArtifactCard, FilesChangedDrawer),
@@ -96,7 +96,7 @@ app
 | Layer | Location | Contents |
 |---|---|---|
 | App UI state | `app/page.tsx` | selected session, sidebar/panel toggles, theme, history mode |
-| Feature runtime state | `features/chat/state/sessionStore.ts` | module-level multi-session store (messages, buffers, abort controllers, LRU-25 eviction, subscription listeners) |
+| Feature runtime state | `features/chat/state/sessionStore.ts` | module-level multi-session store (messages, buffers, abort controllers, LRU-6 eviction, subscription listeners) |
 | Feature local state | each container component | e.g. viewer tabs, sidebar folders, work-log expansion |
 | Server data | `services/*` + feature effects | fetched via services, cached per feature need |
 

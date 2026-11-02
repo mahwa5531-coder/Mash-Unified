@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useCallback } from 'react';
-import { sessionStore, notifyStoreListeners } from '../state/sessionStore';
-import { removeSessionQueueItem, queueSteeringMessage } from '@/services/sessions';
+import { sessionStore, notifyStoreListeners, persistSessionQueue } from '../state/sessionStore';
+import { queueSteeringMessage } from '@/services/sessions';
 
 interface UseChatSteeringOptions {
   activeSessionIdRef: React.RefObject<string | null>;
@@ -30,16 +30,35 @@ export function useChatSteering({
     const msgToInject = s.queuedMessages[index];
     if (!msgToInject) return;
 
+    // Remove from local queue
     s.queuedMessages.splice(index, 1);
+    persistSessionQueue(activeSid, s.queuedMessages);
     if (activeSid === activeSessionIdRef.current) {
       setQueuedMessages([...s.queuedMessages]);
     }
     notifyStoreListeners();
-    removeSessionQueueItem(activeSid, index).catch(() => {});
 
     if (s.isStreaming) {
-      // Send mid-flight steering message directly to the running agent without aborting
-      queueSteeringMessage(activeSid, msgToInject).catch(() => {});
+      // ponytail: Send mid-flight steering message directly to the running agent (DeepSeek Harness pattern)
+      try {
+        const ok = await queueSteeringMessage(activeSid, msgToInject);
+        if (!ok) {
+          // Restore on failure to prevent silent message loss
+          s.queuedMessages.splice(index, 0, msgToInject);
+          persistSessionQueue(activeSid, s.queuedMessages);
+          if (activeSid === activeSessionIdRef.current) {
+            setQueuedMessages([...s.queuedMessages]);
+          }
+          notifyStoreListeners();
+        }
+      } catch (_err) {
+        s.queuedMessages.splice(index, 0, msgToInject);
+          persistSessionQueue(activeSid, s.queuedMessages);
+        if (activeSid === activeSessionIdRef.current) {
+          setQueuedMessages([...s.queuedMessages]);
+        }
+        notifyStoreListeners();
+      }
     } else {
       // Agent is idle: dispatch immediately as a normal turn
       await onSendMessage(msgToInject, false, false, activeSid);
@@ -53,22 +72,38 @@ export function useChatSteering({
     if (!s) return;
     if (index !== undefined && s.queuedMessages) {
       s.queuedMessages.splice(index, 1);
-      removeSessionQueueItem(activeSid, index).catch(() => {});
     } else {
       s.queuedMessages = [];
-      removeSessionQueueItem(activeSid).catch(() => {});
+      s.isQueuePaused = false;
     }
+    persistSessionQueue(activeSid, s.queuedMessages);
+    // ponytail: Local queue discarding must NEVER delete live mid-flight steering mailbox items
     if (activeSid === activeSessionIdRef.current) {
       setQueuedMessages([...s.queuedMessages]);
     }
     notifyStoreListeners();
   }, [activeSessionIdRef, sessionId]);
 
+  const activeSid = activeSessionIdRef.current || sessionId;
+  const isQueuePaused = Boolean(activeSid && sessionStore.get(activeSid)?.isQueuePaused && queuedMessages.length > 0);
+
+  const resumeQueue = useCallback(async () => {
+    const sid = activeSessionIdRef.current || sessionId;
+    if (!sid) return;
+    const s = sessionStore.get(sid);
+    if (!s || !s.queuedMessages || s.queuedMessages.length === 0) return;
+    s.isQueuePaused = false;
+    notifyStoreListeners();
+    await injectQueued(0);
+  }, [activeSessionIdRef, sessionId, injectQueued]);
+
   return {
     queuedMessages,
     queuedMessage: queuedMessages[0] || null,
+    isQueuePaused,
     setQueuedMessages,
     injectQueued,
+    resumeQueue,
     discardQueued,
   };
 }

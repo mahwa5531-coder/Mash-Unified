@@ -1822,6 +1822,9 @@ class Agent:
     def enqueue_message(self, message: dict[str, str]) -> None:
         """Enqueue a message to be added to the history."""
         self.executor.enqueue_message(message)
+        if "<USER_STEERING>" in message.get("content", ""):
+            if hasattr(self.executor, "signal_steering_interrupt"):
+                self.executor.signal_steering_interrupt()
 
     def sync_cleanup(self, *, _from_del: bool = False) -> None:
         """Synchronous cleanup for __del__ and other sync contexts.

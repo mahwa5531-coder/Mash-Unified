@@ -83,6 +83,9 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
         userText = cleanUserSteeringEnvelope(userText);
 
         parsedMsgs.push({
+          id: step.id || (step as any).action_id,
+          sessionId: step.session_id,
+          turnId: step.turn_id,
           role: 'user',
           content: userText,
           timestamp: step.created_at || (step as any).timestamp,
@@ -94,7 +97,11 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
         let content = cleanAssistantContent(typeof step.content === 'string' ? step.content : '');
         const thoughts: string[] = Array.isArray(step.thoughts) ? [...step.thoughts] : (step.thinking ? [step.thinking] : []);
         const rawTools: any[] = Array.isArray(step.tools) ? step.tools : (Array.isArray(step.tool_calls) ? step.tool_calls : []);
-        const stepPrefix = step.action_id || step.id || (step as any).step_index !== undefined ? `st_${(step as any).step_index}` : `m_${parsedMsgs.length}`;
+        // ponytail: correct operator precedence so step_index check doesn't produce st_undefined when action_id exists
+        const stepPrefix =
+          (step as any).step_index !== undefined
+            ? `st_${(step as any).step_index}`
+            : (step.action_id || step.id || `m_${parsedMsgs.length}`);
         const tools: any[] = [];
         for (const t of rawTools) {
           const name = t.name || t.function?.name || 'action';
@@ -107,6 +114,8 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
           const isDenied = t.status === 'denied' || t.decision === 'deny';
           const isPending = t.status === 'pending_approval' || t.status === 'pending';
           const status = isDenied ? 'denied' : isCancelled ? 'cancelled' : isPending ? 'pending_approval' : (t.status || 'completed');
+          const summaryRaw = t.toolSummary || t.tool_summary || args.toolSummary || args.tool_summary || args.summary || args.description;
+          const actionRaw = t.toolAction || t.tool_action || args.toolAction || args.tool_action;
           tools.push({
             id: t.id || `${stepPrefix}_tc_${tools.length}`,
             name,
@@ -114,8 +123,10 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
             output: outputStr,
             status,
             decision: t.decision,
-            toolSummary: t.toolSummary || args.toolSummary,
-            toolAction: t.toolAction || args.toolAction,
+            toolSummary: summaryRaw ? String(summaryRaw).trim() : undefined,
+            toolAction: actionRaw ? String(actionRaw).trim() : undefined,
+            command: t.command || args.CommandLine || args.command || args.cmd,
+            path: t.path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path,
           });
         }
         const tasks = step.tasks || [];
@@ -137,6 +148,8 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
               if (typeof args === 'string') {
                 try { args = JSON.parse(args); } catch { args = {}; }
               }
+              const summaryRaw = b.toolSummary || b.tool_summary || args.toolSummary || args.tool_summary || args.summary || args.description;
+              const actionRaw = b.toolAction || b.tool_action || args.toolAction || args.tool_action;
               tools.push({
                 id: b.id || `${stepPrefix}_tc_${tools.length}`,
                 name,
@@ -144,8 +157,10 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
                 output: b.output || '',
                 status: b.status || 'completed',
                 decision: b.decision,
-                toolSummary: b.toolSummary || args.toolSummary,
-                toolAction: b.toolAction || args.toolAction,
+                toolSummary: summaryRaw ? String(summaryRaw).trim() : undefined,
+                toolAction: actionRaw ? String(actionRaw).trim() : undefined,
+                command: b.command || args.CommandLine || args.command || args.cmd,
+                path: b.path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path,
               });
             }
           }
@@ -232,6 +247,9 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
         } else {
           const isAborted = step.status === 'aborted' || step.status === 'cancelled' || step.stop_reason === 'user_stopped' || step.stop_reason === 'cancelled';
           parsedMsgs.push({ 
+            id: step.id || (step as any).action_id,
+            sessionId: step.session_id,
+            turnId: step.turn_id,
             role: 'assistant', 
             content: content.trim(), 
             status: isAborted ? 'aborted' : (step.status || 'completed'),

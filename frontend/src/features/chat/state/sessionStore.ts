@@ -24,6 +24,7 @@ export interface SessionRuntimeState {
   rawLines?: any[];
   hasUnread?: boolean;
   wasUserAborted?: boolean;
+  isQueuePaused?: boolean;
 }
 
 export const sessionStore = new Map<string, SessionRuntimeState>();
@@ -38,6 +39,32 @@ export function clearSessionStore() {
   sessionStore.clear();
 }
 
+export function persistSessionQueue(sid: string, queue: string[]) {
+  const storage = typeof window !== 'undefined' && window.localStorage ? window.localStorage : (typeof localStorage !== 'undefined' ? localStorage : null);
+  if (!storage) return;
+  try {
+    const key = `mash_queue_${sid}`;
+    if (!queue || queue.length === 0) {
+      storage.removeItem(key);
+    } else {
+      storage.setItem(key, JSON.stringify(queue));
+    }
+  } catch (_) {}
+}
+
+export function loadPersistedQueue(sid: string): string[] {
+  const storage = typeof window !== 'undefined' && window.localStorage ? window.localStorage : (typeof localStorage !== 'undefined' ? localStorage : null);
+  if (!storage) return [];
+  try {
+    const raw = storage.getItem(`mash_queue_${sid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (_) {}
+  return [];
+}
+
 // ponytail: Strict 6-session LRU ceiling to protect low-RAM desktop environments
 const MAX_CACHED_SESSIONS = 6;
 
@@ -49,10 +76,15 @@ export function getOrCreateSessionState(sid: string): SessionRuntimeState {
     sessionStore.set(sid, state);
     return state;
   }
-  // Evict least recently accessed non-streaming session when ceiling is reached
+  // Evict least recently accessed non-streaming session without queued messages when ceiling is reached
   if (sessionStore.size >= MAX_CACHED_SESSIONS) {
     for (const [cachedSid, cachedState] of sessionStore.entries()) {
-      if (!cachedState.isStreaming && cachedSid !== currentViewingSessionId && cachedSid !== sid) {
+      if (
+        !cachedState.isStreaming &&
+        cachedSid !== currentViewingSessionId &&
+        cachedSid !== sid &&
+        (!cachedState.queuedMessages || cachedState.queuedMessages.length === 0)
+      ) {
         sessionStore.delete(cachedSid);
         break;
       }
@@ -69,11 +101,12 @@ export function getOrCreateSessionState(sid: string): SessionRuntimeState {
     turnStartTime: 0,
     thinkingDuration: null,
     abortController: null,
-    queuedMessages: [],
+    queuedMessages: loadPersistedQueue(sid),
     inputPrompt: '',
     isHistoryLoaded: false,
     historyLoadError: false,
     rawLines: [],
+    isQueuePaused: false,
   };
   sessionStore.set(sid, state);
   return state;

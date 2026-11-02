@@ -13,7 +13,7 @@ export interface ChatComposerProps {
   sessionId?: string | null;
   inputPrompt?: string;
   setInputPrompt?: (val: string) => void;
-  onSend: (text: string, stagedSessionId?: string) => void;
+  onSend: (text: string, stagedSessionId?: string) => Promise<void> | void;
   onStop: () => void;
   isStreaming: boolean;
   disabled?: boolean;
@@ -22,6 +22,17 @@ export interface ChatComposerProps {
   initialAttachedFiles?: AttachedFile[];
   permissionMode?: PermissionMode;
   onPermissionModeChange?: (mode: PermissionMode) => void;
+}
+
+// ponytail: DeepSeek Harness relative path normalizer - posix slashes + workspace relativization
+export function relativizePath(fullPath: string, workspaceRoot?: string): string {
+  const normPath = fullPath.replace(/\\/g, '/');
+  if (!workspaceRoot || workspaceRoot === 'No Repo') return normPath;
+  const normRoot = workspaceRoot.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (normPath.toLowerCase().startsWith(normRoot.toLowerCase() + '/')) {
+    return normPath.slice(normRoot.length + 1);
+  }
+  return normPath;
 }
 
 export default function ChatComposer({
@@ -47,6 +58,8 @@ export default function ChatComposer({
     attachedFiles,
     isUploading,
     uploadError,
+    setUploadError,
+    setAttachedFiles,
     stagedSessionId,
     fileInputRef,
     handleFileChange,
@@ -79,28 +92,49 @@ export default function ChatComposer({
     return () => cancelAnimationFrame(rafId);
   }, [localPrompt]);
 
-  const handleSendClick = () => {
+  const handleSendClick = async () => {
     // Synchronous submission lock to prevent double-Enter race conditions and upload races
     if (isSubmittingRef.current || isUploading) return;
     let text = localPrompt.trim();
     if (!text && attachedFiles.length === 0) return;
 
+    const savedPrompt = localPrompt;
+    const savedAttachments = [...attachedFiles];
+
+    // ponytail: Format attachments as clean structured XML blocks with normalized POSIX paths (DeepSeek Harness convention)
     if (attachedFiles.length > 0) {
-      const fileRefs = attachedFiles.map(f => `[Attached file: ${f.path}]`).join('\n');
-      text = text ? `${text}\n\n${fileRefs}` : `Please inspect and analyze the attached audit documents:\n${fileRefs}`;
+      const fileRefs = attachedFiles
+        .map((f) => {
+          const relPath = relativizePath(f.path, sessionRepo);
+          return `  <file path="${relPath}" name="${f.name}" size="${f.size || 0}" />`;
+        })
+        .join('\n');
+      const attachmentBlock = `<attachments>\n${fileRefs}\n</attachments>`;
+      text = text ? `${text}\n\n${attachmentBlock}` : `Please inspect and analyze the attached audit documents:\n${attachmentBlock}`;
       clearAttachments();
     }
 
     isSubmittingRef.current = true;
     setLocalPrompt('');
     setInputPrompt?.('');
-    onSend(text, !sessionId ? stagedSessionId || undefined : undefined);
-    setTimeout(() => {
+
+    try {
+      await onSend(text, !sessionId ? stagedSessionId || undefined : undefined);
+    } catch (_err) {
+      // ponytail: Acknowledgment-based restore on failure protects user drafts from disappearing
+      setLocalPrompt(savedPrompt);
+      setInputPrompt?.(savedPrompt);
+      setAttachedFiles(savedAttachments);
+    } finally {
       isSubmittingRef.current = false;
-    }, 300);
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // ponytail: Protect IME composition (Japanese, Chinese, Korean Enter-to-convert must NOT submit)
+    if (e.nativeEvent.isComposing || e.keyCode === 229) {
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (isUploading) {
@@ -146,10 +180,23 @@ export default function ChatComposer({
         className="hidden" 
       />
 
-      {/* Screen Reader Upload Feedback */}
+      {/* Screen Reader & Visible Upload Feedback */}
       <div aria-live="polite" className="sr-only">
         {isUploading ? "Uploading files..." : uploadError ? uploadError : ""}
       </div>
+      {uploadError && (
+        <div className="flex items-center justify-between text-xs text-rose-500 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-lg px-2.5 py-1.5 my-1">
+          <span className="truncate">{uploadError}</span>
+          <button 
+            type="button" 
+            onClick={() => setUploadError(null)} 
+            className="text-rose-400 hover:text-rose-600 dark:hover:text-rose-200 font-bold ml-2 shrink-0 cursor-pointer text-sm leading-none"
+            aria-label="Dismiss error"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Attached Files Chips */}
       <AttachedFilesList attachedFiles={attachedFiles} onRemove={removeAttachedFile} />

@@ -4,30 +4,25 @@ import React, { memo } from 'react';
 import katex from 'katex';
 import { Streamdown } from 'streamdown';
 import { createMathPlugin } from '@streamdown/math';
+import { createMermaidPlugin } from '@streamdown/mermaid';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
 import { useAgentMarkdownComponents } from './useAgentMarkdownComponents';
 import CodeBlock from '@/components/renderers/CodeBlock';
-import MermaidRenderer from '@/components/renderers/MermaidRenderer';
-import { splitMarkdownBlocks } from './splitMarkdownBlocks';
 import { escapeCurrencyInMarkdown } from '@/features/chat/components/messages/proseHelpers';
 
 /**
- * AgentMarkdown — the single unified markdown renderer for the whole app.
- *
- * Uses streamdown 2.7 for streaming-first AST repair & KaTeX math,
- * and delegates code blocks and diagrams to the proven existing Mash modules:
- *  - CodeBlock: full header bar with language, line count, collapse/expand, and Copy button
- *  - MermaidRenderer: Diagram View header with pulse indicator, zoom controls, Code/Visual toggle, and Copy SVG
- *  - components: FilePills, PathPills, ExtensionBadges, AuditBadges, AuditCallouts, TableContainer
- *
- * mode="chat"     → compact message typography, streaming caret, capped blocks
- * mode="artifact" → spacious document typography, full-height code/tables
+ * AgentMarkdown — unified markdown renderer powered directly by Streamdown.
+ * Uses official @streamdown/mermaid and @streamdown/math plugins for deterministic,
+ * streaming-safe diagram and KaTeX equation rendering without fragile line chunking.
  */
 
-// Single-dollar inline math ($...$) — matches the previous remark-math behavior.
+// Official math plugin with single-dollar inline math ($...$) support
 const mathPlugin = createMathPlugin({ singleDollarTextMath: true });
+
+// Official mermaid plugin with suppressErrorRendering and streaming safety
+const mermaidPlugin = createMermaidPlugin();
 
 // Fenced ```latex / ```math / ```katex blocks render as display math
 const LATEX_LANGUAGES = ['latex', 'math', 'katex'];
@@ -41,19 +36,16 @@ function LatexBlock({ code: source, isIncomplete }: { code: string; isIncomplete
     );
   }
   let html: string | null = null;
+  let isError = false;
   try {
     html = katex.renderToString(source, { displayMode: true, throwOnError: false, strict: false });
     if (html && html.includes('katex-error')) {
-      return (
-        <div className="font-mono text-xs text-rose-400 my-2 select-text p-2 rounded bg-rose-500/10 border border-rose-500/20 whitespace-pre-wrap">
-          {source}
-        </div>
-      );
+      isError = true;
     }
   } catch {
     html = null;
   }
-  if (!html) {
+  if (!html || isError) {
     return (
       <div className="font-mono text-xs text-rose-400 my-2 select-text p-2 rounded bg-rose-500/10 border border-rose-500/20 whitespace-pre-wrap">
         {source}
@@ -66,10 +58,6 @@ function LatexBlock({ code: source, isIncomplete }: { code: string; isIncomplete
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
-}
-
-function StreamdownMermaidBlock({ code: chart, isIncomplete }: { code: string; isIncomplete?: boolean }) {
-  return <MermaidRenderer chart={chart} isStreaming={isIncomplete} />;
 }
 
 function StreamdownCodeBlock({ code, language, isIncomplete }: { code: string; language: string; isIncomplete?: boolean }) {
@@ -119,79 +107,6 @@ export interface AgentMarkdownProps {
   className?: string;
 }
 
-interface MarkdownBlockStreamdownProps {
-  content: string;
-  isStreaming: boolean;
-  isChat: boolean;
-  components: any;
-  isLargeDoc: boolean;
-}
-
-const MarkdownBlockStreamdown = memo(function MarkdownBlockStreamdown({
-  content,
-  isStreaming,
-  isChat,
-  components,
-  isLargeDoc,
-}: MarkdownBlockStreamdownProps) {
-  const [isVisible, setIsVisible] = React.useState(!isLargeDoc);
-  const blockRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    if (!isLargeDoc) return;
-    const el = blockRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsVisible(entry.isIntersecting);
-      },
-      {
-        rootMargin: '1000px 0px 1000px 0px',
-      }
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [isLargeDoc]);
-
-  return (
-    <div
-      ref={blockRef}
-      style={{
-        contentVisibility: 'auto',
-        containIntrinsicSize: '0 60px',
-      }}
-      className="my-1.5"
-    >
-      {isVisible ? (
-        <Streamdown
-          mode={isStreaming ? 'streaming' : 'static'}
-          plugins={{
-            math: mathPlugin,
-            renderers: [
-              { component: StreamdownMermaidBlock, language: 'mermaid' },
-              { component: LatexBlock, language: LATEX_LANGUAGES },
-              { component: StreamdownCodeBlock, language: allOtherLanguages },
-            ],
-          }}
-          remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
-          controls={false}
-          components={components}
-          urlTransform={safeUrlTransform}
-          caret={isChat && isStreaming ? 'block' : undefined}
-          codeBlockMaxHeight={isChat ? 400 : 0}
-          tableMaxHeight={isChat ? 300 : 0}
-        >
-          {content}
-        </Streamdown>
-      ) : (
-        <div style={{ height: '60px' }} className="w-full" />
-      )}
-    </div>
-  );
-});
-
 export const AgentMarkdown = memo(function AgentMarkdown({
   content,
   mode,
@@ -203,12 +118,10 @@ export const AgentMarkdown = memo(function AgentMarkdown({
 }: AgentMarkdownProps) {
   const components = useAgentMarkdownComponents({ mode, sessionId, onOpenFile, onImageClick });
   const sanitizedContent = React.useMemo(() => (content ? escapeCurrencyInMarkdown(content) : ''), [content]);
-  const blocks = React.useMemo(() => (sanitizedContent ? splitMarkdownBlocks(sanitizedContent, 35) : []), [sanitizedContent]);
 
   if (!content) return null;
 
   const isChat = mode === 'chat';
-  const isLargeDoc = blocks.length > 40;
 
   return (
     <div className={cn(
@@ -218,20 +131,29 @@ export const AgentMarkdown = memo(function AgentMarkdown({
         : "p-5 md:p-6 leading-[1.75] text-[13.5px] bg-[var(--bg-surface)]",
       className
     )}>
-      {blocks.map((blockText, idx) => {
-        const isLast = idx === blocks.length - 1;
-        const blockStreaming = isStreaming && isLast;
-        return (
-          <MarkdownBlockStreamdown
-            key={idx}
-            content={blockText}
-            isStreaming={blockStreaming}
-            isChat={isChat}
-            components={components}
-            isLargeDoc={isLargeDoc}
-          />
-        );
-      })}
+      <Streamdown
+        mode={isStreaming ? 'streaming' : 'static'}
+        plugins={{
+          math: mathPlugin,
+          mermaid: mermaidPlugin,
+          renderers: [
+            { component: LatexBlock, language: LATEX_LANGUAGES },
+            { component: StreamdownCodeBlock, language: allOtherLanguages },
+          ],
+        }}
+        remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
+        controls={{
+          code: { copy: true },
+          mermaid: { copy: true, download: true, fullscreen: true, panZoom: true },
+        }}
+        components={components}
+        urlTransform={safeUrlTransform}
+        caret={isChat && isStreaming ? 'block' : undefined}
+        codeBlockMaxHeight={isChat ? 400 : 0}
+        tableMaxHeight={isChat ? 340 : 0}
+      >
+        {sanitizedContent}
+      </Streamdown>
     </div>
   );
 });

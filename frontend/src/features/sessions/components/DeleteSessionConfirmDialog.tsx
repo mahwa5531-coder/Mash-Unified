@@ -64,7 +64,7 @@ export function DeleteSessionConfirmDialog({
 
         {/* Body Text */}
         <p className="text-[13px] text-zinc-400 dark:text-zinc-400 leading-relaxed mb-6">
-          Are you sure you want to delete this conversation? This action cannot be undone.
+          Are you sure you want to delete {sessionTitle ? <span className="font-medium text-zinc-200">&quot;{sessionTitle}&quot;</span> : "this conversation"}? This action cannot be undone.
         </p>
 
         {/* Actions (Bottom-right aligned) */}

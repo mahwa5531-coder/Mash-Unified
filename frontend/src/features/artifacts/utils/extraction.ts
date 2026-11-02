@@ -55,8 +55,9 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
       if (rawPath) {
         const pathStr = String(rawPath);
         const { isArtifact, type } = classifyArtifact(pathStr);
-        if (isArtifact && !shouldExcludePath(pathStr) && !seenPaths.has(pathStr)) {
-          seenPaths.add(pathStr);
+        const canonicalKey = (pathStr.split(/[/\\]/).pop() || pathStr).toLowerCase();
+        if (isArtifact && !shouldExcludePath(pathStr) && !seenPaths.has(canonicalKey)) {
+          seenPaths.add(canonicalKey);
           const rawFilename = pathStr.split(/[/\\]/).pop() || '';
           const rawTitle = rawFilename.replace(/\.[^/.]+$/, '') || 'Artifact';
           const friendlyTitle = rawTitle.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -98,8 +99,9 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
       const linkPath = normalizePath(match[2]);
 
       const { isArtifact, type } = classifyArtifact(linkPath);
-      if (isArtifact && !seenPaths.has(linkPath)) {
-        seenPaths.add(linkPath);
+      const canonicalKey = (linkPath.split(/[/\\]/).pop() || linkPath).toLowerCase();
+      if (isArtifact && !seenPaths.has(canonicalKey)) {
+        seenPaths.add(canonicalKey);
         const rawFilename = linkPath.split(/[/\\]/).pop() || '';
         const rawTitle = rawFilename.replace(/\.[^/.]+$/, '') || linkText;
         const friendlyTitle = rawTitle.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());

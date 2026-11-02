@@ -234,3 +234,35 @@ export function cleanupSessionStorage(sessionId: string): void {
     }
   } catch {}
 }
+
+export async function fetchSessionPermissions(
+  sessionId: string,
+  signal?: AbortSignal
+): Promise<string | null> {
+  try {
+    const res = await safeFetch(`${BASE_URL}/sessions/${sessionId}/permissions`, { signal });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.permission_mode || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateSessionPermissionMode(
+  sessionId: string,
+  mode: string,
+  signal?: AbortSignal
+): Promise<boolean> {
+  try {
+    const res = await safeFetch(`${BASE_URL}/sessions/${sessionId}/permissions/mode`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ permission_mode: mode }),
+      signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

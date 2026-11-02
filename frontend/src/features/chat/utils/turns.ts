@@ -10,7 +10,8 @@ export function buildTurns(chatMessages: Message[]): Turn[] {
     const msg = chatMessages[i];
     if (msg.role === 'user') {
       const snippet = typeof msg.content === 'string' ? msg.content.slice(0, 16).replace(/\s+/g, '_') : 'msg';
-      const stableId = msg.turnId || `turn_${msg.sessionId || 'sid'}_${flatIdx}_${snippet}`;
+      // ponytail: position-independent stable turn ID so prepending older history never shifts React keys or orphans height cache
+      const stableId = msg.turnId || msg.id || (msg.sessionId ? `turn_${msg.sessionId}_${msg.timestamp || snippet}` : `turn_${snippet}_${msg.timestamp || flatIdx}`);
       result.push({ 
         id: stableId,
         turnId: msg.turnId,
@@ -26,6 +27,9 @@ export function buildTurns(chatMessages: Message[]): Turn[] {
       const currentTurn = result[result.length - 1];
       if (currentTurn.aiMsgs.length === 0) {
         currentTurn.aiMsgs.push(msg);
+        if (msg.status) {
+          currentTurn.status = msg.status;
+        }
       } else {
         // Consolidate multiple assistant responses within the same turn into one unified message
         // ponytail: clone existing message once to preserve state immutability
@@ -113,7 +117,7 @@ export function buildTurns(chatMessages: Message[]): Turn[] {
         if (msg.errorId) existing.errorId = msg.errorId;
       }
     } else {
-      const stableId = msg.turnId || `turn_ctx_0`;
+      const stableId = msg.turnId || msg.id || `turn_ctx_0`;
       result.push({
         id: stableId,
         turnId: msg.turnId,

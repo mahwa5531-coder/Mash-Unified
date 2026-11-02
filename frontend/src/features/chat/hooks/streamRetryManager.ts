@@ -2,11 +2,11 @@
 
 import type { Message } from '@/types/chat';
 import { BASE_URL, safeFetch } from '@/services/client';
-import { markSessionViewed, removeSessionQueueItem, renameSession } from '@/services/sessions';
+import { markSessionViewed, renameSession } from '@/services/sessions';
 import { streamQuery, formatErrorMessage } from '@/services/stream';
 export { formatErrorMessage } from '@/services/stream';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
-import { findTargetAssistantIdx, sessionStore, notifyStoreListeners } from '../state/sessionStore';
+import { findTargetAssistantIdx, sessionStore, notifyStoreListeners, persistSessionQueue } from '../state/sessionStore';
 import { createStreamCallbacks } from './streamToolManager';
 
 export function classifyDisconnectError(err: any): string {
@@ -137,8 +137,12 @@ export function finalizeStreamSession(activeSid: string): { updatedMessages: Mes
     const wasAborted = s.wasUserAborted;
     s.wasUserAborted = false;
     const hasPending = s.chatMessages.some((m) => m.tools?.some((t) => t.status === 'pending_approval' && !t.decision));
-    if (!wasAborted && !hasPending && s.queuedMessages?.length) {
+    if (wasAborted && s.queuedMessages?.length) {
+      s.isQueuePaused = true;
+    } else if (!wasAborted && !hasPending && s.queuedMessages?.length) {
+      s.isQueuePaused = false;
       nextQueuedMsg = s.queuedMessages.shift() || null;
+      persistSessionQueue(activeSid, s.queuedMessages);
     }
   }
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mash:turn_completed', { detail: { sessionId: activeSid } }));
@@ -255,7 +259,7 @@ export async function runChatStream(
     const s = sessionStore.get(activeSid);
     if (s?.queuedMessages && options.onSyncSteeringQueue) options.onSyncSteeringQueue([...s.queuedMessages]);
     if (nextQueuedMsg) {
-      removeSessionQueueItem(activeSid, 0).catch(() => {});
+      // ponytail: shifting next-turn queue must NOT delete from backend steering mailbox
       setTimeout(() => options.onAutoDispatchQueue(nextQueuedMsg), 80);
     }
   }

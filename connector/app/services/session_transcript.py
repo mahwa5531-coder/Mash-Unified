@@ -118,6 +118,7 @@ def messages_to_transcript_lines(
     messages: list[Message],
     pending_map: dict | None = None,
     shallow_tools: bool = False,
+    session_id: str | None = None,
 ) -> list[dict]:
     # 1. Index all tool results by tool_use_id
     tool_results: dict[str, str] = {}
@@ -169,21 +170,54 @@ def messages_to_transcript_lines(
                 if is_denied:
                     decision_val = "deny"
                 tool_status = "pending_approval" if is_pending else ("denied" if is_denied else "completed")
-                summary_raw = t_args.get("toolSummary") or (pending_map.get(tc_id, {}).get("prompt") if pending_map else None)
+                # ponytail: schema normalization boundary - extract canonical tool properties
+                summary_raw = (
+                    t_args.get("toolSummary")
+                    or t_args.get("tool_summary")
+                    or t_args.get("summary")
+                    or t_args.get("description")
+                    or (pending_map.get(tc_id, {}).get("prompt") if pending_map else None)
+                )
                 summary_str = redact_sensitive_content(str(summary_raw)) if summary_raw else None
-                action_str = t_args.get("toolAction")
+                action_str = t_args.get("toolAction") or t_args.get("tool_action")
+                cmd_raw = (
+                    t_args.get("CommandLine")
+                    or t_args.get("command")
+                    or t_args.get("cmd")
+                    or t_args.get("code")
+                    or t_args.get("source_code")
+                )
+                path_raw = (
+                    t_args.get("TargetFile")
+                    or t_args.get("AbsolutePath")
+                    or t_args.get("file_path")
+                    or t_args.get("path")
+                    or t_args.get("Path")
+                    or t_args.get("target_file")
+                    or t_args.get("filepath")
+                    or t_args.get("DirectoryPath")
+                    or t_args.get("dir_path")
+                )
 
-                tools.append({
+                tool_dict = {
                     "id": tc_id, "name": tc_name, "args": t_args, "output": output_val,
                     "status": tool_status, "decision": decision_val,
                     "toolSummary": summary_str,
                     "toolAction": action_str, "action_type": tool_action,
-                })
+                }
+                if cmd_raw:
+                    tool_dict["command"] = str(cmd_raw)
+                if path_raw:
+                    tool_dict["path"] = str(path_raw)
+
+                tools.append(tool_dict)
                 steps.append({
                     "id": f"step_{msg_idx}_{step_idx}", "step_index": step_idx, "type": "tool",
                     "tool_call_id": tc_id, "name": tc_name, "args": t_args, "output": output_val,
                     "status": tool_status, "decision": decision_val, "action_type": tool_action,
                     "toolSummary": summary_str, "toolAction": action_str,
+                    **({"command": str(cmd_raw)} if cmd_raw else {}),
+                    **({"path": str(path_raw)} if path_raw else {}),
                 })
                 step_idx += 1
 
@@ -194,7 +228,16 @@ def messages_to_transcript_lines(
         ts = getattr(msg, "created_at", None)
         ts_str = ts.isoformat() if isinstance(ts, datetime) else (datetime.now(UTC).isoformat() if not ts else str(ts))
 
+        msg_id = str(getattr(msg, "id", None) or f"msg_{session_id or 'sid'}_{msg_idx}")
+        meta = getattr(msg, "metadata", None) or {}
+        turn_id = meta.get("turn_id") if isinstance(meta, dict) else None
+        if not turn_id:
+            turn_id = f"turn_{session_id or 'sid'}_{msg_idx}"
+
         lines.append({
+            "id": msg_id,
+            "session_id": session_id or "",
+            "turn_id": str(turn_id),
             "role": role_str, "content": combined_text, "thoughts": thoughts,
             "tools": tools, "steps": steps, "created_at": ts_str, "timestamp": ts_str,
         })
@@ -225,7 +268,7 @@ async def load_session_transcript(
         key = AgentRunActionKey(user_id=user_id, session_id=session_id, agent_id="")
         messages = await agent_run_service.load_messages(key=key)
 
-        lines = messages_to_transcript_lines(messages, pending_map=pending_map, shallow_tools=shallow_tools)
+        lines = messages_to_transcript_lines(messages, pending_map=pending_map, shallow_tools=shallow_tools, session_id=session_id)
         total_lines = len(lines)
         if limit is not None and limit > 0:
             start_idx = max(0, total_lines - limit - offset)

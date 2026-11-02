@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from nexau.archs.session.steering import (
     clear_steering_messages,
     peek_steering_messages,
@@ -160,7 +160,9 @@ async def undo_session(session_id: str, engine: DatabaseEngineDep, payload: Undo
 
 @router.post("/sessions/{session_id}/queue")
 @router.post("/api/sessions/{session_id}/queue")
-async def queue_session_steering(session_id: str, payload: SteeringQueuePayload) -> dict[str, Any]:
+async def queue_session_steering(
+    session_id: str, payload: SteeringQueuePayload, request: Request,
+) -> dict[str, Any]:
     try:
         validate_safe_id(session_id, "session_id")
     except ValueError as e:
@@ -168,8 +170,39 @@ async def queue_session_steering(session_id: str, payload: SteeringQueuePayload)
     msg = payload.message.strip()
     if not msg:
         return {"status": "error", "message": "Empty message"}
+    
+    # 1. Maintain in-memory mailbox for middleware polling
     queue_steering_message(session_id, msg)
-    return {"status": "queued", "session_id": session_id, "message": msg, "total_queued": len(peek_steering_messages(session_id))}
+
+    # 2. ponytail: DeepSeek Harness pattern - bridge directly to active running agent executor
+    # so mid-flight steering interrupts or is queued natively without dropping on final turn.
+    delivered_to_agent = False
+    if request:
+        try:
+            sse_server = getattr(request.app.state, "sse_server", None)
+            if sse_server and hasattr(sse_server, "_running_agents"):
+                async with sse_server._running_agents_lock:
+                    for key, running_agent in sse_server._running_agents.items():
+                        if key[1] == session_id:
+                            running_agent.enqueue_message({
+                                "role": "user",
+                                "content": (
+                                    f"<USER_STEERING>\n[USER MID-FLIGHT INSTRUCTION]: {msg}\n"
+                                    f"Adapt your current plan and respond to this instruction immediately.\n</USER_STEERING>"
+                                ),
+                            })
+                            delivered_to_agent = True
+                            break
+        except Exception as e:
+            logger.warning("Direct agent steer injection failed: %s", e)
+
+    return {
+        "status": "queued",
+        "session_id": session_id,
+        "message": msg,
+        "total_queued": len(peek_steering_messages(session_id)),
+        "delivered_to_agent": delivered_to_agent,
+    }
 
 
 @router.get("/sessions/{session_id}/queue")

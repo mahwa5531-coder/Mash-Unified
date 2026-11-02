@@ -83,11 +83,19 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
   return (
     <div className="w-full">
       <div 
+        role={isOverflowing ? "button" : undefined}
+        tabIndex={isOverflowing ? 0 : undefined}
         onClick={handleCardClick}
+        onKeyDown={(e) => {
+          if (isOverflowing && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            setIsExpanded((prev) => !prev);
+          }
+        }}
         title={isOverflowing ? (isExpanded ? "Click to collapse" : "Click to expand") : undefined}
         className={cn(
           "w-full bg-[#f4f4f6] dark:bg-[#18181b]/90 hover:bg-[#eaecee] dark:hover:bg-[#1f1f23] rounded-2xl px-4 py-2.5 text-[13.5px] text-zinc-900 dark:text-zinc-100 border border-zinc-200/70 dark:border-white/[0.06] shadow-xs relative group transition-colors flex items-start gap-3",
-          isOverflowing && "cursor-pointer"
+          isOverflowing && "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400"
         )}
       >
         {/* Optional Image Thumbnail Preview */}
@@ -122,7 +130,7 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
         </div>
 
         {/* Bottom-Right Actions Bar (Timestamp, Copy, Undo) */}
-        <div className="absolute bottom-2 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 select-none pointer-events-none group-hover:pointer-events-auto">
+        <div className="absolute bottom-2 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 select-none pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto">
           {displayTime && (
             <span className="text-[11.5px] font-mono text-zinc-400 dark:text-zinc-500 select-none mr-0.5 tracking-tight font-medium">
               {displayTime}

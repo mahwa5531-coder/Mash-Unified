@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { Message } from '@/types/chat';
 import { buildTurns } from '@/features/chat/utils/turns';
 import { cleanUserPromptForComposer } from '../utils/sessionHistoryParser';
-import { sessionStore, getOrCreateSessionState, setViewingSession, subscribeToSessionStore, notifyStoreListeners } from '../state/sessionStore';
+import { sessionStore, getOrCreateSessionState, setViewingSession, subscribeToSessionStore, notifyStoreListeners, persistSessionQueue } from '../state/sessionStore';
 import { useSessionHistory } from './useSessionHistory';
 import { useChatSteering } from './useChatSteering';
 import { useSseBufferFlusher } from './useSseBufferFlusher';
@@ -53,25 +53,7 @@ export function useChatStream({
 
   const steering = useChatSteering({ activeSessionIdRef, sessionId, onSendMessage: dispatchSendMessage });
 
-  const prevScrollTopRef = useRef<number>(0);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = el;
-      const distFromBottom = scrollHeight - (scrollTop + clientHeight);
-      const isScrollingUp = scrollTop < prevScrollTopRef.current;
-      prevScrollTopRef.current = scrollTop;
-
-      if (isScrollingUp || distFromBottom > 40) {
-        isAtBottomRef.current = false;
-      } else if (distFromBottom <= 20) {
-        isAtBottomRef.current = true;
-      }
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, [scrollRef]);
+  // ponytail: unified scroll controller - delegate scroll-following ownership to useScrollToBottom
 
   useEffect(() => {
     flushActiveStreamBuffer();
@@ -117,11 +99,13 @@ export function useChatStream({
 
     if (targetSession.isStreaming && !isRetry && !isImmediate && !isResume) {
       targetSession.queuedMessages = [...(targetSession.queuedMessages || []), userText];
+      persistSessionQueue(activeSid, targetSession.queuedMessages);
       if (activeSid === activeSessionIdRef.current) steering.setQueuedMessages([...targetSession.queuedMessages]);
       notifyStoreListeners();
       return;
     }
     if (targetSession.isStreaming && isImmediate) stopSessionStream(activeSid);
+    targetSession.isQueuePaused = false;
 
     let currentTurnId = targetSession.activeTurnId || `turn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     if (!isResume) {
@@ -191,8 +175,8 @@ export function useChatStream({
 
   const handleRetry = useCallback((userText?: string, targetSid?: string) => {
     const sidToUse = targetSid || activeSessionIdRef.current || sessionId;
-    if (sidToUse) handleSendMessage(userText, true, false, sidToUse);
-  }, [sessionId, handleSendMessage]);
+    if (sidToUse && handleSendMessageRef.current) handleSendMessageRef.current(userText, true, false, sidToUse);
+  }, [sessionId]);
 
   const handleUndo = useCallback((flatIdx?: number, userText?: string, turnIdx?: number) => {
     const activeSid = activeSessionIdRef.current || sessionId;
@@ -248,14 +232,19 @@ export function useChatStream({
     [sessionId, dispatchSendMessage]
   );
 
+  const send = useCallback((textToSend?: string, isRetry = false, isImmediate = false, targetSessionId?: string, isResume = false) => {
+    return handleSendMessageRef.current?.(textToSend, isRetry, isImmediate, targetSessionId, isResume);
+  }, []);
+
   return {
     chatMessages, inputPrompt, setInputPrompt: handleSetInputPrompt, isStreaming,
     isHistoryLoaded: history.isHistoryLoaded, historyLoadError: history.historyLoadError,
     retryLoadHistory: history.retryLoadHistory, queuedMessages: steering.queuedMessages,
-    queuedMessage: steering.queuedMessage, turns, artifactsByTurnMsg, send: handleSendMessage,
+    queuedMessage: steering.queuedMessage, turns, artifactsByTurnMsg, send,
     stop: handleStopStreaming, retry: handleRetry, undo: handleUndo, approveToolCall,
-    injectQueued: steering.injectQueued, discardQueued: steering.discardQueued,
+    injectQueued: steering.injectQueued, discardQueued: steering.discardQueued, isQueuePaused: steering.isQueuePaused, resumeQueue: steering.resumeQueue,
     hasEarlierTurns: history.hasEarlierTurns, isLoadingEarlier: history.isLoadingEarlier,
+    earlierLoadError: history.earlierLoadError,
     remainingEarlierCount: history.remainingEarlierCount, loadEarlierTurns: handleLoadEarlier,
   };
 }

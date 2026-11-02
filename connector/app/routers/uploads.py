@@ -1,4 +1,6 @@
+import datetime
 import os
+import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
@@ -41,7 +43,14 @@ async def upload_file(session_id: str, file: UploadFile, engine: DatabaseEngineD
     safe_filename = Path(norm_name).name
     if not safe_filename or safe_filename in (".", ".."):
         raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # ponytail: Collision-safe filename resolution to prevent silent overwrite of same-name files
     dest_path = (Path(save_dir) / safe_filename).resolve()
+    if dest_path.exists():
+        stem = Path(safe_filename).stem
+        ext = Path(safe_filename).suffix
+        dest_path = (Path(save_dir) / f"{stem}_{uuid.uuid4().hex[:6]}{ext}").resolve()
+
     if not dest_path.is_relative_to(Path(save_dir).resolve()):
         raise HTTPException(status_code=400, detail="Invalid filename path")
     dest = str(dest_path)
@@ -71,7 +80,9 @@ async def upload_file(session_id: str, file: UploadFile, engine: DatabaseEngineD
             except Exception:
                 pass
         raise HTTPException(status_code=500, detail=f"Could not save file: {e}")
-    return {"status": "success", "path": dest, "size": total_bytes}
+
+    # ponytail: Normalize returned file path to forward slashes (DeepSeek / POSIX convention)
+    return {"status": "success", "path": dest.replace("\\", "/"), "size": total_bytes, "filename": safe_filename}
 
 
 @router.get("/{session_id}")
@@ -87,8 +98,6 @@ async def list_uploaded_files(session_id: str, engine: DatabaseEngineDep):
     if not brain_dir:
         project_id = (session.context or {}).get("project_id") if session else None
         brain_dir = str(get_session_brain_dir(session_id, project_id))
-    import datetime
-    from pathlib import Path
 
     candidate_upload_dirs = [
         Path(brain_dir) / ".user_uploaded",
@@ -105,7 +114,7 @@ async def list_uploaded_files(session_id: str, engine: DatabaseEngineDep):
                         mtime = fpath.stat().st_mtime
                         files_with_mtime.append({
                             "name": fname,
-                            "path": str(fpath),
+                            "path": str(fpath).replace("\\", "/"),
                             "size_bytes": fpath.stat().st_size,
                             "created_at": datetime.datetime.fromtimestamp(mtime).isoformat(),
                             "mtime": mtime

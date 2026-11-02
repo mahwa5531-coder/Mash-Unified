@@ -18,7 +18,7 @@ import { ChatHeroView } from './ChatHeroView';
 import { SteeringQueueBanner } from './SteeringQueueBanner';
 import { ChatHistoryLoadState } from './ChatHistoryLoadState';
 import { cleanUserPromptForComposer } from '@/features/chat/utils/sessionHistoryParser';
-import { safeFetch } from '@/services/client';
+import { fetchSessionPermissions, updateSessionPermissionMode } from '@/services/sessions';
 import type { PermissionMode } from './composer/PermissionModeSelector';
 
 interface ChatCanvasProps {
@@ -149,31 +149,28 @@ export default function ChatCanvas({
 }: ChatCanvasProps) {
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
+  const currentSessionIdRef = useRef(sessionId);
+  currentSessionIdRef.current = sessionId;
 
-  // Sync permissionMode from backend when viewing a session
+  // Sync permissionMode from backend when viewing a session with stale-session guard and abort signal
   useEffect(() => {
     if (!sessionId) {
       setPermissionMode('default');
       return;
     }
-    safeFetch(`/api/sessions/${sessionId}/permissions`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: any) => {
-        if (data?.permission_mode) {
-          setPermissionMode(data.permission_mode);
-        }
-      })
-      .catch(() => {});
+    const ctrl = new AbortController();
+    fetchSessionPermissions(sessionId, ctrl.signal).then((mode) => {
+      if (mode && currentSessionIdRef.current === sessionId) {
+        setPermissionMode(mode as PermissionMode);
+      }
+    });
+    return () => ctrl.abort();
   }, [sessionId]);
 
   const handlePermissionModeChange = useCallback((newMode: PermissionMode) => {
     setPermissionMode(newMode);
     if (sessionId) {
-      safeFetch(`/api/sessions/${sessionId}/permissions/mode`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: newMode }),
-      }).catch(() => {});
+      updateSessionPermissionMode(sessionId, newMode).catch(() => {});
     }
   }, [sessionId]);
 
@@ -196,9 +193,11 @@ export default function ChatCanvas({
     approveToolCall,
     injectQueued,
     discardQueued,
+    isQueuePaused,
+    resumeQueue,
     hasEarlierTurns,
     isLoadingEarlier,
-    remainingEarlierCount,
+    earlierLoadError,
     loadEarlierTurns,
   } = useChatStream({ 
     sessionId, 
@@ -333,14 +332,22 @@ export default function ChatCanvas({
                 <div
                   ref={topSentinelRef}
                   className="flex justify-center -mt-1 -mb-1 pb-1.5 min-h-[24px]"
-                  aria-hidden="true"
+                  aria-hidden={!earlierLoadError}
                 >
-                  {isLoadingEarlier && (
+                  {earlierLoadError ? (
+                    <button
+                      type="button"
+                      onClick={() => loadEarlierTurns()}
+                      className="text-xs text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 underline font-medium cursor-pointer py-1 px-2 rounded bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
+                    >
+                      Failed to load earlier turns. Click to retry.
+                    </button>
+                  ) : isLoadingEarlier ? (
                     <div className="flex items-center gap-2 text-xs text-zinc-400">
                       <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
                       <span>Loading earlier turns...</span>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               )}
 
@@ -403,6 +410,8 @@ export default function ChatCanvas({
             queuedMessages={queuedMessages}
             queuedMessage={queuedMessage}
             isQueueExpanded={isQueueExpanded}
+            isPaused={isQueuePaused}
+            onResumeQueue={resumeQueue}
             onToggleExpand={() => setIsQueueExpanded((prev) => !prev)}
             onInject={(idx) => injectQueued(idx ?? 0)}
             onEdit={(idx) => handleEditQueued(idx ?? 0)}

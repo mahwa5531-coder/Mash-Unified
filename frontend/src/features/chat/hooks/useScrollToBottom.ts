@@ -17,13 +17,6 @@ export function useScrollToBottom(scrollRef: RefObject<HTMLDivElement | null>) {
   // Store previous scroll position to detect scroll direction
   const prevScrollTopRef = useRef<number>(0);
 
-  // Check if the scroll position is within 20px of the bottom
-  const isAtBottom = useCallback((element: HTMLElement): boolean => {
-    const bottomThreshold = 20;
-    const bottomPosition = element.scrollTop + element.clientHeight;
-    return bottomPosition >= element.scrollHeight - bottomThreshold;
-  }, []);
-
   // Handle scroll events on the chat container
   const onChatBodyScroll = useCallback(
     (e: HTMLElement) => {

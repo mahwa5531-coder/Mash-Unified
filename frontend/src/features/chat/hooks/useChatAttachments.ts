@@ -35,6 +35,8 @@ export function useChatAttachments(
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createdBlobUrlsRef = useRef<Set<string>>(new Set());
   const stagedSidRef = useRef<string | null>(null);
+  // ponytail: Synchronous reservation counter prevents concurrent drop/paste batches from exceeding 5 files
+  const inFlightCountRef = useRef<number>(0);
 
   // ponytail: ensure pre-send uploads isolate to their own clean session ID instead of
   // sharing a 'default_session' folder (Bug 12). When the user submits, this ID is adopted.
@@ -66,16 +68,18 @@ export function useChatAttachments(
     const validFiles = Array.from(files);
     if (validFiles.length === 0) return;
 
-    // ponytail: Single root guard protecting all 3 vectors (Drag & Drop, File Picker, Clipboard Paste)
-    if (attachedFiles.length + validFiles.length > MAX_CHAT_ATTACHMENTS) {
+    // ponytail: Single root guard protecting all 3 vectors with synchronous reservation
+    const currentTotal = attachedFiles.length + inFlightCountRef.current;
+    if (currentTotal + validFiles.length > MAX_CHAT_ATTACHMENTS) {
       setHasInvalidMedia(true);
       onInvalidMedia?.(true, "Maximum number of attachments reached");
     }
 
-    const availableSlots = Math.max(0, MAX_CHAT_ATTACHMENTS - attachedFiles.length);
+    const availableSlots = Math.max(0, MAX_CHAT_ATTACHMENTS - currentTotal);
     const filesToUpload = validFiles.slice(0, availableSlots);
     if (filesToUpload.length === 0) return;
 
+    inFlightCountRef.current += filesToUpload.length;
     setIsUploading(true);
     setUploadError(null);
     const uploadedList: AttachedFile[] = [];
@@ -91,6 +95,8 @@ export function useChatAttachments(
           null;
 
         if (nativePath && typeof nativePath === 'string') {
+          // ponytail: DeepSeek Harness POSIX convention - normalize backslashes to forward slashes
+          const normalizedPath = nativePath.replace(/\\/g, '/');
           const isImg = file.type?.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(file.name);
           let previewUrl: string | undefined = undefined;
           if (isImg && typeof URL !== 'undefined' && URL.createObjectURL) {
@@ -99,7 +105,7 @@ export function useChatAttachments(
           }
           uploadedList.push({
             name: file.name,
-            path: nativePath,
+            path: normalizedPath,
             previewUrl,
             size: file.size,
           });
@@ -118,6 +124,7 @@ export function useChatAttachments(
 
         const res = await uploadSessionFile(sid, file);
         if (res && res.path) {
+          const normalizedPath = res.path.replace(/\\/g, '/');
           const isImg = file.type?.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(file.name);
           let previewUrl: string | undefined = undefined;
           if (isImg && typeof URL !== 'undefined' && URL.createObjectURL) {
@@ -126,12 +133,15 @@ export function useChatAttachments(
           }
           uploadedList.push({ 
             name: file.name, 
-            path: res.path,
+            path: normalizedPath,
             previewUrl,
             size: file.size,
           });
         } else {
-          setUploadError(`Failed to upload ${file.name}`);
+          const reason = `Failed to upload ${file.name}`;
+          setUploadError(reason);
+          setHasInvalidMedia(true);
+          onInvalidMedia?.(true, reason);
         }
       }
       if (uploadedList.length > 0) {
@@ -140,7 +150,8 @@ export function useChatAttachments(
     } catch (_err) {
       setUploadError("An error occurred during file upload.");
     } finally {
-      setIsUploading(false);
+      inFlightCountRef.current = Math.max(0, inFlightCountRef.current - filesToUpload.length);
+      setIsUploading(inFlightCountRef.current > 0);
     }
   };
 
@@ -162,7 +173,11 @@ export function useChatAttachments(
       }
     }
     if (files.length > 0) {
-      e.preventDefault();
+      // ponytail: Preserve text payload if clipboard contains both text and file(s)
+      const hasText = e.clipboardData?.getData('text/plain');
+      if (!hasText) {
+        e.preventDefault();
+      }
       handleUploadFiles(files);
     }
   };
@@ -188,6 +203,8 @@ export function useChatAttachments(
     attachedFiles,
     isUploading,
     uploadError,
+    setUploadError,
+    setAttachedFiles,
     stagedSessionId: stagedSidRef.current,
     hasInvalidMedia,
     setHasInvalidMedia,

@@ -382,6 +382,8 @@ class Executor:
 
         # Message queue for dynamic message enqueueing during execution
         self.queued_messages: list[Message] = []
+        self._steering_interrupt_event = asyncio.Event()
+        self._current_sandbox: Any | None = None
 
         # RFC-0002: Team mode - "forever run" loop that waits for messages when idle
         self.team_mode = team_mode
@@ -656,6 +658,17 @@ class Executor:
         logger.info(
             f"📝 Message enqueued during execution: {message.get('role', 'unknown')} - {message.get('content', '')[:50]}...",
         )
+
+    def signal_steering_interrupt(self) -> None:
+        """Signal cooperative cancellation to in-flight tool execution for steering."""
+        if hasattr(self, "_steering_interrupt_event"):
+            self._steering_interrupt_event.set()
+        try:
+            curr_sb = getattr(self, "_current_sandbox", None)
+            if curr_sb and hasattr(curr_sb, "abort_current_process"):
+                curr_sb.abort_current_process()
+        except Exception as e:
+            logger.debug("Failed to abort active sandbox process on steer: %s", e)
 
     def execute(
         self,
@@ -1433,6 +1446,8 @@ class Executor:
         if self.queued_messages:
             state.messages.extend(self.queued_messages)
             self.queued_messages = []
+            if getattr(self, "_steering_interrupt_event", None):
+                self._steering_interrupt_event.clear()
 
         # 2. team_mode: LLM
         if self.team_mode and not any(m.role != Role.SYSTEM for m in state.messages):
@@ -1994,6 +2009,13 @@ class Executor:
                     except (asyncio.CancelledError, Exception):
                         pass
                     return None, True
+                if getattr(self, "_steering_interrupt_event", None) and self._steering_interrupt_event.is_set():
+                    task.cancel()
+                    try:
+                        await task
+                    except (asyncio.CancelledError, Exception):
+                        pass
+                    return "TOOL_INTERRUPTED_BY_STEERING", False
                 continue
         # task completed; race task cancel
         # task.result CancelledError; interrupted.
@@ -2073,17 +2095,18 @@ class Executor:
             if not is_async_impl:
                 # ── Sync tool: worker ──
                 # ThreadPoolExecutor.submit(_execute_tool_call_safe)
-                return (
-                    "tool",
-                    tc,
-                    await asyncio.to_thread(
+                try:
+                    self._current_sandbox = agent_state.get_sandbox() if hasattr(agent_state, "get_sandbox") else None
+                    res = await asyncio.to_thread(
                         self._execute_tool_call_safe,
                         tc,
                         agent_state,
                         framework_context,
                         permission_cache,
-                    ),
-                )
+                    )
+                    return ("tool", tc, res)
+                finally:
+                    self._current_sandbox = None
 
             # ── Async tool: event loop ──
             tool_call_id = tc.tool_call_id or f"tool_call_{uuid.uuid4()}"
@@ -2236,6 +2259,11 @@ class Executor:
             serial_result, interrupted = await self._await_with_shutdown_race(_run_tool(tc))
             if interrupted:
                 return processed_response, False, None, [], []
+            if serial_result == "TOOL_INTERRUPTED_BY_STEERING":
+                all_results.append(("tool", tc, (tc.tool_name, "Tool execution cancelled: Interrupted by user steering instruction.", True)))
+                if getattr(self, "_steering_interrupt_event", None):
+                    self._steering_interrupt_event.clear()
+                break
             all_results.append(serial_result)
 
         # tools
@@ -2258,13 +2286,19 @@ class Executor:
             gather_result, interrupted = await self._await_with_shutdown_race(asyncio.gather(*parallel_coros, return_exceptions=True))
             if interrupted:
                 return processed_response, False, None, [], []
-            parallel_results = cast(list[Any], gather_result)
-            for idx, r in enumerate(parallel_results):
-                if isinstance(r, BaseException):
-                    _, origin_call = call_origins[idx]
-                    all_results.append(("tool", origin_call, (origin_call.tool_name, str(r), True)))
-                elif isinstance(r, tuple):
-                    all_results.append(r)  # type: ignore[arg-type]
+            if gather_result == "TOOL_INTERRUPTED_BY_STEERING":
+                for _, origin_call in call_origins:
+                    all_results.append(("tool", origin_call, (origin_call.tool_name, "Tool execution cancelled: Interrupted by user steering instruction.", True)))
+                if getattr(self, "_steering_interrupt_event", None):
+                    self._steering_interrupt_event.clear()
+            else:
+                parallel_results = cast(list[Any], gather_result)
+                for idx, r in enumerate(parallel_results):
+                    if isinstance(r, BaseException):
+                        _, origin_call = call_origins[idx]
+                        all_results.append(("tool", origin_call, (origin_call.tool_name, str(r), True)))
+                    elif isinstance(r, tuple):
+                        all_results.append(r)  # type: ignore[arg-type]
 
         tool_results: list[str] = []
         execution_feedbacks: list[dict[str, Any]] = []

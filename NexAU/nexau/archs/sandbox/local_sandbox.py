@@ -616,6 +616,7 @@ class LocalSandbox(BaseSandbox):
                 creationflags=launch_config.creationflags,
                 start_new_session=launch_config.start_new_session,
             )
+            self._current_foreground_process = process
 
             try:
                 stdout_bytes, stderr_bytes = process.communicate(timeout=timeout_seconds)
@@ -724,6 +725,16 @@ class LocalSandbox(BaseSandbox):
                 error=f"Execution failed: {str(e)}",
                 truncated=False,
             )
+        finally:
+            self._current_foreground_process = None
+
+    def abort_current_process(self) -> bool:
+        """Cooperative abort of active foreground command for mid-flight steering."""
+        proc = getattr(self, "_current_foreground_process", None)
+        if proc and proc.poll() is None:
+            self._graceful_kill(proc)
+            return True
+        return False
 
     @override
     def execute_bash(
