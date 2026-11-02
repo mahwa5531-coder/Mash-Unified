@@ -82,14 +82,12 @@ async def list_active_tasks(session_id: str | None = None):
 async def kill_task(pid: int):
     """Terminate an active background task by its PID."""
     try:
-        import subprocess
         import sys
 
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
         from nexau.archs.sandbox.local_sandbox import LocalSandbox
         from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
 
-        # Check all registered sandbox sessions to find the sandbox owning pid
         sandbox = None
         for sid in list(LocalSandbox._registry_by_session.keys()):
             sb = LocalSandbox(sandbox_id=sid)
@@ -101,26 +99,19 @@ async def kill_task(pid: int):
         res = sandbox.kill_background_task(pid)
         is_success = (res.status == SandboxStatus.SUCCESS)
 
-        # Fallback direct OS tree kill if sandbox did not find it or to guarantee shutdown
-        if not is_success and sys.platform == "win32":
+        # Fallback taskkill direct OS tree kill only if pid belongs to sandbox
+        is_known = (sandbox is not None and pid in sandbox.list_background_tasks())
+        if not is_success and is_known and sys.platform == "win32":
+            import subprocess
+
             import psutil
             if psutil.pid_exists(pid):
                 subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
                 is_success = True
 
-        # ponytail: B-15 fix inverted status ternary: return "killed" on success, "failed" on failure
+        # Return "killed" on success, "failed" on failure
         return {"success": is_success, "pid": pid, "status": "killed" if is_success else "failed"}
     except Exception as e:
-        import subprocess
-        import sys
-        if sys.platform == "win32":
-            try:
-                import psutil
-                if psutil.pid_exists(pid):
-                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-                    return {"success": True, "pid": pid, "status": "killed"}
-            except Exception:
-                pass
         return {"success": False, "pid": pid, "status": "failed", "error": str(e)}
 
 

@@ -12,7 +12,7 @@ export function isToolRunning(tool?: ToolCallItem, isStreaming?: boolean): boole
   ) return false;
   if (tool.status === 'running') return true;
   // ponytail: explicit status preferred; fallback only when streaming and output has not arrived
-  return !!(isStreaming && tool.output === undefined && tool.status !== 'completed');
+  return !!(isStreaming && tool.output === undefined);
 }
 
 export function extractLineRange(args?: Record<string, any>): string | null {

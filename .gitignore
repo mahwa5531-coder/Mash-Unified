@@ -5,6 +5,8 @@ out/
 build/*
 !build/icon.ico
 dist/
+frontend/public/monaco/
+public/monaco/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/

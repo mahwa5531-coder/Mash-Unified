@@ -12,6 +12,16 @@ import { ExcelViewerCard } from './renderers/ExcelViewerCard';
 import { AgentMarkdown } from '@/components/markdown/AgentMarkdown';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { fastFormatJsonLine } from '@/features/viewer/utils/fastJsonFormatter';
+import { loader } from '@monaco-editor/react';
+
+// Confine Monaco runtime to local bundled assets in /monaco/vs for offline air-gapped support
+if (typeof window !== 'undefined') {
+  loader.config({
+    paths: {
+      vs: '/monaco/vs',
+    },
+  });
+}
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,

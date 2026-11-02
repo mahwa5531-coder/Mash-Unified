@@ -5,11 +5,11 @@ import katex from 'katex';
 import { Streamdown } from 'streamdown';
 import { createMathPlugin } from '@streamdown/math';
 import { createMermaidPlugin } from '@streamdown/mermaid';
+import { createCodePlugin } from '@streamdown/code';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
 import { useAgentMarkdownComponents } from './useAgentMarkdownComponents';
-import CodeBlock from '@/components/renderers/CodeBlock';
 import { escapeCurrencyInMarkdown } from '@/features/chat/components/messages/proseHelpers';
 
 /**
@@ -23,6 +23,7 @@ const mathPlugin = createMathPlugin({ singleDollarTextMath: true });
 
 // Official mermaid plugin with suppressErrorRendering and streaming safety
 const mermaidPlugin = createMermaidPlugin();
+const codePlugin = createCodePlugin();
 
 // Fenced ```latex / ```math / ```katex blocks render as display math
 const LATEX_LANGUAGES = ['latex', 'math', 'katex'];
@@ -59,26 +60,6 @@ function LatexBlock({ code: source, isIncomplete }: { code: string; isIncomplete
     />
   );
 }
-
-function StreamdownCodeBlock({ code, language, isIncomplete }: { code: string; language: string; isIncomplete?: boolean }) {
-  return <CodeBlock language={language || 'code'} code={code} isStreaming={isIncomplete} />;
-}
-
-// Proxy matching all programming languages except 'mermaid' and LATEX_LANGUAGES
-const allOtherLanguages = new Proxy([] as string[], {
-  get(target, prop) {
-    if (prop === 'includes') {
-      return (lang: string) => {
-        if (!lang) return true;
-        const l = String(lang).toLowerCase().trim();
-        if (l === 'mermaid') return false;
-        if (LATEX_LANGUAGES.includes(l)) return false;
-        return true;
-      };
-    }
-    return Reflect.get(target, prop);
-  }
-});
 
 // Remark plugin ensuring code blocks without explicit language get default 'text' lang
 const ensureCodeLanguagePlugin = () => (tree: any) => {
@@ -134,12 +115,12 @@ export const AgentMarkdown = memo(function AgentMarkdown({
       <Streamdown
         mode={isStreaming ? 'streaming' : 'static'}
         plugins={{
+          code: codePlugin,
           math: mathPlugin,
           mermaid: mermaidPlugin,
           renderers: [
             { component: LatexBlock, language: LATEX_LANGUAGES },
-            { component: StreamdownCodeBlock, language: allOtherLanguages },
-          ],
+                      ],
         }}
         remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
         controls={{

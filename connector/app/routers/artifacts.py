@@ -311,6 +311,18 @@ async def get_file_content(
         except Exception:
             pass
 
+    # Security hardening: strictly block access to configuration secrets, databases, dotfiles, and repo internals
+    name_lower = p.name.lower()
+    if (
+        name_lower.startswith(".env")
+        or name_lower.endswith((".db", ".sqlite", ".sqlite3"))
+        or any(part in (".git", "node_modules", "bin", "__pycache__") for part in p.parts)
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Access to configuration, database files, or runtime binaries is forbidden."
+        )
+
     if not is_path_in_base_roots(p):
         allowed_roots = await get_allowed_file_roots(eng)
         if not any(p == root or p.is_relative_to(root) for root in allowed_roots):

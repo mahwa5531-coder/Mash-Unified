@@ -468,7 +468,7 @@ export function useViewerTabs(sessionId?: string) {
           const capturedSessionId = sessionId;
           inFlightTabFetchesRef.current.add(tabId);
           setIsLoadingContent(true);
-          fetchFileContent(cleanPath, sessionId, true).then(content => {
+          fetchFileContent(cleanPath, sessionId, false).then(content => {
             if (sessionIdRef.current !== capturedSessionId) return;
             if (!openTabsRef.current.some(t => t.id === tabId)) return;
             setTabContent(c => ({ ...c, [tabId]: content }));

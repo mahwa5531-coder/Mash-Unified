@@ -34,12 +34,13 @@ async function runTests() {
   // -----------------------------------------------------------------------------
   console.log('\n[Test 2] cleanupSessionStorage localStorage eviction...');
   const storageStore: Record<string, string> = {
-    'nexau_pinned_sessions': JSON.stringify(['other_sess', testId, 'another_sess']),
-    'nexau_archived_session_ids': JSON.stringify([testId, 'keep_me']),
-    'nexau_cached_sessions': JSON.stringify([
+    'mash_pinned_sessions': JSON.stringify(['other_sess', testId, 'another_sess']),
+    'mash_archived_session_ids': JSON.stringify([testId, 'keep_me']),
+    'mash_cached_sessions': JSON.stringify([
       { session_id: testId, title: 'To Delete' },
       { session_id: 'other_sess', title: 'To Keep' }
     ]),
+    'nexau_pinned_sessions': JSON.stringify(['legacy_val']),
     [`draft_${testId}`]: 'unsent draft text',
     'unrelated_key': 'unrelated_val',
   };
@@ -56,15 +57,16 @@ async function runTests() {
 
   cleanupSessionStorage(testId);
 
-  const pinnedAfter = JSON.parse(storageStore['nexau_pinned_sessions']);
+  const pinnedAfter = JSON.parse(storageStore['mash_pinned_sessions']);
   assert.deepStrictEqual(pinnedAfter, ['other_sess', 'another_sess'], 'Pinned sessions must not contain deleted sessionId');
 
-  const archivedAfter = JSON.parse(storageStore['nexau_archived_session_ids']);
+  const archivedAfter = JSON.parse(storageStore['mash_archived_session_ids']);
   assert.deepStrictEqual(archivedAfter, ['keep_me'], 'Archived sessions must not contain deleted sessionId');
 
-  const cachedAfter = JSON.parse(storageStore['nexau_cached_sessions']);
+  const cachedAfter = JSON.parse(storageStore['mash_cached_sessions']);
   assert.strictEqual(cachedAfter.length, 1);
   assert.strictEqual(cachedAfter[0].session_id, 'other_sess');
+  assert.strictEqual(storageStore['nexau_pinned_sessions'], undefined, 'Legacy keys must be permanently purged');
 
   assert.strictEqual(storageStore[`draft_${testId}`], undefined, 'Session-specific draft key must be removed');
   assert.strictEqual(storageStore['unrelated_key'], 'unrelated_val', 'Unrelated keys must remain untouched');

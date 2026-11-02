@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   },
   turbopack: {},
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   allowedDevOrigins: ["127.0.0.1", "localhost"],
 };

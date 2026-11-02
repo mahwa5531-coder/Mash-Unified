@@ -282,7 +282,20 @@ ipcMain.on('window-close', () => {
 ipcMain.handle('mash-open-path', async (_event, targetPath) => {
   if (!targetPath || typeof targetPath !== 'string') return 'Invalid path';
   try {
-    return await shell.openPath(targetPath);
+    const resolved = path.resolve(targetPath);
+    if (!fs.existsSync(resolved)) return 'Path does not exist';
+
+    // Defense-in-depth: block arbitrary executable/script launching via IPC
+    const ext = path.extname(resolved).toLowerCase();
+    const BLOCKED_EXTENSIONS = new Set([
+      '.exe', '.bat', '.cmd', '.ps1', '.vbs', '.vbe', '.js', '.jse',
+      '.wsf', '.wsh', '.com', '.msi', '.scr', '.pif', '.sh', '.bin'
+    ]);
+    if (BLOCKED_EXTENSIONS.has(ext)) {
+      return 'Execution of executable binaries or scripts is prohibited';
+    }
+
+    return await shell.openPath(resolved);
   } catch (err) {
     return err?.message || 'Failed to open path';
   }

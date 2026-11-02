@@ -147,10 +147,10 @@ export const SessionItemRow = React.memo(function SessionItemRow({
     prev.isSelectionResolved === next.isSelectionResolved &&
     prev.isStreaming === next.isStreaming &&
     prev.hasStoreUnread === next.hasStoreUnread &&
-    prev.onSelect === next.onSelect &&
+    prev.onSessionClick === next.onSessionClick &&
     prev.onOpenMenu === next.onOpenMenu &&
     prev.onRenameSubmit === next.onRenameSubmit &&
-    prev.onRenameCancel === next.onRenameCancel &&
+    prev.onCancelRename === next.onCancelRename &&
     prev.setRenameInput === next.setRenameInput
   );
 });

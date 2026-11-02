@@ -69,11 +69,13 @@ async def list_all_sessions(engine: Any, include_benchmarks: bool = False) -> di
         except Exception:
             pass
 
-        bench = ("benchmark", "bench", "par_", "subfunc_", "eval", "tatqa", "gaia", "stataudit", "l4_", "ssc_cgl", "unbiased", "qa_report", "nlp_batch")
+        bench_tokens = ("benchmark", "bench_", "_bench", "par_", "subfunc_", "eval_", "_eval", "tatqa", "gaia", "stataudit", "l4_", "ssc_cgl", "unbiased", "qa_report", "nlp_batch")
         seen_sids, result = set(), []
         for s in db_sessions:
             sid = s.session_id
-            if sid in seen_sids or (not include_benchmarks and any(p in sid.lower() for p in bench)):
+            ctx = s.context or {}
+            is_bench = bool(ctx.get("is_benchmark")) or any(p in sid.lower() for p in bench_tokens)
+            if sid in seen_sids or (not include_benchmarks and is_bench):
                 continue
             seen_sids.add(sid)
             ctx, stats = s.context or {}, session_stats.get(sid, {"count": 0, "last_action_time": None})
@@ -271,16 +273,19 @@ async def rename_existing_session(engine: Any, session_id: str, title: str) -> d
 async def mark_session_as_viewed(engine: Any, session_id: str) -> dict[str, Any]:
     _validate_id(session_id, "session_id")
     eng, now_iso = _get_engine(engine), datetime.now(UTC).isoformat()
-    if eng:
-        try:
-            s = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
-            if s:
-                ctx = dict(s.context or {})
-                ctx["last_user_view_time"] = now_iso
-                s.context = ctx
-                await eng.update(s)
-        except Exception as e:
-            logger.warning(f"Error updating session view time: {e}")
+    if not eng:
+        raise HTTPException(status_code=503, detail="Database engine is unavailable")
+    s = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
+    if not s:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    try:
+        ctx = dict(s.context or {})
+        ctx["last_user_view_time"] = now_iso
+        s.context = ctx
+        await eng.update(s)
+    except Exception as e:
+        logger.warning(f"Error updating session view time: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update session view timestamp")
     return {"status": "success", "session_id": session_id, "last_user_view_time": now_iso, "has_unread": False}
 
 
@@ -288,7 +293,7 @@ async def undo_session_turn(engine: Any, session_id: str, from_turn: int = 0) ->
     _validate_id(session_id, "session_id")
     eng = _get_engine(engine)
     if not eng:
-        return {"status": "success", "deleted": 0}
+        raise HTTPException(status_code=503, detail="Database engine is unavailable")
     try:
         actions = sorted(await eng.find_many(AgentRunActionModel, filters=ComparisonFilter.eq("session_id", session_id)), key=lambda a: getattr(a, "created_at_ns", 0) or 0)
         user_turn_count, target_run_id = 0, None

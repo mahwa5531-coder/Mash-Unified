@@ -171,19 +171,6 @@ export async function fetchSessionQueue(sessionId: string): Promise<string[]> {
   }
 }
 
-export async function removeSessionQueueItem(sessionId: string, index?: number): Promise<boolean> {
-  try {
-    const url = index !== undefined
-      ? `${BASE_URL}/sessions/${sessionId}/queue?index=${index}`
-      : `${BASE_URL}/sessions/${sessionId}/queue`;
-    const res = await safeFetch(url, { method: "DELETE" });
-    return res.ok;
-  } catch (err) {
-    console.warn("Failed to remove session queue item:", err);
-    return false;
-  }
-}
-
 export async function uploadSessionFile(
   sessionId: string,
   file: File
