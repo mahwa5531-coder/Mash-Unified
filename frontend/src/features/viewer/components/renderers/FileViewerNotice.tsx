@@ -17,7 +17,7 @@ export function FileViewerNotice({ message, filename, path, onRetry, action }: F
   const baseName = displayName && ext ? displayName.slice(0, -(ext.length + 1)) : displayName;
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center bg-[var(--bg-app)] dark:bg-black select-none">
+    <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center bg-[var(--bg-app)] select-none">
       <div className="w-12 h-12 rounded-full border-[2.2px] border-red-500/90 flex items-center justify-center text-red-500 mb-4 shadow-sm">
         <X size={24} strokeWidth={2.2} />
       </div>

@@ -65,8 +65,8 @@ async def resolve_session_workspace(engine: Any, session_id: str | None) -> Path
         session = await engine.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
         if session and session.context:
             ctx = session.context
-            work_dir = ctx.get("working_directory") or ctx.get("workspace_dir") or ctx.get("cwd")
-            if work_dir and Path(work_dir).is_dir():
+            work_dir = ctx.get("working_directory") or ctx.get("workspace_dir") or ctx.get("cwd") or ctx.get("workspace_uri")
+            if work_dir and work_dir != "No Repo" and Path(work_dir).is_dir():
                 return Path(work_dir).resolve()
             if ctx.get("project_id"):
                 return await resolve_workspace_directory(engine, ctx["project_id"])
@@ -105,8 +105,8 @@ async def get_allowed_file_roots(engine: Any | None) -> list[Path]:
         for session in sessions:
             context = session.context or {}
             # Allow session working directories
-            work_dir = context.get("working_directory") or context.get("workspace_dir")
-            if work_dir and Path(work_dir).is_dir():
+            work_dir = context.get("working_directory") or context.get("workspace_dir") or context.get("cwd") or context.get("workspace_uri")
+            if work_dir and work_dir != "No Repo" and Path(work_dir).is_dir():
                 roots.append(Path(work_dir).resolve())
 
             brain_directory = context.get("brain_directory")

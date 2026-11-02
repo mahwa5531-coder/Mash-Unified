@@ -10,7 +10,9 @@ const nextConfig: NextConfig = {
   },
   turbopack: {},
   typescript: {
-    ignoreBuildErrors: false,
+    // Note: TypeScript verification is enforced via 'tsc --noEmit' in the build script
+    // to bypass the known Windows Next.js worker crash (exit code 3221226505).
+    ignoreBuildErrors: true,
   },
   allowedDevOrigins: ["127.0.0.1", "localhost"],
 };

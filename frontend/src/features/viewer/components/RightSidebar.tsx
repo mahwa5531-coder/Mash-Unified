@@ -225,7 +225,7 @@ export default function RightSidebar({
         ) : !activeTab ? (
           <ViewerEmptyState setViewMode={setViewMode} />
         ) : (
-          <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-app)] dark:bg-black text-[var(--text-primary)]">
+          <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
             {/* Canonical FileBreadcrumbBar Primitive */}
             <FileBreadcrumbBar
               path={activeTab.path || activeTab.title || ''}
@@ -242,7 +242,7 @@ export default function RightSidebar({
 
             {/* Content Body: Terminal Viewer vs Safe File Viewer */}
             {activeTab.type === 'terminal' ? (
-              <div className="flex-1 overflow-hidden bg-[#121214]">
+              <div className="flex-1 overflow-hidden bg-[var(--bg-app)]">
                 <ErrorBoundary scope="terminal-viewer">
                   <TerminalViewer
                     activeTab={activeTab}
@@ -254,7 +254,7 @@ export default function RightSidebar({
                 </ErrorBoundary>
               </div>
             ) : (
-              <div className="flex-1 overflow-hidden bg-[var(--bg-app)] dark:bg-black">
+              <div className="flex-1 overflow-hidden bg-[var(--bg-app)]">
                 <ErrorBoundary scope="safe-file-viewer">
                   <SafeFileViewer
                     filename={activeTab?.title || ''}

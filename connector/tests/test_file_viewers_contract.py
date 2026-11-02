@@ -1,4 +1,5 @@
 import sys
+import uuid
 from pathlib import Path
 
 import httpx
@@ -38,7 +39,7 @@ async def test_file_viewers_endpoints(tmp_path):
             # Register workspace folder as project
             proj_res = await client.post("/api/projects", json={
                 "user_id": "test_viewer_user",
-                "name": "Viewer Test Project",
+                "name": f"Viewer Test Project {uuid.uuid4().hex[:8]}",
                 "local_folder_path": str(demo_dir)
             })
             assert proj_res.status_code == 200

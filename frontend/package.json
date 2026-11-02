@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run copy:monaco && next build",
+    "build": "npm run copy:monaco && tsc --noEmit && next build",
     "start": "next start",
     "lint": "eslint --cache",
     "test:chat": "npx tsx --tsconfig tsconfig.json tests/test_chat_scenarios.mjs",

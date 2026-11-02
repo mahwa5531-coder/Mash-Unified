@@ -9,7 +9,6 @@ router = APIRouter(tags=["tasks"])
 
 
 @router.get("/tasks")
-@router.get("/api/tasks")
 async def list_active_tasks(session_id: str | None = None):
     """List all active background tasks and recent session tasks for isolated viewing."""
     tasks_list = []
@@ -78,7 +77,6 @@ async def list_active_tasks(session_id: str | None = None):
 
 
 @router.post("/tasks/{pid}/kill")
-@router.post("/api/tasks/{pid}/kill")
 async def kill_task(pid: int):
     """Terminate an active background task by its PID."""
     try:
@@ -130,7 +128,6 @@ def _normalize_task_id(raw_id: str) -> tuple[int | None, str]:
 
 
 @router.get("/tasks/{task_id:path}/log")
-@router.get("/api/tasks/{task_id:path}/log")
 async def get_task_log(task_id: str):
     """Return task execution log content for the UI viewer as JSON."""
     try:
@@ -183,7 +180,6 @@ async def get_task_log(task_id: str):
 
 
 @router.get("/tasks/{task_id:path}/stream")
-@router.get("/api/tasks/{task_id:path}/stream")
 async def stream_task_log(task_id: str, request: Request):
     """Stream live task terminal logs as SSE (OpenHands pattern)."""
     # ponytail: tail active sandbox stdout/stderr or task log file asynchronously with chunk deltas

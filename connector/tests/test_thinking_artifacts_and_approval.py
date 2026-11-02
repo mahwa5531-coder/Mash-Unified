@@ -172,6 +172,14 @@ async def test_session_state_and_rename_persistence():
             assert res_p.status_code == 200
             proj_id = res_p.json()["id"]
 
+            res_s = await client.post("/api/sessions", json={
+                "user_id": user_id,
+                "session_id": sess_id,
+                "project_id": proj_id,
+                "title": "Initial Session",
+            })
+            assert res_s.status_code == 200
+
             # 2. Rename session
             new_title = f"Verified Audit Session {test_run_id}"
             res_rename = await client.post(f"/sessions/{sess_id}/rename", json={"title": new_title})
