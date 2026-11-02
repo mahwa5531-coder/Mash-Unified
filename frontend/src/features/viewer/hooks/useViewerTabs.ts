@@ -412,7 +412,7 @@ export function useViewerTabs(sessionId?: string) {
       }
       return nextTabs;
     });
-  }, [activeTabId]);
+  }, [activeTabId, sessionId]);
 
   const activeTab = useMemo(() => openTabs.find(t => t.id === activeTabId), [openTabs, activeTabId]);
 
