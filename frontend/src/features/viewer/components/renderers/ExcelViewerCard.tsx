@@ -23,6 +23,13 @@ export function ExcelViewerCard({
   const [downloaded, setDownloaded] = useState(false);
   const downloadTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Cleanup download feedback timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (downloadTimerRef.current) clearTimeout(downloadTimerRef.current);
+    };
+  }, []);
+
   const [statusFeedback, setStatusFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
