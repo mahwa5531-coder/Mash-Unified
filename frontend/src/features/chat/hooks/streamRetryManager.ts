@@ -2,7 +2,7 @@
 
 import type { Message } from '@/types/chat';
 import { BASE_URL, safeFetch } from '@/services/client';
-import { markSessionViewed, renameSession } from '@/services/sessions';
+import { markSessionViewed } from '@/services/sessions';
 import { streamQuery, formatErrorMessage } from '@/services/stream';
 export { formatErrorMessage } from '@/services/stream';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
@@ -165,7 +165,6 @@ export function resolveActiveSession(
   const title = generateCleanSessionTitle(userText || 'Resumed Turn', activeSid);
   if (isNewSession) {
     onCreated(activeSid, title, repo);
-    renameSession(activeSid, title).catch(() => {});
   }
   return { activeSid, isNewSession, title };
 }

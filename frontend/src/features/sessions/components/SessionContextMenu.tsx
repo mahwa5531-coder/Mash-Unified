@@ -52,51 +52,98 @@ export function SessionContextMenu({
           />
           <div 
             ref={menuRef}
+            role="menu"
+            aria-label="Session options"
+            tabIndex={-1}
             style={{ top: `${menuPos.y}px`, left: `${menuPos.x}px` }}
-            className="fixed z-50 w-48 bg-white dark:bg-[#18181a] border border-zinc-200 dark:border-white/[0.08] rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/80 p-1 text-[13px] text-zinc-700 dark:text-zinc-300 font-sans select-none backdrop-blur-md"
+            className="fixed z-50 w-48 bg-white dark:bg-[#18181a] border border-zinc-200 dark:border-white/[0.08] rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/80 p-1 text-[13px] text-zinc-700 dark:text-zinc-300 font-sans select-none backdrop-blur-md outline-none"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation();
+                setActiveMenuSessionId(null);
+              }
+            }}
           >
             <div 
+              role="menuitem"
+              tabIndex={0}
               onClick={() => {
                 togglePin(activeMenuSessionId);
                 setActiveMenuSessionId(null);
               }}
-              className="h-8 px-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white cursor-pointer flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 transition-colors group select-none"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  togglePin(activeMenuSessionId);
+                  setActiveMenuSessionId(null);
+                }
+              }}
+              className="h-8 px-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/[0.08] focus:bg-zinc-100 dark:focus:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white focus:text-zinc-900 dark:focus:text-white cursor-pointer flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 transition-colors group select-none outline-none"
             >
               <Pin size={14} className={`text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200 shrink-0 ${pinnedSessionIds.has(activeMenuSessionId) ? 'fill-sky-400 text-sky-400' : ''}`} />
               <span className="truncate">{pinnedSessionIds.has(activeMenuSessionId) ? 'Unpin conversation' : 'Pin to top'}</span>
             </div>
 
             <div 
+              role="menuitem"
+              tabIndex={0}
               onClick={() => {
                 setEditingSessionId(activeMenuSessionId);
                 const target = sessions.find(s => s.session_id === activeMenuSessionId);
                 setRenameInput(target?.custom_title || target?.title || '');
                 setActiveMenuSessionId(null);
               }}
-              className="h-8 px-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white cursor-pointer flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 transition-colors group select-none"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setEditingSessionId(activeMenuSessionId);
+                  const target = sessions.find(s => s.session_id === activeMenuSessionId);
+                  setRenameInput(target?.custom_title || target?.title || '');
+                  setActiveMenuSessionId(null);
+                }
+              }}
+              className="h-8 px-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/[0.08] focus:bg-zinc-100 dark:focus:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white focus:text-zinc-900 dark:focus:text-white cursor-pointer flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 transition-colors group select-none outline-none"
             >
               <Edit2 size={14} className="text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200 shrink-0" />
               <span className="truncate">Rename</span>
             </div>
 
             <div 
+              role="menuitem"
+              tabIndex={0}
               onClick={() => {
                 handleCopyId(activeMenuSessionId);
                 setActiveMenuSessionId(null);
               }}
-              className="h-8 px-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white cursor-pointer flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 transition-colors group select-none"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleCopyId(activeMenuSessionId);
+                  setActiveMenuSessionId(null);
+                }
+              }}
+              className="h-8 px-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/[0.08] focus:bg-zinc-100 dark:focus:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white focus:text-zinc-900 dark:focus:text-white cursor-pointer flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 transition-colors group select-none outline-none"
             >
               <Copy size={14} className="text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200 shrink-0" />
               <span className="truncate">Copy Session ID</span>
             </div>
 
             <div 
+              role="menuitem"
+              tabIndex={0}
               onClick={() => {
                 handleArchive(activeMenuSessionId);
                 setActiveMenuSessionId(null);
               }}
-              className="h-8 px-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white cursor-pointer flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 transition-colors group select-none"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleArchive(activeMenuSessionId);
+                  setActiveMenuSessionId(null);
+                }
+              }}
+              className="h-8 px-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/[0.08] focus:bg-zinc-100 dark:focus:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-white focus:text-zinc-900 dark:focus:text-white cursor-pointer flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300 transition-colors group select-none outline-none"
             >
               <Archive size={14} className="text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200 shrink-0" />
               <span className="truncate">Archive</span>
@@ -105,8 +152,16 @@ export function SessionContextMenu({
             <div className="my-1 border-t border-zinc-200 dark:border-white/[0.06]" />
 
             <div 
+              role="menuitem"
+              tabIndex={0}
               onClick={() => handleDelete(activeMenuSessionId)}
-              className="h-8 px-2.5 rounded-lg hover:bg-red-500/10 dark:hover:bg-red-500/[0.12] hover:text-red-600 dark:hover:text-red-300 text-zinc-700 dark:text-zinc-300 cursor-pointer flex items-center gap-2.5 transition-colors group select-none"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleDelete(activeMenuSessionId);
+                }
+              }}
+              className="h-8 px-2.5 rounded-lg hover:bg-red-500/10 dark:hover:bg-red-500/[0.12] focus:bg-red-500/10 dark:focus:bg-red-500/[0.12] hover:text-red-600 dark:hover:text-red-300 focus:text-red-600 dark:focus:text-red-300 text-zinc-700 dark:text-zinc-300 cursor-pointer flex items-center gap-2.5 transition-colors group select-none outline-none"
             >
               <Trash2 size={14} className="text-zinc-500 dark:text-zinc-400 group-hover:text-red-500 dark:group-hover:text-red-400 shrink-0 transition-colors" />
               <span className="truncate">Delete</span>

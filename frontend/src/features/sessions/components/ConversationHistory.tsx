@@ -209,13 +209,12 @@ export default function ConversationHistory({
           ) : (
             displayedSessions.map((session) => {
               const isWorkspace = session.section === 'workspace' && Boolean(session.workspace_uri && session.workspace_uri !== 'No Repo');
-              let repoName = 'No Repo';
-              if (isWorkspace && session.workspace_uri) {
-                repoName = session.workspace_uri;
-                if (repoName.includes('/') || repoName.includes('\\')) {
-                  repoName = repoName.split(/[\\/]/).filter(Boolean).pop() || repoName;
-                }
-              }
+              const repoLocation = isWorkspace && session.workspace_uri ? session.workspace_uri : 'No Repo';
+              const repoDisplay = isWorkspace && session.workspace_uri
+                ? (session.workspace_uri.includes('/') || session.workspace_uri.includes('\\')
+                    ? session.workspace_uri.split(/[\\/]/).filter(Boolean).pop() || session.workspace_uri
+                    : session.workspace_uri)
+                : 'No Repo';
 
               const cleanTitle = generateCleanSessionTitle(
                 session.custom_title || session.title || '',
@@ -228,11 +227,11 @@ export default function ConversationHistory({
                   role="button"
                   tabIndex={0}
                   aria-label={`Open conversation: ${cleanTitle}`}
-                  onClick={() => onSelectSession(session.session_id, session.custom_title || session.title, repoName)}
+                  onClick={() => onSelectSession(session.session_id, session.custom_title || session.title, repoLocation)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      onSelectSession(session.session_id, session.custom_title || session.title, repoName);
+                      onSelectSession(session.session_id, session.custom_title || session.title, repoLocation);
                     }
                   }}
                   className="group relative flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-[#202020] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)] transition-all duration-150 cursor-pointer select-none"
@@ -246,7 +245,7 @@ export default function ConversationHistory({
                       {isWorkspace ? (
                         <>
                           <ProjectFolderOutlineIcon size={12} className="text-zinc-400 dark:text-zinc-500 shrink-0" />
-                          <span className="truncate">{repoName}</span>
+                          <span className="truncate">{repoDisplay}</span>
                         </>
                       ) : (
                         <>

@@ -24,10 +24,15 @@ function loadCache<T>(key: string, fallback: T, legacyKey?: string): T {
 function setCache(key: string, val: any, legacyKey?: string): void {
   if (typeof window === 'undefined') return;
   try {
-    const str = JSON.stringify(val);
-    localStorage.setItem(key, str);
-    if (legacyKey) localStorage.setItem(legacyKey, str);
+    localStorage.setItem(key, JSON.stringify(val));
+    if (legacyKey) localStorage.removeItem(legacyKey);
   } catch {}
+}
+
+export interface SidebarSectionsState {
+  pinned: boolean;
+  workspaces: boolean;
+  conversations: boolean;
 }
 
 export function groupSidebarSessions(
@@ -152,6 +157,23 @@ export function useSidebarData({
     }
   };
 
+  // Section accordion state persisted across sidebar collapse/remounts
+  const [sectionsState, setSectionsState] = useState<SidebarSectionsState>(() => {
+    return loadCache<SidebarSectionsState>('mash_sidebar_sections_state', {
+      pinned: true,
+      workspaces: true,
+      conversations: true,
+    });
+  });
+
+  const toggleSection = (sectionKey: keyof SidebarSectionsState) => {
+    setSectionsState(prev => {
+      const next = { ...prev, [sectionKey]: !prev[sectionKey] };
+      setCache('mash_sidebar_sections_state', next);
+      return next;
+    });
+  };
+
   // Folders expansion state: persisted to localStorage to prevent unwanted decomposition on reload
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>(() => {
     return loadCache<Record<string, boolean>>('mash_sidebar_open_folders', {});
@@ -183,7 +205,12 @@ export function useSidebarData({
   const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
 
   // ponytail: Reconcile localStorage cached state with SQLite response without re-sorting jitter
+  const isRefreshingRef = useRef(false);
+  const errorCountRef = useRef(0);
+
   const refreshData = useCallback(async () => {
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
     try {
       const [sessionsRes, projectsRes] = await Promise.all([
         fetchSessionsDetailed(),
@@ -243,24 +270,39 @@ export function useSidebarData({
         setRegisteredProjects(safeProjects);
         setCache('mash_cached_projects', safeProjects, 'nexau_cached_projects');
       }
+      errorCountRef.current = 0;
     } catch (err) {
+      errorCountRef.current += 1;
       console.error('Failed to load sidebar data:', err);
       setIsReconnecting(true);
     } finally {
+      isRefreshingRef.current = false;
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    refreshData();
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      refreshData();
-    }, 10000);
+    let timerId: ReturnType<typeof setTimeout>;
+    let isCancelled = false;
+
+    const poll = async () => {
+      if (!isCancelled && !(typeof document !== 'undefined' && document.hidden)) {
+        await refreshData();
+      }
+      if (!isCancelled) {
+        const delay = errorCountRef.current > 0
+          ? Math.min(60000, 10000 * Math.pow(1.5, Math.min(errorCountRef.current, 5)))
+          : 10000;
+        timerId = setTimeout(poll, delay);
+      }
+    };
+
+    poll();
     const onProjectsUpdated = () => refreshData();
     window.addEventListener('nexau:projects-updated', onProjectsUpdated);
     return () => {
-      clearInterval(interval);
+      isCancelled = true;
+      clearTimeout(timerId);
       window.removeEventListener('nexau:projects-updated', onProjectsUpdated);
     };
   }, [refreshData]);
@@ -312,6 +354,7 @@ export function useSidebarData({
     sessions, setSessions, registeredProjects, loading, refreshData, isReconnecting,
     pinnedSessionIds, togglePin, archivedIds, handleArchive,
     openFolders, setOpenFolders, toggleFolder,
+    sectionsState, toggleSection,
     pinnedSessions, workspaceSessions, directConversations,
   };
 }

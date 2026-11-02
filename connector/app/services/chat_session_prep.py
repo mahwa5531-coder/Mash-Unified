@@ -82,14 +82,15 @@ async def ensure_project_and_context(
     if not eng:
         return
 
-    # Auto-create ProjectModel from workspace path (app-specific, NexAU has no project concept)
+    # Resolve or create ProjectModel from workspace context
     try:
         if workspace_target and workspace_target != "No Repo":
-            target_path = str(Path(workspace_target).resolve()) if os.path.exists(workspace_target) else None
-            existing_proj = (
-                await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("local_folder_path", target_path))
-                if target_path else None
-            )
+            existing_proj = await eng.find_first(ProjectModel, filters=ComparisonFilter.eq("id", workspace_target))
+            target_path = str(Path(workspace_target).resolve()) if (not existing_proj and os.path.exists(workspace_target)) else None
+            if not existing_proj and target_path:
+                existing_proj = await eng.find_first(
+                    ProjectModel, filters=ComparisonFilter.eq("local_folder_path", target_path)
+                )
             if not existing_proj:
                 existing_proj = await eng.find_first(
                     ProjectModel, filters=ComparisonFilter.eq("name", workspace_target)
@@ -105,7 +106,7 @@ async def ensure_project_and_context(
                 brain_path = scaffold_session_storage(sid, project_id)
                 resolved_context.update({
                     "project_id": project_id,
-                    "workspace_uri": existing_proj.name,
+                    "workspace_uri": existing_proj.local_folder_path or existing_proj.name,
                     "working_directory": existing_proj.local_folder_path,
                     "brain_directory": str(brain_path),
                     "scratch_directory": str(brain_path / "scratch"),

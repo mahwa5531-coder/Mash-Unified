@@ -58,9 +58,9 @@ export function WorkspaceFolderRow({
           )}
         </div>
         
-        {/* Right: Dynamic Hover Actions (+ New Conversation, Vertical 3-dots Menu) */}
+        {/* Right: Dynamic Hover & Focus Actions (+ New Conversation, Vertical 3-dots Menu) */}
         <div 
-          className="flex items-center gap-0.5 opacity-0 group-hover/folder:opacity-100 transition-opacity shrink-0 ml-1" 
+          className="flex items-center gap-0.5 opacity-0 group-hover/folder:opacity-100 focus-within:opacity-100 transition-opacity shrink-0 ml-1" 
           onClick={(e) => e.stopPropagation()}
         >
           {/* Quick + button to create new session in this workspace */}

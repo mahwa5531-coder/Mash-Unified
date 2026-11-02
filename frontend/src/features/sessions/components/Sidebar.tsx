@@ -40,6 +40,21 @@ interface SidebarProps {
   authUser?: AuthUser | null;
 }
 
+function fallbackCopyText(text: string): void {
+  if (typeof document === 'undefined') return;
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    document.execCommand('copy');
+  } catch {}
+  document.body.removeChild(textarea);
+}
+
 export default function Sidebar({ 
   selectedSessionId, 
   selectedSessionTitle, 
@@ -76,6 +91,8 @@ export default function Sidebar({
     openFolders,
     setOpenFolders,
     toggleFolder,
+    sectionsState,
+    toggleSection,
     pinnedSessions,
     workspaceSessions,
     directConversations,
@@ -279,7 +296,17 @@ export default function Sidebar({
   };
 
   const handleCopyId = (sessionId: string) => {
-    navigator.clipboard.writeText(sessionId);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(sessionId).catch(() => {
+          fallbackCopyText(sessionId);
+        });
+      } else {
+        fallbackCopyText(sessionId);
+      }
+    } catch {
+      fallbackCopyText(sessionId);
+    }
     setActiveMenuSessionId(null);
   };
 
@@ -327,6 +354,25 @@ export default function Sidebar({
   };
 
   const handleAddWorkspace = async () => {
+    // 1. Native desktop folder selection (primary in Electron desktop)
+    try {
+      const selected = await selectFolder();
+      if (selected && selected.folder_path) {
+        const folderPath = selected.folder_path;
+        const folderName = selected.folder_name || folderPath.split(/[/\\]/).filter(Boolean).pop() || folderPath;
+        const project = await createProject(folderName, folderPath);
+        if (project) {
+          refreshData();
+          setOpenFolders(prev => ({ ...prev, [project.id || project.name]: true }));
+          onNewSession(project.name, project.local_folder_path);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("Native folder picker unavailable, falling back:", err);
+    }
+
+    // 2. Web browser fallback outside Electron
     if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {
       try {
         const dirHandle = await (window as any).showDirectoryPicker({ mode: 'read' });
@@ -345,31 +391,15 @@ export default function Sidebar({
           const project = await createProject(folderName, folderPath);
           if (project) {
             refreshData();
-            setOpenFolders(prev => ({ ...prev, [project.name]: true }));
+            setOpenFolders(prev => ({ ...prev, [project.id || project.name]: true }));
             onNewSession(project.name, project.local_folder_path);
             return;
           }
         }
       } catch (err: any) {
         if (err?.name === 'AbortError') return;
-        console.warn("Browser showDirectoryPicker fallback:", err);
+        console.warn("Browser showDirectoryPicker fallback error:", err);
       }
-    }
-
-    try {
-      const selected = await selectFolder();
-      if (selected && selected.folder_path) {
-        const folderPath = selected.folder_path;
-        const folderName = selected.folder_name || folderPath.split(/[/\\]/).filter(Boolean).pop() || folderPath;
-        const project = await createProject(folderName, folderPath);
-        if (project) {
-          refreshData();
-          setOpenFolders(prev => ({ ...prev, [project.name]: true }));
-          onNewSession(project.name, project.local_folder_path);
-        }
-      }
-    } catch (err) {
-      console.warn("Native folder selection failed:", err);
     }
   };
 
@@ -444,6 +474,8 @@ export default function Sidebar({
             pinnedSessions={pinnedSessions}
             canScrollUp={canScrollUp}
             renderSessionItem={renderSessionItem}
+            isOpen={sectionsState.pinned}
+            onToggleOpen={() => toggleSection('pinned')}
           />
 
           {/* Workspaces Section */}
@@ -458,6 +490,8 @@ export default function Sidebar({
             onOpenQuickProjectModal={() => setIsQuickProjectModalOpen(true)}
             onDeleteProject={handleDeleteProjectClick}
             renderSessionItem={renderSessionItem}
+            isOpen={sectionsState.workspaces}
+            onToggleOpen={() => toggleSection('workspaces')}
           />
 
           {/* Direct Conversations Section */}
@@ -467,6 +501,8 @@ export default function Sidebar({
             canScrollUp={canScrollUp}
             onNewSession={onNewSession}
             renderSessionItem={renderSessionItem}
+            isOpen={sectionsState.conversations}
+            onToggleOpen={() => toggleSection('conversations')}
           />
         </div>
 

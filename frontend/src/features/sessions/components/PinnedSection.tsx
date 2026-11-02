@@ -8,21 +8,27 @@ export interface PinnedSectionProps {
   pinnedSessions: SessionItem[];
   canScrollUp: boolean;
   renderSessionItem: (session: SessionItem, isPinned?: boolean) => React.ReactNode;
+  isOpen?: boolean;
+  onToggleOpen?: () => void;
 }
 
 export function PinnedSection({
   pinnedSessions,
   canScrollUp,
   renderSessionItem,
+  isOpen,
+  onToggleOpen,
 }: PinnedSectionProps) {
-  const [isPinnedOpen, setIsPinnedOpen] = useState(true);
+  const [internalIsOpen, setInternalIsOpen] = useState(true);
+  const isPinnedOpen = isOpen !== undefined ? isOpen : internalIsOpen;
+  const handleToggle = onToggleOpen || (() => setInternalIsOpen(prev => !prev));
 
   if (pinnedSessions.length === 0) return null;
 
   return (
     <div className="relative pb-2">
       <div 
-        onClick={() => setIsPinnedOpen(prev => !prev)}
+        onClick={handleToggle}
         className={`sticky top-0 z-20 bg-[var(--bg-sidebar)] px-3 pt-2 pb-1.5 flex justify-between items-center group cursor-pointer select-none text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors ${
           canScrollUp ? 'border-b border-zinc-200 dark:border-white/[0.04]' : ''
         }`}

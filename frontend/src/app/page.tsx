@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from '@/features/sessions/components/Sidebar';
 import ChatCanvas from '@/features/chat/components/ChatCanvas';
 import RightSidebar from '@/features/viewer/components/RightSidebar';
@@ -140,11 +140,29 @@ export default function Home() {
     setIsHistoryActive(false);
   }, []);
 
-  const handleOpenHistory = useCallback(async () => {
-    setIsHistoryActive(true);
+  const lastHistoryFetchRef = useRef<number>(0);
+
+  const refreshHistory = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastHistoryFetchRef.current < 30000 && allSessions.length > 0) {
+      return;
+    }
+    lastHistoryFetchRef.current = now;
     const list = await fetchSessions();
     setAllSessions(list);
-  }, []);
+  }, [allSessions.length]);
+
+  const handleOpenHistory = useCallback(async () => {
+    setIsHistoryActive(true);
+    await refreshHistory();
+  }, [refreshHistory]);
+
+  useEffect(() => {
+    if (!isHistoryActive) return;
+    const onFocus = () => { refreshHistory(true); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [isHistoryActive, refreshHistory]);
 
   const handleDeleteSession = useCallback(async (sessionId: string, showToast: boolean = true): Promise<DeleteSessionResult> => {
     const state = sessionStore.get(sessionId);

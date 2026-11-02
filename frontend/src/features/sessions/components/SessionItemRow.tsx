@@ -146,7 +146,12 @@ export const SessionItemRow = React.memo(function SessionItemRow({
     prev.isPinnedContext === next.isPinnedContext &&
     prev.isSelectionResolved === next.isSelectionResolved &&
     prev.isStreaming === next.isStreaming &&
-    prev.hasStoreUnread === next.hasStoreUnread
+    prev.hasStoreUnread === next.hasStoreUnread &&
+    prev.onSelect === next.onSelect &&
+    prev.onOpenMenu === next.onOpenMenu &&
+    prev.onRenameSubmit === next.onRenameSubmit &&
+    prev.onRenameCancel === next.onRenameCancel &&
+    prev.setRenameInput === next.setRenameInput
   );
 });
 

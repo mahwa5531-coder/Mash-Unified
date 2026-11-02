@@ -14,6 +14,17 @@ export function SidebarFooter({ onOpenSettings, authUser }: SidebarFooterProps) 
   const displayName = authUser?.name || authUser?.email?.split('@')[0] || 'Account';
   const planName = (authUser?.plan || 'Free').toUpperCase();
 
+  const maxQuotaPercent = React.useMemo(() => {
+    const windows = authUser?.quota?.windows;
+    if (!Array.isArray(windows) || windows.length === 0) return null;
+    let max = -1;
+    for (const w of windows) {
+      const val = w.percent ?? w.used_percent;
+      if (typeof val === 'number' && val > max) max = val;
+    }
+    return max >= 0 ? Math.round(max) : null;
+  }, [authUser?.quota?.windows]);
+
   return (
     <div className="mt-auto p-2 bg-[var(--bg-sidebar)] shrink-0 border-t border-zinc-200/50 dark:border-white/[0.04] flex items-center justify-between gap-1.5">
       {authUser?.authenticated ? (
@@ -32,9 +43,9 @@ export function SidebarFooter({ onOpenSettings, authUser }: SidebarFooterProps) 
             </div>
             <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono flex items-center gap-1">
               <span>{planName}</span>
-              {((authUser?.quota?.windows?.[0]?.percent ?? authUser?.quota?.windows?.[0]?.used_percent) !== undefined) && (
+              {maxQuotaPercent !== null && (
                 <span className="text-[9.5px] text-zinc-400 dark:text-zinc-500">
-                  · {authUser?.quota?.windows?.[0]?.percent ?? authUser?.quota?.windows?.[0]?.used_percent}%
+                  · {maxQuotaPercent}%
                 </span>
               )}
             </div>

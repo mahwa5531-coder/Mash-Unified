@@ -10,6 +10,8 @@ export interface DirectConversationsSectionProps {
   canScrollUp: boolean;
   onNewSession?: (repoName?: string) => void;
   renderSessionItem: (session: SessionItem) => React.ReactNode;
+  isOpen?: boolean;
+  onToggleOpen?: () => void;
 }
 
 export function DirectConversationsSection({
@@ -18,8 +20,12 @@ export function DirectConversationsSection({
   canScrollUp,
   onNewSession,
   renderSessionItem,
+  isOpen,
+  onToggleOpen,
 }: DirectConversationsSectionProps) {
-  const [isSectionOpen, setIsSectionOpen] = useState(true);
+  const [internalIsOpen, setInternalIsOpen] = useState(true);
+  const isSectionOpen = isOpen !== undefined ? isOpen : internalIsOpen;
+  const handleToggle = onToggleOpen || (() => setInternalIsOpen(prev => !prev));
 
   return (
     <div className="relative pb-2">
@@ -30,7 +36,7 @@ export function DirectConversationsSection({
         }`}
       >
         <div 
-          onClick={() => setIsSectionOpen(prev => !prev)}
+          onClick={handleToggle}
           className="flex items-center gap-1.5 cursor-pointer group hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
         >
           <ChevronDown 
@@ -46,7 +52,7 @@ export function DirectConversationsSection({
           <button
             type="button"
             onClick={() => onNewSession('No Repo')}
-            className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer outline-none"
+            className="p-1 rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer outline-none"
             title="New conversation"
             aria-label="New conversation"
           >

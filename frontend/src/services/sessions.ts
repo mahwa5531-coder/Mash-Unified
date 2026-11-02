@@ -249,12 +249,20 @@ export function cleanupSessionStorage(sessionId: string): void {
     const keysToRemove: string[] = [];
     for (let i = 0; i < storage.length; i++) {
       const key = storage.key(i);
-      if (key && (key.includes(sessionId) || key.startsWith(`draft_${sessionId}`))) {
+      if (key && (
+        key === `draft_${sessionId}` ||
+        key.startsWith(`draft_${sessionId}`) ||
+        key === `mash_session_${sessionId}` ||
+        key.startsWith(`mash_session_${sessionId}`)
+      )) {
         keysToRemove.push(key);
       }
     }
     for (const key of keysToRemove) {
       storage.removeItem(key);
+    }
+    for (const legacyKey of ['nexau_pinned_sessions', 'nexau_archived_session_ids', 'nexau_cached_sessions']) {
+      storage.removeItem(legacyKey);
     }
   } catch {}
 }

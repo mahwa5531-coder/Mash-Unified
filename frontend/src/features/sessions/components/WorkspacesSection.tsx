@@ -24,6 +24,8 @@ export interface WorkspacesSectionProps {
   onOpenQuickProjectModal: () => void;
   onDeleteProject: (e: React.MouseEvent, projectId?: string, projectName?: string) => void;
   renderSessionItem: (session: SessionItem) => React.ReactNode;
+  isOpen?: boolean;
+  onToggleOpen?: () => void;
 }
 
 export function WorkspacesSection({
@@ -37,8 +39,12 @@ export function WorkspacesSection({
   onOpenQuickProjectModal,
   onDeleteProject,
   renderSessionItem,
+  isOpen,
+  onToggleOpen,
 }: WorkspacesSectionProps) {
-  const [isSectionOpen, setIsSectionOpen] = useState(true);
+  const [internalIsOpen, setInternalIsOpen] = useState(true);
+  const isSectionOpen = isOpen !== undefined ? isOpen : internalIsOpen;
+  const handleToggle = onToggleOpen || (() => setInternalIsOpen(prev => !prev));
   const entries = Object.entries(workspaceSessions);
 
   const projectsByName = React.useMemo(() => {
@@ -58,7 +64,7 @@ export function WorkspacesSection({
         }`}
       >
         <div 
-          onClick={() => setIsSectionOpen(prev => !prev)}
+          onClick={handleToggle}
           className="flex items-center gap-1.5 cursor-pointer group hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
         >
           <ChevronDown 
@@ -126,16 +132,17 @@ export function WorkspacesSection({
           ) : (
             entries.map(([repoName, repoSessions]) => {
               const match = projectsByName.get(repoName);
-              const folderOpen = openFolders[repoName] ?? false;
+              const folderKey = match?.id || repoName;
+              const folderOpen = openFolders[folderKey] ?? openFolders[repoName] ?? false;
 
               return (
                 <WorkspaceFolderRow
-                  key={repoName}
+                  key={folderKey}
                   repoName={repoName}
                   repoSessions={repoSessions}
                   projectMatch={match}
                   isOpen={folderOpen}
-                  onToggle={() => onToggleFolder(repoName)}
+                  onToggle={() => onToggleFolder(folderKey)}
                   onNewSession={onNewSession}
                   onDeleteProject={onDeleteProject}
                   renderSessionItem={renderSessionItem}

@@ -248,7 +248,7 @@ class ResolveFolderRequest(BaseModel):
 
 @router.post("/system/resolve-folder")
 async def resolve_folder_endpoint(request: ResolveFolderRequest):
-    """Resolve a selected folder name to its absolute filesystem path."""
+    """Resolve a selected folder name to its absolute filesystem path with strict verification."""
     name = request.folder_name.strip()
     home = Path.home()
 
@@ -257,70 +257,35 @@ async def resolve_folder_endpoint(request: ResolveFolderRequest):
         if hp.is_dir():
             return {"status": "success", "folder_path": str(hp), "folder_name": hp.name}
 
-    # If the folder name itself is an existing absolute or relative path
+    # Verify if name is an existing directory path
     direct_p = Path(name).expanduser().resolve()
     if direct_p.is_dir():
         return {"status": "success", "folder_path": str(direct_p), "folder_name": direct_p.name}
 
+    # Only inspect verified standard developer workspace locations
     candidates = [
-        home / "Downloads" / name,
-        home / "Desktop" / name,
         home / "Documents" / name,
+        home / "Desktop" / name,
+        home / "Downloads" / name,
         home / "projects" / name,
         home / ".mash" / "projects" / name,
         home / ".nexau" / "projects" / name,
-        home / name,
         Path.cwd() / name,
-        Path.cwd() if Path.cwd().name.lower() == name.lower() else None,
     ]
 
-    # Check additional drives on Windows
-    for drive in ["D", "E", "F"]:
-        try:
-            d_path = Path(f"{drive}:/")
-            if d_path.exists():
-                candidates.extend([d_path / name, d_path / "projects" / name])
-        except Exception:
-            pass
-
-    # If sample children are provided, score matching candidates
+    # Verify candidate matches sample child entries if available
     if request.sample_children:
-        best_candidate = None
         for c in candidates:
-            if c and c.is_dir():
+            if c.is_dir():
                 matches = sum(1 for ch in request.sample_children if (c / ch).exists())
                 if matches > 0:
                     return {"status": "success", "folder_path": str(c.resolve()), "folder_name": c.name}
-                if best_candidate is None:
-                    best_candidate = c
-        if best_candidate:
-            return {"status": "success", "folder_path": str(best_candidate.resolve()), "folder_name": best_candidate.name}
 
     for c in candidates:
-        if c and c.is_dir():
+        if c.is_dir():
             return {"status": "success", "folder_path": str(c.resolve()), "folder_name": c.name}
 
-    # Search 1-2 levels down in current working directory and common directories
-    for base in [Path.cwd(), home / "Downloads", home / "Desktop", home / "Documents", home]:
-        if base and base.is_dir():
-            try:
-                # Direct child check
-                direct = base / name
-                if direct.is_dir():
-                    return {"status": "success", "folder_path": str(direct.resolve()), "folder_name": direct.name}
-                # 1-level down check
-                for sub in base.iterdir():
-                    if sub.is_dir():
-                        if sub.name.lower() == name.lower():
-                            return {"status": "success", "folder_path": str(sub.resolve()), "folder_name": sub.name}
-                        nested = sub / name
-                        if nested.is_dir():
-                            return {"status": "success", "folder_path": str(nested.resolve()), "folder_name": nested.name}
-            except Exception:
-                pass
-
-    # ponytail: do not fabricate phantom folder paths in Downloads (C-03)
-    return {"status": "error", "message": f"Folder '{name}' could not be resolved to an existing directory on disk."}
+    return {"status": "error", "message": f"Folder '{name}' could not be resolved to an existing directory on disk. Please select folder using the system file browser."}
 
 
 @router.post("/system/quickstart-folder")
