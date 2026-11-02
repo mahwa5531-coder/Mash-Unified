@@ -10,15 +10,29 @@ export interface ProjectItem {
   session_count?: number;
 }
 
-export async function fetchProjects(): Promise<ProjectItem[]> {
+export interface FetchProjectsResult {
+  ok: boolean;
+  data: ProjectItem[];
+  error?: string;
+  status?: number;
+}
+
+export async function fetchProjectsDetailed(): Promise<FetchProjectsResult> {
   try {
     const res = await safeFetch(`${BASE_URL}/api/projects`);
-    if (!res.ok) return [];
+    if (!res.ok) {
+      return { ok: false, data: [], error: `Server error ${res.status}`, status: res.status };
+    }
     const data = await res.json();
-    return data.projects || [];
-  } catch {
-    return [];
+    return { ok: true, data: data.projects || [], status: res.status };
+  } catch (err: any) {
+    return { ok: false, data: [], error: err?.message || 'Network error', status: 503 };
   }
+}
+
+export async function fetchProjects(): Promise<ProjectItem[]> {
+  const res = await fetchProjectsDetailed();
+  return res.data;
 }
 
 function notifyProjectsChanged() {

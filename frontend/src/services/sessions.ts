@@ -4,6 +4,7 @@ import { BASE_URL, safeFetch } from './client';
 
 export interface SessionItem {
   session_id: string;
+  project_id?: string | null;
   title: string;
   custom_title: string;
   workspace_uri: string;
@@ -27,16 +28,34 @@ export function unmarkSessionDeleted(sessionId: string): void {
   deletedSessionIds.delete(sessionId);
 }
 
-export async function fetchSessions(): Promise<SessionItem[]> {
+export interface FetchSessionsResult {
+  ok: boolean;
+  data: SessionItem[];
+  error?: string;
+  status?: number;
+}
+
+export async function fetchSessionsDetailed(): Promise<FetchSessionsResult> {
   try {
     const res = await safeFetch(`${BASE_URL}/sessions`);
-    if (!res.ok) return [];
+    if (!res.ok) {
+      return { ok: false, data: [], error: `Server error ${res.status}`, status: res.status };
+    }
     const data = await res.json();
     const rawSessions: SessionItem[] = data.sessions || [];
-    return rawSessions.filter((s) => !deletedSessionIds.has(s.session_id));
-  } catch {
-    return [];
+    return {
+      ok: true,
+      data: rawSessions.filter((s) => !deletedSessionIds.has(s.session_id)),
+      status: res.status,
+    };
+  } catch (err: any) {
+    return { ok: false, data: [], error: err?.message || 'Network error', status: 503 };
   }
+}
+
+export async function fetchSessions(): Promise<SessionItem[]> {
+  const res = await fetchSessionsDetailed();
+  return res.data;
 }
 
 export interface TranscriptResponse {
@@ -80,9 +99,14 @@ export async function renameSession(sessionId: string, customTitle: string): Pro
     const res = await safeFetch(`${BASE_URL}/sessions/${sessionId}/rename`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ custom_title: customTitle }),
+      body: JSON.stringify({ custom_title: customTitle, title: customTitle }),
     });
-    return res.ok;
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => ({}));
+    if (data.status === 'not_found' || data.status === 'error') {
+      return false;
+    }
+    return true;
   } catch (err) {
     console.warn("Failed to rename session:", err);
     return false;

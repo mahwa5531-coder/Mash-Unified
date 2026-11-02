@@ -110,6 +110,21 @@ assert.strictEqual(archivedView.length, 1);
 assert.strictEqual(archivedView[0].session_id, 's4');
 console.log("[PASS] Test 8: Conversation History archive tab displays only archived sessions");
 
+// Test 9: Exact project ID mapping takes precedence over folder path
+const collisionProjects: ProjectItem[] = [
+  { id: 'proj-1', name: 'Audit', local_folder_path: 'C:/Clients/ClientA/Audit' },
+  { id: 'proj-2', name: 'Audit', local_folder_path: 'C:/Clients/ClientB/Audit' },
+];
+const collisionSessions: SessionItem[] = [
+  { session_id: 's-a1', title: 'Client A Session', custom_title: '', workspace_uri: 'Audit', project_id: 'proj-1', section: 'workspace', created_at: '', updated_at: '', message_count: 0, total_tokens: 0, last_user_view_time: '', has_unread: false },
+  { session_id: 's-b1', title: 'Client B Session', custom_title: '', workspace_uri: 'Audit', project_id: 'proj-2', section: 'workspace', created_at: '', updated_at: '', message_count: 0, total_tokens: 0, last_user_view_time: '', has_unread: false },
+];
+const collisionGrouped = groupSidebarSessions(collisionSessions, new Set(), new Set(), collisionProjects);
+assert.strictEqual(collisionGrouped.workspaceSessions['Audit'].length, 2, "Both sessions should be organized into their respective workspace keys");
+assert.strictEqual(collisionGrouped.workspaceSessions['Audit'][0].session_id, 's-a1');
+assert.strictEqual(collisionGrouped.workspaceSessions['Audit'][1].session_id, 's-b1');
+console.log("[PASS] Test 9: Project ID accurately partitions sessions belonging to same-named folders");
+
 console.log("======================================================================");
-console.log("ALL 8 FRONTEND SIDEBAR TESTS PASSED DIRECTLY FROM useSidebarData!");
+console.log("ALL 9 FRONTEND SIDEBAR TESTS PASSED DIRECTLY FROM useSidebarData!");
 console.log("======================================================================");

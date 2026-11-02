@@ -41,6 +41,14 @@ export function WorkspacesSection({
   const [isSectionOpen, setIsSectionOpen] = useState(true);
   const entries = Object.entries(workspaceSessions);
 
+  const projectsByName = React.useMemo(() => {
+    const map = new Map<string, ProjectItem>();
+    for (const p of registeredProjects) {
+      map.set(p.name, p);
+    }
+    return map;
+  }, [registeredProjects]);
+
   return (
     <div className="relative pb-2">
       {/* Workspaces Sticky Header */}
@@ -117,7 +125,7 @@ export function WorkspacesSection({
             </div>
           ) : (
             entries.map(([repoName, repoSessions]) => {
-              const match = registeredProjects.find((p) => p.name === repoName);
+              const match = projectsByName.get(repoName);
               const folderOpen = openFolders[repoName] ?? false;
 
               return (

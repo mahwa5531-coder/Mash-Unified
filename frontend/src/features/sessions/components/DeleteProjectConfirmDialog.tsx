@@ -15,6 +15,7 @@ interface DeleteProjectConfirmDialogProps {
 export function DeleteProjectConfirmDialog({
   isOpen,
   projectName,
+  projectPath,
   sessionCount,
   onConfirm,
   onCancel,
@@ -68,17 +69,25 @@ export function DeleteProjectConfirmDialog({
         {/* Body Text */}
         <div className="text-[13px] text-zinc-400 dark:text-zinc-400 leading-relaxed mb-6 space-y-2.5">
           <p>
-            Are you sure you want to delete the project <span className="font-semibold text-zinc-100">{projectName}</span>?
+            Are you sure you want to delete the workspace <span className="font-semibold text-zinc-100">{projectName}</span>?
           </p>
+          {projectPath && (
+            <p className="text-xs font-mono text-zinc-400 dark:text-zinc-500 bg-black/20 dark:bg-black/30 px-2.5 py-1.5 rounded-lg border border-zinc-800 break-all select-all">
+              {projectPath}
+            </p>
+          )}
           {sessionCount > 0 ? (
             <p>
-              This will permanently delete <span className="font-semibold text-zinc-100">{sessionCount} active conversation{sessionCount === 1 ? '' : 's'}</span> within it.
+              This will permanently remove <span className="font-semibold text-zinc-100">{sessionCount} conversation{sessionCount === 1 ? '' : 's'}</span> and workspace metadata.
             </p>
           ) : (
             <p>
               This workspace has no active conversations.
             </p>
           )}
+          <p className="text-[11.5px] text-emerald-400/90 dark:text-emerald-400/80">
+            Local code and document files in this folder will remain untouched on disk.
+          </p>
         </div>
 
         {/* Actions (Bottom-right aligned) */}

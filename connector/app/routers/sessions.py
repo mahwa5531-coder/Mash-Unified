@@ -170,7 +170,7 @@ async def queue_session_steering(
     msg = payload.message.strip()
     if not msg:
         return {"status": "error", "message": "Empty message"}
-    
+
     # 1. Maintain in-memory mailbox for middleware polling
     queue_steering_message(session_id, msg)
 

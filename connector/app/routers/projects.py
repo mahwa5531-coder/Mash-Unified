@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -8,6 +9,8 @@ from pydantic import BaseModel
 from app.dependencies import DatabaseEngineDep
 from app.models.project import ProjectModel
 from app.workspace import invalidate_roots_cache
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -60,11 +63,15 @@ async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEng
 
     all_projects = await engine.find_many(ProjectModel)
     for p in all_projects:
+        p_norm_path = os.path.normpath(p.local_folder_path).replace("\\", "/") if p.local_folder_path else ""
         if p.name.strip().lower() == clean_name.lower():
-            p.local_folder_path = normalized_path
-            p.user_id = request.user_id
-            await engine.update(p)
-            invalidate_roots_cache()
+            if p_norm_path.lower() == normalized_path.lower():
+                return p
+            raise HTTPException(
+                status_code=409,
+                detail=f"A workspace named '{clean_name}' already exists at '{p.local_folder_path}'. Please choose a different name.",
+            )
+        if p_norm_path and p_norm_path.lower() == normalized_path.lower():
             return p
 
     project = ProjectModel(user_id=request.user_id, name=clean_name, local_folder_path=normalized_path)
@@ -95,11 +102,15 @@ async def create_project(request: CreateProjectRequest, engine: DatabaseEngineDe
     # ponytail: B-12 case-insensitive uniqueness check & return existing project with stripped name
     all_projects = await engine.find_many(ProjectModel)
     for p in all_projects:
+        p_norm_path = os.path.normpath(p.local_folder_path).replace("\\", "/") if p.local_folder_path else ""
         if p.name.strip().lower() == clean_name.lower():
-            p.local_folder_path = normalized_path
-            p.user_id = request.user_id
-            await engine.update(p)
-            invalidate_roots_cache()
+            if p_norm_path.lower() == normalized_path.lower():
+                return p
+            raise HTTPException(
+                status_code=409,
+                detail=f"A workspace named '{clean_name}' already exists at '{p.local_folder_path}'. Please choose a different name or path.",
+            )
+        if p_norm_path and p_norm_path.lower() == normalized_path.lower():
             return p
 
     project = ProjectModel(user_id=request.user_id, name=clean_name, local_folder_path=normalized_path)
@@ -112,30 +123,33 @@ async def create_project(request: CreateProjectRequest, engine: DatabaseEngineDe
 @router.get("/")
 async def list_all_projects(engine: DatabaseEngineDep):
     from nexau.archs.session.models import SessionModel
-    projects = await engine.find_many(ProjectModel)
-    all_sessions = await engine.find_many(SessionModel)
+    try:
+        projects = await engine.find_many(ProjectModel)
+        all_sessions = await engine.find_many(SessionModel)
+    except Exception as e:
+        logger.error(f"Error querying projects: {e}")
+        raise HTTPException(status_code=503, detail="Database engine is unavailable")
 
     results = []
-    seen_names = set()
+    seen_paths = set()
     for p in reversed(projects):
-        name_key = p.name.strip().lower()
-        if name_key in seen_names:
+        norm_p_path = os.path.normpath(p.local_folder_path).replace("\\", "/").lower() if p.local_folder_path else ""
+        if norm_p_path and norm_p_path in seen_paths:
             continue
-        seen_names.add(name_key)
+        if norm_p_path:
+            seen_paths.add(norm_p_path)
 
         count = 0
-        norm_p_path = os.path.normpath(p.local_folder_path).replace("\\", "/").lower()
         for s in all_sessions:
             ctx = s.context or {}
             ws_uri = getattr(s, "workspace_uri", "") or ctx.get("workspace_uri", "")
             pid = ctx.get("project_id")
             norm_ws = os.path.normpath(ws_uri).replace("\\", "/").lower() if ws_uri else ""
-            if (pid and (pid == p.id or pid.lower() == name_key)) or \
-               (norm_ws and (norm_ws == norm_p_path or os.path.basename(norm_ws) == name_key or ws_uri == p.name)):
+            if (pid and pid == p.id) or (norm_ws and norm_p_path and norm_ws == norm_p_path):
                 count += 1
 
         p_dict = p.model_dump() if hasattr(p, "model_dump") else p.dict()
-        p_dict["local_folder_path"] = os.path.normpath(p.local_folder_path).replace("\\", "/")
+        p_dict["local_folder_path"] = os.path.normpath(p.local_folder_path).replace("\\", "/") if p.local_folder_path else ""
         p_dict["session_count"] = count
         results.append(p_dict)
 
@@ -221,10 +235,10 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
         raise HTTPException(status_code=404, detail=f"Project '{clean_id}' not found")
 
     deleted_sessions_count = 0
-    # 1. Find all sessions tied to this workspace and delete their data
+    failed_sessions = []
+    # 1. Find all sessions strictly tied to this workspace project and delete their data
     try:
         all_sessions = await engine.find_many(SessionModel)
-        proj_name_lower = project.name.strip().lower()
         norm_p_path = os.path.normpath(project.local_folder_path).replace("\\", "/").lower() if project.local_folder_path else ""
 
         for s in all_sessions:
@@ -233,50 +247,45 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
             pid = str(ctx.get("project_id") or "")
             norm_ws = os.path.normpath(ws_uri).replace("\\", "/").lower() if ws_uri else ""
 
-            matches = (pid and (pid == project.id or pid.lower() == proj_name_lower)) or \
-                      (norm_ws and (norm_ws == norm_p_path or os.path.basename(norm_ws) == proj_name_lower or norm_ws == proj_name_lower))
+            matches = (pid and pid == project.id) or (norm_ws and norm_p_path and norm_ws == norm_p_path)
 
             if matches:
                 sid = s.session_id
                 from app.services.session_lifecycle import delete_existing_session
-
                 try:
                     await delete_existing_session(engine=engine, session_id=sid)
-                except Exception:
-                    pass
-                deleted_sessions_count += 1
-    except Exception:
-        pass
+                    deleted_sessions_count += 1
+                except Exception as exc:
+                    logger.error(f"Failed to delete session {sid} for project {project.id}: {exc}")
+                    failed_sessions.append(sid)
+    except Exception as e:
+        logger.error(f"Error listing sessions during project deletion: {e}")
 
     # 2. Clean up project storage directory in .nexau and .mash (~/.mash/projects/ and ~/.nexau/projects/)
     for root in [(get_nexau_home() / "projects").resolve(), (Path.home() / ".nexau" / "projects").resolve()]:
-        for p_ident in [project.id, project.name]:
-            if p_ident:
-                proj_dir = (root / str(p_ident)).resolve()
-                if proj_dir.exists() and proj_dir.is_relative_to(root) and proj_dir != root:
-                    shutil.rmtree(proj_dir, ignore_errors=True)
+        proj_dir = (root / str(project.id)).resolve()
+        if proj_dir.exists() and proj_dir.is_relative_to(root) and proj_dir != root:
+            shutil.rmtree(proj_dir, ignore_errors=True)
 
-    # 3. Clean up .mash and .nexau directory inside the workspace folder if it exists (local code files preserved!)
+    # 3. Clean up .mash and .nexau metadata directory inside the workspace folder if it exists (local user files preserved!)
     if project.local_folder_path and os.path.isdir(project.local_folder_path):
         for hidden_dir in [".mash", ".nexau"]:
             local_meta = os.path.join(project.local_folder_path, hidden_dir)
             if os.path.exists(local_meta):
                 shutil.rmtree(local_meta, ignore_errors=True)
 
-    # 4. Delete all project records from DB matching id or name (case-insensitive)
-    all_projs = await engine.find_many(ProjectModel)
-    for p in all_projs:
-        if p.id == project.id or p.name.strip().lower() == project.name.strip().lower():
-            try:
-                await engine.delete(ProjectModel, filters=ComparisonFilter.eq("id", p.id))
-            except Exception:
-                pass
+    # 4. Delete the project record from database strictly by project ID
+    try:
+        await engine.delete(ProjectModel, filters=ComparisonFilter.eq("id", project.id))
+    except Exception as e:
+        logger.error(f"Failed to delete project record {project.id}: {e}")
 
     invalidate_roots_cache()
     return {
-        "status": "success",
-        "message": f"Project '{project.name}' deleted successfully with {deleted_sessions_count} sessions removed from .nexau and database.",
+        "status": "success" if not failed_sessions else "success_with_warnings",
+        "message": f"Project '{project.name}' deleted successfully ({deleted_sessions_count} sessions removed). Local files preserved.",
         "deleted_sessions_count": deleted_sessions_count,
+        "failed_session_ids": failed_sessions,
         "deleted_project_id": project.id,
         "deleted_project_name": project.name,
     }

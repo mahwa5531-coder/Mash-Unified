@@ -185,10 +185,20 @@ export default function Sidebar({
       const target = sessions.find(s => s.session_id === sessionId);
       const original = target?.custom_title || target?.title || '';
       if (trimmed !== original) {
-        await renameSession(sessionId, trimmed);
+        // Optimistic update with automatic rollback on network/server failure
         setSessions(prev =>
-          prev.map(s => s.session_id === sessionId ? { ...s, custom_title: trimmed } : s)
+          prev.map(s => s.session_id === sessionId ? { ...s, custom_title: trimmed, title: trimmed } : s)
         );
+        const ok = await renameSession(sessionId, trimmed);
+        if (!ok) {
+          setSessions(prev =>
+            prev.map(s => s.session_id === sessionId ? { ...s, custom_title: original, title: original } : s)
+          );
+          setDeleteError({
+            title: "Failed to rename",
+            message: `Could not rename conversation to "${trimmed}". Changes were reverted.`,
+          });
+        }
       }
     }
     setEditingSessionId(null);
@@ -221,8 +231,10 @@ export default function Sidebar({
     if (selectedSessionId === sessionId) {
       const fallbackRepo = targetSession?.workspace_uri && targetSession.workspace_uri !== 'No Repo'
         ? targetSession.workspace_uri
-        : 'No Repo';
-      onNewSession(fallbackRepo);
+        : (selectedSessionRepo || 'No Repo');
+      if (!onDeleteSession) {
+        onNewSession(fallbackRepo);
+      }
     }
 
     try {

@@ -56,7 +56,7 @@ def abort_session_execution(session_id: str, user_id: str = "default_user") -> N
 async def list_all_sessions(engine: Any, include_benchmarks: bool = False) -> dict[str, list[dict]]:
     eng = _get_engine(engine)
     if not eng:
-        return {"sessions": []}
+        raise HTTPException(status_code=503, detail="Database engine is unavailable")
     try:
         db_sessions = await eng.find_many(SessionModel)
         session_stats: dict[str, dict[str, Any]] = {}
@@ -89,15 +89,17 @@ async def list_all_sessions(engine: Any, include_benchmarks: bool = False) -> di
                 "title": generate_clean_session_title(ctx.get("title") or ctx.get("custom_title") or "New Conversation", sid),
                 "custom_title": ctx.get("custom_title"), "workspace_uri": ws, "working_directory": ctx.get("working_directory", ws),
                 "section": sec, "message_count": msg_count, "total_tokens": ctx.get("total_tokens") or 0,
-                "last_user_view_time": ctx.get("last_user_view_time"), "has_unread": (msg_count > 0 and last_view_sec > 0.0 and latest_sec > (last_view_sec + 3.0)),
+                "last_user_view_time": ctx.get("last_user_view_time"), "has_unread": (msg_count > 0 and (last_view_sec == 0.0 or latest_sec > (last_view_sec + 3.0))),
                 "updated_at": updated_iso, "created_at": s.created_at.isoformat() if isinstance(s.created_at, datetime) else str(s.created_at or ""),
                 "_sort_key": latest_sec,
             })
         result.sort(key=lambda x: x.pop("_sort_key", 0.0), reverse=True)
         return {"sessions": result}
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.warning(f"Error listing sessions: {e}")
-        return {"sessions": []}
+        logger.error(f"Error listing sessions: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list sessions: {e}")
 
 
 async def list_project_sessions(engine: Any, project_id: str) -> dict[str, list[dict]]:
@@ -250,18 +252,20 @@ async def delete_existing_session(engine: Any, session_id: str) -> dict[str, str
 async def rename_existing_session(engine: Any, session_id: str, title: str) -> dict[str, Any]:
     _validate_id(session_id, "session_id")
     eng, title_val = _get_engine(engine), (title.strip() if title else "Untitled Session")
-    if eng:
-        try:
-            s = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
-            if not s:
-                return {"status": "not_found", "message": f"Session {session_id} does not exist"}
-            ctx = dict(s.context or {})
-            ctx["custom_title"] = ctx["title"] = title_val
-            s.context = ctx
-            await eng.update(s)
-        except Exception as e:
-            logger.warning(f"Rename session error: {e}")
-    return {"status": "success", "custom_title": title}
+    if not eng:
+        raise HTTPException(status_code=503, detail="Database engine is unavailable")
+    s = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
+    if not s:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    ctx = dict(s.context or {})
+    ctx["custom_title"] = ctx["title"] = title_val
+    s.context = ctx
+    try:
+        await eng.update(s)
+    except Exception as e:
+        logger.error(f"Failed to update session title in database: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update session title: {e}")
+    return {"status": "success", "session_id": session_id, "custom_title": title_val}
 
 
 async def mark_session_as_viewed(engine: Any, session_id: str) -> dict[str, Any]:

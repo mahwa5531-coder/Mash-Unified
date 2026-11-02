@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { fetchSessions, deletedSessionIds, SessionItem } from '@/services/sessions';
-import { fetchProjects, ProjectItem } from '@/services/projects';
+import { fetchSessionsDetailed, deletedSessionIds, SessionItem } from '@/services/sessions';
+import { fetchProjectsDetailed, ProjectItem } from '@/services/projects';
 import { subscribeToSessionStore } from '@/features/chat/state/sessionStore';
 
 interface UseSidebarDataProps {
@@ -36,13 +36,15 @@ export function groupSidebarSessions(
   archivedIds: Set<string>,
   registeredProjects: ProjectItem[]
 ) {
+  const projectById = new Map<string, ProjectItem>();
   const projectPathMap = new Map<string, ProjectItem>();
   const projectNameMap = new Map<string, ProjectItem>();
   const workspaceMap: Record<string, SessionItem[]> = {};
 
   for (const p of registeredProjects) {
     workspaceMap[p.name] = [];
-    projectNameMap.set(p.name.toLowerCase(), p);
+    if (p.id) projectById.set(p.id, p);
+    if (p.name) projectNameMap.set(p.name.toLowerCase(), p);
     if (p.local_folder_path) {
       projectPathMap.set(p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase(), p);
     }
@@ -56,17 +58,28 @@ export function groupSidebarSessions(
     if (pinnedSessionIds.has(s.session_id)) { pinned.push(s); continue; }
     const uri = s.workspace_uri;
     if (!uri || uri === 'No Repo') { direct.push(s); continue; }
-    const normUri = uri.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-    let matched = projectPathMap.get(normUri) || projectNameMap.get(normUri);
+
+    // Direct project_id lookup takes highest priority to avoid name collisions
+    let matched: ProjectItem | undefined;
+    if (s.project_id && projectById.has(s.project_id)) {
+      matched = projectById.get(s.project_id);
+    }
+
+    // Path or name lookup fallback for legacy sessions
     if (!matched) {
-      for (const p of registeredProjects) {
-        const normPath = p.local_folder_path ? p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() : '';
-        if (normPath && (normPath.endsWith('/' + normUri) || normUri.endsWith('/' + p.name.toLowerCase()))) {
-          matched = p;
-          break;
+      const normUri = uri.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+      matched = projectPathMap.get(normUri) || projectNameMap.get(normUri);
+      if (!matched) {
+        for (const p of registeredProjects) {
+          const normPath = p.local_folder_path ? p.local_folder_path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() : '';
+          if (normPath && (normPath.endsWith('/' + normUri) || normUri.endsWith('/' + p.name.toLowerCase()))) {
+            matched = p;
+            break;
+          }
         }
       }
     }
+
     const targetGroupName = matched ? matched.name : (uri.includes('/') || uri.includes('\\') ? uri.split(/[/\\]/).filter(Boolean).pop() || uri : uri);
     if (!workspaceMap[targetGroupName]) workspaceMap[targetGroupName] = [];
     workspaceMap[targetGroupName].push(s);
@@ -167,62 +180,72 @@ export function useSidebarData({
     }
   }, [selectedSessionRepo]);
 
+  const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
+
   // ponytail: Reconcile localStorage cached state with SQLite response without re-sorting jitter
   const refreshData = useCallback(async () => {
     try {
-      const [fetchedSessions, fetchedProjects] = await Promise.all([
-        fetchSessions(),
-        fetchProjects().catch(() => [] as ProjectItem[])
+      const [sessionsRes, projectsRes] = await Promise.all([
+        fetchSessionsDetailed(),
+        fetchProjectsDetailed(),
       ]);
 
-      if (Array.isArray(fetchedSessions)) {
-        setSessions(prev => {
-          const curId = selectedSessionIdRef.current;
-          const curTitle = selectedSessionTitleRef.current;
-          const fetchedMap = new Map<string, SessionItem>(fetchedSessions.map(s => [s.session_id, s]));
-          const seen = new Set<string>();
-          const reconciled: SessionItem[] = [];
-
-          // 1. Maintain stable order of valid sessions that exist on the server
-          for (const old of (prev || [])) {
-            if (deletedSessionIds.has(old.session_id)) continue;
-            const fresh = fetchedMap.get(old.session_id);
-            if (fresh) {
-              reconciled.push({
-                ...old,
-                ...fresh,
-                title: (curId === old.session_id && curTitle) ? curTitle : (fresh.custom_title || fresh.title || old.title),
-                has_unread: curId === old.session_id ? false : fresh.has_unread,
-              });
-              seen.add(old.session_id);
-            } else if (old.session_id === curId && !deletedSessionIds.has(old.session_id)) {
-              reconciled.push(old);
-              seen.add(old.session_id);
-            }
-          }
-
-          // 2. Prepend any new sessions from backend not in cache
-          for (const s of fetchedSessions) {
-            if (!seen.has(s.session_id) && !deletedSessionIds.has(s.session_id)) {
-              reconciled.unshift({
-                ...s,
-                title: (curId === s.session_id && curTitle) ? curTitle : (s.custom_title || s.title),
-                has_unread: curId === s.session_id ? false : s.has_unread,
-              });
-            }
-          }
-
-          setCache('mash_cached_sessions', reconciled, 'nexau_cached_sessions');
-          return reconciled;
-        });
+      // If session listing failed (e.g. connector restarting or offline), preserve existing state and do NOT overwrite cache!
+      if (!sessionsRes.ok) {
+        setIsReconnecting(true);
+        return;
       }
+      setIsReconnecting(false);
 
-      // Always sync projects with server response (empty [] removes deleted projects from sidebar)
-      const safeProjects = Array.isArray(fetchedProjects) ? fetchedProjects : [];
-      setRegisteredProjects(safeProjects);
-      setCache('mash_cached_projects', safeProjects, 'nexau_cached_projects');
+      const fetchedSessions = sessionsRes.data;
+      setSessions(prev => {
+        const curId = selectedSessionIdRef.current;
+        const curTitle = selectedSessionTitleRef.current;
+        const fetchedMap = new Map<string, SessionItem>(fetchedSessions.map(s => [s.session_id, s]));
+        const seen = new Set<string>();
+        const reconciled: SessionItem[] = [];
+
+        // 1. Maintain stable order of valid sessions that exist on the server
+        for (const old of (prev || [])) {
+          if (deletedSessionIds.has(old.session_id)) continue;
+          const fresh = fetchedMap.get(old.session_id);
+          if (fresh) {
+            reconciled.push({
+              ...old,
+              ...fresh,
+              title: (curId === old.session_id && curTitle) ? curTitle : (fresh.custom_title || fresh.title || old.title),
+              has_unread: curId === old.session_id ? false : fresh.has_unread,
+            });
+            seen.add(old.session_id);
+          } else if (old.session_id === curId && !deletedSessionIds.has(old.session_id)) {
+            reconciled.push(old);
+            seen.add(old.session_id);
+          }
+        }
+
+        // 2. Prepend any new sessions from backend not in cache
+        for (const s of fetchedSessions) {
+          if (!seen.has(s.session_id) && !deletedSessionIds.has(s.session_id)) {
+            reconciled.unshift({
+              ...s,
+              title: (curId === s.session_id && curTitle) ? curTitle : (s.custom_title || s.title),
+              has_unread: curId === s.session_id ? false : s.has_unread,
+            });
+          }
+        }
+
+        setCache('mash_cached_sessions', reconciled, 'nexau_cached_sessions');
+        return reconciled;
+      });
+
+      if (projectsRes.ok) {
+        const safeProjects = Array.isArray(projectsRes.data) ? projectsRes.data : [];
+        setRegisteredProjects(safeProjects);
+        setCache('mash_cached_projects', safeProjects, 'nexau_cached_projects');
+      }
     } catch (err) {
       console.error('Failed to load sidebar data:', err);
+      setIsReconnecting(true);
     } finally {
       setLoading(false);
     }
@@ -230,7 +253,10 @@ export function useSidebarData({
 
   useEffect(() => {
     refreshData();
-    const interval = setInterval(refreshData, 10000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      refreshData();
+    }, 10000);
     const onProjectsUpdated = () => refreshData();
     window.addEventListener('nexau:projects-updated', onProjectsUpdated);
     return () => {
@@ -283,7 +309,7 @@ export function useSidebarData({
   }, [sessions, registeredProjects, pinnedSessionIds, archivedIds]);
 
   return {
-    sessions, setSessions, registeredProjects, loading, refreshData,
+    sessions, setSessions, registeredProjects, loading, refreshData, isReconnecting,
     pinnedSessionIds, togglePin, archivedIds, handleArchive,
     openFolders, setOpenFolders, toggleFolder,
     pinnedSessions, workspaceSessions, directConversations,

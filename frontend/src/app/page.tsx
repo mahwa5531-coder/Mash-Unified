@@ -160,8 +160,8 @@ export default function Home() {
     if (selectedSessionId === sessionId) {
       const fallbackRepo = targetSession?.workspace_uri && targetSession.workspace_uri !== 'No Repo'
         ? targetSession.workspace_uri
-        : 'No Repo';
-      handleNewSession(fallbackRepo);
+        : (selectedSessionRepo && selectedSessionRepo !== 'No Repo' ? selectedSessionRepo : 'No Repo');
+      handleNewSession(fallbackRepo, pendingWorkspacePath || undefined);
     }
 
     try {

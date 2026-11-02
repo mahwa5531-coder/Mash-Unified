@@ -12,7 +12,7 @@ export interface SidebarFooterProps {
 export function SidebarFooter({ onOpenSettings, authUser }: SidebarFooterProps) {
   const initial = ((authUser?.name || authUser?.email || 'U').charAt(0) || 'U').toUpperCase();
   const displayName = authUser?.name || authUser?.email?.split('@')[0] || 'Account';
-  const planName = (authUser?.plan || 'pro').toUpperCase();
+  const planName = (authUser?.plan || 'Free').toUpperCase();
 
   return (
     <div className="mt-auto p-2 bg-[var(--bg-sidebar)] shrink-0 border-t border-zinc-200/50 dark:border-white/[0.04] flex items-center justify-between gap-1.5">
@@ -45,7 +45,7 @@ export function SidebarFooter({ onOpenSettings, authUser }: SidebarFooterProps) 
           type="button"
           onClick={() => onOpenSettings?.('account')}
           className="flex-1 min-w-0 flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer"
-          title="Sign in to your MASh account"
+          title="Sign in to your MASH account"
         >
           <User size={14} className="shrink-0 text-zinc-500 dark:text-zinc-400" />
           <span className="truncate">Sign In</span>
