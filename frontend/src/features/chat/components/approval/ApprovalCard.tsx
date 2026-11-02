@@ -13,7 +13,7 @@ export interface ApprovalCardProps {
   args?: Record<string, any>;
   status?: 'pending' | 'running' | 'completed' | 'denied';
   decision?: 'allow' | 'allow_once' | 'deny' | null;
-  onApprove: (action: 'allow_once' | 'allow' | 'deny', feedback?: string) => void | Promise<void>;
+  onApprove: (action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<boolean | void> | boolean | void;
   className?: string;
 }
 
@@ -100,7 +100,12 @@ export function ApprovalCard({
     setIsSubmitting(true);
     setLocalDecision(act);
     try {
-      await onApprove(act);
+      const res = await onApprove(act);
+      if (res === false) {
+        setLocalDecision(null);
+      }
+    } catch {
+      setLocalDecision(null);
     } finally {
       setIsSubmitting(false);
     }

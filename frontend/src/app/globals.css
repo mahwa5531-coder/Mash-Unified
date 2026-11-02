@@ -107,6 +107,27 @@ body,
   height: 0 !important;
 }
 
+/* Custom Scrollbar Utility */
+.custom-scrollbar::-webkit-scrollbar {
+  display: block !important;
+  width: 5px !important;
+  height: 5px !important;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(160, 160, 160, 0.25) !important;
+  border-radius: 9999px !important;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(160, 160, 160, 0.45) !important;
+}
+.custom-scrollbar {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(160, 160, 160, 0.25) transparent !important;
+}
+
 /* Dynamic Animated Loading Dots for Working... */
 @keyframes loadingEllipsis {
   0%, 20% { opacity: 0.2; transform: translateY(0); }
@@ -174,3 +195,58 @@ body,
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
+
+/* ==========================================================================
+   MASH Unit 17 Code Block Reskin (Border-of-Border Elimination)
+   Reskins Streamdown's default code chrome using data-streamdown attributes.
+   Keeps Shiki grammar highlighting & token caching 100% intact.
+   ========================================================================== */
+[data-streamdown="code-block"] {
+  position: relative !important;
+  background: transparent !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 0.5rem !important;
+  padding: 0 !important;
+  margin-top: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+[data-streamdown="code-block-header"] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  height: 28px !important;
+  padding: 0 0.75rem !important;
+  background: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  border-top-left-radius: 0.5rem !important;
+  border-top-right-radius: 0.5rem !important;
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important;
+  color: var(--text-secondary) !important;
+}
+
+[data-streamdown="code-block-body"] {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 0.75rem !important;
+  --sdm-bg: transparent !important;
+  --shiki-dark-bg: transparent !important;
+}
+
+[data-streamdown="code-block-actions"] {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+[data-streamdown="code-block-copy-button"] {
+  font-size: 11px !important;
+  color: var(--text-secondary) !important;
+  transition: color 0.15s ease !important;
+}
+[data-streamdown="code-block-copy-button"]:hover {
+  color: var(--text-primary) !important;
+}
+

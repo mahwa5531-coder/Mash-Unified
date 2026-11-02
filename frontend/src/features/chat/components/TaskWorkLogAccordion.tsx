@@ -21,7 +21,7 @@ interface TaskWorkLogAccordionProps {
   hasAssistantContent?: boolean;
   totalDurationSeconds?: number;
   onOpenFile?: (path: string) => void;
-  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<void> | void;
+  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<boolean | void> | boolean | void;
   isLast?: boolean;
   turnStartTime?: number;
 }
@@ -123,8 +123,7 @@ export default function TaskWorkLogAccordion({
         if (step.type === 'thinking' || step.type === 'reasoning' || (step.thoughts && step.thoughts.length > 0)) {
           const thText = (step.content || (step.thoughts ? step.thoughts.join('\n\n') : '')).replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
           if (thText) {
-            const computedSecs = step.thinkingDurationSeconds 
-              || Math.max(1, Math.min(60, Math.round(thText.length / 120)));
+            const computedSecs = step.thinkingDurationSeconds || undefined;
             const lastEntry = fullTimeline[fullTimeline.length - 1];
             if (lastEntry && lastEntry.type === 'thought') {
               lastEntry.data.text += '\n\n' + thText;
@@ -176,8 +175,7 @@ export default function TaskWorkLogAccordion({
     if (thoughts.length > 0) {
       const combinedThoughtText = thoughts.join('\n\n').replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
       if (combinedThoughtText) {
-        const computedSecs = thinkingDurationSeconds 
-          || Math.max(1, Math.min(60, Math.round(combinedThoughtText.length / 120)));
+        const computedSecs = thinkingDurationSeconds || undefined;
         fullTimeline.push({
           id: 'thought-primary',
           type: 'thought',
@@ -194,14 +192,9 @@ export default function TaskWorkLogAccordion({
     return fullTimeline;
   }, [steps, thoughts, tools, isStreaming, thinkingDurationSeconds, clusterOpen, hasPendingApproval, hasWork, hasAssistantContent]);
 
-  // Format header time for completed turn (e.g. 3m or 26s)
-  const fallbackSecs = Math.max(
-    1,
-    (thinkingDurationSeconds || 0) + tools.length * 2
-  );
-
-  const finalSecs = totalDurationSeconds || (turnStartTime ? Math.max(1, Math.round((Date.now() - turnStartTime) / 1000)) : fallbackSecs);
-  const formattedTime = formatDurationDisplay(finalSecs);
+  // ponytail: Use native server durations from SQLite on reload; use wall-clock delta only while actively streaming
+  const finalSecs = totalDurationSeconds || (turnStartTime ? Math.max(1, Math.round((Date.now() - turnStartTime) / 1000)) : undefined);
+  const formattedTime = finalSecs ? formatDurationDisplay(finalSecs) : '';
 
   const hasDuration = Boolean(totalDurationSeconds || thinkingDurationSeconds || turnStartTime);
   if (!hasWork && !isStreaming && !hasDuration) return null;

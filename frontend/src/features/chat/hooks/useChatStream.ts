@@ -178,10 +178,10 @@ export function useChatStream({
     if (sidToUse && handleSendMessageRef.current) handleSendMessageRef.current(userText, true, false, sidToUse);
   }, [sessionId]);
 
-  const handleUndo = useCallback((flatIdx?: number, userText?: string, turnIdx?: number) => {
+  const handleUndo = useCallback((flatIdx?: number, userText?: string, turnIdx?: number, turnId?: string) => {
     const activeSid = activeSessionIdRef.current || sessionId;
     if (!activeSid) return;
-    const msgs = executeSessionUndo(activeSid, flatIdx, turnIdx);
+    const msgs = executeSessionUndo(activeSid, flatIdx, turnIdx, turnId);
     if (msgs) setChatMessages(msgs);
     setIsStreaming(false);
     if (userText) handleSetInputPrompt(cleanUserPromptForComposer(userText));
@@ -211,11 +211,11 @@ export function useChatStream({
   }, [steering]);
 
   const approveToolCall = useCallback(
-    async (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => {
+    async (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string): Promise<boolean> => {
       const curSid = activeSessionIdRef.current || sessionId;
-      if (!curSid) return;
+      if (!curSid) return false;
       const ok = await executeToolApproval(curSid, toolCallId, action, feedback);
-      if (!ok) return;
+      if (!ok) return false;
       const s = sessionStore.get(curSid);
       if (curSid === activeSessionIdRef.current && s) {
         setChatMessages(s.chatMessages);
@@ -225,9 +225,10 @@ export function useChatStream({
         m.tools?.some((t) => (t.status === 'pending_approval' || (t as any).pending) && !t.decision && t.id !== toolCallId)
       );
       if (hasOtherPending) {
-        return;
+        return true;
       }
       dispatchSendMessage('', false, true, curSid, true);
+      return true;
     },
     [sessionId, dispatchSendMessage]
   );

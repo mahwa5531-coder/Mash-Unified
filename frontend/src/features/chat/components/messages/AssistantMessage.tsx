@@ -21,7 +21,7 @@ interface AssistantMessageProps {
   onOpenFile?: (path: string) => void;
   onRetry?: () => void;
   onContinue?: () => void;
-  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<void> | void;
+  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<boolean | void> | boolean | void;
 }
 
 function formatTurnTimestamp(ts?: string): string {

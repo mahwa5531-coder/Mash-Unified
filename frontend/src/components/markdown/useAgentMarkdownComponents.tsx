@@ -9,6 +9,7 @@ import {
   WebLink
 } from '@/primitives';
 import CalloutBlockquote from '@/components/renderers/CalloutBlockquote';
+import TableContainer from '@/components/renderers/TableContainer';
 import { normalizePath } from '@/utils/normalizePath';
 import { BASE_URL } from '@/services/client';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
@@ -167,56 +168,17 @@ export function useAgentMarkdownComponents({
       return <strong className="text-zinc-950 dark:text-white font-semibold" {...props}>{children}</strong>;
     },
 
-    /** Pure minimalist responsive table with subtle vertical hairlines — zero extra card/frame, zero clutter buttons */
-    table({ children, node: _node, className, ...props }: any) {
-      return (
-        <div className="my-3 overflow-x-auto select-text custom-scrollbar">
-          <table className={cn("w-full border-collapse text-[13px] text-zinc-900 dark:text-zinc-100", className)} {...props}>
-            {children}
-          </table>
-        </div>
-      );
-    },
-
-    thead({ children, node: _node, className, ...props }: any) {
-      return (
-        <thead className={cn("border-b border-zinc-200 dark:border-white/[0.1] bg-zinc-50/50 dark:bg-white/[0.02]", className)} {...props}>
-          {children}
-        </thead>
-      );
-    },
-
-    tbody({ children, node: _node, className, ...props }: any) {
-      return (
-        <tbody className={cn("divide-y divide-zinc-200/60 dark:divide-white/[0.06]", className)} {...props}>
-          {children}
-        </tbody>
-      );
-    },
-
-    tr({ children, node: _node, className, ...props }: any) {
-      return (
-        <tr className={cn("hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors", className)} {...props}>
-          {children}
-        </tr>
-      );
+    /** Single-source naked table via MASH Unit 15 TableContainer — zero extra card/frame, zero clutter buttons */
+    table({ children, node: _node, className: _cls, ...props }: any) {
+      return <TableContainer {...props}>{children}</TableContainer>;
     },
 
     td({ children, node: _node, className, ...props }: any) {
       const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
       return (
-        <td className={cn("px-3.5 py-2 text-zinc-900 dark:text-zinc-100 tabular-nums text-[13px] border-r border-zinc-200/40 dark:border-white/[0.04] last:border-r-0", alignClass, className)} {...props}>
+        <td className={cn("px-3.5 py-2 tabular-nums text-[13px]", alignClass, className)} {...props}>
           {processTextNodes(children, onOpenFile)}
         </td>
-      );
-    },
-
-    th({ children, node: _node, className, ...props }: any) {
-      const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
-      return (
-        <th className={cn("px-3.5 py-2 font-semibold text-zinc-900 dark:text-zinc-100 text-[12px] uppercase tracking-wider text-left border-r border-zinc-200/60 dark:border-white/[0.05] last:border-r-0", alignClass, className)} {...props}>
-          {children}
-        </th>
       );
     },
 
@@ -242,7 +204,7 @@ export function useAgentMarkdownComponents({
       );
     },
 
-    /** Images: resolve local paths via connector, lightbox on click (feature #6). */
+    /** Images: resolve local paths via connector, single-frame lightbox on click (eliminated 3 nested frames) */
     img({ src, alt, node: _node, ...props }: any) {
       let resolvedSrc = src;
       let cleanPath = src;
@@ -260,21 +222,18 @@ export function useAgentMarkdownComponents({
           onClick={() => {
             onImageClick?.({ src: resolvedSrc, alt: caption || '', path: cleanPath });
           }}
-          className="block my-3 rounded-xl overflow-hidden border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#141414] p-2.5 shadow-xs group/img cursor-pointer transition-all hover:border-zinc-300 dark:hover:border-white/[0.15]"
+          className="group/img my-3 block max-w-full cursor-pointer select-none"
           title={caption ? `Click to inspect: ${caption}` : 'Click to inspect image'}
         >
-          <span className="relative block overflow-hidden rounded-lg bg-black/[0.02] dark:bg-white/[0.02] flex items-center justify-center min-h-[120px] max-h-[500px]">
-            { }
-            <img
-              src={resolvedSrc}
-              alt={caption || 'Chart'}
-              className="max-w-full rounded-md object-contain max-h-[480px] mx-auto transition-transform duration-200 group-hover/img:scale-[1.01]"
-              loading="lazy"
-              {...props}
-            />
-          </span>
+          <img
+            src={resolvedSrc}
+            alt={caption || 'Chart'}
+            className="max-w-full rounded-lg object-contain max-h-[480px] border border-zinc-200/60 dark:border-white/[0.08] transition-transform duration-200 group-hover/img:scale-[1.01]"
+            loading="lazy"
+            {...props}
+          />
           {caption && (
-            <span className="block text-center text-xs text-zinc-500 dark:text-zinc-400 mt-2 font-medium truncate px-2">
+            <span className="block text-center text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 font-medium truncate px-1">
               {caption}
             </span>
           )}

@@ -91,6 +91,12 @@ async def handle_preemptive_steer(
         return False
 
     try:
+        if hasattr(sm, "cancel_pending_tool_calls_on_steer"):
+            return await sm.cancel_pending_tool_calls_on_steer(
+                user_id=user_id,
+                session_id=session_id,
+                steer_prompt=user_prompt,
+            )
         pending = await sm.get_pending_tool_calls(user_id=user_id, session_id=session_id)
         if pending and any(v.get("decision") is None for v in pending.values()):
             prompt_text = user_prompt.strip()
@@ -224,9 +230,3 @@ def get_session_permission_mode(session_context: dict[str, Any] | None) -> str:
         return "default"
     mode = str(session_context.get("permission_mode") or "default").strip().lower()
     return mode if mode in ("turbo", "default", "review") else "default"
-
-
-# Aliases for architectural compatibility across milestones and survey
-configure_tools_for_permission_mode = apply_permission_mode_to_tools
-sync_session_permission_rules = init_session_permissions
-resolve_preemptive_steer = handle_preemptive_steer

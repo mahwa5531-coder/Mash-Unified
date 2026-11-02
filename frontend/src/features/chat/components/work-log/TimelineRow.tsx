@@ -17,7 +17,7 @@ interface TimelineRowProps {
   isStreaming?: boolean;
   thinkingDurationSeconds?: number;
   onOpenFile?: (path: string) => void;
-  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<void> | void;
+  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<boolean | void> | boolean | void;
   liveThinkingSeconds: number;
   latchedThinkingSeconds: number | null;
   expandedThoughts: Record<string, boolean>;

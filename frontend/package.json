@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "npm run copy:monaco && tsc --noEmit && next build",
     "start": "next start",
-    "lint": "eslint --cache",
+    "lint": "eslint src",
     "test:chat": "npx tsx --tsconfig tsconfig.json tests/test_chat_scenarios.mjs",
     "test:lessons": "npx tsx --tsconfig tsconfig.json tests/test_three_lessons_and_steering.mjs",
     "test:sidebar": "node tests/test_right_sidebar_logic.cjs",

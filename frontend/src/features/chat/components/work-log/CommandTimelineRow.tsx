@@ -44,6 +44,7 @@ export function CommandTimelineRow({
   const isRunning = isToolRunning(entry.data?.tool, isStreaming);
   const isCancelled = entry.data?.tool?.status === 'cancelled';
   const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
+  const isFailed = entry.data?.tool?.status === 'failed' || entry.data?.status === 'failed';
   const isQueued = entry.data?.status === 'queued' || entry.data?.tool?.status === 'queued_approval';
   const toolId = String(entry.data?.tool?.id || entry.id);
   const rawOutput = entry.data?.tool?.output || '';
@@ -82,6 +83,9 @@ export function CommandTimelineRow({
   } else if (isCancelled) {
     displayLabel = 'Cancelled';
     showCmd = true;
+  } else if (isFailed) {
+    displayLabel = 'Failed';
+    showCmd = true;
   } else if (isQueued) {
     displayLabel = 'Queued (awaiting prior approval)';
     showCmd = true;
@@ -116,6 +120,8 @@ export function CommandTimelineRow({
             "font-sans text-[12px] shrink-0",
             isRunning
               ? "animate-silver-shine"
+              : isFailed
+              ? "text-red-500 dark:text-red-400 font-medium"
               : "text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 transition-colors"
           )}
         >

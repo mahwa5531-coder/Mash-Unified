@@ -476,3 +476,77 @@ class SessionManager:
         session.pending_tool_calls = pending_tool_calls
         session.updated_at = datetime.now(UTC)
         return await self._update_session(session)
+
+    async def cancel_pending_tool_calls_on_steer(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        steer_prompt: str,
+    ) -> bool:
+        """Cancel/auto-deny undecided pending tool calls when a user sends a new steer prompt.
+
+        Avoids PendingPermissionsError when a user steers the conversation mid-approval.
+        Returns True if any pending tool calls were auto-denied, False otherwise.
+        """
+        pending = await self.get_pending_tool_calls(user_id=user_id, session_id=session_id)
+        if pending and any(v.get("decision") is None for v in pending.values()):
+            prompt_text = steer_prompt.strip()
+            for ptc in pending.values():
+                if ptc.get("decision") is None:
+                    ptc["decision"] = "deny"
+                    ptc["feedback"] = f"Superseded by user steer instruction: {prompt_text}"
+            await self.update_pending_tool_calls(
+                user_id=user_id,
+                session_id=session_id,
+                pending_tool_calls=pending,
+            )
+            return True
+        return False
+
+    async def delete_session(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+    ) -> bool:
+        """Cascade-delete all session records across all registered models natively."""
+        import contextlib
+        from nexau.archs.session.models import (
+            AgentLockModel,
+            AgentModel,
+            AgentRunActionModel,
+            PermissionRuleModel,
+            SessionModel,
+            TeamMemberModel,
+            TeamMessageModel,
+            TeamModel,
+            TeamTaskLockModel,
+            TeamTaskModel,
+        )
+
+        models_to_delete = [
+            AgentRunActionModel,
+            PermissionRuleModel,
+            AgentLockModel,
+            TeamTaskLockModel,
+            TeamTaskModel,
+            TeamMessageModel,
+            TeamMemberModel,
+            TeamModel,
+            AgentModel,
+            SessionModel,
+        ]
+
+        deleted_any = False
+        for model_cls in models_to_delete:
+            with contextlib.suppress(Exception):
+                count = await self._engine.delete(
+                    model_cls,
+                    filters=ComparisonFilter.eq("session_id", session_id),
+                )
+                if count and count > 0:
+                    deleted_any = True
+
+        return deleted_any
+

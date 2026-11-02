@@ -48,7 +48,7 @@ export function cleanUserSteeringEnvelope(text?: string): string {
 // ponytail: strip internal protocol envelopes, attachments, and boilerplate for composer textarea
 export function cleanUserPromptForComposer(text?: string): string {
   if (!text || typeof text !== 'string') return '';
-  let cleaned = text.replace(/\[Attached (?:file|files)[^\]]*\]/gi, '').trim();
+  let cleaned = text.replace(/\[Attached (?:file|files)[^\]]*\]/gi, '').replace(/<attachments>[\s\S]*?<\/attachments>/gi, '').trim();
   cleaned = cleaned.replace(/^Please inspect and analyze the attached (?:audit )?documents?:?\s*/i, '').trim();
   return cleanUserSteeringEnvelope(cleaned);
 }
@@ -238,7 +238,9 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
             }
           }
           const isAborted = step.status === 'aborted' || step.status === 'cancelled' || step.stop_reason === 'user_stopped' || step.stop_reason === 'cancelled';
+          const isError = step.status === 'error' || step.status === 'failed';
           if (isAborted) prevMsg.status = 'aborted';
+          else if (isError) prevMsg.status = 'error';
           if (step.created_at || (step as any).timestamp) {
             prevMsg.timestamp = step.created_at || (step as any).timestamp;
           }
@@ -246,13 +248,14 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
           if (totalDurationSeconds) prevMsg.totalDurationSeconds = totalDurationSeconds;
         } else {
           const isAborted = step.status === 'aborted' || step.status === 'cancelled' || step.stop_reason === 'user_stopped' || step.stop_reason === 'cancelled';
+          const isError = step.status === 'error' || step.status === 'failed';
           parsedMsgs.push({ 
             id: step.id || (step as any).action_id,
             sessionId: step.session_id,
             turnId: step.turn_id,
             role: 'assistant', 
             content: content.trim(), 
-            status: isAborted ? 'aborted' : (step.status || 'completed'),
+            status: isAborted ? 'aborted' : (isError ? 'error' : (step.status || 'completed')),
             thoughts: thoughts, 
             tools: tools,
             tasks: tasks,
@@ -281,7 +284,11 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
           }
           if (target) {
             target.output = outputText || 'Done.';
-            target.status = 'completed';
+            if (step.status) {
+              target.status = step.status;
+            } else if (!target.status || target.status === 'pending_approval') {
+              target.status = 'completed';
+            }
           } else if (outputText) {
             prevMsg.tools.push({
               id: toolId || `tc_${prevMsg.tools.length}`,

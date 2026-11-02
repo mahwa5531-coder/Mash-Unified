@@ -175,7 +175,12 @@ async def delete_existing_session(engine: Any, session_id: str) -> dict[str, str
     try:
         from app.routers.chat import _sse_server
 
-        if _sse_server and hasattr(_sse_server, "handle_stop_request"):
+        if _sse_server and hasattr(_sse_server, "has_running_agent"):
+            if await _sse_server.has_running_agent(user_id=user_id, session_id=session_id):
+                await _sse_server.handle_stop_request(
+                    user_id=user_id, session_id=session_id, force=True, timeout=5.0
+                )
+        elif _sse_server and hasattr(_sse_server, "handle_stop_request"):
             await _sse_server.handle_stop_request(
                 user_id=user_id, session_id=session_id, force=True, timeout=5.0
             )
@@ -185,33 +190,23 @@ async def delete_existing_session(engine: Any, session_id: str) -> dict[str, str
     # 2. Clear steering mailboxes
     clear_steering_messages(session_id)
 
-    # 3. Purge all related SQLite tables in a single atomic SQL transaction
-    tables_to_purge = [
-        "agent_run_actions",
-        "permission_rules",
-        "agent_locks",
-        "agents",
-        "teams",
-        "team_members",
-        "team_messages",
-        "team_tasks",
-        "team_task_locks",
-        "sessions",
-    ]
+    # 3. Purge all related session records cleanly via native SessionManager
+    sm = None
+    try:
+        from app.routers.chat import _sse_server
+        if _sse_server is not None:
+            sm = getattr(_sse_server, "_session_manager", None)
+    except Exception:
+        sm = None
+    if not sm:
+        try:
+            from app.dependencies import _session_manager
+            sm = _session_manager
+        except Exception:
+            sm = None
 
-    async_eng = getattr(getattr(eng, "_inner", None), "_engine", None) or getattr(eng, "_engine", None)
-    if async_eng:
-        from sqlalchemy import text
-
-        async with async_eng.begin() as conn:
-            res = await conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
-            existing_tables = {row[0] for row in res.fetchall()}
-            for tbl in tables_to_purge:
-                if tbl in existing_tables:
-                    await conn.execute(
-                        text(f"DELETE FROM {tbl} WHERE session_id = :sid"),
-                        {"sid": session_id},
-                    )
+    if sm and hasattr(sm, "delete_session"):
+        await sm.delete_session(user_id=user_id, session_id=session_id)
     else:
         from nexau.archs.session.models import (
             AgentLockModel,
@@ -238,10 +233,8 @@ async def delete_existing_session(engine: Any, session_id: str) -> dict[str, str
             SessionModel,
         ]
         for m in models_to_delete:
-            try:
+            with contextlib.suppress(Exception):
                 await eng.delete(m, filters=ComparisonFilter.eq("session_id", session_id))
-            except Exception as e:
-                logger.warning(f"Fallback delete failed for {m.__name__}: {e}")
 
     # 4. Safely unlink brain directories
     try:
@@ -289,7 +282,9 @@ async def mark_session_as_viewed(engine: Any, session_id: str) -> dict[str, Any]
     return {"status": "success", "session_id": session_id, "last_user_view_time": now_iso, "has_unread": False}
 
 
-async def undo_session_turn(engine: Any, session_id: str, from_turn: int = 0) -> dict[str, Any]:
+async def undo_session_turn(
+    engine: Any, session_id: str, from_turn: int = 0, turn_id: str | None = None, run_id: str | None = None
+) -> dict[str, Any]:
     _validate_id(session_id, "session_id")
     eng = _get_engine(engine)
     if not eng:
@@ -297,16 +292,36 @@ async def undo_session_turn(engine: Any, session_id: str, from_turn: int = 0) ->
     try:
         actions = sorted(await eng.find_many(AgentRunActionModel, filters=ComparisonFilter.eq("session_id", session_id)), key=lambda a: getattr(a, "created_at_ns", 0) or 0)
         user_turn_count, target_run_id = 0, None
-        for a in actions:
-            act = getattr(a, "action_type", "")
-            if (act.value if hasattr(act, "value") else str(act)) not in ("append", "replace"):
-                continue
-            msgs = a.append_messages or a.replace_messages or []
-            if any(getattr(m, "role", None) == "user" or (isinstance(m, dict) and m.get("role") == "user") for m in msgs):
-                if user_turn_count >= from_turn:
-                    target_run_id = getattr(a, "run_id", "")
+
+        # 1. Direct run_id match
+        if run_id:
+            target_run_id = run_id
+        # 2. Match by turn_id across stored message metadata or action IDs
+        elif turn_id:
+            for a in actions:
+                msgs = a.append_messages or a.replace_messages or []
+                for m in msgs:
+                    meta = getattr(m, "metadata", None) or (m.get("metadata") if isinstance(m, dict) else {})
+                    m_id = getattr(m, "id", None) or (m.get("id") if isinstance(m, dict) else None)
+                    t_id = meta.get("turn_id") if isinstance(meta, dict) else None
+                    if t_id == turn_id or m_id == turn_id or getattr(a, "action_id", "") == turn_id:
+                        target_run_id = getattr(a, "run_id", "")
+                        break
+                if target_run_id:
                     break
-                user_turn_count += 1
+
+        # 3. Fallback: integer turn count
+        if not target_run_id:
+            for a in actions:
+                act = getattr(a, "action_type", "")
+                if (act.value if hasattr(act, "value") else str(act)) not in ("append", "replace"):
+                    continue
+                msgs = a.append_messages or a.replace_messages or []
+                if any(getattr(m, "role", None) == "user" or (isinstance(m, dict) and m.get("role") == "user") for m in msgs):
+                    if user_turn_count >= from_turn:
+                        target_run_id = getattr(a, "run_id", "")
+                        break
+                    user_turn_count += 1
         if not target_run_id:
             return {"status": "success", "deleted": 0}
         s = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))

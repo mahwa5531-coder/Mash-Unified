@@ -20,7 +20,7 @@ export function classifyDisconnectError(err: any): string {
 export function prepareRetryMessages(
   messages: Message[], activeTurnId?: string | null, activeSid?: string
 ): { updatedMessages: Message[]; targetTurnId: string } {
-  const targetIdx = findTargetAssistantIdx(messages);
+  const targetIdx = findTargetAssistantIdx(messages, activeTurnId);
   const startNow = Date.now();
   if (targetIdx >= 0) {
     const next = [...messages];
@@ -185,7 +185,7 @@ export function stopSessionStream(curSid: string): Message[] {
   return s.chatMessages;
 }
 
-export function executeSessionUndo(activeSid: string, flatIdx?: number, turnIdx?: number): Message[] | null {
+export function executeSessionUndo(activeSid: string, flatIdx?: number, turnIdx?: number, turnId?: string): Message[] | null {
   const s = sessionStore.get(activeSid);
   if (!s) return null;
   s.abortController?.abort();
@@ -193,7 +193,7 @@ export function executeSessionUndo(activeSid: string, flatIdx?: number, turnIdx?
   s.chatMessages = computeUndoMessages(s.chatMessages, flatIdx);
   notifyStoreListeners();
   safeFetch(`${BASE_URL}/sessions/${activeSid}/undo`, {
-    method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from_turn: turnIdx ?? 0 }),
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from_turn: turnIdx ?? 0, turn_id: turnId }),
   }).catch(() => {});
   return s.chatMessages;
 }

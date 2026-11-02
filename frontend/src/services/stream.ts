@@ -256,7 +256,7 @@ export async function streamQuery(
           if (eventType === "TEXT_MESSAGE_CONTENT" || eventType === "TEXT_MESSAGE_CHUNK") {
             const rawToken = event.delta ?? data.delta ?? event.content ?? data.content ?? "";
             if (typeof rawToken === "string" && rawToken) {
-              if (/^\[?(DONE|END)\]?$/i.test(rawToken.trim())) continue;
+              if (/^\[(DONE|END|done|end|empty)\]$/i.test(rawToken.trim())) continue;
               const tokenText = rawToken.replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '');
               if (tokenText) onToken(tokenText);
             }
@@ -270,7 +270,7 @@ export async function streamQuery(
           ) {
             const rawThought = event.delta ?? data.delta ?? event.content ?? data.content ?? "";
             if (typeof rawThought === "string" && rawThought) {
-              if (/^\[?(DONE|END)\]?$/i.test(rawThought.trim())) continue;
+              if (/^\[(DONE|END|done|end|empty)\]$/i.test(rawThought.trim())) continue;
               const thoughtText = rawThought.replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '');
               if (thoughtText && onThought) onThought(thoughtText);
             }

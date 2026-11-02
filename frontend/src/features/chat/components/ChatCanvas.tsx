@@ -49,8 +49,8 @@ interface MountedTurnRowProps {
   onOpenFile?: (path: string) => void;
   onContinue: () => void;
   onRetryTurn: (content: string, sid?: string) => void;
-  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<void> | void;
-  onUndo: (flatIdx: number, content: string, turnIdx?: number) => void;
+  onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<boolean | void> | boolean | void;
+  onUndo: (flatIdx: number, content: string, turnIdx?: number, turnId?: string) => void;
   onMeasureHeight: (turnKey: string, height: number) => void;
 }
 
@@ -99,8 +99,8 @@ const MountedTurnRow = memo(function MountedTurnRow({
   }, [onRetryTurn, turn.userMsg.content, turn.userMsg.sessionId]);
 
   const handleUndo = useCallback(() => {
-    onUndo(turn.flatIdx, turn.userMsg.content, turnIdx);
-  }, [onUndo, turn.flatIdx, turn.userMsg.content, turnIdx]);
+    onUndo(turn.flatIdx, turn.userMsg.content, turnIdx, turn.turnId);
+  }, [onUndo, turn.flatIdx, turn.userMsg.content, turnIdx, turn.turnId]);
 
   return (
     <TurnViewportProvider isNearViewport={true}>

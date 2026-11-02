@@ -758,7 +758,7 @@ class Executor:
                 )
                 token_trace_session.sync_external_messages(messages)
 
-            if self.middleware_manager:
+            if self.middleware_manager and not agent_state.get("_before_agent_fired", False):
                 before_agent_hook_input = BeforeAgentHookInput(
                     agent_state=agent_state,
                     messages=messages,
@@ -1423,10 +1423,11 @@ class Executor:
                 framework_context=state.framework_context,
             )
             try:
-                state.messages = await asyncio.to_thread(
-                    self.middleware_manager.run_before_agent,
-                    before_agent_hook_input,
-                )
+                if not state.agent_state.get("_before_agent_fired", False):
+                    state.messages = await asyncio.to_thread(
+                        self.middleware_manager.run_before_agent,
+                        before_agent_hook_input,
+                    )
             except Exception as e:
                 logger.warning(f"⚠️ Before-agent middleware execution failed: {e}")
 

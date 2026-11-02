@@ -130,7 +130,7 @@ class AgentEventsMiddleware(Middleware):
                 RunErrorEvent(
                     timestamp=int(datetime.now().timestamp() * 1000),
                     run_id=agent_state.run_id,
-                    message=hook_input.agent_response,
+                    message=str(hook_input.agent_response or "Agent execution encountered an error."),
                 )
             )
         else:

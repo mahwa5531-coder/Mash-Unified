@@ -1282,6 +1282,7 @@ class Agent:
             # RFC-0019: Resume -
             if pending and all(v.get("decision") is not None for v in pending.values()):
                 from nexau.archs.main_sub.framework_context import FrameworkContext
+                from nexau.archs.main_sub.execution.hooks import BeforeAgentHookInput
 
                 resume_ctx = FrameworkContext(
                     agent_name=self.agent_name,
@@ -1292,6 +1293,19 @@ class Agent:
                     _shutdown_event=self.executor.shutdown_event,
                     session_id=self._session_id,
                 )
+                # Ensure BeforeAgent middleware (which emits RunStartedEvent) fires before resumed tool results
+                if hasattr(self, "executor") and getattr(self.executor, "middleware_manager", None):
+                    try:
+                        before_agent_input = BeforeAgentHookInput(
+                            agent_state=agent_state,
+                            messages=self.history.get_messages(),
+                            framework_context=resume_ctx,
+                        )
+                        self.executor.middleware_manager.run_before_agent(before_agent_input)
+                        agent_state.set("_before_agent_fired", True)
+                    except Exception as b_err:
+                        logger.warning("Error running before_agent middleware on resume: %s", b_err)
+
                 await self._resume_pending_tool_calls(pending, agent_state, resume_ctx)
                 self.history.flush()
 

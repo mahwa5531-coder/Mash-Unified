@@ -159,6 +159,16 @@ export async function queueSteeringMessage(
   }
 }
 
+export async function clearSessionQueue(sessionId: string, index?: number): Promise<boolean> {
+  try {
+    const url = index !== undefined ? `${BASE_URL}/sessions/${sessionId}/queue?index=${index}` : `${BASE_URL}/sessions/${sessionId}/queue`;
+    const res = await safeFetch(url, { method: "DELETE" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchSessionQueue(sessionId: string): Promise<string[]> {
   try {
     const res = await safeFetch(`${BASE_URL}/sessions/${sessionId}/queue`);

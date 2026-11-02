@@ -39,7 +39,7 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
   const imgMatch = msg.content ? msg.content.match(/!\[([^\]]*)\]\(([^)]+)\)/) : null;
   let rawText = imgMatch ? msg.content.replace(imgMatch[0], '').trim() : (msg.content || '');
 
-  // Extract attached files: [Attached file: <path>] or [Attached files: <path>]
+  // Extract attached files: both bracket tags [Attached file: ...] and XML <attachments><file .../></attachments>
   const attachedFilePaths: string[] = [];
   const fileTagRegex = /\[Attached (?:file|files):\s*([^\]]+)\]/gi;
   let fileMatch: RegExpExecArray | null;
@@ -50,6 +50,16 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
     }
   }
   rawText = rawText.replace(fileTagRegex, '').trim();
+
+  const fileXmlRegex = /<file\s+[^>]*path=["']([^"']+)["'][^>]*\/?>/gi;
+  let xmlFileMatch: RegExpExecArray | null;
+  while ((xmlFileMatch = fileXmlRegex.exec(rawText)) !== null) {
+    const p = xmlFileMatch[1]?.trim();
+    if (p && !attachedFilePaths.includes(p)) {
+      attachedFilePaths.push(p);
+    }
+  }
+  rawText = rawText.replace(/<attachments>[\s\S]*?<\/attachments>/gi, '').trim();
   rawText = rawText.replace(/^Please inspect and analyze the attached (?:audit )?documents?:?\s*/i, '').trim();
 
   const cleanText = cleanUserSteeringEnvelope(rawText);

@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import { sessionStore, notifyStoreListeners, persistSessionQueue } from '../state/sessionStore';
-import { queueSteeringMessage } from '@/services/sessions';
+import { queueSteeringMessage, clearSessionQueue } from '@/services/sessions';
+import type { Message } from '@/types/chat';
 
 interface UseChatSteeringOptions {
   activeSessionIdRef: React.RefObject<string | null>;
@@ -50,6 +51,19 @@ export function useChatSteering({
             setQueuedMessages([...s.queuedMessages]);
           }
           notifyStoreListeners();
+        } else {
+          // Echo injected steer into local chat messages so user sees it immediately
+          const userSteerMsg: Message = {
+            id: `msg_steer_${Date.now()}`,
+            role: 'user',
+            content: msgToInject,
+            timestamp: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }),
+            sessionId: activeSid,
+            thoughts: [],
+            tools: [],
+          };
+          s.chatMessages = [...s.chatMessages, userSteerMsg];
+          notifyStoreListeners();
         }
       } catch (_err) {
         s.queuedMessages.splice(index, 0, msgToInject);
@@ -72,12 +86,13 @@ export function useChatSteering({
     if (!s) return;
     if (index !== undefined && s.queuedMessages) {
       s.queuedMessages.splice(index, 1);
+      clearSessionQueue(activeSid, index).catch(() => {});
     } else {
       s.queuedMessages = [];
       s.isQueuePaused = false;
+      clearSessionQueue(activeSid).catch(() => {});
     }
     persistSessionQueue(activeSid, s.queuedMessages);
-    // ponytail: Local queue discarding must NEVER delete live mid-flight steering mailbox items
     if (activeSid === activeSessionIdRef.current) {
       setQueuedMessages([...s.queuedMessages]);
     }

@@ -23,6 +23,7 @@ export function ExecutionStatusDisclosure({
   retryAttempt,
   isLast,
   isStreaming,
+  onRetry,
   onContinue,
 }: ExecutionStatusDisclosureProps) {
   // 1. User Cancellation (`status === 'aborted'`): calm static ghost text with zero buttons and zero chevrons
@@ -89,11 +90,21 @@ export function ExecutionStatusDisclosure({
       );
     }
 
-    // General / other errors: calm static ghost text with zero heavy card box, zero accordions, zero copy button
+    // General / other errors: calm static ghost text with zero heavy card box, zero accordions
     const description = classified?.description || effectiveError;
     return (
-      <div className="text-xs text-zinc-500 dark:text-zinc-400 font-sans my-1 select-text">
+      <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 font-sans my-1 select-text">
         <span>{description}</span>
+        {isLast && !isStreaming && onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="group inline-flex items-center gap-1.5 h-[21px] px-2.5 py-0 rounded-full font-sans text-[11px] font-medium leading-none select-none outline-none transition-all duration-150 cursor-pointer active:scale-[0.97] bg-zinc-100/90 hover:bg-zinc-200/90 dark:bg-white/[0.06] dark:hover:bg-white/[0.12] text-zinc-700 hover:text-zinc-950 dark:text-zinc-200 dark:hover:text-white border border-zinc-200/90 hover:border-zinc-300 dark:border-white/[0.08] dark:hover:border-white/[0.20] shadow-2xs backdrop-blur-sm"
+            title="Retry execution"
+          >
+            <span>Retry</span>
+          </button>
+        )}
       </div>
     );
   }

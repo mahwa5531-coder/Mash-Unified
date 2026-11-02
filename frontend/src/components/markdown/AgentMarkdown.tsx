@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
 import { useAgentMarkdownComponents } from './useAgentMarkdownComponents';
 import { escapeCurrencyInMarkdown } from '@/features/chat/components/messages/proseHelpers';
+import { repairMermaidSyntax } from '@/components/renderers/MermaidRenderer';
 
 /**
  * AgentMarkdown — unified markdown renderer powered directly by Streamdown.
@@ -98,7 +99,16 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   className,
 }: AgentMarkdownProps) {
   const components = useAgentMarkdownComponents({ mode, sessionId, onOpenFile, onImageClick });
-  const sanitizedContent = React.useMemo(() => (content ? escapeCurrencyInMarkdown(content) : ''), [content]);
+  const sanitizedContent = React.useMemo(() => {
+    if (!content) return '';
+    let text = escapeCurrencyInMarkdown(content);
+    if (text.includes('```mermaid')) {
+      text = text.replace(/```mermaid\s*\n([\s\S]*?)```/g, (_, code) => {
+        return '```mermaid\n' + repairMermaidSyntax(code) + '\n```';
+      });
+    }
+    return text;
+  }, [content]);
 
   if (!content) return null;
 
@@ -125,7 +135,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
         remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
         controls={{
           code: { copy: true },
-          mermaid: { copy: true, download: true, fullscreen: true, panZoom: true },
+          mermaid: { copy: false, download: false, fullscreen: false, panZoom: false },
         }}
         components={components}
         urlTransform={safeUrlTransform}

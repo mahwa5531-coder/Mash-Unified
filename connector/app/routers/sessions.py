@@ -73,6 +73,8 @@ class RenameSessionPayload(BaseModel):
 
 class UndoPayload(BaseModel):
     from_turn: int = 0
+    turn_id: str | None = None
+    run_id: str | None = None
 
 
 class SteeringQueuePayload(BaseModel):
@@ -153,9 +155,9 @@ async def rename_session(session_id: str, payload: RenameSessionPayload, engine:
 
 @router.delete("/sessions/{session_id}/undo")
 @router.delete("/api/sessions/{session_id}/undo")
-# ponytail: B-14 default payload allows DELETE without request body
+# ponytail: default payload allows DELETE without request body
 async def undo_session(session_id: str, engine: DatabaseEngineDep, payload: UndoPayload = UndoPayload()) -> dict[str, Any]:
-    return await undo_session_turn(engine=engine, session_id=session_id, from_turn=payload.from_turn)
+    return await undo_session_turn(engine=engine, session_id=session_id, from_turn=payload.from_turn, turn_id=payload.turn_id, run_id=payload.run_id)
 
 
 @router.post("/sessions/{session_id}/queue")

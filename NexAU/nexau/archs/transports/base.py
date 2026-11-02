@@ -423,6 +423,19 @@ class TransportBase[TTransportConfig](ABC):
         )
         return result
 
+    async def has_running_agent(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        agent_id: str | None = None,
+    ) -> bool:
+        """Check if an agent is currently running for this user and session."""
+        async with self._running_agents_lock:
+            if agent_id:
+                return (user_id, session_id, agent_id) in self._running_agents
+            return any(k[0] == user_id and k[1] == session_id for k in self._running_agents.keys())
+
     def __enter__(self) -> TransportBase[TTransportConfig]:
         self.start()
         return self

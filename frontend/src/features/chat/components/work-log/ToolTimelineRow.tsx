@@ -27,6 +27,7 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
+    const isFailed = entry.data?.tool?.status === 'failed' || entry.data?.status === 'failed';
     const filePath = entry.data?.filePath || entry.data?.filename || entry.data?.folderPath || entry.data?.foldername || 'file';
     const baseName = (entry.data?.filename || entry.data?.foldername || filePath.split(/[/\\]/).pop() || '').trim();
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
@@ -37,6 +38,8 @@ export function ToolTimelineRow({
       label = 'Cancelled by user';
     } else if (isCancelled) {
       label = 'Cancelled';
+    } else if (isFailed) {
+      label = 'Failed';
     } else if (isRunning) {
       if (toolAction && baseName && baseName !== 'file' && toolAction.toLowerCase().includes(baseName.toLowerCase())) {
         label = 'Analysing';
@@ -65,6 +68,8 @@ export function ToolTimelineRow({
             "font-sans text-[12px] shrink-0",
             isRunning
               ? "animate-silver-shine"
+              : isFailed
+              ? "text-red-500 dark:text-red-400 font-medium"
               : "text-zinc-500 dark:text-zinc-400"
           )}
         >
@@ -83,6 +88,7 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
+    const isFailed = entry.data?.tool?.status === 'failed' || entry.data?.status === 'failed';
     const filePath = entry.data?.filePath || entry.data?.filename || 'file';
     const baseName = (entry.data?.filename || filePath.split(/[/\\]/).pop() || '').trim();
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
@@ -93,6 +99,8 @@ export function ToolTimelineRow({
       label = 'Cancelled by user';
     } else if (isCancelled) {
       label = 'Cancelled';
+    } else if (isFailed) {
+      label = 'Failed';
     } else if (isRunning) {
       if (toolAction && baseName && baseName !== 'file' && toolAction.toLowerCase().includes(baseName.toLowerCase())) {
         label = 'Editing';
@@ -121,6 +129,8 @@ export function ToolTimelineRow({
             "font-sans text-[12px] shrink-0",
             isRunning
               ? "animate-silver-shine"
+              : isFailed
+              ? "text-red-500 dark:text-red-400 font-medium"
               : "text-zinc-500 dark:text-zinc-400"
           )}
         >
@@ -139,6 +149,7 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
+    const isFailed = entry.data?.tool?.status === 'failed' || entry.data?.status === 'failed';
     const query = entry.data?.query || 'query';
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
@@ -148,6 +159,8 @@ export function ToolTimelineRow({
       label = 'Cancelled by user';
     } else if (isCancelled) {
       label = 'Cancelled';
+    } else if (isFailed) {
+      label = 'Failed';
     } else if (isRunning) {
       label = toolAction || 'Searching web';
     } else {
@@ -170,6 +183,8 @@ export function ToolTimelineRow({
             "font-sans text-[12px] shrink-0",
             isRunning
               ? "animate-silver-shine"
+              : isFailed
+              ? "text-red-500 dark:text-red-400 font-medium"
               : "text-zinc-500 dark:text-zinc-400"
           )}
         >
@@ -190,6 +205,7 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
+    const isFailed = entry.data?.tool?.status === 'failed' || entry.data?.status === 'failed';
     const url = entry.data?.url || 'url';
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
@@ -199,6 +215,8 @@ export function ToolTimelineRow({
       label = 'Cancelled by user';
     } else if (isCancelled) {
       label = 'Cancelled';
+    } else if (isFailed) {
+      label = 'Failed';
     } else if (isRunning) {
       label = toolAction || 'Fetching web';
     } else {
@@ -221,6 +239,8 @@ export function ToolTimelineRow({
             "font-sans text-[12px] shrink-0",
             isRunning
               ? "animate-silver-shine"
+              : isFailed
+              ? "text-red-500 dark:text-red-400 font-medium"
               : "text-zinc-500 dark:text-zinc-400"
           )}
         >
@@ -241,6 +261,7 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
+    const isFailed = entry.data?.tool?.status === 'failed' || entry.data?.status === 'failed';
     const pattern = entry.data?.pattern || 'query';
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
@@ -250,6 +271,8 @@ export function ToolTimelineRow({
       label = 'Cancelled by user';
     } else if (isCancelled) {
       label = 'Cancelled';
+    } else if (isFailed) {
+      label = 'Failed';
     } else if (isRunning) {
       label = toolAction || 'Searching';
     } else {
@@ -272,6 +295,8 @@ export function ToolTimelineRow({
             "font-sans text-[12px] shrink-0",
             isRunning
               ? "animate-silver-shine"
+              : isFailed
+              ? "text-red-500 dark:text-red-400 font-medium"
               : "text-zinc-500 dark:text-zinc-400"
           )}
         >
@@ -297,6 +322,7 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
+    const isFailed = entry.data?.tool?.status === 'failed' || entry.data?.status === 'failed';
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
     const taskName = entry.data?.taskName || 'Task';
@@ -306,6 +332,8 @@ export function ToolTimelineRow({
       label = 'Cancelled by user';
     } else if (isCancelled) {
       label = 'Cancelled';
+    } else if (isFailed) {
+      label = 'Failed';
     } else if (isRunning) {
       label = toolAction || 'Running';
     } else {
@@ -321,6 +349,8 @@ export function ToolTimelineRow({
             "font-sans text-[12px] shrink-0",
             isRunning
               ? "animate-silver-shine"
+              : isFailed
+              ? "text-red-500 dark:text-red-400 font-medium"
               : "text-zinc-500 dark:text-zinc-400"
           )}
         >
@@ -339,6 +369,7 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(entry.data?.tool, isStreaming);
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
+    const isFailed = entry.data?.tool?.status === 'failed' || entry.data?.status === 'failed';
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
     const role = entry.data?.roleLabel || 'Subagent';
@@ -348,6 +379,8 @@ export function ToolTimelineRow({
       label = 'Cancelled by user';
     } else if (isCancelled) {
       label = 'Cancelled';
+    } else if (isFailed) {
+      label = 'Failed';
     } else if (isRunning) {
       label = toolAction || 'Running subagent';
     } else {
@@ -363,6 +396,8 @@ export function ToolTimelineRow({
             "font-sans text-[12px] shrink-0",
             isRunning
               ? "animate-silver-shine"
+              : isFailed
+              ? "text-red-500 dark:text-red-400 font-medium"
               : "text-zinc-500 dark:text-zinc-400"
           )}
         >
@@ -385,6 +420,7 @@ export function ToolTimelineRow({
     const isRunning = isToolRunning(t, isStreaming);
     const isCancelled = t?.status === 'cancelled';
     const isDenied = t?.status === 'denied' || t?.decision === 'deny';
+    const isFailed = t?.status === 'failed' || entry.data?.status === 'failed';
     const toolAction = entry.data?.toolAction || t?.toolAction;
     const toolSummary = entry.data?.toolSummary || t?.toolSummary;
 
@@ -393,6 +429,8 @@ export function ToolTimelineRow({
       label = 'Cancelled by user';
     } else if (isCancelled) {
       label = 'Cancelled';
+    } else if (isFailed) {
+      label = 'Failed';
     } else if (isRunning) {
       label = toolAction || 'Executing';
     } else {
@@ -407,6 +445,8 @@ export function ToolTimelineRow({
             "font-sans text-[12px] shrink-0",
             isRunning
               ? "animate-silver-shine"
+              : isFailed
+              ? "text-red-500 dark:text-red-400 font-medium"
               : "text-zinc-500 dark:text-zinc-400"
           )}
         >

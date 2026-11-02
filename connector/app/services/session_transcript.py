@@ -11,9 +11,10 @@ from nexau.archs.session.agent_run_action_service import (
     redact_data_structure,
     redact_sensitive_content,
 )
-from nexau.archs.session.models import SessionModel
+import json
+from nexau.archs.session.models import AgentRunActionModel, SessionModel
 from nexau.archs.session.orm import ComparisonFilter
-from nexau.core.messages import Message, TextBlock, ToolResultBlock, ToolUseBlock
+from nexau.core.messages import Message, Role, TextBlock, ToolResultBlock, ToolUseBlock
 
 from app.paths import validate_safe_id
 
@@ -50,7 +51,7 @@ def clean_protocol_sentinels(text: str) -> str:
     if not text or not isinstance(text, str):
         return text or ""
     tag_pat = (
-        r"</?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|"
+        r"</?(?:user[\s_]+message|assistant[\s_]+message|attachments|file|task_result|user_rules|user_information|"
         r"identity|system_prompt|session_mode|file_storage_and_discipline|tool_execution_discipline|"
         r"ui_presentation_format|runtime_context|skills|Skill[A-Za-z0-9_-]+|scratchpad|thought|thinking|"
         r"tool_use|tool_result|tool_name|tool_output|use_parallel_tool_calls|parallel_tool|summary_data_json|empty)>\s*"
@@ -122,6 +123,7 @@ def messages_to_transcript_lines(
 ) -> list[dict]:
     # 1. Index all tool results by tool_use_id
     tool_results: dict[str, str] = {}
+    tool_errors: dict[str, bool] = {}
     for m in messages:
         for b in m.content:
             if isinstance(b, ToolResultBlock):
@@ -129,6 +131,7 @@ def messages_to_transcript_lines(
                 if shallow_tools and len(content_str) > 3000:
                     content_str = content_str[:3000] + f"\n... [Truncated for rapid UI loading; {len(content_str)} total characters]"
                 tool_results[str(b.tool_use_id)] = redact_sensitive_content(content_str)
+                tool_errors[str(b.tool_use_id)] = bool(getattr(b, "is_error", False))
 
     lines = []
     for msg_idx, msg in enumerate(messages):
@@ -169,7 +172,8 @@ def messages_to_transcript_lines(
                 is_denied = (decision_val == "deny") or ("Permission denied" in str(output_val))
                 if is_denied:
                     decision_val = "deny"
-                tool_status = "pending_approval" if is_pending else ("denied" if is_denied else "completed")
+                is_failed = tool_errors.get(tc_id, False)
+                tool_status = "pending_approval" if is_pending else ("denied" if is_denied else ("failed" if is_failed else "completed"))
                 # ponytail: schema normalization boundary - extract canonical tool properties
                 summary_raw = (
                     t_args.get("toolSummary")
@@ -225,8 +229,9 @@ def messages_to_transcript_lines(
         if not combined_text and not tools and not thoughts:
             continue
 
-        ts = getattr(msg, "created_at", None)
-        ts_str = ts.isoformat() if isinstance(ts, datetime) else (datetime.now(UTC).isoformat() if not ts else str(ts))
+        meta = getattr(msg, "metadata", None) or {}
+        ts = getattr(msg, "created_at", None) or (meta.get("created_at") if isinstance(meta, dict) else None)
+        ts_str = ts.isoformat() if isinstance(ts, datetime) else (str(ts) if ts else "")
 
         msg_id = str(getattr(msg, "id", None) or f"msg_{session_id or 'sid'}_{msg_idx}")
         meta = getattr(msg, "metadata", None) or {}
@@ -234,13 +239,21 @@ def messages_to_transcript_lines(
         if not turn_id:
             turn_id = f"turn_{session_id or 'sid'}_{msg_idx}"
 
-        lines.append({
+        line_item = {
             "id": msg_id,
             "session_id": session_id or "",
             "turn_id": str(turn_id),
             "role": role_str, "content": combined_text, "thoughts": thoughts,
             "tools": tools, "steps": steps, "created_at": ts_str, "timestamp": ts_str,
-        })
+        }
+        if isinstance(meta, dict):
+            if meta.get("status"):
+                line_item["status"] = meta["status"]
+            if meta.get("thinking_duration_seconds") is not None:
+                line_item["thinking_duration_seconds"] = meta["thinking_duration_seconds"]
+            if meta.get("total_duration_seconds") is not None:
+                line_item["total_duration_seconds"] = meta["total_duration_seconds"]
+        lines.append(line_item)
     return lines
 
 
@@ -267,6 +280,95 @@ async def load_session_transcript(
         agent_run_service = AgentRunActionService(engine=eng)
         key = AgentRunActionKey(user_id=user_id, session_id=session_id, agent_id="")
         messages = await agent_run_service.load_messages(key=key)
+
+        # ponytail: Hydrate nanosecond durations, run outcome status, and timestamps from native ledger
+        try:
+            raw_actions = await eng.find_many(
+                AgentRunActionModel,
+                filters=ComparisonFilter.eq("session_id", session_id),
+            )
+            actions = sorted(raw_actions, key=lambda a: getattr(a, "created_at_ns", 0) or 0)
+        except Exception as act_err:
+            logger.debug(f"Could not load raw actions for session {session_id}: {act_err}")
+            actions = []
+
+        if actions:
+            run_meta: dict[str, dict[str, Any]] = {}
+            msg_to_run: dict[str, str] = {}
+            msg_to_created_at: dict[str, Any] = {}
+
+            for a in actions:
+                rid = getattr(a, "run_id", None)
+                if not rid:
+                    continue
+                if rid not in run_meta:
+                    run_meta[rid] = {
+                        "start_ns": None,
+                        "end_ns": None,
+                        "status": None,
+                        "reason": None,
+                        "first_asst_ns": None,
+                        "timestamps": [],
+                    }
+                rm = run_meta[rid]
+                ans = getattr(a, "created_at_ns", 0) or 0
+                if ans > 0:
+                    rm["timestamps"].append(ans)
+
+                atype = getattr(a, "action_type", "")
+                extra = getattr(a, "extra", None) or {}
+                if isinstance(extra, str):
+                    try:
+                        extra = json.loads(extra)
+                    except Exception:
+                        extra = {}
+
+                if atype == "run_start":
+                    rm["start_ns"] = ans
+                elif atype == "run_end":
+                    rm["end_ns"] = extra.get("finished_at_ns") or ans
+                    rm["status"] = extra.get("status") or "ok"
+                    rm["reason"] = extra.get("reason")
+                elif atype in ("append", "replace"):
+                    app_msgs = getattr(a, "append_messages", None) or getattr(a, "replace_messages", None) or []
+                    for m in app_msgs:
+                        mid = str(getattr(m, "id", "") or "")
+                        if mid:
+                            msg_to_run[mid] = rid
+                            m_ts = getattr(m, "created_at", None) or getattr(a, "created_at", None)
+                            if m_ts:
+                                msg_to_created_at[mid] = m_ts
+                        m_role = getattr(m, "role", None)
+                        if (m_role in ("assistant", Role.ASSISTANT)) and rm["first_asst_ns"] is None and ans > 0:
+                            rm["first_asst_ns"] = ans
+
+            for m in messages:
+                mid = str(getattr(m, "id", "") or "")
+                rid = msg_to_run.get(mid)
+                if not isinstance(getattr(m, "metadata", None), dict):
+                    m.metadata = {}
+                if mid in msg_to_created_at and not getattr(m, "created_at", None):
+                    m.created_at = msg_to_created_at[mid]
+
+                if rid and rid in run_meta:
+                    rm = run_meta[rid]
+                    start = rm["start_ns"] or (rm["timestamps"][0] if rm["timestamps"] else None)
+                    end = rm["end_ns"] or (rm["timestamps"][-1] if rm["timestamps"] else None)
+                    if start and end and end >= start:
+                        m.metadata["total_duration_seconds"] = round((end - start) / 1e9, 2)
+                    first_asst = rm["first_asst_ns"]
+                    if start and first_asst and first_asst >= start:
+                        m.metadata["thinking_duration_seconds"] = round((first_asst - start) / 1e9, 2)
+                    if rm.get("status"):
+                        raw_st = str(rm["status"]).lower()
+                        norm_st = "aborted" if raw_st in ("cancelled", "abort", "aborted") else ("error" if raw_st in ("error", "failed") else "completed")
+                        m.metadata["status"] = norm_st
+                    else:
+                        m.metadata["status"] = "completed" 
+                    if rm.get("reason"):
+                        m.metadata["reason"] = rm["reason"]
+                    m.metadata["run_id"] = rid
+                    m.metadata["turn_id"] = f"turn_{rid}"
 
         lines = messages_to_transcript_lines(messages, pending_map=pending_map, shallow_tools=shallow_tools, session_id=session_id)
         total_lines = len(lines)

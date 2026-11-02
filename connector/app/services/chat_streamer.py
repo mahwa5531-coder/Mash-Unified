@@ -156,7 +156,7 @@ async def generate_chat_sse_stream(
                     with contextlib.suppress(Exception):
                         event_type = json.loads(data_str).get("type")
 
-                # B-04/B-05: Handle empty / whitespace-only model completion error cleanly
+                # Handle empty / whitespace-only model completion error cleanly
                 if event_type == "RUN_ERROR":
                     err_msg = getattr(event, "message", None) or ""
                     if not err_msg and isinstance(data_str, str) and "No response content or tool calls" in data_str:
@@ -172,7 +172,7 @@ async def generate_chat_sse_stream(
                         anext_task = asyncio.ensure_future(event_iter.__anext__())
                         continue
 
-                # B-01: On stream resume, ensure RUN_STARTED precedes tool execution result or content
+                # On stream resume, ensure RUN_STARTED precedes tool execution result or content
                 if not run_started_emitted:
                     if event_type == "RUN_STARTED":
                         run_started_emitted = True
@@ -181,7 +181,7 @@ async def generate_chat_sse_stream(
                         yield f"data: {json.dumps({'type': 'RUN_STARTED', 'run_id': run_id, 'session_id': session_id})}\n\n"
                         run_started_emitted = True
 
-                # B-01: Flush TOOL_CALL_PENDING_APPROVAL before yielding RUN_FINISHED
+                # Flush TOOL_CALL_PENDING_APPROVAL before yielding RUN_FINISHED
                 if event_type == "RUN_FINISHED" and sm and session_id and not pending_flushed:
                     with contextlib.suppress(Exception):
                         for ptc_id, ptc in (await sm.get_pending_tool_calls(user_id=user_id, session_id=session_id) or {}).items():
@@ -353,8 +353,13 @@ async def stream_chat_query(
                     yield f"data: {json.dumps({'type': 'STATUS', 'status': 'waiting_for_remaining_approvals'})}\n\n"
                 return StreamingResponse(waiting(), media_type="text/event-stream")
 
-        with contextlib.suppress(Exception):
-            await server.handle_stop_request(user_id=user_id, session_id=sid, force=True, timeout=1.0)
+        if server and hasattr(server, "has_running_agent"):
+            if await server.has_running_agent(user_id=user_id, session_id=sid):
+                with contextlib.suppress(Exception):
+                    await server.handle_stop_request(user_id=user_id, session_id=sid, force=True, timeout=1.0)
+        else:
+            with contextlib.suppress(Exception):
+                await server.handle_stop_request(user_id=user_id, session_id=sid, force=True, timeout=1.0)
 
         run_kwargs = {"message": user_prompt or [], "user_id": user_id, "agent_config": cfg, "session_id": sid, "context": resolved_context}
         if payload.variables:

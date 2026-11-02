@@ -45,6 +45,7 @@ const EXACT_TOOL_CATEGORY_MAP: Record<string, TimelineEntry['type']> = {
   bash: 'command',
   run_code: 'command',
   terminal: 'command',
+  audit_skill_tool: 'other',
 
   read_file: 'file_read',
   view_file: 'file_read',
@@ -310,7 +311,7 @@ export function groupTimelineEntries(entries: TimelineEntry[]): TimelineEntry[] 
       const isDuplicate = result.some((r) => {
         if (r.type !== 'approval') return false;
         const rId = String(r.data?.toolCallId || r.data?.tool?.id || r.id).replace(/^run_[^_]+_/, '').replace(/^run_/, '');
-        return rId === cleanId || (current.data?.command && r.data?.command === current.data?.command);
+        return rId === cleanId;
       });
       if (!isDuplicate) {
         // Sequential Tool Approval Guard:
