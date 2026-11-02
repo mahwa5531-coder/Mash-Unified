@@ -26,12 +26,13 @@ function parseArtifactItem(raw: any, defaultGroup: 'deliverables' | 'working_pap
   const name = raw.name || raw.path?.split(/[/\\]/).pop() || '';
   const lower = name.toLowerCase();
   let type: 'walkthrough' | 'plan' | 'doc' | 'code' | 'sheet' | 'image' | 'pdf' = 'doc';
-  if (lower.includes('walkthrough')) type = 'walkthrough';
-  else if (lower.includes('plan')) type = 'plan';
-  else if (/\.(xlsx?|csv|xlsm)$/.test(lower)) type = 'sheet';
+  // Check explicit binary, spreadsheet, image, and PDF extensions before fuzzy keyword inference
+  if (/\.(xlsx?|csv|xlsm)$/.test(lower)) type = 'sheet';
   else if (/\.(png|jpe?g|svg|webp|gif|bmp)$/.test(lower)) type = 'image';
   else if (/\.pdf$/.test(lower)) type = 'pdf';
   else if (/\.(py|ts|tsx|js|sql|sh|ps1|json|ya?ml)$/.test(lower)) type = 'code';
+  else if (lower.includes('walkthrough')) type = 'walkthrough';
+  else if (lower.includes('plan')) type = 'plan';
 
   return {
     name,
