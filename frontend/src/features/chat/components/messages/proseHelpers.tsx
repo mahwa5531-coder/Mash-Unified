@@ -48,21 +48,14 @@ export function isFullFilePath(raw: string): boolean {
   const filename = parts.pop() || '';
   if (!filename || filename.startsWith('.')) return false;
 
-  // 1. Absolute full path (drive letter, unix root, or file:// URI)
+  // Must be an absolute full path with a drive letter, unix root, or file:// URI
   const isAbsolute = (
     /^[a-zA-Z]:[/\\]/.test(clean) ||
     /^\/(?:Users|home|tmp|var|etc)\//.test(clean) ||
     clean.startsWith('file://')
   );
 
-  // 2. Relative workspace path containing directory separators (e.g. working_papers/vouching.xlsx, src/index.ts)
-  const hasSlash = clean.includes('/') || clean.includes('\\');
-  const isRelative = hasSlash && !clean.startsWith('http://') && !clean.startsWith('https://');
-
-  // 3. Bare document or code file name (e.g. lead_schedule.xlsx, audit_plan.md, test.py)
-  const isBareFile = !hasSlash && !clean.startsWith('.');
-
-  return isAbsolute || isRelative || isBareFile;
+  return isAbsolute;
 }
 
 // Detect if a string is a standalone file extension
@@ -89,7 +82,7 @@ export function isDirectoryPath(raw: string): boolean {
 }
 
 const STATUS_TAG_REGEX = /(\[(?:COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|VERIFIED|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\])/g;
-const FILE_PATH_IN_PROSE_REGEX = /((?:file:\/\/\/?|[a-zA-Z]:[/\\]|\/(?:Users|home|tmp)\/|(?:scratch|tests|frontend|connector|src|workpapers|working_papers|Audit_Deliverables|evidence|reports|procedures|plans|controls|filings|data)\/|\.\/)[^\s'",;()<>]+\.(?:py|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|csv|tsv|xlsx?|xlsm|xlsb|ods|parquet|pdf|docx?|pptx?|xml|xbrl|md|markdown|txt|diff|patch|html|css|log)(?:#L\d+(?:-\d+)?)?)/gi;
+const FILE_PATH_IN_PROSE_REGEX = /((?:file:\/\/\/?|[a-zA-Z]:[/\\]|\/(?:Users|home|tmp)\/|(?:scratch|tests|frontend|connector|src|working_papers|Audit_Deliverables)\/)[^\s'",;()<>]+\.(?:py|tsx?|jsx?|mjs|json|ya?ml|toml|sql|csv|xlsx?|md|txt|diff|patch|html|css|log)(?:#L\d+(?:-\d+)?)?)/gi;
 
 export function processTextNodes(children: any, onOpenFile?: (path: string) => void): any {
   if (typeof children === 'string') {

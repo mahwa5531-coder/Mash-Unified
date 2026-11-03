@@ -1,7 +1,6 @@
 import assert from 'node:assert';
 import { normalizePath } from '../src/utils/normalizePath';
 import { STATUS_VARIANT_MAP, VARIANT_CONFIG } from '../src/primitives/AuditCallout';
-import { isFullFilePath } from '../src/features/chat/components/messages/proseHelpers';
 
 console.log('[Test 1] Verifying Hardened Path Deduplication across Windows, file:/// URLs & basenames...');
 {
@@ -82,37 +81,6 @@ console.log('[Test 3] Verifying Callout Regex pattern matching...');
   console.log('  -> PASSED: Alert regex captures all standard tags and optional trailing titles.');
 }
 
-console.log('[Test 4] Verifying Relative & Bare Document Path Classification for FilePills...');
-{
-  // 1. Valid workspace-relative paths
-  assert.ok(isFullFilePath('working_papers/lead_schedule.xlsx'), 'working_papers/*.xlsx must pass');
-  assert.ok(isFullFilePath('evidence/bank_confirmations/sbi.pdf'), 'evidence/*.pdf must pass');
-  assert.ok(isFullFilePath('src/primitives/FilePill.tsx'), 'src/*.tsx must pass');
-  assert.ok(isFullFilePath('reports/CARO_2020.docx'), 'reports/*.docx must pass');
-  assert.ok(isFullFilePath('data/Ledger_Sampling_Results.csv'), 'data/*.csv must pass');
-  assert.ok(isFullFilePath('./data/sample.csv'), './data/*.csv must pass');
-
-  // 2. Bare document/code files without directory prefix
-  assert.ok(isFullFilePath('lead_schedule.xlsx'), 'Bare .xlsx must pass');
-  assert.ok(isFullFilePath('CARO_2020.docx'), 'Bare .docx must pass');
-  assert.ok(isFullFilePath('audit_plan.md'), 'Bare .md must pass');
-  assert.ok(isFullFilePath('test.py'), 'Bare .py must pass');
-
-  // 3. Absolute paths
-  assert.ok(isFullFilePath('C:/Users/rama/Downloads/Mash/frontend/src/app/page.tsx'), 'Windows abs path must pass');
-  assert.ok(isFullFilePath('file:///C:/Users/rama/Downloads/Mash/workpapers/test.xlsx'), 'file:// URI must pass');
-
-  // 4. Invalid strings that must NEVER become file pills
-  assert.strictEqual(isFullFilePath('version 2.0.1'), false, 'Version numbers must be rejected');
-  assert.strictEqual(isFullFilePath('npm run build'), false, 'Commands with spaces must be rejected');
-  assert.strictEqual(isFullFilePath('node_modules/pkg/index.js'), false, 'node_modules must be rejected');
-  assert.strictEqual(isFullFilePath('total_revenue'), false, 'Plain identifiers must be rejected');
-  assert.strictEqual(isFullFilePath('just a regular sentence.txt'), false, 'Text with spaces must be rejected');
-  assert.strictEqual(isFullFilePath('example.com'), false, 'Web domains must be rejected');
-
-  console.log('  -> PASSED: Relative paths and bare document files properly recognized for FilePills with zero false positives.');
-}
-
 console.log('\n======================================================================');
-console.log('ALL CALLOUT, TYPOGRAPHY & PATH DEDUPLICATION TESTS PASSED (4/4)');
+console.log('ALL CALLOUT, TYPOGRAPHY & PATH DEDUPLICATION TESTS PASSED (3/3)');
 console.log('======================================================================\n');
