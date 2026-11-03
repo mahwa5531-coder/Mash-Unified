@@ -191,10 +191,36 @@ export function useAgentMarkdownComponents({
       return <TableContainer {...props}>{children}</TableContainer>;
     },
 
-    td({ children, node: _node, className, ...props }: any) {
+    th({ children, node: _node, className, ...props }: any) {
       const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
       return (
-        <td className={cn("px-3.5 py-2 tabular-nums text-[13px]", alignClass, className)} {...props}>
+        <th className={cn("px-3.5 py-2 font-semibold text-zinc-900 dark:text-zinc-100 text-[12px] uppercase tracking-wider border-r border-zinc-200/60 dark:border-white/[0.05] last:border-r-0 whitespace-nowrap", alignClass, className)} {...props}>
+          {children}
+        </th>
+      );
+    },
+
+    td({ children, node: _node, className, ...props }: any) {
+      const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
+      // ponytail: detect Unit 15 financial column semantics from cell text
+      const rawText = extractChildText(children).trim();
+      const isNumericOrCurrency = /^[₹$€£+\-—\d]/.test(rawText) || props.align === 'right';
+      const isCreditOrNegative = rawText.startsWith('-') || /^\([₹$€£\d]/.test(rawText) || /CR/i.test(rawText);
+      const isDebitOrPositive = rawText.startsWith('+') || /DR/i.test(rawText);
+      const isCode = /^(?:[A-Z]{2,4}-\d+|\d{4,6}|SA\s*\d+)$/i.test(rawText);
+
+      const colorClass = isCreditOrNegative
+        ? "text-rose-500 dark:text-rose-400 font-mono"
+        : isDebitOrPositive
+        ? "text-emerald-600 dark:text-emerald-400 font-mono"
+        : isCode
+        ? "font-mono text-zinc-500 dark:text-zinc-400"
+        : isNumericOrCurrency
+        ? "font-mono tabular-nums text-zinc-900 dark:text-zinc-100"
+        : "";
+
+      return (
+        <td className={cn("px-3.5 py-2 text-[13px] border-r border-zinc-200/40 dark:border-white/[0.04] last:border-r-0", isNumericOrCurrency && "whitespace-nowrap", colorClass, alignClass, className)} {...props}>
           {processTextNodes(children, onOpenFile)}
         </td>
       );

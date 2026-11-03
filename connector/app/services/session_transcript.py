@@ -357,8 +357,9 @@ async def load_session_transcript(
                     if start and end and end >= start:
                         m.metadata["total_duration_seconds"] = round((end - start) / 1e9, 2)
                     first_asst = rm["first_asst_ns"]
-                    if start and first_asst and first_asst >= start:
+                    if start and first_asst and first_asst >= start and not rm.get("first_asst_hydrated"):
                         m.metadata["thinking_duration_seconds"] = round((first_asst - start) / 1e9, 2)
+                        rm["first_asst_hydrated"] = True
                     if rm.get("status"):
                         raw_st = str(rm["status"]).lower()
                         norm_st = "aborted" if raw_st in ("cancelled", "abort", "aborted") else ("error" if raw_st in ("error", "failed") else "completed")

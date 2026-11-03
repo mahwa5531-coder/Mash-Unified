@@ -103,6 +103,7 @@ const AssistantMessage = memo(function AssistantMessage({
           return (
             <TaskWorkLogAccordion
               key={unit.id}
+              id={unit.id}
               steps={unit.steps}
               thoughts={unit.thoughts}
               tools={unit.tools}

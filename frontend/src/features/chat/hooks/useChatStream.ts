@@ -129,7 +129,7 @@ export function useChatStream({
     targetSession.isStreaming = true;
     targetSession.tokenBuffer = '';
     targetSession.thoughtBuffer = '';
-    targetSession.turnStartTime = Date.now();
+    targetSession.turnStartTime = isResume ? (targetSession.turnStartTime || Date.now()) : Date.now();
     targetSession.thinkingDuration = null;
     targetSession.abortController = new AbortController();
 

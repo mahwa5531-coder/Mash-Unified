@@ -26,9 +26,10 @@ export function extractLineRange(args?: Record<string, any>): string | null {
 
 export function formatDurationDisplay(secs: number): string {
   if (secs <= 0) return '0s';
-  if (secs < 60) return `${secs}s`;
+  const rounded = Math.round(secs);
+  if (rounded < 60) return `${rounded}s`;
   const mins = Math.floor(secs / 60);
-  const remSecs = secs % 60;
+  const remSecs = rounded % 60;
   if (mins < 60) {
     return remSecs > 0 ? `${mins}m ${remSecs}s` : `${mins}m`;
   }
@@ -308,10 +309,14 @@ export function groupTimelineEntries(entries: TimelineEntry[]): TimelineEntry[] 
     if (current.type === 'approval') {
       const tcId = String(current.data?.toolCallId || current.data?.tool?.id || current.id);
       const cleanId = tcId.replace(/^run_[^_]+_/, '').replace(/^run_/, '');
+      const curCmd = current.data?.command;
       const isDuplicate = result.some((r) => {
         if (r.type !== 'approval') return false;
         const rId = String(r.data?.toolCallId || r.data?.tool?.id || r.id).replace(/^run_[^_]+_/, '').replace(/^run_/, '');
-        return rId === cleanId;
+        const rCmd = r.data?.command;
+        if (cleanId && rId === cleanId) return true;
+        if (curCmd && rCmd && curCmd === rCmd) return true;
+        return false;
       });
       if (!isDuplicate) {
         // Sequential Tool Approval Guard:

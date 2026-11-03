@@ -9,38 +9,50 @@ import { cleanAssistantContent } from '@/features/chat/utils/sessionHistoryParse
 
 const cleanProseContent = cleanAssistantContent;
 
-function isWorkStep(s: ExecutionStep): boolean {
-  return (
-    s.type === 'tool' ||
-    s.type === 'thinking' ||
-    s.type === 'reasoning' ||
-    (s.type && s.type !== 'text') ||
-    Boolean(s.tools && s.tools.length > 0) ||
-    Boolean(s.thoughts && s.thoughts.length > 0) ||
-    Boolean(s.name) ||
-    Boolean(s.tool_call_id)
-  );
-}
-
 /**
- * ponytail: Compute Authentic Interleaved Chronological Units per Turn
- * Sequentially interleaves execution phases (thinking + tools in WorkLog accordion)
- * and assistant commentary/prose in exact chronological order:
- * [WorkLog] -> [Prose Note] -> [WorkLog] -> [Prose Summary]
+ * Group execution steps and conversational prose for an assistant turn.
+ * All pre-response execution steps (tools, reasoning, intermediate step notes) are
+ * consolidated into a single worklog unit, followed by conversational prose.
  */
 export function computeInterleavedUnits(msg: Message, isActivelyStreaming: boolean): MessageInterleavedUnit[] {
-  const result: MessageInterleavedUnit[] = [];
-  const rawSteps = msg.steps && msg.steps.length > 0 ? msg.steps : [];
+  const hasWork =
+    (msg.thoughts && msg.thoughts.length > 0) ||
+    (msg.tools && msg.tools.length > 0) ||
+    (msg.steps && msg.steps.some((s) => (s.type && s.type !== 'text') || (s.tools && s.tools.length > 0) || (s.thoughts && s.thoughts.length > 0) || Boolean(s.name) || Boolean(s.tool_call_id)));
+  const hasDuration = Boolean(
+    (msg.totalDurationSeconds || msg.thinkingDurationSeconds) && hasWork
+  );
+  const shouldIncludeWorklog = hasWork || isActivelyStreaming || msg.status === 'running' || hasDuration;
 
-  if (rawSteps.length > 0) {
-    let currentWorkChunk: ExecutionStep[] = [];
-    let currentProseChunk: ExecutionStep[] = [];
+  if (msg.steps && msg.steps.length > 0) {
+    let lastWorkStepIdx = -1;
+    for (let i = msg.steps.length - 1; i >= 0; i--) {
+      const s = msg.steps[i];
+      if (
+        s.type === 'tool' ||
+        s.type === 'thinking' ||
+        s.type === 'reasoning' ||
+        (s.type && s.type !== 'text') ||
+        (s.tools && s.tools.length > 0) ||
+        (s.thoughts && s.thoughts.length > 0) ||
+        Boolean(s.name) ||
+        Boolean(s.tool_call_id)
+      ) {
+        lastWorkStepIdx = i;
+        break;
+      }
+    }
 
-    const flushWork = () => {
-      if (currentWorkChunk.length === 0) return;
+    const result: MessageInterleavedUnit[] = [];
+
+    if (lastWorkStepIdx >= 0) {
+      const workSteps = msg.steps.slice(0, lastWorkStepIdx + 1);
+      const postWorkSteps = msg.steps.slice(lastWorkStepIdx + 1);
+
       const tools: ToolCall[] = [];
       const thoughts: string[] = [];
-      currentWorkChunk.forEach((s) => {
+
+      workSteps.forEach((s) => {
         if (s.type === 'tool' || (!s.type && (s.name || s.tool_call_id))) {
           tools.push({
             id: s.tool_call_id || s.id,
@@ -62,95 +74,98 @@ export function computeInterleavedUnits(msg: Message, isActivelyStreaming: boole
         }
       });
 
+      if (msg.tools && msg.tools.length > 0 && tools.length === 0) {
+        tools.push(...msg.tools);
+      }
+      if (msg.thoughts && msg.thoughts.length > 0 && thoughts.length === 0) {
+        thoughts.push(...msg.thoughts);
+      }
+
       result.push({
         type: 'worklog',
-        id: `work_${msg.id || 'turn'}_${result.length}`,
-        steps: [...currentWorkChunk],
+        id: `work_primary_${msg.id || 'start'}`,
+        steps: workSteps,
         thoughts,
         tools,
       });
-      currentWorkChunk = [];
-    };
 
-    const flushProse = () => {
-      if (currentProseChunk.length === 0) return;
-      const text = currentProseChunk
+      let finalProse = postWorkSteps
+        .filter((s) => s.type === 'text' && s.content)
         .map((s) => cleanProseContent(s.content))
         .filter(Boolean)
         .join('\n\n');
-      if (text) {
-        result.push({
-          type: 'prose',
-          id: `prose_${msg.id || 'turn'}_${result.length}`,
-          content: text,
-        });
-      }
-      currentProseChunk = [];
-    };
 
-    for (const step of rawSteps) {
-      if (isWorkStep(step)) {
-        flushProse();
-        currentWorkChunk.push(step);
-      } else if (step.type === 'text') {
-        flushWork();
-        currentProseChunk.push(step);
-      }
-    }
-    flushWork();
-    flushProse();
-
-    // Check if prose was produced; if not, or if trailing msg.content exists
-    const cleanMsg = cleanProseContent(msg.content);
-    if (cleanMsg) {
-      const existingProse = result
-        .filter((u): u is { type: 'prose'; id: string; content: string } => u.type === 'prose')
-        .map((u) => u.content)
-        .join('\n\n');
-
-      if (!existingProse) {
-        result.push({
-          type: 'prose',
-          id: `prose_final_${msg.id || 'turn'}`,
-          content: cleanMsg,
-        });
-      } else if (cleanMsg.length > existingProse.length && cleanMsg.startsWith(existingProse)) {
-        const remaining = cleanMsg.slice(existingProse.length).trim();
-        if (remaining) {
-          result.push({
-            type: 'prose',
-            id: `prose_final_${msg.id || 'turn'}`,
-            content: remaining,
-          });
+      if (!finalProse && postWorkSteps.length === 0 && msg.content) {
+        const intermediateTexts = workSteps
+          .filter((s) => s.type === 'text' && s.content)
+          .map((s) => cleanProseContent(s.content))
+          .filter(Boolean);
+        const cleanMsg = cleanProseContent(msg.content);
+        if (cleanMsg) {
+          const intermediateCombined = intermediateTexts.join('\n\n');
+          if (intermediateCombined && cleanMsg === intermediateCombined) {
+            finalProse = '';
+          } else if (intermediateCombined && cleanMsg.startsWith(intermediateCombined)) {
+            finalProse = cleanMsg.slice(intermediateCombined.length).trim();
+          } else {
+            finalProse = cleanMsg;
+          }
         }
       }
-    }
 
-    return result;
+      if (finalProse) {
+        result.push({
+          type: 'prose',
+          id: `prose_summary_${msg.id || 'end'}`,
+          content: finalProse,
+        });
+      }
+
+      return result;
+    } else {
+      if (shouldIncludeWorklog) {
+        result.push({
+          type: 'worklog',
+          id: `work_primary_${msg.id || 'start'}`,
+          steps: [],
+          thoughts: msg.thoughts || [],
+          tools: msg.tools || [],
+        });
+      }
+      const cleanContent = cleanProseContent(
+        msg.steps.map((s) => s.content || '').join('\n\n') || msg.content
+      );
+      if (cleanContent) {
+        result.push({
+          type: 'prose',
+          id: `prose_summary_${msg.id || 'end'}`,
+          content: cleanContent,
+        });
+      }
+      return result;
+    }
   }
 
-  // Fallback: Legacy or steps-less messages
-  const hasWork =
-    (msg.thoughts && msg.thoughts.length > 0) ||
-    (msg.tools && msg.tools.length > 0);
-  if (hasWork || isActivelyStreaming || msg.status === 'running') {
-    result.push({
+  // Fallback for flat or legacy messages
+  const fallbackUnits: MessageInterleavedUnit[] = [];
+  if (shouldIncludeWorklog) {
+    fallbackUnits.push({
       type: 'worklog',
       id: `work_primary_${msg.id || 'start'}`,
-      steps: [],
+      steps: msg.steps || [],
       thoughts: msg.thoughts || [],
       tools: msg.tools || [],
     });
   }
   const cleanContent = cleanProseContent(msg.content);
   if (cleanContent) {
-    result.push({
+    fallbackUnits.push({
       type: 'prose',
       id: `prose_primary_${msg.id || 'end'}`,
       content: cleanContent,
     });
   }
-  return result;
+  return fallbackUnits;
 }
 
 export function useInterleavedUnits(msg: Message, isActivelyStreaming: boolean): MessageInterleavedUnit[] {

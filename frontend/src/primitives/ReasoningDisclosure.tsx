@@ -27,9 +27,10 @@ export interface ReasoningDisclosureProps {
 
 export function formatReasoningDuration(secs: number): string {
   if (!secs || secs <= 0) return '0s';
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  const remSecs = secs % 60;
+  const rounded = Math.round(secs);
+  if (rounded < 60) return `${rounded}s`;
+  const mins = Math.floor(rounded / 60);
+  const remSecs = rounded % 60;
   if (mins < 60) {
     return remSecs > 0 ? `${mins}m ${remSecs}s` : `${mins}m`;
   }
@@ -39,13 +40,10 @@ export function formatReasoningDuration(secs: number): string {
 }
 
 /**
- * ReasoningDisclosure Primitive
- * 
- * Minimal, zero-decoration reasoning disclosure:
- * - Active state: "Thinking..." / "Thinking (12s)..."
+ * Minimal reasoning disclosure:
+ * - Active state: "Thinking..." / "Thinking (12s)..." with spinner
  * - Completed state: "Thought for 12s"
  * - Decomposes on click; grouped by default after completing.
- * - No brain icon, no sparkles icon, no extraneous buttons.
  */
 export function ReasoningDisclosure({
   text = '',
@@ -64,7 +62,7 @@ export function ReasoningDisclosure({
   const scrollRef = externalScrollRef || localScrollRef;
   const [userScrolledUp, setUserScrolledUp] = useState(false);
 
-  // Group (collapse) when job completes
+  // Auto-collapse when reasoning phase completes
   useEffect(() => {
     if (wasStreamingRef.current && !isStreaming) {
       setInternalIsOpen(false);
@@ -99,19 +97,17 @@ export function ReasoningDisclosure({
     setUserScrolledUp(!isNearBottom);
   };
 
-  const effectiveSecs = durationSeconds || liveSeconds || 1;
-  const formattedDuration = formatReasoningDuration(effectiveSecs);
+  const effectiveSecs = durationSeconds || liveSeconds;
+  const formattedDuration = effectiveSecs ? formatReasoningDuration(effectiveSecs) : '';
 
   const displayLabel = isStreaming
-    ? 'Thinking...'
-    : `Thought for ${formattedDuration}`;
+    ? (liveSeconds ? `Thinking (${Math.round(liveSeconds)}s)...` : 'Thinking...')
+    : (formattedDuration ? `Thought for ${formattedDuration}` : 'Thought');
 
-  // ponytail: strip XML thought/thinking tags if raw reasoning text is enclosed in them
   const cleanReasoningText = text ? text.replace(/<\/?(?:thought|thinking)>/gi, '').trim() : '';
 
   return (
     <div className={cn("my-1 select-none font-sans", className)}>
-      {/* Trigger: Pure text + chevron, NO brain button or icons */}
       <button
         type="button"
         onClick={handleToggle}
@@ -133,7 +129,6 @@ export function ReasoningDisclosure({
         />
       </button>
 
-      {/* Decomposed Reasoning Block as Clean Paragraphs */}
       {isExpanded && (
         <div className="mt-1.5 mb-2 pl-2">
           <div

@@ -13,6 +13,7 @@ import {
 import type { ToolCallItem, ExecutionStep, TimelineEntry } from './work-log/types';
 
 interface TaskWorkLogAccordionProps {
+  id?: string;
   steps?: ExecutionStep[];
   thoughts?: string[];
   tools?: ToolCallItem[];
@@ -26,7 +27,10 @@ interface TaskWorkLogAccordionProps {
   turnStartTime?: number;
 }
 
+const userExpandedAccordions = new Map<string, boolean>();
+
 export default function TaskWorkLogAccordion({
+  id,
   steps = [],
   thoughts = [],
   tools = [],
@@ -39,16 +43,38 @@ export default function TaskWorkLogAccordion({
   isLast: _isLast = false,
   turnStartTime,
 }: TaskWorkLogAccordionProps) {
-  // ponytail: Completed turns render calm collapsed summary bar by default on app reload; only pure reasoning-only turns without tools/prose stay open
   const hasTools = Boolean((tools && tools.length > 0) || (steps && steps.some((s: any) => s.type === 'tool' || (!s.type && (s.name || s.tool_call_id)) || (s.tools && s.tools.length > 0))));
-  const [clusterOpen, setClusterOpen] = useState<boolean>(!hasAssistantContent && !hasTools);
+  const [clusterOpen, setClusterOpen] = useState<boolean>(() => {
+    if (id && userExpandedAccordions.has(id)) {
+      return !!userExpandedAccordions.get(id);
+    }
+    return !hasAssistantContent && !hasTools && !isStreaming;
+  });
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
   const [expandedCmds, setExpandedCmds] = useState<Record<string, boolean>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const thoughtScrollRef = useRef<HTMLDivElement>(null);
 
-  // Live ticking seconds counter: runs strictly when the latest step is actively in reasoning/thinking phase from LLM output
+  // Auto-collapse completed turns upon stream termination
+  const wasStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    if (wasStreamingRef.current && !isStreaming) {
+      setClusterOpen(false);
+      if (id) userExpandedAccordions.set(id, false);
+    }
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming, id]);
+
+  const toggleCluster = () => {
+    setClusterOpen((prev) => {
+      const next = !prev;
+      if (id) userExpandedAccordions.set(id, next);
+      return next;
+    });
+  };
+
+  // Live ticking seconds counter: active while latest step is actively in reasoning phase
   const activeThinkingStep = (steps && steps.length > 0 && steps[steps.length - 1].type === 'thinking' && steps[steps.length - 1].status === 'running')
     ? steps[steps.length - 1]
     : null;
@@ -81,7 +107,6 @@ export default function TaskWorkLogAccordion({
     return () => clearInterval(interval);
   }, [isActivelyThinking, activeThinkingStep?.startTime, turnStartTime]);
 
-  // After doing its job (active thinking completes), ensure thoughts are grouped
   const wasActivelyThinkingRef = useRef(isActivelyThinking);
   useEffect(() => {
     if (wasActivelyThinkingRef.current && !isActivelyThinking) {
@@ -90,7 +115,6 @@ export default function TaskWorkLogAccordion({
     wasActivelyThinkingRef.current = isActivelyThinking;
   }, [isActivelyThinking]);
 
-  // Seamless live streaming reasoning card auto-scroll
   useEffect(() => {
     if (isActivelyThinking && thoughtScrollRef.current) {
       const el = thoughtScrollRef.current;
@@ -103,23 +127,18 @@ export default function TaskWorkLogAccordion({
 
   const hasWork = steps.length > 0 || thoughts.length > 0 || tools.length > 0;
 
-  // Find any active pending approval that is awaiting user decision
   const hasPendingApproval = useMemo(() => {
     return tools.some(t => t.status === 'pending_approval' && !t.decision) ||
       steps.some((s: any) => s.type === 'approval' || (s.tools && s.tools.some((t: any) => t.status === 'pending_approval' && !t.decision)));
   }, [tools, steps]);
 
-  // Build chronologically authentic timeline: Step 1 (Thought -> Parallel Tools) -> Step 2 (Thought -> Edits) -> Step 3 (Command)
   const groupedTimeline = useMemo(() => {
-    // ponytail: 100% inert in collapsed historical turns. When collapsed and not streaming, defer timeline compilation until expanded.
     if (!clusterOpen && !isStreaming && !hasPendingApproval) return [];
     if (!hasWork && (!isStreaming || hasAssistantContent)) return [];
     const fullTimeline: TimelineEntry[] = [];
 
-    // Branch A: We have discrete structured execution steps from the agent run
     if (steps && steps.length > 0) {
       steps.forEach((step: any, sIdx) => {
-        // 1. Unitised 'thinking' step or legacy step.thoughts
         if (step.type === 'thinking' || step.type === 'reasoning' || (step.thoughts && step.thoughts.length > 0)) {
           const thText = (step.content || (step.thoughts ? step.thoughts.join('\n\n') : '')).replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
           if (thText) {
@@ -143,14 +162,11 @@ export default function TaskWorkLogAccordion({
             }
           }
         } else if (step.type === 'tool' || (!step.type && (step.name || step.tool_call_id))) {
-          // 2. Unitised single 'tool' step
           fullTimeline.push(parseToolItem(step, step.tool_call_id || (step.id ? `${step.id}_${sIdx}` : `tool_${sIdx}`)));
         } else if (step.tools && step.tools.length > 0) {
-          // 3. Step with tools array
           const stepToolEntries = step.tools.map((t: any, tIdx: number) => parseToolItem(t, `${sIdx}_${tIdx}`));
           fullTimeline.push(...stepToolEntries);
         } else if (step.type === 'text' && step.content) {
-          // 4. Intermediate step note / commentary in unified worklog
           const noteText = step.content.replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
           if (noteText) {
             fullTimeline.push({
@@ -164,11 +180,9 @@ export default function TaskWorkLogAccordion({
           }
         }
       });
-      // ponytail: group consecutive same-category tools across steps while preserving chronological order
       return groupTimelineEntries(fullTimeline);
     }
 
-    // Branch B: Streaming or legacy flat messages fallback
     const rawToolEntries = tools.map((t, tIdx) => parseToolItem(t, tIdx));
     const groupedTools = groupTimelineEntries(rawToolEntries);
 
@@ -192,7 +206,6 @@ export default function TaskWorkLogAccordion({
     return fullTimeline;
   }, [steps, thoughts, tools, isStreaming, thinkingDurationSeconds, clusterOpen, hasPendingApproval, hasWork, hasAssistantContent]);
 
-  // ponytail: Use native server durations from SQLite on reload; use wall-clock delta only while actively streaming
   const finalSecs = totalDurationSeconds || (turnStartTime ? Math.max(1, Math.round((Date.now() - turnStartTime) / 1000)) : undefined);
   const formattedTime = finalSecs ? formatDurationDisplay(finalSecs) : '';
 
@@ -217,7 +230,6 @@ export default function TaskWorkLogAccordion({
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 1500);
   };
-
 
   const renderTimelineRow = (entry: TimelineEntry, isChild = false) => (
     <TimelineRow
@@ -275,11 +287,17 @@ export default function TaskWorkLogAccordion({
     );
   }
 
-  // 2. Completed turn: render "Worked for {formattedTime} >" or "Thought for {formattedTime} >" naked text link dropdown
+  // 2. Completed turn: render summary button once turn is finished
   const hasThoughts = thoughts.length > 0 || (steps && steps.some((s: any) => s.type === 'thinking' || s.type === 'reasoning' || (s.thoughts && s.thoughts.length > 0)));
-  const actionLabel = hasThoughts && !hasTools ? `Thought for ${formattedTime}` : `Worked for ${formattedTime}`;
+  let actionLabel = 'Completed';
+  if (hasTools) {
+    actionLabel = formattedTime ? `Worked for ${formattedTime}` : 'Worked';
+  } else if (hasThoughts) {
+    actionLabel = formattedTime ? `Thought for ${formattedTime}` : 'Thought';
+  } else if (formattedTime) {
+    actionLabel = `Completed in ${formattedTime}`;
+  }
 
-  // Find any active pending approval that is awaiting user decision
   const pendingApprovalEntry = groupedTimeline.find(
     (e) => e.type === 'approval' || (e.data?.tool && e.data.tool.status === 'pending_approval' && !e.data.tool.decision)
   );
@@ -289,21 +307,21 @@ export default function TaskWorkLogAccordion({
       <button
         type="button"
         aria-expanded={clusterOpen}
-        onClick={() => setClusterOpen((v) => !v)}
+        onClick={toggleCluster}
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-normal py-0.5 px-1 -mx-1 rounded-md hover:bg-muted/50 transition-all cursor-pointer select-none my-0.5 w-fit group"
       >
         <span className="font-sans">{actionLabel}</span>
         <ChevronRight size={11} className={cn("text-muted-foreground group-hover:text-foreground transition-transform", clusterOpen && "rotate-90")} />
       </button>
 
-      {/* If there's an active pending approval waiting for user decision, render it prominently so it is never buried inside a collapsed accordion (Chain 2) */}
+      {/* Prominently render pending approvals awaiting user decision */}
       {pendingApprovalEntry && !clusterOpen && (
         <div className="my-1.5 animate-in fade-in-50 slide-in-from-top-1">
           {renderTimelineRow(pendingApprovalEntry, false)}
         </div>
       )}
 
-      {/* Chronological Timeline List revealed only when user expands */}
+      {/* Grouped timeline items revealed upon user expansion */}
       {clusterOpen && (
         <div className="min-w-0 overflow-hidden mt-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
           <div className="flex flex-col gap-1 py-1 text-xs">
@@ -311,7 +329,7 @@ export default function TaskWorkLogAccordion({
               groupedTimeline.map((entry) => renderTimelineRow(entry, false))
             ) : (
               <div className="text-xs text-muted-foreground/80 py-1 px-1 font-sans">
-                Completed response in {formattedTime}
+                Completed response {formattedTime ? `in ${formattedTime}` : ''}
               </div>
             )}
           </div>

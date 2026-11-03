@@ -406,7 +406,7 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
                   transformOrigin: "center",
                   transition: "transform 0.15s ease",
                 }}
-                className="max-w-full flex justify-center items-center select-none"
+                className="w-full flex justify-center items-center select-none [&_svg]:max-w-none [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-h-[75vh]"
                 dangerouslySetInnerHTML={{ __html: sanitizeSvg(svgContent) }}
               />
             </div>

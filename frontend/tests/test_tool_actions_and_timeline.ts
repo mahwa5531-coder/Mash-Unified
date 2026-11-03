@@ -549,20 +549,20 @@ const turnWithIntermediateCommentary: Message = {
 
 const units = computeInterleavedUnits(turnWithIntermediateCommentary, false);
 
-// 7.1 Authentic Interleaved Chronological Units per Turn (ed35a41)
-// [WorkLog] -> [Prose Note] -> [WorkLog] -> [Prose Summary]
+// 7.1 Single unified worklog unit per turn (all tools grouped under one worklog)
 const worklogUnits = units.filter((u) => u.type === 'worklog');
-assert.strictEqual(worklogUnits.length, 3, 'Turn must interleave work chunks chronologically');
+assert.strictEqual(worklogUnits.length, 1, 'Turn must consolidate execution steps into a single unified worklog');
 
-// 7.2 Tools and thoughts are distributed across the respective worklogs
-const allTools = worklogUnits.flatMap((w) => w.type === 'worklog' ? w.tools : []);
-assert.strictEqual(allTools.length, 3, 'Worklogs must contain all 3 tools');
+// 7.2 All tools in the turn are grouped into this worklog
+const toolsInWorklog = worklogUnits[0].type === 'worklog' ? worklogUnits[0].tools : [];
+assert.strictEqual(toolsInWorklog.length, 3, 'All tools must be grouped under the single worklog');
 
-// 7.3 Conversational answers and intermediate notes are preserved as prose units
+// 7.3 Final conversational answer is emitted as prose
 const proseUnits = units.filter((u) => u.type === 'prose');
-assert.strictEqual(proseUnits.length, 3, 'Turn must contain 3 prose units interleaved');
+assert.strictEqual(proseUnits.length, 1, 'Turn must contain one summary prose unit for the final answer');
+assert.strictEqual(proseUnits[0].content, 'Implementation complete. All tests pass.');
 
-console.log('  -> PASSED: Authentic Interleaved Chronological Units verified');
+console.log('  -> PASSED: Single unified worklog per turn with all tools grouped verified');
 
 // -----------------------------------------------------------------------------
 // [Test 8] SQLite Reload Parity & Metadata Preservation (R3)
@@ -692,12 +692,11 @@ const turnWithAnswerInContent: Message = {
   ],
 };
 const unitsWithAnswer = computeInterleavedUnits(turnWithAnswerInContent, false);
-assert.strictEqual(unitsWithAnswer.length, 3, 'Must produce 1 initial prose, 1 worklog, and 1 final prose summary');
-assert.strictEqual(unitsWithAnswer[0].type, 'prose');
-assert.strictEqual(unitsWithAnswer[1].type, 'worklog');
-assert.strictEqual(unitsWithAnswer[2].type, 'prose');
-if (unitsWithAnswer[2].type === 'prose') {
-  assert.strictEqual(unitsWithAnswer[2].content, 'Found 0 vulnerabilities. System is secure.', 'Final conversational prose MUST NOT be swallowed by intermediate commentary!');
+assert.strictEqual(unitsWithAnswer.length, 2, 'Must produce 1 worklog and 1 prose summary');
+assert.strictEqual(unitsWithAnswer[0].type, 'worklog');
+assert.strictEqual(unitsWithAnswer[1].type, 'prose');
+if (unitsWithAnswer[1].type === 'prose') {
+  assert.strictEqual(unitsWithAnswer[1].content, 'Found 0 vulnerabilities. System is secure.', 'Final conversational prose MUST NOT be swallowed by intermediate commentary!');
 }
 
 // 8.6 Reasoning steps support (s.type === 'reasoning')

@@ -4,8 +4,7 @@ import React, { memo } from 'react';
 import katex from 'katex';
 import { Streamdown } from 'streamdown';
 import { createMathPlugin } from '@streamdown/math';
-import { createMermaidPlugin } from '@streamdown/mermaid';
-import { createCodePlugin } from '@streamdown/code';
+import CodeBlock from '@/components/renderers/CodeBlock';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
@@ -21,10 +20,6 @@ import MermaidRenderer, { repairMermaidSyntax } from '@/components/renderers/Mer
 
 // Official math plugin with single-dollar inline math ($...$) support
 const mathPlugin = createMathPlugin({ singleDollarTextMath: true });
-
-// Official mermaid plugin with suppressErrorRendering and streaming safety
-const mermaidPlugin = createMermaidPlugin();
-const codePlugin = createCodePlugin();
 
 // Fenced ```latex / ```math / ```katex blocks render as display math
 const LATEX_LANGUAGES = ['latex', 'math', 'katex'];
@@ -66,6 +61,27 @@ function LatexBlock({ code: source, isIncomplete }: { code: string; isIncomplete
 function MermaidBlock({ code: chart, isIncomplete }: { code: string; isIncomplete?: boolean }) {
   return <MermaidRenderer chart={chart} isStreaming={isIncomplete} />;
 }
+
+// Custom renderer for Code blocks — Unit 17 fast regex tokenizer with header bar, line count, and copy
+function StreamdownCodeBlock({ code, language, isIncomplete }: { code: string; language: string; isIncomplete?: boolean }) {
+  return <CodeBlock language={language || 'code'} code={code} isStreaming={isIncomplete} />;
+}
+
+// ponytail: proxy matches all languages except mermaid and latex, routing them to Unit 17 CodeBlock
+const allOtherLanguages = new Proxy([] as string[], {
+  get(target, prop) {
+    if (prop === 'includes') {
+      return (lang: string) => {
+        if (!lang) return true;
+        const l = String(lang).toLowerCase().trim();
+        if (l === 'mermaid') return false;
+        if (LATEX_LANGUAGES.includes(l)) return false;
+        return true;
+      };
+    }
+    return Reflect.get(target, prop);
+  }
+});
 
 // Remark plugin ensuring code blocks without explicit language get default 'text' lang
 const ensureCodeLanguagePlugin = () => (tree: any) => {
@@ -130,19 +146,15 @@ export const AgentMarkdown = memo(function AgentMarkdown({
       <Streamdown
         mode={isStreaming ? 'streaming' : 'static'}
         plugins={{
-          code: codePlugin,
           math: mathPlugin,
-          mermaid: mermaidPlugin,
           renderers: [
             { component: LatexBlock, language: LATEX_LANGUAGES },
             { component: MermaidBlock, language: 'mermaid' },
-                      ],
+            { component: StreamdownCodeBlock, language: allOtherLanguages },
+          ],
         }}
         remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
-        controls={{
-          code: { copy: true, download: false },
-          mermaid: { copy: false, download: false, fullscreen: false, panZoom: false },
-        }}
+        controls={false}
         components={components}
         urlTransform={safeUrlTransform}
         caret={isChat && isStreaming ? 'block' : undefined}

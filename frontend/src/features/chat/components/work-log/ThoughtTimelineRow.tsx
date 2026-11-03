@@ -28,7 +28,7 @@ export function ThoughtTimelineRow({
   const isThoughtActive = Boolean(isStreaming && entry.data?.status === 'running');
   const displaySecs = isThoughtActive 
     ? liveThinkingSeconds 
-    : (entry.data?.durationSecs || thinkingDurationSeconds || latchedThinkingSeconds || 1);
+    : (entry.data?.durationSecs || thinkingDurationSeconds || latchedThinkingSeconds);
 
   return (
     <ReasoningDisclosure
