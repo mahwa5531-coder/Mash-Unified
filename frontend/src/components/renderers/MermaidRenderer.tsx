@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useId } from "react";
+import { createPortal } from "react-dom";
 import { X, ZoomIn, ZoomOut, RotateCcw, RefreshCw, AlertCircle } from "lucide-react";
 import { useIsDarkMode } from "@/hooks/useIsDarkMode";
 import { useTurnViewport } from "@/features/chat/context/TurnViewportContext";
@@ -337,7 +338,7 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
       </div>
 
       {/* Enlarged Modal Window ("su window") */}
-      {isModalOpen && (
+      {isModalOpen && typeof document !== "undefined" && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -345,7 +346,7 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
             setIsModalOpen(false);
             setModalZoom(1);
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 sm:p-8 animate-in fade-in duration-150"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 sm:p-8 animate-in fade-in duration-150"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -410,7 +411,8 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -8,7 +9,9 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
-  turbopack: {},
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   typescript: {
     // Note: TypeScript verification is enforced via 'tsc --noEmit' in the build script
     // to bypass the known Windows Next.js worker crash (exit code 3221226505).

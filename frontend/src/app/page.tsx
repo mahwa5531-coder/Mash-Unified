@@ -138,6 +138,10 @@ export default function Home() {
     setSelectedSessionRepo(repoName || 'No Repo');
     setPendingWorkspacePath(folderPath || null);
     setIsHistoryActive(false);
+    // ponytail: brand new conversation starts clean without leaking previous session's open right sidebar
+    setIsRightSidebarOpen(false);
+    setIsRightSidebarMaximized(false);
+    setFileToOpen(null);
   }, []);
 
   const lastHistoryFetchRef = useRef<number>(0);

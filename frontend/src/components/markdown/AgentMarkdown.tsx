@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
 import { useAgentMarkdownComponents } from './useAgentMarkdownComponents';
 import { escapeCurrencyInMarkdown } from '@/features/chat/components/messages/proseHelpers';
-import { repairMermaidSyntax } from '@/components/renderers/MermaidRenderer';
+import MermaidRenderer, { repairMermaidSyntax } from '@/components/renderers/MermaidRenderer';
 
 /**
  * AgentMarkdown — unified markdown renderer powered directly by Streamdown.
@@ -60,6 +60,11 @@ function LatexBlock({ code: source, isIncomplete }: { code: string; isIncomplete
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
+}
+
+// Custom renderer for Mermaid diagrams — Unit 16 clean inline look with foreground modal zoom lightbox
+function MermaidBlock({ code: chart, isIncomplete }: { code: string; isIncomplete?: boolean }) {
+  return <MermaidRenderer chart={chart} isStreaming={isIncomplete} />;
 }
 
 // Remark plugin ensuring code blocks without explicit language get default 'text' lang
@@ -130,11 +135,12 @@ export const AgentMarkdown = memo(function AgentMarkdown({
           mermaid: mermaidPlugin,
           renderers: [
             { component: LatexBlock, language: LATEX_LANGUAGES },
+            { component: MermaidBlock, language: 'mermaid' },
                       ],
         }}
         remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
         controls={{
-          code: { copy: true },
+          code: { copy: true, download: false },
           mermaid: { copy: false, download: false, fullscreen: false, panZoom: false },
         }}
         components={components}

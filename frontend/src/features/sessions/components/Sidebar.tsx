@@ -433,7 +433,7 @@ export default function Sidebar({
 
   return (
     <div 
-      className="bg-[var(--bg-sidebar)] border-r border-zinc-200/80 dark:border-white/[0.08] h-full flex flex-col text-zinc-700 dark:text-zinc-300 font-sans shrink-0 select-none relative transition-colors"
+      className="bg-[var(--bg-sidebar)] border-r border-zinc-200/70 dark:border-white/[0.06] h-full flex flex-col text-zinc-700 dark:text-zinc-300 font-sans shrink-0 select-none relative transition-colors"
       style={{ width: `${effectiveWidth}px` }}
       onClick={() => setActiveMenuSessionId(null)}
     >
