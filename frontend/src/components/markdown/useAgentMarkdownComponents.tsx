@@ -16,6 +16,7 @@ import type { LightboxImageData } from '@/features/chat/components/messages/Imag
 import {
   extractChildText,
   formatFilePill,
+  prunePathPunctuation,
   isFullFilePath,
   isFileExtension,
   isDirectoryPath,
@@ -59,9 +60,10 @@ export function useAgentMarkdownComponents({
       }
 
       const plainText = (extractChildText(children) || rawText).trim();
+      const { cleanPath } = prunePathPunctuation(plainText);
 
-      if (isFullFilePath(plainText)) {
-        const { filePath, display } = formatFilePill(plainText, plainText);
+      if (isFullFilePath(cleanPath)) {
+        const { filePath, display } = formatFilePill(cleanPath, cleanPath);
         return <FilePill path={filePath} label={display} onOpenFile={onOpenFile} />;
       }
 
@@ -205,7 +207,9 @@ export function useAgentMarkdownComponents({
       const isFileUri = href.startsWith('file:///') || href.startsWith('file://');
       const isWinPath = /^[a-zA-Z]:[/\\]/.test(href);
       const isUnixAbsPath = /^\/(?:Users|home|tmp|var|etc)\//.test(href);
-      const isFullFile = isFileUri || isWinPath || isUnixAbsPath || isFullFilePath(href);
+      const isExternal = href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:');
+      const hasFileExt = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|tsx?|jsx?|mjs|json|ya?ml|toml|sql|md|txt|xml|xbrl)$/i.test(href.split('#')[0]);
+      const isFullFile = !isExternal && (isFileUri || isWinPath || isUnixAbsPath || isFullFilePath(href) || hasFileExt);
 
       if (isFullFile) {
         const rawLabel = extractChildText(children);

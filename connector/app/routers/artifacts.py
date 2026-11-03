@@ -246,6 +246,7 @@ async def get_file_content(
                     candidates.extend([
                         ws / rel_path,
                         ws / "Audit_Deliverables" / rel_path,
+                        ws / "working_papers" / rel_path,
                     ])
             except Exception:
                 pass

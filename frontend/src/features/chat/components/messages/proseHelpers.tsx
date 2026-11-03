@@ -33,12 +33,35 @@ export function formatFilePill(rawLabel: string, rawHref: string) {
   return { filePath, display };
 }
 
-// Detect if a string is a valid full absolute file path with recognized extension
+// Prune surrounding quotes, brackets, and trailing sentence punctuation from a path token
+export function prunePathPunctuation(raw: string): { cleanPath: string; trailingPunctuation: string } {
+  if (!raw || typeof raw !== 'string') return { cleanPath: '', trailingPunctuation: '' };
+
+  let p = raw.trim();
+  let trailing = '';
+
+  // 1. Strip leading quotes / brackets
+  p = p.replace(/^['"`<(\[]+/, '');
+
+  // 2. Peel trailing quotes, sentence punctuation, and closing brackets
+  const match = p.match(/([.,;:!?)"'`>\]]+)$/);
+  if (match) {
+    trailing = match[1];
+    p = p.slice(0, -trailing.length);
+  }
+
+  return { cleanPath: p, trailingPunctuation: trailing };
+}
+
+// Detect if a string is a valid file path with recognized extension under structural rules:
+// 1. Absolute paths (Windows drive, Unix root, or file:// URI)
+// 2. Explicit relative paths (starts with ./ or ../) - supports ANY dynamic user folder
+// 3. Known system audit roots (Audit_Deliverables/, working_papers/, workpapers/, scratch/)
 export function isFullFilePath(raw: string): boolean {
   if (!raw || typeof raw !== 'string') return false;
   const clean = normalizePath(raw.trim());
   if (clean.includes('/node_modules/') || clean.startsWith('node_modules/')) return false;
-  if (!clean || clean.includes(' ') || clean.includes('\n') || clean.includes('(') || clean.includes(')') || clean.includes('*') || clean.includes('?')) return false;
+  if (!clean || clean.includes(' ') || clean.includes('\n') || clean.includes('*') || clean.includes('?')) return false;
 
   const FILE_EXT_REGEX = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|pyw|ipynb|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|db|sqlite|md|markdown|txt|log|html|css|scss|xml|xbrl|sh|bash|zsh|ps1|rs|go|c|cpp|h|java|zip|tar|gz|png|jpe?g|gif|svg|webp)$/i;
 
@@ -48,14 +71,20 @@ export function isFullFilePath(raw: string): boolean {
   const filename = parts.pop() || '';
   if (!filename || filename.startsWith('.')) return false;
 
-  // Must be an absolute full path with a drive letter, unix root, or file:// URI
+  // 1. Absolute full path (drive letter, unix root, or file:// URI)
   const isAbsolute = (
     /^[a-zA-Z]:[/\\]/.test(clean) ||
     /^\/(?:Users|home|tmp|var|etc)\//.test(clean) ||
     clean.startsWith('file://')
   );
 
-  return isAbsolute;
+  // 2. Explicit relative path (starts with ./ or ../) - supports ANY dynamic user folder
+  const isExplicitRelative = /^\.\.?\//.test(clean);
+
+  // 3. Known System Audit Roots
+  const isSystemAuditRoot = /^(?:Audit_Deliverables|working_papers|workpapers|scratch)\//i.test(clean);
+
+  return isAbsolute || isExplicitRelative || isSystemAuditRoot;
 }
 
 // Detect if a string is a standalone file extension
@@ -82,7 +111,7 @@ export function isDirectoryPath(raw: string): boolean {
 }
 
 const STATUS_TAG_REGEX = /(\[(?:COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|VERIFIED|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\])/g;
-const FILE_PATH_IN_PROSE_REGEX = /((?:file:\/\/\/?|[a-zA-Z]:[/\\]|\/(?:Users|home|tmp)\/|(?:scratch|tests|frontend|connector|src|working_papers|Audit_Deliverables)\/)[^\s'",;()<>]+\.(?:py|tsx?|jsx?|mjs|json|ya?ml|toml|sql|csv|xlsx?|md|txt|diff|patch|html|css|log)(?:#L\d+(?:-\d+)?)?)/gi;
+const FILE_PATH_IN_PROSE_REGEX = /((?:file:\/\/\/?|[a-zA-Z]:[/\\]|\/(?:Users|home|tmp)\/|\.\.?\/|(?:Audit_Deliverables|working_papers|workpapers|scratch)\/)[^\s'",;()<>]+\.(?:xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|md|markdown|txt|diff|patch|html|css|log|xml|xbrl)(?:#L\d+(?:-\d+)?)?)/gi;
 
 export function processTextNodes(children: any, onOpenFile?: (path: string) => void): any {
   if (typeof children === 'string') {
@@ -91,24 +120,27 @@ export function processTextNodes(children: any, onOpenFile?: (path: string) => v
       return children;
     }
     const parts = children.split(STATUS_TAG_REGEX);
-    return parts.map((part, idx) => {
+    const result = parts.flatMap((part, idx) => {
       const match = part.match(/^\[(COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|VERIFIED|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\]$/);
       if (match) {
         const tag = match[1];
-        return (
+        return [
           <AuditBadge key={`tag_${idx}`} status={tag}>
             {tag}
           </AuditBadge>
-        );
+        ];
       }
 
       const pathParts = part.split(FILE_PATH_IN_PROSE_REGEX);
-      if (pathParts.length === 1) return part;
+      if (pathParts.length === 1) return [part];
 
-      return pathParts.map((pPart, pIdx) => {
-        if (pPart && isFullFilePath(pPart)) {
-          const { filePath, display } = formatFilePill(pPart, pPart);
-          return (
+      const nodes: any[] = [];
+      pathParts.forEach((pPart, pIdx) => {
+        if (!pPart) return; // Prune empty string fragments
+        const { cleanPath, trailingPunctuation } = prunePathPunctuation(pPart);
+        if (cleanPath && isFullFilePath(cleanPath)) {
+          const { filePath, display } = formatFilePill(cleanPath, cleanPath);
+          nodes.push(
             <FilePill
               key={`pill_${pIdx}_${filePath}`}
               path={filePath}
@@ -116,10 +148,17 @@ export function processTextNodes(children: any, onOpenFile?: (path: string) => v
               onOpenFile={onOpenFile}
             />
           );
+          if (trailingPunctuation) {
+            nodes.push(trailingPunctuation);
+          }
+        } else {
+          nodes.push(pPart);
         }
-        return pPart;
       });
+      return nodes;
     });
+
+    return result.length === 1 && typeof result[0] === 'string' ? result[0] : result;
   }
 
   if (Array.isArray(children)) {
