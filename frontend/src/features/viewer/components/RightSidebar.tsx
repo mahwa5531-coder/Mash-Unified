@@ -267,6 +267,11 @@ export default function RightSidebar({
                     onViewModeChange={setFileViewMode}
                     hideToolbar={true}
                     onRetry={() => retryTabContent(activeTab?.id)}
+                    onOpenFile={(p) => {
+                      const norm = normalizePath(p);
+                      const base = norm.split(/[/\\]/).pop() || norm;
+                      openFileTab(base, norm);
+                    }}
                   />
                 </ErrorBoundary>
               </div>

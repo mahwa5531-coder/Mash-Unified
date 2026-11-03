@@ -206,10 +206,10 @@ export default function TaskWorkLogAccordion({
     return fullTimeline;
   }, [steps, thoughts, tools, isStreaming, thinkingDurationSeconds, clusterOpen, hasPendingApproval, hasWork, hasAssistantContent]);
 
-  const finalSecs = totalDurationSeconds || (turnStartTime ? Math.max(1, Math.round((Date.now() - turnStartTime) / 1000)) : undefined);
+  const finalSecs = totalDurationSeconds || (isStreaming && turnStartTime ? Math.max(1, Math.round((Date.now() - turnStartTime) / 1000)) : undefined);
   const formattedTime = finalSecs ? formatDurationDisplay(finalSecs) : '';
 
-  const hasDuration = Boolean(totalDurationSeconds || thinkingDurationSeconds || turnStartTime);
+  const hasDuration = Boolean(totalDurationSeconds || thinkingDurationSeconds || (isStreaming && turnStartTime));
   if (!hasWork && !isStreaming && !hasDuration) return null;
   if (!hasWork && isStreaming && hasAssistantContent) return null;
 

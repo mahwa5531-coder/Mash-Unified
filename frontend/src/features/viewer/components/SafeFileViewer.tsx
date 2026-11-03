@@ -45,6 +45,7 @@ export interface SafeFileViewerProps {
   isTruncated?: boolean;
   is_truncated?: boolean;
   onRetry?: () => void;
+  onOpenFile?: (path: string) => void;
 }
 
 const EXT_LANG_MAP: Record<string, string> = {
@@ -89,6 +90,7 @@ export default function SafeFileViewer({
   isTruncated,
   is_truncated,
   onRetry,
+  onOpenFile,
 }: SafeFileViewerProps) {
   const isDark = useIsDarkMode();
 
@@ -98,7 +100,7 @@ export default function SafeFileViewer({
   const isMarkdown = /\.md$/i.test(cleanName);
   const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods)$/i.test(cleanName);
   const isPdf = /\.pdf$/i.test(cleanName);
-  const isUnsupported = /\.(docx|doc|pptx|ppt|zip|tar|gz|7z|rar|exe|bin|iso|dmg|dll|so|dylib)$/i.test(cleanName);
+  const isUnsupported = /\.(docx|doc|pptx|ppt|zip|tar|gz|7z|rar|exe|bin|iso|dmg|dll|so|dylib|db|sqlite|sqlite3)$/i.test(cleanName);
 
   const monacoLang = useMemo(() => {
     const ext = cleanName.split('.').pop()?.toLowerCase() || '';
@@ -239,6 +241,7 @@ export default function SafeFileViewer({
               mode="artifact"
               isStreaming={false}
               sessionId={sessionId}
+              onOpenFile={onOpenFile}
             />
           </ErrorBoundary>
         </div>

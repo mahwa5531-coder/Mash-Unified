@@ -221,7 +221,7 @@ async def get_file_content(
 
     # Traversal defense
     if any(p in clean_path.split("/") or p in clean_path.split("\\") for p in ("..", ".%2e", "%2e.")):
-        raise HTTPException(status_code=400, detail="Invalid path traversal detected.")
+        raise HTTPException(status_code=403, detail="Invalid path traversal detected.")
 
     eng = _get_engine(engine)
     p = Path(clean_path).expanduser()
@@ -279,26 +279,26 @@ async def get_file_content(
                 detail="Access denied: Cross-session file access is strictly forbidden."
             )
 
-    # Denylist: secrets, database engines, git metadata, and build output
-    name_lower = p.name.lower()
-    if (
-        name_lower.startswith(".env")
-        or name_lower.endswith((".db", ".sqlite", ".sqlite3"))
-        or any(part in (".git", "node_modules", "bin", "__pycache__") for part in p.parts)
-    ):
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied: Access to configuration, database files, or runtime binaries is forbidden."
-        )
+
 
     # Workspace containment: verify within registered or base workspace roots
-    if not is_path_in_base_roots(p):
+    is_allowed = is_path_in_base_roots(p)
+    if not is_allowed:
         allowed_roots = await get_allowed_file_roots(eng)
-        if not any(p == root or p.is_relative_to(root) for root in allowed_roots):
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: Path is outside authorized workspace directories."
-            )
+        is_allowed = any(p == root or p.is_relative_to(root) for root in allowed_roots)
+
+    # ponytail: session-attached files are explicitly authorized for active session
+    if not is_allowed and session_id and eng:
+        session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
+        if session and session.context:
+            att_files = session.context.get("attached_files") or []
+            is_allowed = any(p == Path(f).expanduser().resolve() for f in att_files)
+
+    if not is_allowed:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: Path is outside authorized workspace directories."
+        )
 
     try:
         exists = p.exists()
@@ -322,7 +322,7 @@ async def get_file_content(
     if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".svg"):
         return FileResponse(p, content_disposition_type="inline")
 
-    if raw or ext in (".docx", ".doc", ".pptx", ".ppt", ".zip", ".tar", ".gz", ".7z", ".rar", ".exe", ".bin"):
+    if raw or ext in (".docx", ".doc", ".pptx", ".ppt", ".zip", ".tar", ".gz", ".7z", ".rar", ".exe", ".bin", ".db", ".sqlite", ".sqlite3"):
         return FileResponse(p, filename=p.name)
 
     # Spreadsheets: lightweight descriptor; Univer format returns minimal sheet schema

@@ -25,7 +25,7 @@ export function FilePill({
   onClick,
   ...props
 }: FilePillProps) {
-  const cleanPath = normalizePath(path);
+  const cleanPath = normalizePath(path, false);
   const [filePathOnly, hashAnchor] = cleanPath.split('#');
 
   const parts = filePathOnly.split(/[/\\]/);

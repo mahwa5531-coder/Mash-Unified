@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import logging
 import os
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -122,6 +123,23 @@ async def ensure_project_and_context(
         session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
         now_utc = datetime.now(UTC)
         now_iso = now_utc.isoformat()
+        if session:
+            raw_msg = resolved_context.get("_raw_message") or ""
+            parsed_attachments = list(resolved_context.get("attached_files") or [])
+            for m in re.finditer(r'<file\s+[^>]*path=["\']([^"\']+)["\']', raw_msg, re.I):
+                parsed_attachments.append(m.group(1).strip())
+            for m in re.finditer(r'\[Attached (?:file|files):\s*([^\]]+)\]', raw_msg, re.I):
+                parsed_attachments.append(m.group(1).strip().rstrip(']"\''))
+            if parsed_attachments:
+                cur_ctx = dict(session.context or {})
+                existing_att = list(cur_ctx.get("attached_files") or [])
+                merged_att = list(dict.fromkeys(existing_att + parsed_attachments))
+                if merged_att != existing_att:
+                    cur_ctx["attached_files"] = merged_att
+                    session.context = cur_ctx
+                    await eng.update(session)
+                    from app.workspace import invalidate_roots_cache
+                    invalidate_roots_cache()
         if not session:
             clean_title = generate_clean_session_title(resolved_context.get("_raw_message", ""), sid)
             title_val = (
@@ -135,6 +153,14 @@ async def ensure_project_and_context(
                 resolved_context["section"] = "workspace" if workspace_target != "No Repo" else "conversation"
             resolved_context["last_user_view_time"] = now_iso
 
+            # ponytail: extract attached files from user prompt or resolved context
+            raw_msg = resolved_context.get("_raw_message") or ""
+            parsed_attachments = list(resolved_context.get("attached_files") or [])
+            for m in re.finditer(r'<file\s+[^>]*path=["\']([^"\']+)["\']', raw_msg, re.I):
+                parsed_attachments.append(m.group(1).strip())
+            for m in re.finditer(r'\[Attached (?:file|files):\s*([^\]]+)\]', raw_msg, re.I):
+                parsed_attachments.append(m.group(1).strip().rstrip(']"\''))
+
             init_context = {
                 "title": title_val, "custom_title": title_val,
                 "workspace_uri": resolved_context.get("workspace_uri", workspace_target),
@@ -144,6 +170,7 @@ async def ensure_project_and_context(
                 "brain_directory": resolved_context["brain_directory"],
                 "scratch_directory": resolved_context["scratch_directory"],
                 "permission_mode": resolved_context.get("permission_mode", "default"),
+                "attached_files": list(dict.fromkeys(parsed_attachments)),
                 "updated_at": now_iso,
                 "last_user_view_time": now_iso,
             }

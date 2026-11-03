@@ -18,13 +18,13 @@ export function formatFilePill(rawLabel: string, rawHref: string) {
   const rawPath = normalizePath(rawHref || rawLabel || '', false);
   const [filePath, lineAnchor] = rawPath.split('#');
 
-  // ponytail: preserve relative folder paths (e.g. working_papers/rev_cutoff.md) instead of popping only basename
-  let display = safeDecodeURI(rawLabel || '').trim();
-  if (!display || display.startsWith('file:') || display === '[object Object]') {
-    display = filePath;
-  }
-  display = display.replace(/^(?:\.\/|file:\/\/+)/, '').split('#')[0];
+  const parts = filePath.split(/[\\/]/);
+  const basename = parts.pop() || filePath;
+  const labelParts = safeDecodeURI(rawLabel || '').split(/[\\/]/);
+  const cleanLabelRaw = labelParts.pop() || basename;
+  const cleanLabel = cleanLabelRaw.split('#')[0];
 
+  let display = (cleanLabel && !cleanLabel.startsWith('file:') && cleanLabel !== '[object Object]' ? cleanLabel : basename).trim();
   if (lineAnchor && !/:(?:L)?\d+(?:-\d+)?$/i.test(display)) {
     const cleanAnchor = lineAnchor.replace(/^[#L]+/i, '').replace(/-L/i, '-');
     if (cleanAnchor) display = `${display}:${cleanAnchor}`;

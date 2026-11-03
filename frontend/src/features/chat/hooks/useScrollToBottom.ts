@@ -4,10 +4,13 @@ import { RefObject, useState, useCallback, useRef } from "react";
  * Velocity-aware scroll retention hook adapted directly from OpenHands.
  * - Detects scrolling direction: scrolling UP immediately disarms autoscroll.
  * - Scrolling to within 20px of bottom re-arms autoscroll.
- * - Prevents streaming text from yanking the user's viewport down.
+ * - Exposes synchronous isPinnedToBottomRef for 60fps RAF stream flusher to prevent yanking.
  * - Exposes hitBottom to show a floating "Scroll to bottom" button when user is scrolled up.
  */
 export function useScrollToBottom(scrollRef: RefObject<HTMLDivElement | null>) {
+  // Synchronous pin ref for RAF/stream flusher (bypasses React state batching)
+  const isPinnedToBottomRef = useRef<boolean>(true);
+
   // Track whether automatic content-following is enabled
   const [autoscroll, setAutoscroll] = useState(true);
 
@@ -23,16 +26,19 @@ export function useScrollToBottom(scrollRef: RefObject<HTMLDivElement | null>) {
       const currentScrollTop = e.scrollTop;
       const distFromBottom = e.scrollHeight - (currentScrollTop + e.clientHeight);
       const isCurrentlyAtBottom = distFromBottom <= 20;
-      setHitBottom(isCurrentlyAtBottom);
 
       // Detect scroll direction: upward scroll or distance > 40px immediately disarms autoscroll
       const isScrollingUp = currentScrollTop < prevScrollTopRef.current;
       prevScrollTopRef.current = currentScrollTop;
 
       if (isScrollingUp || distFromBottom > 40) {
-        setAutoscroll(false);
+        isPinnedToBottomRef.current = false;
+        setAutoscroll((prev) => (prev ? false : prev));
+        setHitBottom((prev) => (prev ? false : prev));
       } else if (isCurrentlyAtBottom) {
-        setAutoscroll(true);
+        isPinnedToBottomRef.current = true;
+        setAutoscroll((prev) => (!prev ? true : prev));
+        setHitBottom((prev) => (!prev ? true : prev));
       }
     },
     [],
@@ -40,6 +46,7 @@ export function useScrollToBottom(scrollRef: RefObject<HTMLDivElement | null>) {
 
   // Scroll to bottom on demand or on send
   const scrollDomToBottom = useCallback(() => {
+    isPinnedToBottomRef.current = true;
     const dom = scrollRef.current;
     if (dom) {
       requestAnimationFrame(() => {
@@ -52,6 +59,7 @@ export function useScrollToBottom(scrollRef: RefObject<HTMLDivElement | null>) {
 
   return {
     scrollRef,
+    isPinnedToBottomRef,
     autoScroll: autoscroll,
     setAutoScroll: setAutoscroll,
     scrollDomToBottom,

@@ -113,6 +113,7 @@ const MountedTurnRow = memo(function MountedTurnRow({
             <UserMessage
               msg={turn.userMsg}
               onUndo={handleUndo}
+              onOpenFile={onOpenFile}
             />
           </div>
         )}
@@ -174,6 +175,15 @@ export default function ChatCanvas({
     }
   }, [sessionId]);
 
+  // Velocity-aware scroll retention hook (synchronous pin ref passed to stream flusher)
+  const {
+    autoScroll,
+    hitBottom,
+    isPinnedToBottomRef,
+    scrollDomToBottom,
+    onChatBodyScroll,
+  } = useScrollToBottom(chatScrollContainerRef);
+
   const {
     chatMessages,
     inputPrompt,
@@ -205,6 +215,7 @@ export default function ChatCanvas({
     pendingWorkspacePath, 
     onSessionCreated,
     scrollContainerRef: chatScrollContainerRef,
+    isPinnedToBottomRef,
     permissionMode,
   });
 
@@ -245,21 +256,11 @@ export default function ChatCanvas({
     turnsCount: turns.length,
   });
 
-  // Velocity-aware scroll retention hook
-  const {
-    autoScroll,
-    hitBottom,
-    scrollDomToBottom,
-    onChatBodyScroll,
-  } = useScrollToBottom(chatScrollContainerRef);
-
   const lastTurn = turns[turns.length - 1];
   const lastAiMsg = lastTurn?.aiMsgs[lastTurn.aiMsgs.length - 1];
-  const lastAiContent = lastAiMsg?.content;
-  const lastAiThoughts = lastAiMsg?.thoughts?.length;
-  const lastAiTools = lastAiMsg?.tools?.length;
 
-  // Auto-scroll strictly to bottom ONLY when autoScroll is active
+  // Auto-scroll strictly to bottom when new turns arrive or streaming starts
+  // (Token-by-token follow scroll is handled smoothly by useSseBufferFlusher at 60fps)
   useEffect(() => {
     if (autoScroll) {
       scrollDomToBottom();
@@ -269,9 +270,6 @@ export default function ChatCanvas({
     isStreaming, 
     autoScroll, 
     scrollDomToBottom,
-    lastAiContent,
-    lastAiThoughts,
-    lastAiTools
   ]);
 
   // Trigger quota banner ONLY if backend/model returns a rate limit or quota exceeded error

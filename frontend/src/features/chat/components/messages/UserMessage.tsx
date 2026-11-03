@@ -26,7 +26,15 @@ function formatUserTimestamp(ts?: string): string {
 
 // ----------------------------------------------------------------------
 // ponytail: memoize UserMessage so past turns never re-render during token streaming
-const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, onUndo: () => void }) {
+const UserMessage = memo(function UserMessage({ 
+  msg, 
+  onUndo, 
+  onOpenFile 
+}: { 
+  msg: Message; 
+  onUndo: () => void; 
+  onOpenFile?: (path: string) => void; 
+}) {
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const textRef = useRef<HTMLDivElement>(null);
@@ -122,7 +130,7 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
           {attachedFilePaths.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 mb-1.5 select-none">
               {attachedFilePaths.map((filePath, idx) => (
-                <FilePill key={`${filePath}_${idx}`} path={filePath} />
+                <FilePill key={`${filePath}_${idx}`} path={filePath} onOpenFile={onOpenFile} />
               ))}
             </div>
           )}
@@ -136,7 +144,7 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
                   !isExpanded && isOverflowing && "line-clamp-3 overflow-hidden"
                 )}
               >
-                <AgentMarkdown content={cleanText} mode="chat" className="!mt-0 !text-[13.5px] [&_p]:mb-1.5 [&_blockquote]:my-2" />
+                <AgentMarkdown content={cleanText} mode="chat" onOpenFile={onOpenFile} className="!mt-0 !text-[13.5px] [&_p]:mb-1.5 [&_blockquote]:my-2" />
               </div>
             ) : (
               <div 

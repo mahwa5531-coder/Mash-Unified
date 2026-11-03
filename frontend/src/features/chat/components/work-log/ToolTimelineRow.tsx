@@ -76,7 +76,7 @@ export function ToolTimelineRow({
           {label}
         </span>
         <div className={cn(isDenied && "opacity-60")}>
-          <FilePill path={filePath} onOpenFile={onOpenFile} />
+          <FilePill path={filePath} line={entry.data?.lineRange} onOpenFile={onOpenFile} />
         </div>
         {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
       </div>
@@ -137,7 +137,7 @@ export function ToolTimelineRow({
           {label}
         </span>
         <div className={cn(isDenied && "opacity-60")}>
-          <FilePill path={filePath} onOpenFile={onOpenFile} />
+          <FilePill path={filePath} line={entry.data?.lineRange} onOpenFile={onOpenFile} />
         </div>
         {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
       </div>

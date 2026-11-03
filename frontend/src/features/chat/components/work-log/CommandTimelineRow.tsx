@@ -13,7 +13,6 @@ interface CommandTimelineRowProps {
   expandedCmds?: Set<string> | Record<string, boolean>;
   isCmdExpanded?: boolean;
   copiedId?: string | null;
-  onOpenFile?: (path: string) => void;
   handleCopy?: (text: string, id: string) => void;
   toggleCmd?: (id: string) => void;
 }

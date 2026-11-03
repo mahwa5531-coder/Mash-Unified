@@ -96,11 +96,19 @@ export function computeUndoMessages(messages: Message[], flatIdx?: number): Mess
   return messages.slice(0, messages.length - removeCount);
 }
 
-export function applyStreamError(messages: Message[], activeTurnId: string | null, errorText: string, errorId?: string): Message[] {
+export function applyStreamError(messages: Message[], activeTurnId: string | null, errorText: string, errorId?: string, turnStartTime?: number): Message[] {
+  const elapsed = turnStartTime && turnStartTime > 0 ? Math.max(1, Math.round((Date.now() - turnStartTime) / 1000)) : undefined;
   const next = [...messages];
   const idx = findTargetAssistantIdx(next, activeTurnId);
   if (idx >= 0 && next[idx].status !== 'aborted') {
-    next[idx] = { ...next[idx], status: 'error', error: errorText, retryAttempt: undefined, ...(errorId ? { errorId } : {}) };
+    next[idx] = {
+      ...next[idx],
+      status: 'error',
+      error: errorText,
+      retryAttempt: undefined,
+      totalDurationSeconds: elapsed ?? next[idx].totalDurationSeconds,
+      ...(errorId ? { errorId } : {}),
+    };
   }
   return next;
 }
@@ -121,6 +129,8 @@ export function applyStreamCompletion(messages: Message[], activeTurnId: string 
   const idx = findTargetAssistantIdx(next, activeTurnId);
   if (idx >= 0 && next[idx].status !== 'aborted' && next[idx].status !== 'error') {
     next[idx] = { ...next[idx], status: wasUserAborted ? 'aborted' : 'completed', retryAttempt: undefined, totalDurationSeconds: totalElapsed ?? next[idx].totalDurationSeconds };
+  } else if (idx >= 0 && next[idx].totalDurationSeconds === undefined && totalElapsed) {
+    next[idx] = { ...next[idx], totalDurationSeconds: totalElapsed };
   }
   return next;
 }
@@ -216,7 +226,7 @@ export async function runChatStream(
           const s = sessionStore.get(activeSid);
           if (!s) return;
           options.flushBuffer();
-          s.chatMessages = applyStreamError(s.chatMessages, s.activeTurnId, errText, errId);
+          s.chatMessages = applyStreamError(s.chatMessages, s.activeTurnId, errText, errId, s.turnStartTime);
           s.isStreaming = false;
           s.abortController = null;
           options.onUpdateMessages(s.chatMessages);
@@ -246,7 +256,7 @@ export async function runChatStream(
           options.onRestorePrompt(userText);
         }
       } else {
-        s.chatMessages = applyStreamError(s.chatMessages, s.activeTurnId, err?.message || 'Agent execution encountered an error.');
+        s.chatMessages = applyStreamError(s.chatMessages, s.activeTurnId, err?.message || 'Agent execution encountered an error.', undefined, s.turnStartTime);
       }
       options.onUpdateMessages(s.chatMessages);
     }

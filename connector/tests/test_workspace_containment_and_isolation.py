@@ -9,6 +9,7 @@ Comprehensive Security, Workspace Containment & Cross-Session Isolation Suite:
 """
 
 import sys
+import uuid
 from pathlib import Path
 import httpx
 import pytest
@@ -46,6 +47,8 @@ async def test_cross_session_isolation_and_workspace_containment(tmp_path):
     outside_secret = outside_dir / "outside_credentials.env"
     outside_secret.write_text("DATABASE_PASSWORD=super_secret_outside", encoding="utf-8")
 
+    proj_name = f"Containment Test Project {uuid.uuid4().hex[:8]}"
+
     try:
         async with lifespan(app):
             transport = httpx.ASGITransport(app=app)
@@ -53,10 +56,10 @@ async def test_cross_session_isolation_and_workspace_containment(tmp_path):
                 # Register authorized workspace
                 proj_res = await client.post("/api/projects", json={
                     "user_id": "containment_tester",
-                    "name": "Containment Test Project",
+                    "name": proj_name,
                     "local_folder_path": str(ws_dir)
                 })
-                assert proj_res.status_code == 200
+                assert proj_res.status_code == 200, f"Project creation failed: {proj_res.text}"
 
                 # -------------------------------------------------------------
                 # 1. Intra-session access: Session A requesting its own file -> 200 OK

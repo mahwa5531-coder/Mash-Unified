@@ -114,6 +114,14 @@ async def get_allowed_file_roots(engine: Any | None) -> list[Path]:
             path = Path(brain_directory) if brain_directory else get_session_brain_dir(session.session_id, project_id)
             if path.is_dir():
                 roots.append(path.resolve())
+
+            for att in context.get("attached_files", []):
+                try:
+                    att_p = Path(att).expanduser().resolve()
+                    if att_p.exists():
+                        roots.append(att_p if att_p.is_dir() else att_p)
+                except Exception:
+                    pass
     except Exception:
         # The application workspace remains available if persistence is temporarily unavailable.
         pass

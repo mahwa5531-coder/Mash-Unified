@@ -78,7 +78,6 @@ export function TimelineRow(props: TimelineRowProps) {
         isStreaming={props.isStreaming}
         isCmdExpanded={!!props.expandedCmds[toolId]}
         copiedId={props.copiedId}
-        onOpenFile={props.onOpenFile}
         handleCopy={props.handleCopy}
         toggleCmd={props.toggleCmd}
       />

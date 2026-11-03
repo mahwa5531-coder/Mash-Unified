@@ -422,9 +422,13 @@ async def open_system_file(request: OpenFileRequest):
     if not p.exists():
         return {"status": "error", "message": f"Path '{clean_path}' does not exist on local disk."}
 
-    # ponytail: strictly confine opened files to allowed workspace or brain directories
+    # ponytail: strictly confine opened files to allowed workspace, brain, or attached directories
     if not is_path_in_base_roots(p):
-        return {"status": "error", "message": f"Access denied: Path '{clean_path}' is outside allowed application workspace roots."}
+        from app.dependencies import _engine as global_eng
+        from app.workspace import get_allowed_file_roots
+        allowed_roots = await get_allowed_file_roots(global_eng)
+        if not any(p == root or p.is_relative_to(root) for root in allowed_roots):
+            return {"status": "error", "message": f"Access denied: Path '{clean_path}' is outside allowed application workspace roots."}
 
     try:
         if sys.platform == "win32":

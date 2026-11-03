@@ -19,6 +19,7 @@ interface UseChatStreamOptions {
   pendingWorkspacePath?: string | null;
   onSessionCreated: (newSessionId: string, title?: string, repoName?: string) => void;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  isPinnedToBottomRef?: React.MutableRefObject<boolean>;
   permissionMode?: PermissionMode;
 }
 
@@ -28,6 +29,7 @@ export function useChatStream({
   pendingWorkspacePath,
   onSessionCreated,
   scrollContainerRef,
+  isPinnedToBottomRef,
   permissionMode = 'default',
 }: UseChatStreamOptions) {
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
@@ -35,13 +37,14 @@ export function useChatStream({
   const [isStreaming, setIsStreaming] = useState(false);
   const fallbackScrollRef = useRef<HTMLDivElement>(null);
   const scrollRef = scrollContainerRef || fallbackScrollRef;
-  const isAtBottomRef = useRef(true);
+  const fallbackPinnedRef = useRef(true);
+  const activePinnedRef = isPinnedToBottomRef || fallbackPinnedRef;
 
   const activeSessionIdRef = useRef<string | null>(sessionId);
   useEffect(() => { activeSessionIdRef.current = sessionId; }, [sessionId]);
 
   const { flushActiveStreamBuffer, scheduleFlush, cancelFlush } = useSseBufferFlusher({
-    activeSessionIdRef, setChatMessages, scrollRef, isAtBottomRef,
+    activeSessionIdRef, setChatMessages, scrollRef, isAtBottomRef: activePinnedRef,
   });
 
   const history = useSessionHistory({ sessionId, activeSessionIdRef, scrollContainerRef });
@@ -136,7 +139,7 @@ export function useChatStream({
     if (activeSid === activeSessionIdRef.current) {
       setChatMessages([...targetSession.chatMessages]);
       setIsStreaming(true);
-      isAtBottomRef.current = true;
+      activePinnedRef.current = true;
       requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; });
     }
     notifyStoreListeners();
@@ -148,7 +151,7 @@ export function useChatStream({
       flushBuffer: flushActiveStreamBuffer,
       onUpdateMessages: (msgs) => { if (activeSid === activeSessionIdRef.current) setChatMessages(msgs); },
       onStreamEnd: () => { if (activeSid === activeSessionIdRef.current) setIsStreaming(false); },
-      scrollToBottom: () => { if (scrollRef.current && isAtBottomRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; },
+      scrollToBottom: () => { if (scrollRef.current && activePinnedRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; },
       onAutoDispatchQueue: (msg) => handleSendMessage(msg, false, false, activeSid),
       onSyncSteeringQueue: (q) => { if (activeSid === activeSessionIdRef.current) steering.setQueuedMessages(q); },
       onRestorePrompt: (prompt) => { if (activeSid === activeSessionIdRef.current) setInputPrompt(prompt); },
