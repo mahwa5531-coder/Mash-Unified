@@ -6,6 +6,7 @@ import { Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import { cleanUserSteeringEnvelope } from '@/features/chat/utils/sessionHistoryParser';
 import { FilePill } from '@/primitives';
+import AgentMarkdown from '@/components/markdown/AgentMarkdown';
 
 function formatUserTimestamp(ts?: string): string {
   if (!ts) return '';
@@ -127,15 +128,27 @@ const UserMessage = memo(function UserMessage({ msg, onUndo }: { msg: Message, o
           )}
 
           {cleanText ? (
-            <div 
-              ref={textRef}
-              className={cn(
-                "whitespace-pre-wrap font-sans text-[13.5px] leading-[22px] text-zinc-900 dark:text-zinc-100 break-words select-text transition-all",
-                !isExpanded && isOverflowing && "line-clamp-3 overflow-hidden"
-              )}
-            >
-              {cleanText}
-            </div>
+            cleanText.includes('> [!') || cleanText.includes('```') ? (
+              <div 
+                ref={textRef}
+                className={cn(
+                  "font-sans text-[13.5px] leading-[22px] text-zinc-900 dark:text-zinc-100 break-words select-text transition-all",
+                  !isExpanded && isOverflowing && "line-clamp-3 overflow-hidden"
+                )}
+              >
+                <AgentMarkdown content={cleanText} mode="chat" className="!mt-0 !text-[13.5px] [&_p]:mb-1.5 [&_blockquote]:my-2" />
+              </div>
+            ) : (
+              <div 
+                ref={textRef}
+                className={cn(
+                  "whitespace-pre-wrap font-sans text-[13.5px] leading-[22px] text-zinc-900 dark:text-zinc-100 break-words select-text transition-all",
+                  !isExpanded && isOverflowing && "line-clamp-3 overflow-hidden"
+                )}
+              >
+                {cleanText}
+              </div>
+            )
           ) : null}
         </div>
 

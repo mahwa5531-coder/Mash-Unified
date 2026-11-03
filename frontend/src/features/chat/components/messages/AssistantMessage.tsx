@@ -5,6 +5,7 @@ import TaskWorkLogAccordion from '@/features/chat/components/TaskWorkLogAccordio
 import ArtifactCard from '@/features/artifacts/components/ArtifactCard';
 import { TurnFilesGenerated } from '@/features/artifacts';
 import { extractArtifacts, extractEditedFiles } from '@/features/artifacts/utils/extraction';
+import { normalizePath } from '@/utils/normalizePath';
 import { Message } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
 import { ExecutionStatusDisclosure } from './ExecutionStatusDisclosure';
@@ -66,9 +67,20 @@ const AssistantMessage = memo(function AssistantMessage({
   const editedFilesData = useMemo(() => isActivelyStreaming ? { files: [], totalAdded: 0, totalDeleted: 0 } : extractEditedFiles(msg), [msg.tools, isActivelyStreaming]);
 
   // Filter edited files to exclude files already displayed as prominent artifact/deliverable cards
+  // ponytail: Hardened path deduplication ensures Windows drive letters, file:/// URIs, and basenames match
   const nonArtifactEditedFiles = useMemo(() => {
-    const artifactPaths = new Set(artifacts.map(a => a.filePath.toLowerCase().replace(/\\/g, '/')));
-    return editedFilesData.files.filter(f => !artifactPaths.has(f.path.toLowerCase().replace(/\\/g, '/')));
+    const artifactSet = new Set(
+      artifacts.flatMap(a => {
+        const norm = normalizePath(a.filePath).toLowerCase();
+        const base = norm.split('/').pop() || norm;
+        return [norm, base];
+      })
+    );
+    return editedFilesData.files.filter(f => {
+      const norm = normalizePath(f.path).toLowerCase();
+      const base = norm.split('/').pop() || norm;
+      return !artifactSet.has(norm) && !artifactSet.has(base);
+    });
   }, [editedFilesData.files, artifacts]);
 
   // Interleaved Sequential Units — clean chronological flow where worklogs and authentic prose alternate

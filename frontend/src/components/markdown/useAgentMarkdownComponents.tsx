@@ -88,8 +88,8 @@ export function useAgentMarkdownComponents({
     p({ children, node: _node, ...props }: any) {
       return (
         <p className={isChat
-          ? "mb-3 text-[13.5px] leading-[1.75] text-zinc-900 dark:text-zinc-100 last:mb-0 [li>&]:mb-0 [li>&]:my-0.5"
-          : "mb-3.5 text-[13.5px] leading-[1.75] text-zinc-900 dark:text-zinc-100 last:mb-0 [li>&]:mb-0 [li>&]:my-0.5"
+          ? "mb-2.5 text-[13.5px] leading-[1.72] text-zinc-900 dark:text-zinc-100 last:mb-0 [li>&]:mb-0 [li>&]:my-0.5 [&+ul]:mt-1.5 [&+ol]:mt-1.5"
+          : "mb-3 text-[13.5px] leading-[1.75] text-zinc-900 dark:text-zinc-100 last:mb-0 [li>&]:mb-0 [li>&]:my-0.5 [&+ul]:mt-1.5 [&+ol]:mt-1.5"
         } {...props}>
           {processTextNodes(children, onOpenFile)}
         </p>
@@ -98,7 +98,7 @@ export function useAgentMarkdownComponents({
 
     ul({ children, node: _node, ...props }: any) {
       return (
-        <ul className="my-2 pl-5 list-disc space-y-1 text-zinc-900 dark:text-zinc-100 marker:text-zinc-400 dark:marker:text-zinc-500 [&_ul]:my-0.5 [&_ul]:pl-4 [&_ol]:my-0.5 [&_ol]:pl-4" {...props}>
+        <ul className="my-2 pl-4 list-disc space-y-1 text-zinc-900 dark:text-zinc-100 marker:text-zinc-400 dark:marker:text-zinc-500 [&_ul]:my-1 [&_ul]:pl-4 [&_ol]:my-1 [&_ol]:pl-4 [&>li>p]:my-0.5 [&>li>p]:mb-0" {...props}>
           {children}
         </ul>
       );
@@ -106,7 +106,7 @@ export function useAgentMarkdownComponents({
 
     ol({ children, node: _node, ...props }: any) {
       return (
-        <ol className="my-2 pl-5 list-decimal space-y-1 text-zinc-900 dark:text-zinc-100 marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400 [&_ul]:my-0.5 [&_ul]:pl-4 [&_ol]:my-0.5 [&_ol]:pl-4" {...props}>
+        <ol className="my-2 pl-4 list-decimal space-y-1 text-zinc-900 dark:text-zinc-100 marker:font-medium marker:text-zinc-500 dark:marker:text-zinc-400 [&_ul]:my-1 [&_ul]:pl-4 [&_ol]:my-1 [&_ol]:pl-4 [&>li>p]:my-0.5 [&>li>p]:mb-0" {...props}>
           {children}
         </ol>
       );
@@ -114,7 +114,7 @@ export function useAgentMarkdownComponents({
 
     hr({ node: _node, ...props }: any) {
       return (
-        <hr className="my-5 border-t border-zinc-200/60 dark:border-white/[0.08]" {...props} />
+        <hr className="my-4 border-t border-zinc-200/60 dark:border-white/[0.08]" {...props} />
       );
     },
 
@@ -129,8 +129,8 @@ export function useAgentMarkdownComponents({
     h1({ children, node: _node, ...props }: any) {
       return (
         <h1 className={isChat
-          ? "mt-7 mb-3.5 text-[22px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0"
-          : "mt-8 mb-4 text-[22px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0"
+          ? "mt-4 mb-2 text-[18px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0 [&+h2]:mt-2 [&+h3]:mt-1.5"
+          : "mt-6 mb-3 text-[20px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0 [&+h2]:mt-2.5"
         } {...props}>
           {processTextNodes(children, onOpenFile)}
         </h1>
@@ -140,8 +140,8 @@ export function useAgentMarkdownComponents({
     h2({ children, node: _node, ...props }: any) {
       return (
         <h2 className={isChat
-          ? "mt-6 mb-2.5 text-[17.5px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/60 dark:border-white/[0.08] pb-1.5"
-          : "mt-7 mb-3 text-[17.5px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/60 dark:border-white/[0.08] pb-2"
+          ? "mt-3.5 mb-1.5 text-[16px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 [&+h3]:mt-1.5 [&+h4]:mt-1"
+          : "mt-5 mb-2.5 text-[17px] font-semibold text-zinc-950 dark:text-zinc-50 tracking-tight first:mt-0 border-b border-zinc-200/60 dark:border-white/[0.08] pb-1.5 [&+h3]:mt-2"
         } {...props}>
           {processTextNodes(children, onOpenFile)}
         </h2>
@@ -150,7 +150,7 @@ export function useAgentMarkdownComponents({
 
     h3({ children, node: _node, ...props }: any) {
       return (
-        <h3 className="mt-5 mb-2 text-[15px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
+        <h3 className="mt-3 mb-1 text-[14.5px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0 [&+h4]:mt-1" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h3>
       );
@@ -158,9 +158,25 @@ export function useAgentMarkdownComponents({
 
     h4({ children, node: _node, ...props }: any) {
       return (
-        <h4 className="mt-4 mb-1.5 text-[14.5px] font-semibold text-zinc-950 dark:text-white tracking-tight first:mt-0" {...props}>
+        <h4 className="mt-2.5 mb-1 text-[13.5px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight first:mt-0 [&+h5]:mt-1" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h4>
+      );
+    },
+
+    h5({ children, node: _node, ...props }: any) {
+      return (
+        <h5 className="mt-2 mb-0.5 text-[13px] font-medium text-zinc-800 dark:text-zinc-200 tracking-tight first:mt-0" {...props}>
+          {processTextNodes(children, onOpenFile)}
+        </h5>
+      );
+    },
+
+    h6({ children, node: _node, ...props }: any) {
+      return (
+        <h6 className="mt-1.5 mb-0.5 text-[12.5px] font-medium text-zinc-600 dark:text-zinc-400 tracking-tight first:mt-0" {...props}>
+          {processTextNodes(children, onOpenFile)}
+        </h6>
       );
     },
 

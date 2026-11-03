@@ -4,7 +4,7 @@ import React from 'react';
 import { AuditCallout } from '@/primitives/AuditCallout';
 
 // ----------------------------------------------------------------------
-// Strip alert/color tags from children nodes
+// Strip alert/color tags from children nodes and prune empty paragraph artifacts
 // ----------------------------------------------------------------------
 export function cleanCalloutChildren(node: any, tag: string, title?: string, state = { stripped: false }): any {
   if (!node || state.stripped) return node;
@@ -14,15 +14,27 @@ export function cleanCalloutChildren(node: any, tag: string, title?: string, sta
     const reg = new RegExp(`^\\s*\\[!?${tagEscaped}\\]${titlePattern}\\s*`, 'i');
     if (reg.test(node)) {
       state.stripped = true;
-      return node.replace(reg, '');
+      const strippedText = node.replace(reg, '').replace(/^\n+/, '');
+      return strippedText;
     }
     return node;
   }
   if (Array.isArray(node)) {
-    return node.map((child) => cleanCalloutChildren(child, tag, title, state));
+    const cleaned = node.map((child) => cleanCalloutChildren(child, tag, title, state));
+    return cleaned.filter((child) => {
+      if (child === '' || child === null || child === undefined) return false;
+      if (React.isValidElement(child)) {
+        const c = (child.props as any)?.children;
+        if (c === '' || (Array.isArray(c) && c.length === 0)) return false;
+      }
+      return true;
+    });
   }
   if (React.isValidElement(node) && (node.props as any)?.children) {
     const newChildren = cleanCalloutChildren((node.props as any).children, tag, title, state);
+    if (newChildren === '' || (Array.isArray(newChildren) && newChildren.length === 0)) {
+      return null;
+    }
     return React.cloneElement(node as React.ReactElement<any>, {}, newChildren);
   }
   return node;
@@ -45,8 +57,8 @@ export function extractText(nodes: any): string {
 export function CalloutBlockquote({ children }: { children?: React.ReactNode }) {
   const rawText = extractText(children);
 
-  // 1. Check for statutory alert or color tags: [!EXCEPTION], [EXCEPTION], [!WARNING], [WARNING], etc.
-  const alertMatch = rawText.match(/^\s*\[!?(EXCEPTION|MATERIAL WEAKNESS|FAIL|WARNING|CAUTION|CONTROL DEFICIENCY|SIGNIFICANT DEFICIENCY|COMPLIANT|PASS|NOTE|TIP|IMPORTANT|RED|GREEN|AMBER|BLUE|NEUTRAL)\](?:\s*([^\n\r]+))?/i);
+  // 1. Check for standard GitHub alert or statutory color tags: [!NOTE], [!TIP], [!WARNING], [!INFO], [!CAUTION], etc.
+  const alertMatch = rawText.match(/^\s*\[!?(NOTE|TIP|IMPORTANT|WARNING|CAUTION|INFO|QUESTION|TODO|SUCCESS|ERROR|DANGER|BUG|EXAMPLE|HINT|ABSTRACT|SUMMARY|EXCEPTION|MATERIAL WEAKNESS|FAIL|CONTROL DEFICIENCY|SIGNIFICANT DEFICIENCY|COMPLIANT|PASS|NO EXCEPTION|LOW RISK|HIGH RISK|MEDIUM RISK|RED|GREEN|AMBER|BLUE|NEUTRAL)\](?:\s*([^\n\r]+))?/i);
   if (alertMatch) {
     const tag = alertMatch[1].toUpperCase();
     const trailingTitle = alertMatch[2]?.trim();
