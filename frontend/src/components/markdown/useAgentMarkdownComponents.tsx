@@ -192,13 +192,13 @@ export function useAgentMarkdownComponents({
 
     /** Single-source naked table via MASH Unit 15 TableContainer — zero extra card/frame, zero clutter buttons */
     table({ children, node: _node, className: _cls, ...props }: any) {
-      return <TableContainer {...props}>{children}</TableContainer>;
+      return <TableContainer isChat={isChat} {...props}>{children}</TableContainer>;
     },
 
     th({ children, node: _node, className, ...props }: any) {
       const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
       return (
-        <th className={cn("px-3.5 py-2.5 font-semibold text-zinc-700 dark:text-zinc-300 text-[11.5px] uppercase tracking-wider bg-zinc-100/90 dark:bg-zinc-800/70 border-r border-zinc-200 dark:border-white/[0.08] last:border-r-0", alignClass, className)} {...props}>
+        <th className={cn("px-3.5 py-2.5 font-semibold text-zinc-700 dark:text-zinc-300 text-[11.5px] uppercase tracking-wider bg-zinc-100 dark:bg-[#1c1c1f] border-r border-zinc-200 dark:border-white/[0.08] last:border-r-0", alignClass, className)} {...props}>
           {children}
         </th>
       );

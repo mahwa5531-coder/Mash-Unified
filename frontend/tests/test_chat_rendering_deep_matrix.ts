@@ -346,7 +346,7 @@ test('Edge Case: Multi-column financial ledger table with empty cells', () => {
   );
 
   const markup = renderToStaticMarkup(
-    React.createElement(TableContainer, {}, [thead, tbody])
+    React.createElement(TableContainer, {}, thead, tbody)
   );
 
   assert(markup.includes('Account Code'), 'Header 1 rendered');
