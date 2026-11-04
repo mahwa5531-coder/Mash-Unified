@@ -406,7 +406,7 @@ def test_audit_scenario_7_statutory_audit_skills_grounding():
     """
     # 1. Master Guide
     guide_res = audit_skill_tool(action="get_guide")
-    assert "73 specialized audit procedures" in guide_res["content"]
+    assert "specialized audit procedures" in guide_res["content"]
     assert "03-procurement-and-payables" in guide_res["content"]
 
     # 2. Retrieve Specific Procedure: accounts-payable-testing

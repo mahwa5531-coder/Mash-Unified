@@ -91,7 +91,7 @@ def test_create_project_enforces_case_insensitive_uniqueness(client, tmp_path):
     assert data1["name"] == "UniqueAlphaProject"
     proj_id = data1["id"]
 
-    # Re-post with different casing and whitespace
+    # Re-post with different casing and whitespace on a DIFFERENT folder -> 409 Conflict
     dir2 = tmp_path / "dir_unique_2"
     dir2.mkdir(parents=True, exist_ok=True)
     res2 = client.post("/api/projects", json={
@@ -99,9 +99,16 @@ def test_create_project_enforces_case_insensitive_uniqueness(client, tmp_path):
         "local_folder_path": str(dir2),
         "user_id": "test_user",
     })
-    assert res2.status_code == 200
-    data2 = res2.json()
-    assert data2["id"] == proj_id
+    assert res2.status_code == 409
+
+    # Re-post with same folder -> 200 returning existing project
+    res_same = client.post("/api/projects", json={
+        "name": "uniquealphaproject",
+        "local_folder_path": str(dir1),
+        "user_id": "test_user",
+    })
+    assert res_same.status_code == 200
+    assert res_same.json()["id"] == proj_id
 
 
 # ==============================================================================

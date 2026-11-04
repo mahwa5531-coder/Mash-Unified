@@ -203,7 +203,7 @@ async def get_artifact(
         raise HTTPException(status_code=500, detail=f"Failed to read artifact: {e}")
 
 
-@router.get("/files/content")
+@router.api_route("/files/content", methods=["GET", "HEAD"])
 async def get_file_content(
     path: str,
     raw: bool = False,

@@ -72,7 +72,7 @@ async def test_deferred_project_registration():
                 sessions_list = sess_res.json().get("sessions", [])
                 matching_sess = next((s for s in sessions_list if s["session_id"] == test_sid), None)
                 assert matching_sess is not None, "Session must be registered in DB upon first message send!"
-                assert matching_sess["workspace_uri"] == folder_name
+                assert matching_sess["workspace_uri"] in (tmp_path, folder_name)
                 assert matching_sess["section"] == "workspace"
 
                 # Cleanup

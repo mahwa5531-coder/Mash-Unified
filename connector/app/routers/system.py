@@ -313,9 +313,6 @@ async def open_system_file(request: OpenFileRequest):
         allowed_roots = await get_allowed_file_roots(global_eng)
         is_allowed = any(p == root or p.is_relative_to(root) for root in allowed_roots)
 
-    if not is_allowed and p.is_file():
-        is_allowed = True
-
     if not is_allowed:
         return {"status": "error", "message": f"Access denied: Path '{clean_path}' is outside allowed application workspace roots."}
 
