@@ -40,11 +40,11 @@ from app.dependencies import init_engine
 from app.models.project import ProjectModel
 
 # ──────────────────────────────────────────────
-# DB path (~/.nexau/nexau.db)
+# DB path (~/.mash/database/mash.db)
 # ──────────────────────────────────────────────
 from app.paths import (
     get_database_path,
-    get_nexau_home,
+    get_mash_home,
 )
 from app.routers import (
     artifacts,
@@ -58,7 +58,7 @@ from app.routers import (
     uploads,
 )
 
-_DB_DIR = get_nexau_home()
+_DB_DIR = get_mash_home()
 _DB_PATH = get_database_path()
 _DB_ASYNC_URL = f"sqlite+aiosqlite:///{_DB_PATH}"
 _DB_SYNC_URL  = f"sqlite:///{_DB_PATH}"

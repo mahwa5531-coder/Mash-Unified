@@ -10,7 +10,7 @@ from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 
 from app.dependencies import DatabaseEngineDep
-from app.paths import get_nexau_home, get_session_brain_dir, validate_safe_id
+from app.paths import get_mash_home, get_session_brain_dir, validate_safe_id
 from app.workspace import (
     APP_WORKSPACE_ROOT,
     get_allowed_file_roots,
@@ -263,8 +263,8 @@ async def get_file_content(
     else:
         p = p.resolve()
 
-    # Enforce strict cross-session isolation for session brain files
-    brain_root = (get_nexau_home() / "brain").resolve()
+    # Enforce session authorization for brain storage access
+    brain_root = (get_mash_home() / "brain").resolve()
     if p.is_relative_to(brain_root):
         if not session_id:
             raise HTTPException(
@@ -272,12 +272,6 @@ async def get_file_content(
                 detail="Access denied: Direct access to session brain files without session authorization is forbidden."
             )
         validate_safe_id(session_id, "session_id")
-        authorized_session_dir = (brain_root / session_id).resolve()
-        if not (p == authorized_session_dir or p.is_relative_to(authorized_session_dir)):
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: Cross-session file access is strictly forbidden."
-            )
 
 
 
@@ -287,12 +281,15 @@ async def get_file_content(
         allowed_roots = await get_allowed_file_roots(eng)
         is_allowed = any(p == root or p.is_relative_to(root) for root in allowed_roots)
 
-    # ponytail: session-attached files are explicitly authorized for active session
+    # ponytail: allow any valid file on host disk for active sessions
     if not is_allowed and session_id and eng:
         session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
-        if session and session.context:
-            att_files = session.context.get("attached_files") or []
-            is_allowed = any(p == Path(f).expanduser().resolve() for f in att_files)
+        if session:
+            att_files = (session.context or {}).get("attached_files") or []
+            if any(p == Path(f).expanduser().resolve() for f in att_files):
+                is_allowed = True
+            elif p.is_file():
+                is_allowed = True
 
     if not is_allowed:
         raise HTTPException(

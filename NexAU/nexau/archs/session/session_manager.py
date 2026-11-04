@@ -12,6 +12,7 @@
 """Unified session manager - single entry point for all session operations."""
 
 from __future__ import annotations
+import contextlib
 
 from datetime import UTC, datetime
 from typing import Any
@@ -421,6 +422,17 @@ class SessionManager:
         allow/deny  source=config .
          permissions  tool .
         """
+        # Reaps prior config-sourced rules for this session before applying new mode rules,
+        # preventing rule-taint across mode switches while preserving explicit user rules.
+        with contextlib.suppress(Exception):
+            await self._engine.delete(
+                PermissionRuleModel,
+                filters=AndFilter(filters=[
+                    ComparisonFilter.eq("session_id", session_id),
+                    ComparisonFilter.eq("source", "config"),
+                ]),
+            )
+
         for tool in tools:
             permissions = getattr(tool, "permissions", None)
             if permissions is None:

@@ -140,6 +140,22 @@ export default function SafeFileViewer({
     );
   }
 
+  const isAccessDenied = Boolean(
+    content && (
+      content.includes('Access denied') ||
+      content.includes('outside authorized') ||
+      content.includes('strictly forbidden') ||
+      content.includes('Access Denied')
+    )
+  );
+
+  if (isAccessDenied) {
+    const noticeMsg = content.includes('strictly forbidden')
+      ? "Access denied: cross-session access forbidden"
+      : (content.includes('outside authorized') ? content : "Access denied: file is outside authorized workspace directories");
+    return <FileViewerNotice message={noticeMsg} filename={filename} path={path} onRetry={onRetry} />;
+  }
+
   const isFileNotFound = Boolean(
     content && (
       content.includes('not found on local disk') ||

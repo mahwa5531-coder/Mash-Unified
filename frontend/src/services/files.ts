@@ -80,13 +80,17 @@ export async function fetchFileContent(filePath: string, sessionId?: string, byp
       const url = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanKey)}${qs}${isCsv ? '&raw=true' : ''}`;
       const res = await safeFetch(url);
       if (!res.ok) {
-        if (res.status === 404) {
-          try {
-            const errData = await res.json();
-            return errData.detail || `File '${cleanKey}' not found on local disk.`;
-          } catch {
-            return `File '${cleanKey}' not found on local disk.`;
+        try {
+          const errData = await res.json();
+          if (errData && errData.detail) {
+            return String(errData.detail);
           }
+        } catch {}
+        if (res.status === 404) {
+          return `File '${cleanKey}' not found on local disk.`;
+        }
+        if (res.status === 403) {
+          return "Access denied: file is outside authorized workspace directories.";
         }
         return "Failed to load file content.";
       }

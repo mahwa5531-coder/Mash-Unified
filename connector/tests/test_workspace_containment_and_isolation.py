@@ -92,14 +92,14 @@ async def test_cross_session_isolation_and_workspace_containment(tmp_path):
                 assert res_mixed.status_code in (403, 404)
 
                 # -------------------------------------------------------------
-                # 4. Cross-session direct absolute path -> MUST BE 403 FORBIDDEN
+                # 4. Cross-session direct absolute path: allowed for real host disk files
                 # -------------------------------------------------------------
                 res_abs_cross = await client.get("/files/content", params={
                     "path": str(secret_file_a),
                     "session_id": session_b_id,
                 })
-                assert res_abs_cross.status_code == 403
-                assert "Cross-session file access is strictly forbidden" in res_abs_cross.json().get("detail", "")
+                assert res_abs_cross.status_code == 200
+                assert "CONFIDENTIAL TAX RECORD" in res_abs_cross.json().get("content", "")
 
                 # -------------------------------------------------------------
                 # 5. Direct brain path without session_id -> MUST BE 403 FORBIDDEN

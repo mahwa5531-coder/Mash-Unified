@@ -287,7 +287,7 @@ export async function updateSessionPermissionMode(
     const res = await safeFetch(`${BASE_URL}/sessions/${sessionId}/permissions/mode`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ permission_mode: mode }),
+      body: JSON.stringify({ mode, permission_mode: mode }),
       signal,
     });
     return res.ok;

@@ -8,7 +8,7 @@ import ConversationHistory from '@/features/sessions/components/ConversationHist
 import SettingsModal from '@/features/settings/components/SettingsModal';
 import DesktopSignInView from '@/features/auth/components/DesktopSignInView';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { fetchSessions, deleteSession, unmarkSessionDeleted, cleanupSessionStorage, SessionItem, DeleteSessionResult } from '@/services/sessions';
+import { fetchSessions, fetchSessionsDetailed, deleteSession, unmarkSessionDeleted, cleanupSessionStorage, SessionItem, DeleteSessionResult } from '@/services/sessions';
 import { evictRightSidebarMemory } from '@/features/viewer/hooks/useViewerTabs';
 import { invalidateFileCache } from '@/services/files';
 import { FailedToDeleteCard } from '@/features/sessions/components/FailedToDeleteCard';
@@ -89,13 +89,32 @@ export default function Home() {
     }
   }, [isDark]);
 
-  // Support ?file=... and ?session=... query parameters, or sessionStorage on reload
+  // Support ?file=... and ?session=... query parameters, or sessionStorage on reload (F-6, F-5)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      const sessionParam = params.get('session') || params.get('sessionId');
+      let sessionParam = params.get('session') || params.get('sessionId');
+      if (!sessionParam) {
+        try {
+          sessionParam = sessionStorage.getItem('mash_active_session_id');
+        } catch {}
+      }
       if (sessionParam) {
         setSelectedSessionId(sessionParam);
+        // Hydrate session metadata (title, repo/workspace) for deep links and F5 reloads (F-6, F-5)
+        fetchSessionsDetailed().then((res) => {
+          if (res.ok && res.data) {
+            const match = res.data.find((s) => s.session_id === sessionParam);
+            if (match) {
+              if (match.custom_title || match.title) {
+                setSelectedSessionTitle(match.custom_title || match.title);
+              }
+              if (match.workspace_uri && match.workspace_uri !== 'No Repo') {
+                setSelectedSessionRepo(match.workspace_uri);
+              }
+            }
+          }
+        }).catch(() => {});
       }
       const fileParam = params.get('file');
       if (fileParam) {
@@ -115,7 +134,18 @@ export default function Home() {
     }
   }, []);
 
-  // ponytail: remember sidebar open state across F5 browser reloads
+  // ponytail: remember active session and sidebar open state across F5 browser reloads (F-5)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (selectedSessionId) {
+        sessionStorage.setItem('mash_active_session_id', selectedSessionId);
+      } else {
+        sessionStorage.removeItem('mash_active_session_id');
+      }
+    } catch {}
+  }, [selectedSessionId]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {

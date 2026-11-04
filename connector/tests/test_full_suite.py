@@ -24,16 +24,13 @@ async def test_full_system_verification():
             assert res.status_code == 200
             assert "installation_id" in res.json()
 
-            res = await client.get("/api/capabilities")
+            res = await client.get("/api/system/health")
             assert res.status_code == 200
-            assert len(res.json()["capabilities"]) >= 3
+            assert res.json()["status"] == "ok"
 
-            res = await client.get("/api/skills")
+            res = await client.get("/api/system/updates")
             assert res.status_code == 200
-            assert len(res.json()["skills"]) >= 3
-
-            res = await client.get("/api/models")
-            assert res.status_code == 200
+            assert "status" in res.json()
 
             # 2. Settings
             res = await client.get("/api/settings")

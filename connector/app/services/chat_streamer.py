@@ -91,7 +91,15 @@ class PlanApprovalPayload(BaseModel):
 
 
 class PermissionModePayload(BaseModel):
-    mode: str
+    mode: str | None = None
+    permission_mode: str | None = None
+
+    def resolved_mode(self) -> str:
+        # ponytail: accepts both 'mode' and 'permission_mode' to align frontend & backend contracts
+        val = self.mode or self.permission_mode
+        if not val:
+            raise ValueError("Either 'mode' or 'permission_mode' must be provided")
+        return val.strip().lower()
 
 
 def check_session_id(val: str | None, name: str = "session_id") -> None:

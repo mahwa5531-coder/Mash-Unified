@@ -189,18 +189,15 @@ async def test_ui_backend_comprehensive_unit_suite():
             assert "path traversal detected" in res.json()["detail"]
 
             # -------------------------------------------------------------
-            # 6. System Discovery Unit Tests
+            # 6. System & Desktop Update Unit Tests
             # -------------------------------------------------------------
-            res = await client.get("/api/skills")
+            res = await client.get("/api/system/health")
             assert res.status_code == 200
-            assert len(res.json()["skills"]) >= 3
+            assert res.json()["status"] == "ok"
 
-            res = await client.get("/api/models")
+            res = await client.get("/api/system/updates")
             assert res.status_code == 200
-            assert len(res.json()["models"]) >= 4
-
-            res = await client.get("/api/capabilities")
-            assert res.status_code == 200
+            assert "status" in res.json()
 
             res = await client.get("/tasks/task_unit_test/log")
             assert res.status_code == 200

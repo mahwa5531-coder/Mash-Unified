@@ -6,6 +6,7 @@ import { fetchFileContent, getFileContentFromCache, isFileTruncatedFromCache, in
 import { deletedSessionIds } from '@/services/sessions';
 import { fetchTaskLog } from '@/services/tasks';
 import { normalizePath } from '@/utils/normalizePath';
+import { isDirectoryPath } from '@/features/chat/components/messages/proseHelpers';
 import { UNSUPPORTED_DOC_REGEX } from '../utils/artifactPresentation';
 
 export function isFileLoadError(content?: string): boolean {
@@ -14,7 +15,10 @@ export function isFileLoadError(content?: string): boolean {
     content.startsWith('Error loading file:') ||
     content.includes('not found on local disk') ||
     content.includes('File not found') ||
-    content.includes('Failed to load file content')
+    content.includes('Failed to load file content') ||
+    content.includes('Access denied') ||
+    content.includes('outside authorized') ||
+    content.includes('strictly forbidden')
   );
 }
 
@@ -252,6 +256,10 @@ export function useViewerTabs(sessionId?: string) {
   // Atomic Tab Opening (Guarantees zero duplicate tabs and enforces MAX_VIEWER_TABS ceiling with true LRU eviction)
   const openFileTab = useCallback((name: string, fullPath: string, type: 'file' | 'image' = 'file') => {
     const normalizedPath = normalizePath(fullPath);
+    // ponytail: directories are strictly non-clickable and never open as viewer tabs
+    if (!normalizedPath || normalizedPath.endsWith('/') || normalizedPath.endsWith('\\') || isDirectoryPath(normalizedPath)) {
+      return;
+    }
 
     const isImg = type === 'image' || /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp)$/i.test(normalizedPath || name);
     const isPdf = /\.pdf$/i.test(normalizedPath || name);

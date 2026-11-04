@@ -62,7 +62,11 @@ export function useAgentMarkdownComponents({
       const plainText = (extractChildText(children) || rawText).trim();
       const { cleanPath } = prunePathPunctuation(plainText);
 
-      if (isFullFilePath(cleanPath)) {
+      // A backtick token is only converted to an interactive FilePill if it has a concrete path structure
+      // (contains a path separator like src/app.py or Audit_Deliverables/test.xlsx, or is a root dotfile like .env).
+      // Bare filenames or code identifiers (like main.py or console.log) remain as clean code badges.
+      const hasConcretePath = cleanPath.includes('/') || cleanPath.includes('\\') || /^\.env(?:\.[a-zA-Z0-9_-]+)?$/i.test(cleanPath);
+      if (isFullFilePath(cleanPath) && hasConcretePath) {
         const { filePath, display } = formatFilePill(cleanPath, cleanPath);
         return <FilePill path={filePath} label={display} onOpenFile={onOpenFile} />;
       }
@@ -234,13 +238,17 @@ export function useAgentMarkdownComponents({
       const isWinPath = /^[a-zA-Z]:[/\\]/.test(href);
       const isUnixAbsPath = /^\/(?:Users|home|tmp|var|etc)\//.test(href);
       const isExternal = href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:');
-      const hasFileExt = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|tsx?|jsx?|mjs|json|ya?ml|toml|sql|md|txt|xml|xbrl)$/i.test(href.split('#')[0]);
+      const hasFileExt = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|tsx?|jsx?|mjs|json|ya?ml|toml|sql|md|txt|xml|xbrl|png|jpe?g|gif|svg|webp)$/i.test(href.split('#')[0]);
       const isFullFile = !isExternal && (isFileUri || isWinPath || isUnixAbsPath || isFullFilePath(href) || hasFileExt);
 
       if (isFullFile) {
         const rawLabel = extractChildText(children);
         const { filePath, display } = formatFilePill(rawLabel || href, href);
         return <FilePill path={filePath} label={display} onOpenFile={onOpenFile} />;
+      }
+
+      if (!isExternal && isDirectoryPath(href)) {
+        return <PathPill path={href} />;
       }
 
       return (

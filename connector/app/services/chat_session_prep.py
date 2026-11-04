@@ -83,6 +83,32 @@ async def ensure_project_and_context(
     if not eng:
         return
 
+    # ponytail: restore stored workspace binding if client passed degraded 'No Repo' / None (F-6, D5)
+    existing_session = None
+    try:
+        existing_session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
+        if existing_session and existing_session.context:
+            stored_ctx = existing_session.context
+            if stored_ctx.get("workspace_uri") and stored_ctx.get("workspace_uri") != "No Repo":
+                if resolved_context.get("workspace_uri") in ("No Repo", None, ""):
+                    resolved_context["workspace_uri"] = stored_ctx["workspace_uri"]
+                    workspace_target = stored_ctx["workspace_uri"]
+                if resolved_context.get("working_directory") in ("No Repo", None, ""):
+                    resolved_context["working_directory"] = stored_ctx.get("working_directory", stored_ctx["workspace_uri"])
+                if not resolved_context.get("project_id") and stored_ctx.get("project_id"):
+                    resolved_context["project_id"] = stored_ctx["project_id"]
+                    project_id = stored_ctx["project_id"]
+                    brain_path = scaffold_session_storage(sid, project_id)
+                    resolved_context.update({
+                        "brain_directory": str(brain_path),
+                        "scratch_directory": str(brain_path / "scratch"),
+                        "cache_directory": str(brain_path / "cache"),
+                    })
+                if not resolved_context.get("section") and stored_ctx.get("section"):
+                    resolved_context["section"] = stored_ctx["section"]
+    except Exception as e:
+        logger.warning("Session pre-lookup error: %s", e)
+
     # Resolve or create ProjectModel from workspace context
     try:
         if workspace_target and workspace_target != "No Repo":
@@ -120,7 +146,7 @@ async def ensure_project_and_context(
     # The sidebar needs title, workspace_uri, section, last_user_view_time etc.
     # We pre-create/update the session with app-specific metadata so NexAU reuses it.
     try:
-        session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
+        session = existing_session or await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
         now_utc = datetime.now(UTC)
         now_iso = now_utc.isoformat()
         if session:
@@ -208,6 +234,16 @@ async def ensure_project_and_context(
             title_val = ctx.get("custom_title") or ctx.get("title") or "New Conversation"
             resolved_context["title"] = resolved_context["custom_title"] = title_val
             ctx["permission_mode"] = resolved_context.get("permission_mode") or ctx.get("permission_mode") or "default"
+            # ponytail: preserve valid workspace bindings against degraded incoming payloads (F-6, D5)
+            if ctx.get("workspace_uri") and ctx.get("workspace_uri") != "No Repo":
+                if resolved_context.get("workspace_uri") in ("No Repo", None, ""):
+                    resolved_context["workspace_uri"] = ctx["workspace_uri"]
+                if resolved_context.get("working_directory") in ("No Repo", None, ""):
+                    resolved_context["working_directory"] = ctx.get("working_directory", ctx["workspace_uri"])
+                if not resolved_context.get("project_id") and ctx.get("project_id"):
+                    resolved_context["project_id"] = ctx["project_id"]
+                if not resolved_context.get("section") and ctx.get("section"):
+                    resolved_context["section"] = ctx["section"]
             session.context = ctx
             await eng.update(session)
 

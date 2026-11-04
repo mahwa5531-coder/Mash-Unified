@@ -102,7 +102,10 @@ async def update_session_permission_mode(session_id: str, payload: PermissionMod
     session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    mode = payload.mode.lower()
+    try:
+        mode = payload.resolved_mode()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if mode not in ("turbo", "default", "review"):
         raise HTTPException(status_code=400, detail="Mode must be 'turbo', 'default', or 'review'")
     ctx = dict(session.context or {})

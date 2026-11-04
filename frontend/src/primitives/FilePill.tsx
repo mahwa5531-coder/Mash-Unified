@@ -10,6 +10,7 @@ export interface FilePillProps extends React.ButtonHTMLAttributes<HTMLButtonElem
   path: string;
   label?: string;
   line?: number | string;
+  isClickable?: boolean;
   onOpenFile?: (path: string) => void;
   /** Optional callback to close / remove the file pill (swaps logo with [X] in same left slot on hover) */
   onClose?: (e: React.MouseEvent) => void;
@@ -19,6 +20,7 @@ export function FilePill({
   path,
   label,
   line,
+  isClickable: propIsClickable,
   onOpenFile,
   onClose,
   className,
@@ -30,7 +32,9 @@ export function FilePill({
 
   const parts = filePathOnly.split(/[/\\]/);
   const basename = parts.pop() || filePathOnly;
-  const rawDisplay = label || basename;
+  const parent = parts.length > 0 ? parts[parts.length - 1] : '';
+  const halfPath = parent && parent !== '.' && !/^[a-zA-Z]:$/.test(parent) ? `${parent}/${basename}` : basename;
+  const rawDisplay = label || halfPath;
 
   let lineSuffix = '';
   // Only append lineSuffix if rawDisplay does not already contain a line indicator (:12 or :L12 or :12-30)
@@ -48,11 +52,14 @@ export function FilePill({
   // A file pill displays an authentic logo whenever it has a valid filename/path (and not a pure wildcard query)
   const hasWildcard = cleanPath.includes('*') || cleanPath.includes('?');
   const showIcon = !hasWildcard && Boolean(filePathOnly.trim());
-  const isClickable = Boolean(!hasWildcard && (onOpenFile || onClick));
+  const isClickable = propIsClickable !== undefined
+    ? Boolean(propIsClickable && !hasWildcard)
+    : Boolean(!hasWildcard && (onOpenFile || onClick));
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!isClickable) return;
     onClick?.(e);
     onOpenFile?.(cleanPath);
   };

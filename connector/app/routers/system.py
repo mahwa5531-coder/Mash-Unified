@@ -10,45 +10,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["system"])
 
 
-@router.get("/capabilities")
-async def list_capabilities():
-    return {
-        "capabilities": [
-            {"id": "python_execution", "name": "Python Sandbox"},
-            {"id": "file_system", "name": "Local File System Access"},
-            {"id": "chrome_devtools", "name": "Chrome DevTools"},
-        ]
-    }
-
-
-@router.get("/skills")
-async def list_skills():
-    """List available builtin and workspace skills."""
-    return {
-        "skills": [
-            {"name": "ponytail", "description": "Senior dev efficiency ladder and minimal diff rules"},
-            {"name": "audit_engine", "description": "Financial and ledger reconciliation audit tools"},
-            {"name": "code_refactor", "description": "Surgical codebase refactoring without rewrite"},
-        ]
-    }
-
-
-@router.get("/models")
-async def list_models():
-    """List supported intelligence models."""
-    return {
-        "models": [
-            {"id": "mash/auto", "name": "MASh Intelligent Auto-Router", "provider": "mash"},
-            {"id": "anthropic/claude-3-7-sonnet", "name": "Claude 3.7 Sonnet", "provider": "anthropic"},
-            {"id": "openai/gpt-4o", "name": "GPT-4o", "provider": "openai"},
-            {"id": "google/gemini-2.5-pro", "name": "Gemini 2.5 Pro", "provider": "google"},
-        ]
-    }
-
-
-
-
-
 @router.get("/system/health")
 @router.get("/health")
 async def get_system_health():
@@ -63,7 +24,7 @@ async def get_system_info():
     import platform
     import sys
 
-    from app.paths import get_database_path, get_installation_id, get_nexau_home
+    from app.paths import get_database_path, get_installation_id, get_mash_home
 
     db_path = get_database_path()
     db_size = db_path.stat().st_size if db_path.exists() else 0
@@ -74,7 +35,7 @@ async def get_system_info():
         "platform": platform.platform(),
         "os": sys.platform,
         "python_version": sys.version.split()[0],
-        "home_directory": str(get_nexau_home()),
+        "home_directory": str(get_mash_home()),
         "database_size_bytes": db_size,
     }
 
@@ -130,8 +91,7 @@ def _open_folder_dialog() -> str | None:
     import sys
 
     if sys.platform == "win32":
-        # 1. Native IFileOpenDialog with FOS_PICKFOLDERS via native_picker.ps1 (Real modern File Explorer)
-        # 1. Native folder picker via native_picker.ps1 (QA-BUG-7)
+        # 1. Native folder picker via native_picker.ps1 (IFileOpenDialog with FOS_PICKFOLDERS)
         picker_script = Path(__file__).resolve().parent.parent / "native_picker.ps1"
         if not picker_script.exists() and getattr(sys, "frozen", False):
             picker_script = Path(sys.executable).parent / "native_picker.ps1"
@@ -248,7 +208,7 @@ class ResolveFolderRequest(BaseModel):
 
 @router.post("/system/resolve-folder")
 async def resolve_folder_endpoint(request: ResolveFolderRequest):
-    """Resolve a selected folder name to its absolute filesystem path with strict verification."""
+    """Resolve a selected folder name to its absolute filesystem path."""
     name = request.folder_name.strip()
     home = Path.home()
 
@@ -257,128 +217,26 @@ async def resolve_folder_endpoint(request: ResolveFolderRequest):
         if hp.is_dir():
             return {"status": "success", "folder_path": str(hp), "folder_name": hp.name}
 
-    # Verify if name is an existing directory path
+    # Direct existing directory check
     direct_p = Path(name).expanduser().resolve()
     if direct_p.is_dir():
         return {"status": "success", "folder_path": str(direct_p), "folder_name": direct_p.name}
 
-    # Only inspect verified standard developer workspace locations
+    # Standard user workspace locations
     candidates = [
         home / "Documents" / name,
         home / "Desktop" / name,
         home / "Downloads" / name,
         home / "projects" / name,
         home / ".mash" / "projects" / name,
-        home / ".nexau" / "projects" / name,
         Path.cwd() / name,
     ]
-
-    # Verify candidate matches sample child entries if available
-    if request.sample_children:
-        for c in candidates:
-            if c.is_dir():
-                matches = sum(1 for ch in request.sample_children if (c / ch).exists())
-                if matches > 0:
-                    return {"status": "success", "folder_path": str(c.resolve()), "folder_name": c.name}
 
     for c in candidates:
         if c.is_dir():
             return {"status": "success", "folder_path": str(c.resolve()), "folder_name": c.name}
 
     return {"status": "error", "message": f"Folder '{name}' could not be resolved to an existing directory on disk. Please select folder using the system file browser."}
-
-
-@router.post("/system/quickstart-folder")
-async def get_quickstart_folder():
-    """Get or generate the default quickstart folder path under ~/.nexau/projects/."""
-    from app.paths import get_nexau_home
-    projects_dir = get_nexau_home() / "projects"
-    projects_dir.mkdir(parents=True, exist_ok=True)
-
-    base_target = projects_dir / "Quickstart"
-    target = base_target
-    counter = 1
-    while target.exists() and any(target.iterdir()):
-        target = projects_dir / f"Quickstart-{counter}"
-        counter += 1
-
-    return {
-        "status": "success",
-        "folder_path": str(target),
-        "folder_name": target.name,
-    }
-
-
-@router.get("/system/browse-directories")
-async def browse_directories(path: str | None = None):
-    """List subdirectories on the host machine for in-app workspace selection without browser security prompts."""
-    import os
-    import string
-    import sys
-    from pathlib import Path
-
-    home = Path.home()
-    if not path or not path.strip():
-        target = home / "Downloads" if (home / "Downloads").is_dir() else home
-    else:
-        target = Path(path.strip()).expanduser().resolve()
-
-    if not target.exists() or not target.is_dir():
-        target = home
-
-    # Drives on Windows
-    drives = []
-    if sys.platform == "win32":
-        for letter in string.ascii_uppercase:
-            try:
-                dp = Path(f"{letter}:\\")
-                if dp.exists():
-                    drives.append(f"{letter}:\\")
-            except Exception:
-                pass
-
-    # Standard quick shortcuts
-    shortcuts = []
-    for sc_name, sc_sub in [("Downloads", "Downloads"), ("Desktop", "Desktop"), ("Documents", "Documents"), ("Projects", "projects")]:
-        p = home / sc_sub
-        if p.is_dir():
-            shortcuts.append({"name": sc_name, "path": str(p.resolve())})
-
-    if Path.cwd().is_dir():
-        shortcuts.append({"name": f"{Path.cwd().name} (Current)", "path": str(Path.cwd().resolve())})
-
-    # Subdirectories
-    directories = []
-    try:
-        with os.scandir(target) as it:
-            for entry in it:
-                try:
-                    if entry.is_dir(follow_symlinks=False):
-                        name = entry.name
-                        if name.startswith("$") or name in ("System Volume Information", "Recovery", "PerfLogs"):
-                            continue
-                        directories.append({
-                            "name": name,
-                            "path": str(Path(entry.path).resolve()),
-                            "is_hidden": name.startswith("."),
-                        })
-                except Exception:
-                    continue
-    except PermissionError:
-        pass
-    except Exception as e:
-        logger.warning(f"Error scanning directory {target}: {e}")
-
-    directories.sort(key=lambda d: (d["is_hidden"], d["name"].lower()))
-    parent = str(target.parent) if target.parent != target else None
-
-    return {
-        "current_path": str(target),
-        "parent_path": parent,
-        "drives": drives,
-        "shortcuts": shortcuts,
-        "directories": directories,
-    }
 
 
 class OpenFileRequest(BaseModel):
@@ -410,25 +268,56 @@ async def open_system_file(request: OpenFileRequest):
             return {"status": "error", "message": str(e)}
 
     p = Path(clean_path).expanduser()
-    if not p.exists() and request.session_id:
-        cand_mash = Path.home() / ".mash" / "brain" / request.session_id / clean_path
-        cand_nexau = Path.home() / ".nexau" / "brain" / request.session_id / clean_path
-        if cand_mash.exists():
-            p = cand_mash
-        elif cand_nexau.exists():
-            p = cand_nexau
+    if not (p.is_absolute() and p.exists()) and request.session_id:
+        from app.dependencies import _engine as global_eng
+        from app.paths import get_session_brain_dir
+        from app.workspace import resolve_session_workspace, APP_WORKSPACE_ROOT
+
+        rel_path = clean_path.lstrip("/\\")
+        candidates = []
+        s_dir = get_session_brain_dir(request.session_id).resolve()
+        if s_dir.is_dir():
+            candidates.extend([
+                s_dir / rel_path,
+                s_dir / "working_papers" / rel_path,
+                s_dir / "scratch" / rel_path,
+            ])
+        try:
+            ws = await resolve_session_workspace(global_eng, request.session_id)
+            if ws and ws.is_dir():
+                candidates.extend([
+                    ws / rel_path,
+                    ws / "Audit_Deliverables" / rel_path,
+                    ws / "working_papers" / rel_path,
+                ])
+        except Exception:
+            pass
+        candidates.extend([
+            Path.cwd() / rel_path,
+            APP_WORKSPACE_ROOT / rel_path,
+        ])
+        for cand in candidates:
+            if cand.is_file():
+                p = cand.resolve()
+                break
 
     p = p.resolve()
     if not p.exists():
         return {"status": "error", "message": f"Path '{clean_path}' does not exist on local disk."}
 
-    # ponytail: strictly confine opened files to allowed workspace, brain, or attached directories
-    if not is_path_in_base_roots(p):
+    # ponytail: allow valid user files on host disk
+    is_allowed = is_path_in_base_roots(p)
+    if not is_allowed:
         from app.dependencies import _engine as global_eng
         from app.workspace import get_allowed_file_roots
         allowed_roots = await get_allowed_file_roots(global_eng)
-        if not any(p == root or p.is_relative_to(root) for root in allowed_roots):
-            return {"status": "error", "message": f"Access denied: Path '{clean_path}' is outside allowed application workspace roots."}
+        is_allowed = any(p == root or p.is_relative_to(root) for root in allowed_roots)
+
+    if not is_allowed and p.is_file():
+        is_allowed = True
+
+    if not is_allowed:
+        return {"status": "error", "message": f"Access denied: Path '{clean_path}' is outside allowed application workspace roots."}
 
     try:
         if sys.platform == "win32":
@@ -443,5 +332,3 @@ async def open_system_file(request: OpenFileRequest):
         if "1155" in err_str or "No application is associated" in err_str or "no application" in err_str.lower():
             err_str = "No spreadsheet application found on this computer. Please download the file or install Excel."
         return {"status": "error", "message": err_str}
-
-

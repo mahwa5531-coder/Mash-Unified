@@ -49,20 +49,14 @@ export function ExcelViewerCard({
       // 1. If running inside Electron shell with native API
       if (typeof window !== 'undefined' && (window as any).electronAPI?.openPath) {
         const errorMsg = await (window as any).electronAPI.openPath(targetPath);
-        if (errorMsg) {
-          setStatusFeedback({
-            type: 'error',
-            message: errorMsg.includes('1155') || errorMsg.toLowerCase().includes('no application')
-              ? 'No spreadsheet app found. Click Download to open in Google Sheets or Excel.'
-              : errorMsg,
-          });
-        } else {
+        if (!errorMsg) {
           setStatusFeedback({
             type: 'success',
             message: 'Workbook launched in Microsoft Excel',
           });
+          return;
         }
-        return;
+        // If Electron failed (e.g. relative path), fall through to Desktop Connector to resolve session workspace
       }
 
       // 2. Loopback to Desktop Connector system router

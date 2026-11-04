@@ -39,12 +39,10 @@ async def run_list_projects_endpoint(client: httpx.AsyncClient):
 
 
 async def run_quickstart_folder_endpoint(client: httpx.AsyncClient):
-    print("[2] Testing POST /api/system/quickstart-folder...")
-    res = await http_post(client, "/api/system/quickstart-folder", {})
-    assert res.get("status") == "success"
-    assert "Quickstart" in res.get("folder_name", "")
-    assert res.get("folder_path")
-    print(f"    Passed! Quickstart path: {res['folder_path']}")
+    print("[2] Testing POST /api/projects/quick...")
+    res = await http_post(client, "/api/projects/quick", {"name": "Test-Quick-Project"})
+    assert "name" in res or "id" in res
+    print(f"    Passed! Quick project created: {res.get('name')}")
 
 
 async def run_folder_selection_validation(client: httpx.AsyncClient):

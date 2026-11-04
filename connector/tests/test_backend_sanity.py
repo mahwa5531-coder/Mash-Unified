@@ -24,9 +24,9 @@ async def test_backend_sanity_and_health():
             assert res.status_code == 200
             assert "installation_id" in res.json()
 
-            res = await client.get("/api/capabilities")
+            res = await client.get("/api/system/health")
             assert res.status_code == 200
-            assert len(res.json()["capabilities"]) >= 3
+            assert res.json()["status"] == "ok"
 
             res = await client.get("/api/settings")
             assert res.status_code == 200
