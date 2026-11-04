@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from nexau.archs.session.models.team_task import TeamTaskModel
@@ -243,7 +243,7 @@ class TaskBoard:
             # 3.
             task.assignee_agent_id = assignee_agent_id
             task.status = "in_progress"
-            task.updated_at = datetime.now()
+            task.updated_at = datetime.now(UTC)
             await self._engine.update(task)
             logger.info(f"Task claimed: {task_id} by {assignee_agent_id}")
 
@@ -261,7 +261,7 @@ class TaskBoard:
             task = await self._get_task(task_id)
             task.assignee_agent_id = None
             task.status = "pending"
-            task.updated_at = datetime.now()
+            task.updated_at = datetime.now(UTC)
             await self._engine.update(task)
             logger.info(f"Task released: {task_id}")
 
@@ -290,6 +290,6 @@ class TaskBoard:
             task.status = status
             if result_summary is not None:
                 task.result_summary = result_summary
-            task.updated_at = datetime.now()
+            task.updated_at = datetime.now(UTC)
             await self._engine.update(task)
             logger.info(f"Task status updated: {task_id} -> {status}")
