@@ -6,9 +6,8 @@ import { useIsDarkMode } from '@/hooks/useIsDarkMode';
 import { useTurnViewport } from '@/features/chat/context/TurnViewportContext';
 
 // ----------------------------------------------------------------------
-// High-performance, zero-dependency syntax tokenizer for chat code blocks
-// Replaces Prism (~500KB bundle + thousands of DOM spans) with an instant
-// single-pass regex tokenizer that produces zero virtual-DOM thrashing.
+// High-performance syntax tokenizer for standalone / fallback code blocks
+// Tokenizer handles instant single-pass tokenization without virtual-DOM thrashing.
 // ----------------------------------------------------------------------
 
 function escapeHtml(str: string): string {
@@ -90,7 +89,8 @@ export function highlightCodeSnippet(rawCode: string, language: string, isDark: 
 }
 
 // ----------------------------------------------------------------------
-// CodeBlock with Copy, Language Pill, and Collapse Toggle
+// CodeBlock with Copy and Language Pill (Untruncated, Full View)
+// ponytail: code blocks never truncate or collapse; all lines are fully visible
 // ----------------------------------------------------------------------
 const CodeBlock = memo(function CodeBlock({ 
   language, 
@@ -102,7 +102,6 @@ const CodeBlock = memo(function CodeBlock({
   isStreaming?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const isDark = useIsDarkMode();
   const { isNearViewport } = useTurnViewport();
   
@@ -111,7 +110,6 @@ const CodeBlock = memo(function CodeBlock({
   for (let i = 0; i < code.length; i++) {
     if (code.charCodeAt(i) === 10) lineCount++;
   }
-  const isLong = lineCount > 45;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -133,15 +131,6 @@ const CodeBlock = memo(function CodeBlock({
           <span className="text-[10px] text-[var(--text-muted)] font-sans">({lineCount} lines)</span>
         </div>
         <div className="flex items-center gap-2">
-          {isLong && (
-            <button
-              type="button"
-              onClick={() => setCollapsed(!collapsed)}
-              className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors px-1.5 py-0.5 rounded hover:bg-[var(--bg-hover)] cursor-pointer"
-            >
-              {collapsed ? `Expand (${lineCount} lines)` : 'Collapse'}
-            </button>
-          )}
           <button
             type="button"
             onClick={handleCopy}
@@ -153,7 +142,7 @@ const CodeBlock = memo(function CodeBlock({
           </button>
         </div>
       </div>
-      <div className={collapsed ? 'max-h-[220px] overflow-hidden relative' : ''}>
+      <div>
         {isStreaming ? (
           <pre
             className="font-mono text-[13px] leading-[1.5] p-3 text-zinc-800 dark:text-zinc-200 overflow-x-auto whitespace-pre select-text m-0"
@@ -168,17 +157,6 @@ const CodeBlock = memo(function CodeBlock({
           >
             <code dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
           </pre>
-        )}
-        {collapsed && (
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[var(--bg-surface)] to-transparent pointer-events-none flex items-end justify-center pb-2">
-            <button
-              type="button"
-              onClick={() => setCollapsed(false)}
-              className="pointer-events-auto px-3 py-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] rounded-full shadow-md hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-            >
-              Show {lineCount - 10} more lines
-            </button>
-          </div>
         )}
       </div>
     </div>

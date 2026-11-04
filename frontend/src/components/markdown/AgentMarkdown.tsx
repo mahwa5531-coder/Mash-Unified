@@ -3,8 +3,8 @@
 import React, { memo } from 'react';
 import katex from 'katex';
 import { Streamdown } from 'streamdown';
+import { code } from '@streamdown/code';
 import { createMathPlugin } from '@streamdown/math';
-import CodeBlock from '@/components/renderers/CodeBlock';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
@@ -14,8 +14,9 @@ import MermaidRenderer from '@/components/renderers/MermaidRenderer';
 
 /**
  * AgentMarkdown — unified markdown renderer powered directly by Streamdown.
- * Uses official @streamdown/mermaid and @streamdown/math plugins for deterministic,
- * streaming-safe diagram and KaTeX equation rendering without fragile line chunking.
+ * Uses official @streamdown/code (Shiki) for 200+ language TextMate syntax highlighting,
+ * official @streamdown/math for KaTeX equations, and custom Pele MermaidRenderer.
+ * Code blocks never truncate or collapse; codeBlockMaxHeight={0} enforces full view.
  */
 
 // Official math plugin with single-dollar inline math ($...$) support
@@ -57,31 +58,10 @@ function LatexBlock({ code: source, isIncomplete }: { code: string; isIncomplete
   );
 }
 
-// Custom renderer for Mermaid diagrams — Unit 16 clean inline look with foreground modal zoom lightbox
+// Custom renderer for Mermaid diagrams — Pele engine with clean inline look & interactive foreground modal zoom
 function MermaidBlock({ code: chart, isIncomplete }: { code: string; isIncomplete?: boolean }) {
   return <MermaidRenderer chart={chart} isStreaming={isIncomplete} />;
 }
-
-// Custom renderer for Code blocks — Unit 17 fast regex tokenizer with header bar, line count, and copy
-function StreamdownCodeBlock({ code, language, isIncomplete }: { code: string; language: string; isIncomplete?: boolean }) {
-  return <CodeBlock language={language || 'code'} code={code} isStreaming={isIncomplete} />;
-}
-
-// ponytail: proxy matches all languages except mermaid and latex, routing them to Unit 17 CodeBlock
-const allOtherLanguages = new Proxy([] as string[], {
-  get(target, prop) {
-    if (prop === 'includes') {
-      return (lang: string) => {
-        if (!lang) return true;
-        const l = String(lang).toLowerCase().trim();
-        if (l === 'mermaid') return false;
-        if (LATEX_LANGUAGES.includes(l)) return false;
-        return true;
-      };
-    }
-    return Reflect.get(target, prop);
-  }
-});
 
 // Remark plugin ensuring code blocks without explicit language get default 'text' lang
 const ensureCodeLanguagePlugin = () => (tree: any) => {
@@ -140,19 +120,19 @@ export const AgentMarkdown = memo(function AgentMarkdown({
       <Streamdown
         mode={isStreaming ? 'streaming' : 'static'}
         plugins={{
+          code,
           math: mathPlugin,
           renderers: [
             { component: LatexBlock, language: LATEX_LANGUAGES },
             { component: MermaidBlock, language: 'mermaid' },
-            { component: StreamdownCodeBlock, language: allOtherLanguages },
           ],
         }}
         remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
-        controls={false}
+        controls={{ code: { copy: true } }}
         components={components}
         urlTransform={safeUrlTransform}
         caret={isChat && isStreaming ? 'block' : undefined}
-        codeBlockMaxHeight={isChat ? 400 : 0}
+        codeBlockMaxHeight={0}
         tableMaxHeight={isChat ? 340 : 0}
       >
         {sanitizedContent}
