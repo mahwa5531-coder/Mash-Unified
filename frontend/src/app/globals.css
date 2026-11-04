@@ -255,30 +255,31 @@ body,
 /* ==========================================================================
    MASH Pele Mermaid Integration
    Maps MASH dark & light theme palette to Pele's CSS variables.
+   Clean neutral zinc palette (eliminates garish electric blue fills/borders).
    ========================================================================== */
 .mash-mermaid {
-  --pele-bg: #ffffff;
-  --pele-fg: #101010;
-  --pele-muted: #6e6e6e;
-  --pele-line: #6e6e6e;
-  --pele-surface: #e0f2fe;
-  --pele-surface-alt: #f9f9f9;
-  --pele-border: #007acc;
-  --pele-accent: #007acc;
+  --pele-bg: transparent;
+  --pele-fg: var(--m-text-primary, #101010);
+  --pele-muted: var(--m-text-muted, #71717a);
+  --pele-line: #71717a;
+  --pele-surface: #f4f4f5;
+  --pele-surface-alt: #ffffff;
+  --pele-border: #d4d4d8;
+  --pele-accent: var(--m-accent, #007acc);
   --pele-font: inherit;
   --pele-font-mono: var(--font-mono, monospace);
 }
 
 [data-theme="dark"] .mash-mermaid,
 .dark .mash-mermaid {
-  --pele-bg: #111113;
-  --pele-fg: #cccccc;
-  --pele-muted: #858585;
-  --pele-line: #858585;
-  --pele-surface: #1e293b;
-  --pele-surface-alt: #222222;
-  --pele-border: #007acc;
-  --pele-accent: #007acc;
+  --pele-bg: transparent;
+  --pele-fg: var(--m-text-primary, #f4f4f6);
+  --pele-muted: var(--m-text-muted, #a1a1aa);
+  --pele-line: #71717a;
+  --pele-surface: #18181b;
+  --pele-surface-alt: #111113;
+  --pele-border: rgba(255, 255, 255, 0.14);
+  --pele-accent: var(--m-accent, #007acc);
   --pele-font: inherit;
   --pele-font-mono: var(--font-mono, monospace);
 }
