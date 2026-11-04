@@ -80,7 +80,9 @@ import {
   isFullFilePath,
   isFileExtension,
   isDirectoryPath,
+  processTextNodes,
 } from '../src/features/chat/components/messages/proseHelpers';
+import { AuditBadge } from '../src/primitives/AuditBadge';
 import type { Message, ToolCall } from '../src/types/chat';
 
 console.log('--- STARTING CHAT UI RENDERING & STREAMING DEEP MATRIX TESTS ---');
@@ -720,5 +722,49 @@ test('Turns Builder: Groups user prompt with multiple assistant steps and dedupl
 });
 
 console.log(`\n======================================================`);
+
+// ============================================================================
+// 8. AUDIT BADGES & SOFT CAPSULE RENDERING (OPTION 3)
+// ============================================================================
+console.log('\n[Suite 8: Audit Badges & Soft Capsule Rendering]');
+
+test('Option 3 Capsule Styling: Renders rounded-full, hairline border, and semantic dot', () => {
+  const verifiedHtml = renderToStaticMarkup(React.createElement(AuditBadge, { status: 'VERIFIED' }));
+  assert(verifiedHtml.includes('rounded-full'), 'Must render rounded-full soft capsule');
+  assert(verifiedHtml.includes('border-emerald-500'), 'Must use emerald border for verified');
+  assert(verifiedHtml.includes('bg-emerald-500/15'), 'Must use translucent 15% tint');
+  assert(verifiedHtml.includes('bg-emerald-400') || verifiedHtml.includes('bg-emerald-500'), 'Must have emerald indicator dot');
+  assert(verifiedHtml.includes('VERIFIED'), 'Must render label');
+});
+
+test('Semantic Variant Resolution: Maps statutory statuses accurately', () => {
+  const dangerHtml = renderToStaticMarkup(React.createElement(AuditBadge, { status: 'EXCEPTION' }));
+  assert(dangerHtml.includes('text-rose-'), 'EXCEPTION must resolve to danger/rose');
+
+  const warnHtml = renderToStaticMarkup(React.createElement(AuditBadge, { status: 'NEEDS REVIEW' }));
+  assert(warnHtml.includes('text-amber-'), 'NEEDS REVIEW must resolve to warning/amber');
+
+  const neutralHtml = renderToStaticMarkup(React.createElement(AuditBadge, { status: 'NOTE' }));
+  assert(neutralHtml.includes('text-zinc-'), 'NOTE must resolve to neutral/zinc');
+
+  const infoHtml = renderToStaticMarkup(React.createElement(AuditBadge, { status: 'RUNNING' }));
+  assert(infoHtml.includes('text-sky-'), 'RUNNING must resolve to info/sky');
+});
+
+test('Dynamic Keyword Fallback: Custom unlisted audit tags resolve correctly', () => {
+  const customPass = renderToStaticMarkup(React.createElement(AuditBadge, { status: 'SAMPLE RECONCILED' }));
+  assert(customPass.includes('text-emerald-'), 'RECONCILED keyword must fall back to success');
+
+  const customFail = renderToStaticMarkup(React.createElement(AuditBadge, { status: 'UNVERIFIED VOUCHERS' }));
+  assert(customFail.includes('text-rose-'), 'UNVERIFIED keyword must fall back to danger');
+});
+
+test('Case-Insensitive Tag Detection: processTextNodes parses [Verified] into AuditBadge', () => {
+  const rendered = renderToStaticMarkup(React.createElement('div', {}, processTextNodes('Voucher 101: [Verified] compliant')));
+  assert(rendered.includes('rounded-full'), 'Must convert [Verified] into soft capsule AuditBadge');
+  assert(rendered.includes('VERIFIED'), 'Must normalize to uppercase');
+  assert(rendered.includes('text-emerald-'), 'Must map to emerald');
+});
+
 console.log(`✓ ALL ${passedTests} CHAT RENDERING & STREAMING TESTS PASSED!`);
 console.log(`======================================================\n`);

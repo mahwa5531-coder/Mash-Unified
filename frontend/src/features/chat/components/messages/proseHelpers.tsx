@@ -46,7 +46,7 @@ export function prunePathPunctuation(raw: string): { cleanPath: string; trailing
   p = p.replace(/^['"`<(\[]+/, '');
 
   // 2. Peel trailing quotes, sentence punctuation, and closing brackets
-  const match = p.match(/([.,;:!?)"'`>\]]+)$/);
+  const match = p.match(/([.,;:!?)"'`>\]]+)$/i);
   if (match) {
     trailing = match[1];
     p = p.slice(0, -trailing.length);
@@ -102,7 +102,7 @@ export function isDirectoryPath(raw: string): boolean {
   return (endsWithSlash || (isLikelyFolder && hasSlash));
 }
 
-const STATUS_TAG_REGEX = /(\[(?:COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|VERIFIED|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\])/g;
+const STATUS_TAG_REGEX = /(\[(?:COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|VERIFIED|RECONCILED|APPROVED|DONE|EXCEPTION|MATERIAL WEAKNESS|FAIL|UNVERIFIED|REJECTED|QUALIFIED|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NEEDS REVIEW|PENDING|NOTE|WARNING|CAUTION|UNCHANGED|IN PROGRESS|RUNNING)\])/gi;
 const FILE_PATH_IN_PROSE_REGEX = /((?:\.env(?:\.[a-zA-Z0-9_-]+)?|(?:(?:file:\/\/\/?|[a-zA-Z]:[/\\]|\/(?:Users|home|tmp)\/|\.\.?\/|[a-zA-Z0-9_.-]+[/\\])[^\s'",;()<>]+\.(?:xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|pyw|ipynb|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|db|sqlite|md|markdown|txt|diff|patch|html|css|log|xml|xbrl|png|jpe?g|gif|svg|webp|env)))(?:#L\d+(?:-\d+)?)?)/gi;
 
 export function processTextNodes(children: any, onOpenFile?: (path: string) => void): any {
@@ -113,9 +113,9 @@ export function processTextNodes(children: any, onOpenFile?: (path: string) => v
     }
     const parts = children.split(STATUS_TAG_REGEX);
     const result = parts.flatMap((part, idx) => {
-      const match = part.match(/^\[(COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|VERIFIED|EXCEPTION|MATERIAL WEAKNESS|FAIL|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NOTE|WARNING|CAUTION)\]$/);
+      const match = part.match(/^\[(COMPLIANT|NO EXCEPTION|NO EXCEPTION NOTED|PASS|VERIFIED|RECONCILED|APPROVED|DONE|EXCEPTION|MATERIAL WEAKNESS|FAIL|UNVERIFIED|REJECTED|QUALIFIED|SIGNIFICANT DEFICIENCY|CONTROL DEFICIENCY|HIGH RISK|MEDIUM RISK|LOW RISK|NEEDS REVIEW|PENDING|NOTE|WARNING|CAUTION|UNCHANGED|IN PROGRESS|RUNNING)\]$/i);
       if (match) {
-        const tag = match[1];
+        const tag = match[1].toUpperCase();
         return [
           <AuditBadge key={`tag_${idx}`} status={tag}>
             {tag}
