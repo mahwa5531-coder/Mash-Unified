@@ -133,7 +133,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
         urlTransform={safeUrlTransform}
         caret={isChat && isStreaming ? 'block' : undefined}
         codeBlockMaxHeight={0}
-        tableMaxHeight={isChat ? 340 : 0}
+        tableMaxHeight={0}
       >
         {sanitizedContent}
       </Streamdown>
