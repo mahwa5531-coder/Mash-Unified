@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useId } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, ZoomIn, ZoomOut, RotateCcw, RefreshCw, AlertCircle } from "lucide-react";
-import { useIsDarkMode } from "@/hooks/useIsDarkMode";
 import { useTurnViewport } from "@/features/chat/context/TurnViewportContext";
+import { cn } from "@/lib/utils";
 
 interface MermaidRendererProps {
   chart: string;
@@ -17,60 +17,6 @@ export function sanitizeSvg(svg: string): string {
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
     .replace(/\bon\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, "")
     .replace(/href\s*=\s*(?:'javascript:[^']*'|"javascript:[^"]*")/gi, 'href="#"');
-}
-
-// Module-level Mermaid singleton loader and active theme tracking
-let mermaidModulePromise: Promise<any> | null = null;
-let activeTheme: "dark" | "default" | null = null;
-
-// Sequential rendering queue to eliminate concurrent DOM layout collisions
-let renderQueue: Promise<unknown> = Promise.resolve();
-
-function enqueueRender<T>(fn: () => Promise<T>): Promise<T> {
-  const next = renderQueue.then(fn, fn);
-  renderQueue = next.then(
-    () => {},
-    () => {}
-  );
-  return next;
-}
-
-// Specific orphan cleanup to sweep only the targeted completed render node
-function sweepMermaidOrphans(renderId?: string) {
-  if (typeof document === "undefined" || !renderId) return;
-  try {
-    document.getElementById(renderId)?.remove();
-    document.getElementById(`d${renderId}`)?.remove();
-  } catch {}
-}
-
-async function getInitializedMermaid(isDark: boolean) {
-  if (!mermaidModulePromise) {
-    mermaidModulePromise = import("mermaid").then((m) => m.default || m);
-  }
-  const mermaid = await mermaidModulePromise;
-
-  const targetTheme = isDark ? "dark" : "default";
-  if (activeTheme !== targetTheme) {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: targetTheme,
-      securityLevel: "strict",
-      fontFamily: "inherit",
-      themeVariables: {
-        darkMode: isDark,
-        background: isDark ? "#181818" : "#FFFFFF",
-        primaryColor: isDark ? "#1e293b" : "#e0f2fe",
-        primaryTextColor: isDark ? "#CCCCCC" : "#101010",
-        primaryBorderColor: "#007ACC",
-        lineColor: isDark ? "#858585" : "#6E6E6E",
-        secondaryColor: isDark ? "#222222" : "#F9F9F9",
-        tertiaryColor: isDark ? "#2A2A2A" : "#EFEFEF",
-      },
-    });
-    activeTheme = targetTheme;
-  }
-  return mermaid;
 }
 
 // Auto-repair common LLM Mermaid syntax flaws
@@ -125,8 +71,36 @@ export function repairMermaidSyntax(raw: string): string {
     return `${arrow} n_${autoId++}["${inner.replace(/"/g, "'").trim()}"]`;
   });
 
-  // 5. Ensure bracket labels [...] containing special characters ()[]&:$#/\ are safely quoted
+  // 5. Safely preserve and quote compound Mermaid shapes before general brackets
+  // Cylinder/Database: [("...")] or [(...)]
+  cleaned = cleaned.replace(/\[\(\s*"?([^"\n]*?)"?\s*\)\]/g, (_, inner) => {
+    return `[("${inner.trim()}")]`;
+  });
+
+  // Stadium: (["..."]) or ([...])
+  cleaned = cleaned.replace(/\(\[\s*"?([^"\n]*?)"?\s*\]\)/g, (_, inner) => {
+    return `(["${inner.trim()}"])`;
+  });
+
+  // Subroutine: [["..."]] or [[...]]
+  cleaned = cleaned.replace(/\[\[\s*"?([^"\n]*?)"?\s*\]\]/g, (_, inner) => {
+    return `[["${inner.trim()}"]]`;
+  });
+
+  // Circle: (("...")) or ((...))
+  cleaned = cleaned.replace(/\(\(\s*"?([^"\n]*?)"?\s*\)\)/g, (_, inner) => {
+    return `(("${inner.trim()}"))`;
+  });
+
+  // Rhombus/Diamond: {"..."} or {...}
+  cleaned = cleaned.replace(/\{\s*"?([^"{}\n]*?)"?\s*\}/g, (_, inner) => {
+    return `{"${inner.trim()}"}`;
+  });
+
+  // 6. Ensure simple bracket labels [...] containing special characters ()[]&:$#/ are safely quoted
   cleaned = cleaned.replace(/\[([^"\]\n]+)\]/g, (match, inner) => {
+    // Preserve compound shapes like [("...")]
+    if (inner.startsWith("(") && inner.endsWith(")")) return match;
     if (/[()&:$#\/]|[\uD800-\uDBFF][\uDC00-\uDFFF]/.test(inner)) {
       const escaped = inner.replace(/"/g, "'").trim();
       return `["${escaped}"]`;
@@ -134,8 +108,9 @@ export function repairMermaidSyntax(raw: string): string {
     return match;
   });
 
-  // 6. Ensure parenthesis labels (...) containing special characters are safely quoted
+  // 7. Ensure simple parenthesis labels (...) containing special characters are safely quoted
   cleaned = cleaned.replace(/\(([^"()\n]+)\)/g, (match, inner) => {
+    if (inner.startsWith("[") && inner.endsWith("]")) return match;
     if (/[\[\]&:$#\/]/.test(inner)) {
       const escaped = inner.replace(/"/g, "'").trim();
       return `("${escaped}")`;
@@ -148,7 +123,6 @@ export function repairMermaidSyntax(raw: string): string {
 
 // Fallback aggressive repair pass for diagrams that fail initial parse
 export function fallbackSanitize(chart: string): string {
-  // Convert flowchart to graph for looser edge parsing
   let s = chart.replace(/\bflowchart\b/i, "graph");
   s = s.replace(/\[([^\]]*?)\]/g, (match, inner) => {
     if (inner.includes('"')) {
@@ -160,108 +134,233 @@ export function fallbackSanitize(chart: string): string {
   return s;
 }
 
-const LAYOUT_TIMEOUT_MS = 6000;
+// Lazy singleton loader for Pele engine
+let pelePromise: Promise<typeof import("pele")> | null = null;
+function getPele() {
+  if (!pelePromise) {
+    pelePromise = import("pele");
+  }
+  return pelePromise;
+}
 
 export default function MermaidRenderer({ chart, isStreaming = false }: MermaidRendererProps) {
-  const [svgContent, setSvgContent] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [retryKey, setRetryKey] = useState<number>(0);
+  const [isRendered, setIsRendered] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [modalZoom, setModalZoom] = useState<number>(1);
-  const isDark = useIsDarkMode();
+  const [modalZoomPercent, setModalZoomPercent] = useState<number>(100);
+
   const { isNearViewport } = useTurnViewport();
-  const uniqueId = useId().replace(/[^a-zA-Z0-9]/g, "_");
-  const renderCountRef = useRef<number>(0);
 
+  const inlineContainerRef = useRef<HTMLDivElement>(null);
+  const inlineMountedRef = useRef<{ destroy: () => void } | null>(null);
+  const modalContainerRef = useRef<HTMLDivElement>(null);
+  const modalMountedRef = useRef<any>(null);
+
+  // Mount inline static diagram (strictly no zoom gestures to prevent chat scroll traps)
   useEffect(() => {
-    // ponytail: Defer Mermaid layout calculation until within viewport or already rendered
-    if (!isNearViewport && !svgContent) return;
+    // ponytail: Defer diagram rendering until within viewport (unless already loaded)
+    if (!isNearViewport && !isRendered) return;
 
-    let isMounted = true;
-    renderCountRef.current += 1;
-    const renderId = `mermaid_${uniqueId}_${renderCountRef.current}`;
-    let abortTimer: NodeJS.Timeout | null = null;
-
-    async function renderChart() {
-      if (!chart.trim()) return;
-      setLoading(true);
-      setError(null);
-
-      try {
-        await enqueueRender(async () => {
-          if (!isMounted) return;
-          const mermaid = await getInitializedMermaid(isDark);
-          sweepMermaidOrphans(renderId);
-
-          // 6-second timeout race to prevent infinite hanging on dagre layout loops
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            abortTimer = setTimeout(() => {
-              reject(new Error("Diagram layout timed out (exceeded 6s threshold)"));
-            }, LAYOUT_TIMEOUT_MS);
-          });
-
-          const renderPromise = (async () => {
-            // 1. Try rendering chart directly without regex alterations
-            try {
-              return await mermaid.render(renderId, chart.trim());
-            } catch {
-              // 2. If direct render failed, attempt gentle syntax repair
-              sweepMermaidOrphans(renderId);
-              try {
-                const repairedChart = repairMermaidSyntax(chart);
-                return await mermaid.render(renderId, repairedChart);
-              } catch {
-                // 3. Fallback sanitize for edge cases
-                sweepMermaidOrphans(renderId);
-                const fallbackChart = fallbackSanitize(chart);
-                return await mermaid.render(renderId, fallbackChart);
-              }
-            }
-          })();
-
-          const { svg } = await Promise.race([renderPromise, timeoutPromise]);
-          if (abortTimer) clearTimeout(abortTimer);
-
-          if (isMounted) {
-            setSvgContent(svg);
-            setError(null);
-            setLoading(false);
-          }
-        });
-      } catch (err: any) {
-        if (abortTimer) clearTimeout(abortTimer);
-        sweepMermaidOrphans(renderId);
-        console.warn("Mermaid render error:", err);
-
-        if (isMounted) {
-          setError(err?.message || "Failed to render diagram");
-          setLoading(false);
-        }
-      }
+    let isCancelled = false;
+    const trimmed = chart?.trim() || "";
+    if (!trimmed) {
+      setLoading(false);
+      return;
     }
 
-    renderChart();
+    setLoading(true);
+    setError(null);
+
+    getPele().then((pele) => {
+      if (isCancelled || !inlineContainerRef.current) return;
+
+      inlineMountedRef.current?.destroy();
+      inlineMountedRef.current = null;
+
+      let sourceToMount = trimmed;
+      if (!pele.detectType(sourceToMount) && (sourceToMount.includes("-->") || sourceToMount.includes("---"))) {
+        sourceToMount = "flowchart TD\n" + sourceToMount;
+      }
+
+      try {
+        inlineMountedRef.current = pele.mount(inlineContainerRef.current, sourceToMount, {
+          zoom: false, // strictly disabled in chat stream: 2-finger touchpad scrolls message transcript naturally
+          links: false,
+          images: false,
+          onError: (err) => {
+            if (isCancelled) return;
+            setError(err instanceof Error ? err.message : String(err));
+            setLoading(false);
+          },
+        });
+        if (!isCancelled) {
+          setIsRendered(true);
+          setLoading(false);
+        }
+      } catch {
+        try {
+          const repaired = repairMermaidSyntax(sourceToMount);
+          inlineMountedRef.current = pele.mount(inlineContainerRef.current, repaired, {
+            zoom: false,
+            links: false,
+            images: false,
+            onError: (err) => {
+              if (isCancelled) return;
+              setError(err instanceof Error ? err.message : String(err));
+              setLoading(false);
+            },
+          });
+          if (!isCancelled) {
+            setIsRendered(true);
+            setLoading(false);
+          }
+        } catch (finalErr: any) {
+          if (!isCancelled) {
+            console.warn("Pele diagram render error:", finalErr);
+            setError(finalErr?.message || "Failed to render diagram");
+            setLoading(false);
+          }
+        }
+      }
+    }).catch((err) => {
+      if (!isCancelled) {
+        setError(err?.message || "Failed to load diagram engine");
+        setLoading(false);
+      }
+    });
 
     return () => {
-      isMounted = false;
-      if (abortTimer) clearTimeout(abortTimer);
-      sweepMermaidOrphans(renderId);
+      isCancelled = true;
+      inlineMountedRef.current?.destroy();
+      inlineMountedRef.current = null;
     };
-  }, [chart, isDark, uniqueId, isNearViewport, retryKey]);
+  }, [chart, isNearViewport, isRendered, retryKey]);
 
-  // Handle escape key to close modal
+  // Mount modal lightbox diagram (trackpad pinch-to-zoom and click-and-drag pan fully active)
+  useEffect(() => {
+    if (!isModalOpen) {
+      modalMountedRef.current?.destroy();
+      modalMountedRef.current = null;
+      return;
+    }
+
+    let isCancelled = false;
+    const trimmed = chart?.trim() || "";
+    if (!trimmed) return;
+
+    getPele().then((pele) => {
+      if (isCancelled || !modalContainerRef.current) return;
+
+      modalMountedRef.current?.destroy();
+      modalMountedRef.current = null;
+
+      let sourceToMount = trimmed;
+      if (!pele.detectType(sourceToMount) && (sourceToMount.includes("-->") || sourceToMount.includes("---"))) {
+        sourceToMount = "flowchart TD\n" + sourceToMount;
+      }
+
+      const mountModalInstance = (src: string) => {
+        return pele.mount(modalContainerRef.current!, src, {
+          zoom: {
+            always: true,
+            controls: false, // hide Pele's buttons; controlled via MASH Lucide toolbar
+            maxScale: 4,
+          },
+          links: false,
+          images: false,
+          onError: (err) => console.warn("Modal Pele diagram error:", err),
+        });
+      };
+
+      try {
+        modalMountedRef.current = mountModalInstance(sourceToMount);
+        setModalZoomPercent(100);
+      } catch {
+        try {
+          modalMountedRef.current = mountModalInstance(repairMermaidSyntax(sourceToMount));
+          setModalZoomPercent(100);
+        } catch (modalErr) {
+          console.warn("Failed to mount diagram in modal:", modalErr);
+        }
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+      modalMountedRef.current?.destroy();
+      modalMountedRef.current = null;
+    };
+  }, [isModalOpen, chart]);
+
+  // Handle escape key, touchpad pinch gestures, and mouse wheel zoom in modal
   useEffect(() => {
     if (!isModalOpen) return;
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsModalOpen(false);
-        setModalZoom(1);
+        setModalZoomPercent(100);
       }
     };
+
+    const container = modalContainerRef.current;
+    const onWheel = () => {
+      requestAnimationFrame(() => {
+        if (modalMountedRef.current?.zoom) {
+          const zoom = modalMountedRef.current.zoom;
+          const fit = zoom.fit || 1;
+          setModalZoomPercent(Math.round((zoom.scale / fit) * 100));
+        }
+      });
+    };
+
+    const onDblClick = () => {
+      requestAnimationFrame(() => {
+        if (modalMountedRef.current?.zoom) {
+          const zoom = modalMountedRef.current.zoom;
+          const fit = zoom.fit || 1;
+          setModalZoomPercent(Math.round((zoom.scale / fit) * 100));
+        }
+      });
+    };
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    container?.addEventListener("wheel", onWheel, { passive: true });
+    container?.addEventListener("dblclick", onDblClick);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      container?.removeEventListener("wheel", onWheel);
+      container?.removeEventListener("dblclick", onDblClick);
+    };
   }, [isModalOpen]);
+
+  const handleZoomIn = useCallback(() => {
+    if (modalMountedRef.current?.zoom) {
+      modalMountedRef.current.zoom.zoomBy(1.2);
+      const zoom = modalMountedRef.current.zoom;
+      const fit = zoom.fit || 1;
+      setModalZoomPercent(Math.round((zoom.scale / fit) * 100));
+    }
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    if (modalMountedRef.current?.zoom) {
+      modalMountedRef.current.zoom.zoomBy(1 / 1.2);
+      const zoom = modalMountedRef.current.zoom;
+      const fit = zoom.fit || 1;
+      setModalZoomPercent(Math.round((zoom.scale / fit) * 100));
+    }
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    if (modalMountedRef.current?.zoom) {
+      modalMountedRef.current.zoom.reset();
+      setModalZoomPercent(100);
+    }
+  }, []);
 
   if (error) {
     if (isStreaming) {
@@ -305,9 +404,9 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
       {/* Inline Naked Diagram Container */}
       <div
         onClick={() => {
-          if (!loading && svgContent) {
+          if (!loading && !error) {
             setIsModalOpen(true);
-            setModalZoom(1);
+            setModalZoomPercent(100);
           }
         }}
         title="Click to expand diagram"
@@ -329,12 +428,13 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
           </div>
         )}
 
-        {!loading && svgContent && (
-          <div
-            className="w-full flex justify-center items-center select-none"
-            dangerouslySetInnerHTML={{ __html: sanitizeSvg(svgContent) }}
-          />
-        )}
+        <div
+          ref={inlineContainerRef}
+          className={cn(
+            "mash-mermaid w-full flex justify-center items-center select-none overflow-hidden",
+            loading ? "hidden" : "block"
+          )}
+        />
       </div>
 
       {/* Enlarged Modal Window ("su window") */}
@@ -344,7 +444,7 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
           aria-modal="true"
           onClick={() => {
             setIsModalOpen(false);
-            setModalZoom(1);
+            setModalZoomPercent(100);
           }}
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 sm:p-8 animate-in fade-in duration-150"
         >
@@ -358,18 +458,18 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setModalZoom((z) => Math.max(0.4, +(z - 0.2).toFixed(1)))}
+                  onClick={handleZoomOut}
                   className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors cursor-pointer"
                   title="Zoom Out"
                 >
                   <ZoomOut size={14} />
                 </button>
                 <span className="font-mono text-[11px] text-muted-foreground px-1 select-none">
-                  {Math.round(modalZoom * 100)}%
+                  {modalZoomPercent}%
                 </span>
                 <button
                   type="button"
-                  onClick={() => setModalZoom((z) => Math.min(3, +(z + 0.2).toFixed(1)))}
+                  onClick={handleZoomIn}
                   className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors cursor-pointer"
                   title="Zoom In"
                 >
@@ -377,7 +477,7 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
                 </button>
                 <button
                   type="button"
-                  onClick={() => setModalZoom(1)}
+                  onClick={handleResetZoom}
                   className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-muted transition-colors cursor-pointer"
                   title="Reset Zoom"
                 >
@@ -388,7 +488,7 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
                   type="button"
                   onClick={() => {
                     setIsModalOpen(false);
-                    setModalZoom(1);
+                    setModalZoomPercent(100);
                   }}
                   className="p-1 rounded-md text-zinc-500 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                   title="Close (Esc)"
@@ -398,16 +498,11 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
               </div>
             </div>
 
-            {/* Modal Body with Enlarged SVG */}
-            <div className="flex-1 overflow-auto p-6 flex items-center justify-center custom-scrollbar">
+            {/* Modal Body with Interactive SVG */}
+            <div className="flex-1 overflow-hidden p-6 flex items-center justify-center relative min-h-[420px] max-h-[75vh]">
               <div
-                style={{
-                  transform: `scale(${modalZoom})`,
-                  transformOrigin: "center",
-                  transition: "transform 0.15s ease",
-                }}
-                className="w-full flex justify-center items-center select-none [&_svg]:max-w-none [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-h-[75vh]"
-                dangerouslySetInnerHTML={{ __html: sanitizeSvg(svgContent) }}
+                ref={modalContainerRef}
+                className="mash-mermaid w-full h-full min-h-[420px] max-h-[75vh] flex justify-center items-center select-none overflow-hidden"
               />
             </div>
           </div>

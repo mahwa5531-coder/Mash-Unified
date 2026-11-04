@@ -250,3 +250,40 @@ body,
   color: var(--text-primary) !important;
 }
 
+
+
+/* ==========================================================================
+   MASH Pele Mermaid Integration
+   Maps MASH dark & light theme palette to Pele's CSS variables.
+   ========================================================================== */
+.mash-mermaid {
+  --pele-bg: #ffffff;
+  --pele-fg: #101010;
+  --pele-muted: #6e6e6e;
+  --pele-line: #6e6e6e;
+  --pele-surface: #e0f2fe;
+  --pele-surface-alt: #f9f9f9;
+  --pele-border: #007acc;
+  --pele-accent: #007acc;
+  --pele-font: inherit;
+  --pele-font-mono: var(--font-mono, monospace);
+}
+
+[data-theme="dark"] .mash-mermaid,
+.dark .mash-mermaid {
+  --pele-bg: #111113;
+  --pele-fg: #cccccc;
+  --pele-muted: #858585;
+  --pele-line: #858585;
+  --pele-surface: #1e293b;
+  --pele-surface-alt: #222222;
+  --pele-border: #007acc;
+  --pele-accent: #007acc;
+  --pele-font: inherit;
+  --pele-font-mono: var(--font-mono, monospace);
+}
+
+.mash-mermaid svg {
+  display: block;
+  margin: 0 auto;
+}

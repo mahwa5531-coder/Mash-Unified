@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
 import { useAgentMarkdownComponents } from './useAgentMarkdownComponents';
 import { escapeCurrencyInMarkdown } from '@/features/chat/components/messages/proseHelpers';
-import MermaidRenderer, { repairMermaidSyntax } from '@/components/renderers/MermaidRenderer';
+import MermaidRenderer from '@/components/renderers/MermaidRenderer';
 
 /**
  * AgentMarkdown — unified markdown renderer powered directly by Streamdown.
@@ -122,13 +122,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   const components = useAgentMarkdownComponents({ mode, sessionId, onOpenFile, onImageClick });
   const sanitizedContent = React.useMemo(() => {
     if (!content) return '';
-    let text = escapeCurrencyInMarkdown(content);
-    if (text.includes('```mermaid')) {
-      text = text.replace(/```mermaid\s*\n([\s\S]*?)```/g, (_, code) => {
-        return '```mermaid\n' + repairMermaidSyntax(code) + '\n```';
-      });
-    }
-    return text;
+    return escapeCurrencyInMarkdown(content);
   }, [content]);
 
   if (!content) return null;
