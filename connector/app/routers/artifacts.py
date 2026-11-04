@@ -15,6 +15,7 @@ from app.workspace import (
     APP_WORKSPACE_ROOT,
     get_allowed_file_roots,
     is_path_in_base_roots,
+    is_safe_attachment_root,
     resolve_session_workspace,
 )
 
@@ -281,14 +282,12 @@ async def get_file_content(
         allowed_roots = await get_allowed_file_roots(eng)
         is_allowed = any(p == root or p.is_relative_to(root) for root in allowed_roots)
 
-    # ponytail: allow any valid file on host disk for active sessions
+    # Authorize session-attached files if safe and explicitly listed in session context
     if not is_allowed and session_id and eng:
         session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
         if session:
             att_files = (session.context or {}).get("attached_files") or []
-            if any(p == Path(f).expanduser().resolve() for f in att_files):
-                is_allowed = True
-            elif p.is_file():
+            if any(p == Path(f).expanduser().resolve() for f in att_files if is_safe_attachment_root(Path(f).expanduser())):
                 is_allowed = True
 
     if not is_allowed:

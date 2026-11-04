@@ -74,3 +74,41 @@ async def test_desktop_attached_file_authorization():
                 unauthorized_file.unlink(missing_ok=True)
             except Exception:
                 pass
+
+
+@pytest.mark.anyio
+async def test_r2_7a_poisoned_root_attachment_defense():
+    """Verify R2-7a: poisoned attached_files with literal '/' or root drives cannot compromise allowed roots."""
+    poisoned_session_id = f"test-poisoned-session-{uuid.uuid4().hex[:8]}"
+    async with lifespan(app):
+        engine = deps.get_engine()
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            session = SessionModel(
+                session_id=poisoned_session_id,
+                user_id="attacker",
+                context={
+                    "title": "Poisoned Session",
+                    "attached_files": ["/", "C:\\", "/etc/passwd", "C:\\Windows\\win.ini"],
+                }
+            )
+            await engine.create(session)
+            invalidate_roots_cache()
+
+            # 1. Unauthenticated request to /etc/passwd or system file must be 403 Forbidden
+            res_passwd = await client.get("/files/content?path=/etc/passwd")
+            assert res_passwd.status_code == 403, f"Expected 403 for /etc/passwd, got {res_passwd.status_code}"
+
+            res_winini = await client.get("/files/content?path=C:/Windows/win.ini")
+            assert res_winini.status_code in (403, 404), f"Expected 403 or 404 for C:/Windows/win.ini, got {res_winini.status_code}"
+
+            # 2. Even WITH session_id query param, root paths cannot be read
+            res_with_sess = await client.get(f"/files/content?path=/etc/passwd&session_id={poisoned_session_id}")
+            assert res_with_sess.status_code in (403, 404), f"Expected 403 or 404 with session_id, got {res_with_sess.status_code}"
+
+            # Clean up
+            try:
+                await engine.delete(SessionModel, filters=ComparisonFilter.eq("session_id", poisoned_session_id))
+            except Exception:
+                pass
+            invalidate_roots_cache()

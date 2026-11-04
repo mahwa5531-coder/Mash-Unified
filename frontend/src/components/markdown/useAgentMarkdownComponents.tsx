@@ -206,18 +206,11 @@ export function useAgentMarkdownComponents({
 
     td({ children, node: _node, className, ...props }: any) {
       const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
-      // ponytail: detect Unit 15 financial column semantics from cell text
       const rawText = extractChildText(children).trim();
-      const isNumericOrCurrency = /^[₹$€£+\-—\d]/.test(rawText) || props.align === 'right';
-      const isCreditOrNegative = rawText.startsWith('-') || /^\([₹$€£\d]/.test(rawText) || /CR/i.test(rawText);
-      const isDebitOrPositive = rawText.startsWith('+') || /DR/i.test(rawText);
+      const isNumericOrCurrency = /^[\u20b9$€£+\-—\d]/.test(rawText) || props.align === 'right';
       const isCode = /^(?:[A-Z]{2,4}-\d+|\d{4,6}|SA\s*\d+)$/i.test(rawText);
 
-      const colorClass = isCreditOrNegative
-        ? "text-rose-500 dark:text-rose-400 font-mono"
-        : isDebitOrPositive
-        ? "text-emerald-600 dark:text-emerald-400 font-mono"
-        : isCode
+      const colorClass = isCode
         ? "font-mono text-zinc-500 dark:text-zinc-400"
         : isNumericOrCurrency
         ? "font-mono tabular-nums text-zinc-900 dark:text-zinc-100"
@@ -229,7 +222,6 @@ export function useAgentMarkdownComponents({
         </td>
       );
     },
-
     /** Links: file paths become FilePills, external links use WebLink (feature #1). */
     a({ href, children, node: _node, ...props }: any) {
       if (!href) return <span {...props}>{children}</span>;

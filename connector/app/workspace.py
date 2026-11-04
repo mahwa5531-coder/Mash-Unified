@@ -81,6 +81,23 @@ def invalidate_roots_cache() -> None:
     _DYNAMIC_ROOTS_CACHE = None
 
 
+def is_safe_attachment_root(p: Path) -> bool:
+    """Security guard (R2-7a): ensure path is never a filesystem root or sensitive system directory."""
+    try:
+        resolved = p.resolve()
+        # Reject root drives or filesystem roots (e.g. '/', 'C:\', '\\')
+        if resolved.parent == resolved or len(resolved.parts) <= 1 or str(resolved) in ("/", "\\", "C:\\", "C:/"):
+            return False
+        # Reject sensitive system paths
+        posix = str(resolved).replace("\\", "/")
+        for sys_dir in ("/etc", "/usr", "/bin", "/sbin", "/sys", "/proc", "/dev", "C:/Windows", "C:/Program Files", "C:/Program Files (x86)"):
+            if posix == sys_dir or posix.startswith(sys_dir + "/"):
+                return False
+        return True
+    except Exception:
+        return False
+
+
 async def get_allowed_file_roots(engine: Any | None) -> list[Path]:
     """Retrieve all authorized workspace and brain roots with a 30s TTL cache."""
     global _DYNAMIC_ROOTS_CACHE
@@ -118,8 +135,8 @@ async def get_allowed_file_roots(engine: Any | None) -> list[Path]:
             for att in context.get("attached_files", []):
                 try:
                     att_p = Path(att).expanduser().resolve()
-                    if att_p.exists():
-                        roots.append(att_p if att_p.is_dir() else att_p)
+                    if att_p.exists() and is_safe_attachment_root(att_p):
+                        roots.append(att_p)
                 except Exception:
                     pass
     except Exception:
