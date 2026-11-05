@@ -10,6 +10,7 @@ import type { LightboxImageData } from '@/features/chat/components/messages/Imag
 import { useAgentMarkdownComponents } from './useAgentMarkdownComponents';
 import { escapeCurrencyInMarkdown } from '@/features/chat/components/messages/proseHelpers';
 import MermaidRenderer from '@/components/renderers/MermaidRenderer';
+import CodeBlock from '@/components/renderers/CodeBlock';
 
 /**
  * AgentMarkdown — unified markdown renderer powered directly by Streamdown.
@@ -62,6 +63,27 @@ function MermaidBlock({ code: chart, isIncomplete }: { code: string; isIncomplet
   return <MermaidRenderer chart={chart} isStreaming={isIncomplete} />;
 }
 
+// Custom renderer for Code blocks — MASH native CodeBlock with header bar, line count, and copy
+function StreamdownCodeBlock({ code, language, isIncomplete }: { code: string; language: string; isIncomplete?: boolean }) {
+  return <CodeBlock language={language || 'code'} code={code} isStreaming={isIncomplete} />;
+}
+
+// ponytail: proxy matches all languages except mermaid and latex, routing them cleanly to MASH CodeBlock
+const allOtherLanguages = new Proxy([] as string[], {
+  get(target, prop) {
+    if (prop === 'includes') {
+      return (lang: string) => {
+        if (!lang) return true;
+        const l = String(lang).toLowerCase().trim();
+        if (l === 'mermaid') return false;
+        if (LATEX_LANGUAGES.includes(l)) return false;
+        return true;
+      };
+    }
+    return Reflect.get(target, prop);
+  }
+});
+
 // Remark plugin ensuring code blocks without explicit language get default 'text' lang
 const ensureCodeLanguagePlugin = () => (tree: any) => {
   const visit = (node: any) => {
@@ -98,7 +120,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   onImageClick,
   className,
 }: AgentMarkdownProps) {
-  const components = useAgentMarkdownComponents({ mode, sessionId, onOpenFile, onImageClick, isStreaming });
+  const components = useAgentMarkdownComponents({ mode, sessionId, onOpenFile, onImageClick });
   const sanitizedContent = React.useMemo(() => {
     if (!content) return '';
     return escapeCurrencyInMarkdown(content);
@@ -123,6 +145,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
           renderers: [
             { component: LatexBlock, language: LATEX_LANGUAGES },
             { component: MermaidBlock, language: 'mermaid' },
+            { component: StreamdownCodeBlock, language: allOtherLanguages },
           ],
         }}
         remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}

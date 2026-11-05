@@ -10,7 +10,6 @@ import {
 } from '@/primitives';
 import CalloutBlockquote from '@/components/renderers/CalloutBlockquote';
 import TableContainer from '@/components/renderers/TableContainer';
-import CodeBlock from '@/components/renderers/CodeBlock';
 import { normalizePath } from '@/utils/normalizePath';
 import { BASE_URL } from '@/services/client';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
@@ -26,18 +25,17 @@ import {
 
 /**
  * Unified component map for AgentMarkdown — used by BOTH chat mode and
- * artifact mode so file pills, audit badges, math, tables, and images behave
+ * artifact mode so file pills, audit badges, tables, and links behave
  * identically everywhere.
  *
- * Fenced code blocks are owned by MASH CodeBlock; Mermaid diagrams are
- * owned by Pele MermaidRenderer; Math is owned by @streamdown/math.
+ * Fenced code blocks, Mermaid diagrams, and math are owned by Streamdown's
+ * plugins and custom renderers in AgentMarkdown.tsx.
  */
 export interface UseAgentMarkdownComponentsOptions {
   mode: 'chat' | 'artifact';
   sessionId?: string;
   onOpenFile?: (path: string) => void;
   onImageClick?: (img: LightboxImageData) => void;
-  isStreaming?: boolean;
 }
 
 export function useAgentMarkdownComponents({
@@ -45,7 +43,6 @@ export function useAgentMarkdownComponents({
   sessionId,
   onOpenFile,
   onImageClick,
-  isStreaming = false,
 }: UseAgentMarkdownComponentsOptions) {
   const isChat = mode === 'chat';
 
@@ -190,31 +187,6 @@ export function useAgentMarkdownComponents({
 
     strong({ children, node: _node, ...props }: any) {
       return <strong className="text-zinc-950 dark:text-white font-semibold" {...props}>{children}</strong>;
-    },
-
-    /**
-     * Fenced code block — delegates directly to MASH CodeBlock component
-     * (single source for line counts, copy button, syntax highlight, Unit 17 styling).
-     * Special diagram/math languages (mermaid, math, latex) pass through to Streamdown renderers.
-     */
-    pre({ children, node: _node, ...props }: any) {
-      const child = React.isValidElement(children) ? (children as React.ReactElement<any>) : null;
-      const className = child?.props?.className || '';
-      const match = /language-(\w+)/.exec(className);
-      const language = match ? match[1].toLowerCase() : '';
-
-      // Delegate mermaid diagrams and math/latex blocks to Streamdown's specialized renderers
-      if (language === 'mermaid' || language === 'math' || language === 'latex' || language === 'katex') {
-        return React.isValidElement(children)
-          ? React.cloneElement(children as any, { 'data-block': 'true' })
-          : children;
-      }
-
-      const code = typeof child?.props?.children === 'string'
-        ? child.props.children
-        : extractChildText(children);
-
-      return <CodeBlock language={language} code={code} isStreaming={isStreaming} />;
     },
 
     /** Single-source naked table via MASH Unit 15 TableContainer — zero extra card/frame, zero clutter buttons */
