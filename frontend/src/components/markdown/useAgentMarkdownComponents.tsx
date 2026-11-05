@@ -195,12 +195,21 @@ export function useAgentMarkdownComponents({
     /**
      * Fenced code block — delegates directly to MASH CodeBlock component
      * (single source for line counts, copy button, syntax highlight, Unit 17 styling).
+     * Special diagram/math languages (mermaid, math, latex) pass through to Streamdown renderers.
      */
     pre({ children, node: _node, ...props }: any) {
       const child = React.isValidElement(children) ? (children as React.ReactElement<any>) : null;
       const className = child?.props?.className || '';
       const match = /language-(\w+)/.exec(className);
-      const language = match ? match[1] : '';
+      const language = match ? match[1].toLowerCase() : '';
+
+      // Delegate mermaid diagrams and math/latex blocks to Streamdown's specialized renderers
+      if (language === 'mermaid' || language === 'math' || language === 'latex' || language === 'katex') {
+        return React.isValidElement(children)
+          ? React.cloneElement(children as any, { 'data-block': 'true' })
+          : children;
+      }
+
       const code = typeof child?.props?.children === 'string'
         ? child.props.children
         : extractChildText(children);
