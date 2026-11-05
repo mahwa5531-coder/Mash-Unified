@@ -42,9 +42,9 @@ console.log('✓ PASS: ChatCanvas pruned redundant token change dependencies fro
 
 // 6. Verify TableContainer supports isChat with max-height ceiling and sticky headers
 assert.ok(tableContainerSrc.includes('isChat'), 'TableContainer must accept isChat prop');
-assert.ok(tableContainerSrc.includes('max-h-[440px]'), 'TableContainer must apply max-height ceiling in chat mode');
+assert.ok(tableContainerSrc.includes('max-h-[1850px]'), 'TableContainer must apply max-height ceiling in chat mode');
 assert.ok(tableContainerSrc.includes('[&_th]:sticky'), 'TableContainer must have sticky header positioning');
-console.log('✓ PASS: TableContainer supports isChat with max-h-[440px] and sticky headers');
+console.log('✓ PASS: TableContainer supports isChat with 50-row max-h-[1850px] and sticky headers');
 
 // 7. Verify useAgentMarkdownComponents passes isChat to TableContainer
 assert.ok(markdownCompSrc.includes('<TableContainer isChat={isChat}'), 'useAgentMarkdownComponents must pass isChat to TableContainer');
