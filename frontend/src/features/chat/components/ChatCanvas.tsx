@@ -122,7 +122,7 @@ const MountedTurnRow = memo(function MountedTurnRow({
 
 // ponytail: Module-hoisted Virtuoso footer prevents component re-creation and DOM remounts on every render frame
 const VirtuosoFooter = memo(function VirtuosoFooter() {
-  return <div className="max-w-3xl mx-auto w-full pb-6" aria-hidden="true" />;
+  return <div className="max-w-3xl mx-auto w-full pb-6 px-4 sm:px-6" aria-hidden="true" />;
 });
 
 export default function ChatCanvas({ 
@@ -264,7 +264,7 @@ export default function ChatCanvas({
   const virtuosoComponents = useMemo(() => ({
     Header: function VirtuosoHeader() {
       return (
-        <div className="max-w-3xl mx-auto w-full pt-2">
+        <div className="max-w-3xl mx-auto w-full pt-2 px-4 sm:px-6">
           <ChatHistoryLoadState
             sessionId={sessionId}
             isHistoryLoaded={isHistoryLoaded}
@@ -311,7 +311,7 @@ export default function ChatCanvas({
       {chatMessages.length === 0 ? (
         <div 
           ref={chatScrollContainerRef} 
-          className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 custom-scrollbar relative"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 custom-scrollbar relative"
         >
           <div className="max-w-3xl mx-auto flex flex-col min-h-full pb-6 w-full">
             <ChatHistoryLoadState
@@ -339,13 +339,14 @@ export default function ChatCanvas({
               (chatScrollContainerRef as any).current = el;
             }
           }}
-          className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 custom-scrollbar relative"
+          style={{ overflowX: 'hidden' }}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar relative"
           components={virtuosoComponents}
           itemContent={(index, turn) => {
             const isLastTurn = index === turns.length - 1;
             const turnKey = turn.id || `turn_${turn.flatIdx}_${index}`;
             return (
-              <div className="max-w-3xl mx-auto w-full py-1">
+              <div className="max-w-3xl mx-auto w-full py-1 px-4 sm:px-6">
                 <MountedTurnRow
                   turn={turn}
                   turnKey={turnKey}
