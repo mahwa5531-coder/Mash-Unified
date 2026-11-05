@@ -54,7 +54,7 @@ export function useChatStream({
 
   const steering = useChatSteering({ activeSessionIdRef, sessionId, onSendMessage: dispatchSendMessage });
 
-  // ponytail: unified scroll controller - delegate scroll-following ownership to useScrollToBottom
+  // Unified scroll controller - delegate scroll-following ownership to Virtuoso followOutput
 
   useEffect(() => {
     flushActiveStreamBuffer();
@@ -148,7 +148,7 @@ export function useChatStream({
       flushBuffer: flushActiveStreamBuffer,
       onUpdateMessages: (msgs) => { if (activeSid === activeSessionIdRef.current) setChatMessages(msgs); },
       onStreamEnd: () => { if (activeSid === activeSessionIdRef.current) setIsStreaming(false); },
-      scrollToBottom: () => {}, // ponytail: Virtuoso followOutput manages stream following natively; no manual scrollTop yanking
+      scrollToBottom: () => {}, // Virtuoso followOutput manages stream following natively; no manual scrollTop yanking
       onAutoDispatchQueue: (msg) => handleSendMessage(msg, false, false, activeSid),
       onSyncSteeringQueue: (q) => { if (activeSid === activeSessionIdRef.current) steering.setQueuedMessages(q); },
       onRestorePrompt: (prompt) => { if (activeSid === activeSessionIdRef.current) setInputPrompt(prompt); },

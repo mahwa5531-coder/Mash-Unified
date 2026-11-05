@@ -117,12 +117,12 @@ export function useSseBufferFlusher({
       s.chatMessages = next;
       setChatMessages(next);
     }
-    // ponytail: Delegated scroll retention entirely to Virtuoso followOutput.
+    // Delegated scroll retention entirely to Virtuoso followOutput.
     // Zero manual scrollTop mutations prevent yanking the user away from history during streaming.
   }, [activeSessionIdRef, setChatMessages]);
 
   const scheduleFlush = useCallback(() => {
-    // ponytail: Fall back to 100ms timer when document.hidden to drain tokens while tab is backgrounded
+    // Fall back to 100ms timer when document.hidden to drain tokens while tab is backgrounded
     if (typeof document !== 'undefined' && document.hidden) {
       if (timeoutIdRef.current === null) {
         timeoutIdRef.current = setTimeout(() => {

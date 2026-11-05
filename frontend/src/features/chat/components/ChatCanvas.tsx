@@ -34,7 +34,7 @@ interface ChatCanvasProps {
   onOpenSettings?: (tab?: string) => void;
 }
 
-// ponytail: Module-level stable empty array prevents breaking AssistantMessage memo on every token
+// Module-level stable empty array prevents breaking AssistantMessage memo on every token
 const EMPTY_ARTIFACTS: any[] = [];
 
 interface MountedTurnRowProps {
@@ -120,7 +120,7 @@ const MountedTurnRow = memo(function MountedTurnRow({
          prev.artifactsByTurnMsg === next.artifactsByTurnMsg;
 });
 
-// ponytail: Module-hoisted Virtuoso footer prevents component re-creation and DOM remounts on every render frame
+// Module-hoisted Virtuoso footer prevents component re-creation and DOM remounts on every render frame
 const VirtuosoFooter = memo(function VirtuosoFooter() {
   return <div className="max-w-3xl mx-auto w-full pb-6 px-4 sm:px-6" aria-hidden="true" />;
 });
@@ -215,12 +215,35 @@ export default function ChatCanvas({
   }, [retry]);
 
   const scrollDomToBottom = useCallback(() => {
+    setHitBottom(true);
     virtuosoRef.current?.scrollToIndex({
       index: turns.length - 1,
       align: 'end',
       behavior: 'smooth',
     });
   }, [turns.length]);
+
+  // Immediate wheel & touch intent detection (inspired by assistant-ui useThreadViewportAutoScroll)
+  // When the user scrolls upwards, immediately disconnect auto-follow to prevent
+  // Virtuoso from snapping back down on streaming token flushes or tool renders.
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    if (e.deltaY < 0) {
+      setHitBottom(false);
+    }
+  }, []);
+
+  const touchStartYRef = useRef(0);
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    touchStartYRef.current = e.touches[0]?.clientY || 0;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    const currentY = e.touches[0]?.clientY || 0;
+    if (currentY > touchStartYRef.current + 6) {
+      // Finger pulled downwards, which scrolls content upwards away from bottom
+      setHitBottom(false);
+    }
+  }, []);
 
   const handleLoadEarlier = useCallback(async () => {
     if (isLoadingEarlier || !hasEarlierTurns) return;
@@ -260,7 +283,7 @@ export default function ChatCanvas({
     }
   };
 
-  // ponytail: Hoisted components with stable identity prevent Virtuoso from unmounting & remounting the Header/Footer on every streaming token flush
+  // Hoisted components with stable identity prevent Virtuoso from unmounting & remounting the Header/Footer on every streaming token flush
   const virtuosoComponents = useMemo(() => ({
     Header: function VirtuosoHeader() {
       return (
@@ -305,7 +328,12 @@ export default function ChatCanvas({
   ]);
 
   return (
-    <div className="flex-1 min-w-0 min-h-0 bg-[var(--bg-app)] flex flex-col h-full overflow-hidden relative font-sans text-[var(--text-primary)] transition-colors">
+    <div 
+      onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      className="flex-1 min-w-0 min-h-0 bg-[var(--bg-app)] flex flex-col h-full overflow-hidden relative font-sans text-[var(--text-primary)] transition-colors"
+    >
       
       {/* Main Chat Feed (Powered by react-virtuoso for zero-jank dynamic virtualization & prepending) */}
       {chatMessages.length === 0 ? (
@@ -329,10 +357,11 @@ export default function ChatCanvas({
           data={turns}
           firstItemIndex={firstItemIndex}
           initialTopMostItemIndex={Math.max(0, turns.length - 1)}
-          followOutput={(isAtBottom) => isAtBottom ? 'auto' : false}
-          startReached={handleLoadEarlier}
+          followOutput={hitBottom ? 'auto' : false}
+          startReached={isStreaming ? undefined : handleLoadEarlier}
           computeItemKey={(_, turn) => turn.id || String(turn.flatIdx)}
           atBottomStateChange={setHitBottom}
+          atBottomThreshold={8}
           increaseViewportBy={{ top: 1200, bottom: 1200 }}
           scrollerRef={(el) => {
             if (el instanceof HTMLElement) {
