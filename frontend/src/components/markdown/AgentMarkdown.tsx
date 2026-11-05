@@ -68,7 +68,7 @@ function StreamdownCodeBlock({ code, language, isIncomplete }: { code: string; l
   return <CodeBlock language={language || 'code'} code={code} isStreaming={isIncomplete} />;
 }
 
-// ponytail: proxy matches all languages except mermaid and latex, routing them cleanly to MASH CodeBlock
+// Proxy matches all languages except mermaid and latex, routing them cleanly to CodeBlock
 const allOtherLanguages = new Proxy([] as string[], {
   get(target, prop) {
     if (prop === 'includes') {
@@ -111,7 +111,7 @@ export interface AgentMarkdownProps {
   className?: string;
 }
 
-// ponytail: Module-level stable references so Streamdown's built-in block memoization (Sr) never invalidates
+// Module-level stable references so Streamdown block memoization never invalidates
 const STREAMDOWN_PLUGINS = {
   math: mathPlugin,
   renderers: [
