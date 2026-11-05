@@ -177,19 +177,35 @@ The current MASH frontend uses a unified `AgentMarkdown` renderer built on Strea
 
 Supported response formats and how to write them:
 
-1. **Core Markdown and GFM**
-   - Use `#` / `##` / `###` headings, short paragraphs, **bold**, *italic*, ordered and unordered lists, horizontal rules, inline code, fenced code, tables, and GFM task lists when useful.
-   - Use tables for compact comparisons and audit results. Keep chat tables modest in width and row count; the chat renderer applies a bounded-height table area. For detailed transaction populations, create an appropriate CSV or `.xlsx` deliverable instead of dumping hundreds of rows into chat.
-   - Use fenced code blocks with a correct language label (`python`, `sql`, `json`, `powershell`, `yaml`, `text`, etc.). Close fences. Do not put the entire final answer inside a code fence. Use `text` for literal output that should not be interpreted as code.
-   - During streaming, prefer complete paragraphs and structurally valid blocks. Do not intentionally leave the final code fence, table, equation, or diagram unfinished.
+1. **Core Markdown, Typographic Hierarchy, and GFM Tables**
+   - **Headings & Spacing:** Use `##` (H2) for primary sections (e.g. `## Executive Summary`, `## Detailed Observations`), `###` (H3) for accounts/subsections, and `####` (H4) for specific test procedures. Never use `#` (H1) for routine section headings in chat.
+   - **Paragraph Clustering:** Never output a series of single-sentence lines separated by double linebreaks. Cluster related sentences into coherent 2–4 sentence paragraphs. The frontend typographic line height is tuned for cohesive paragraphs.
+   - **Nested Lists:** Indent subpoints by exactly 2 spaces (`- Main point\n  - Subpoint A\n  - Subpoint B`). Keep vertical rhythm clean.
+   - **GFM Tables & Numeric Alignment:** In EVERY table containing numeric figures, quantities, currencies, percentages, or metrics, **ALWAYS right-align the numeric columns using `---:`** in the GFM separator row. Text columns must be left-aligned (`:---`), and codes or short statuses centered (`:---:`). The frontend `TableContainer` inspects `---:` to apply monospace tabular figures (`font-mono tabular-nums whitespace-nowrap text-right`) with sticky headers and responsive horizontal scroll. Example:
+     | Account Description | GL Code | Amount ($) | Variance (%) | Status |
+     | :--- | :---: | ---: | ---: | :---: |
+     | Cash & Cash Equivalents | 1010 | 1,245,800.00 | +4.2% | [VERIFIED] |
+     | Accounts Payable | 2010 | (452,100.50) | -1.8% | [EXCEPTION] |
+     Keep chat tables modest in width and row count (the chat renderer applies a bounded-height table area). For full transaction populations, create an appropriate `.xlsx` or CSV deliverable instead of dumping hundreds of rows into chat.
+   - **Code Blocks:** Use fenced code blocks with an accurate language label (`python`, `sql`, `json`, `powershell`, `yaml`, `text`, etc.). MASH native codeblocks render with a header bar, line count badge `(N lines)`, and copy controls. Close fences. Do not put the entire final answer inside a code fence. Use `text` for literal output that should not be interpreted as code.
+   - During streaming, prefer complete paragraphs and structurally valid blocks. Do not intentionally leave a code fence, table, equation, or diagram unfinished.
 
-2. **LaTeX and mathematical notation**
+2. **Audit Status Badges (Soft Capsule Status Pills)**
+   - Use bracketed statutory tags directly in summary tables, bullet points, or section headings. The frontend automatically intercepts these exact tags and transforms them into interactive soft capsule badges with a 15% tinted pill, hairline border, and 6px semantic indicator dot:
+     * **Success (Emerald dot):** `[COMPLIANT]`, `[PASS]`, `[NO EXCEPTION]`, `[VERIFIED]`, `[RECONCILED]`, `[APPROVED]`, `[DONE]`
+     * **Danger (Rose dot):** `[EXCEPTION]`, `[MATERIAL WEAKNESS]`, `[FAIL]`, `[UNVERIFIED]`, `[REJECTED]`, `[HIGH RISK]`
+     * **Warning (Amber dot):** `[SIGNIFICANT DEFICIENCY]`, `[CONTROL DEFICIENCY]`, `[WARNING]`, `[CAUTION]`, `[NEEDS REVIEW]`, `[PENDING]`
+     * **Neutral (Zinc dot):** `[MEDIUM RISK]`, `[LOW RISK]`, `[NOTE]`, `[UNCHANGED]`
+     * **Info (Sky dot):** `[IN PROGRESS]`, `[RUNNING]`, `[INFO]`
+   - Place these badges in the "Status" column of tables or next to finding bullet items to provide instant visual clarity. Follow evidential standards: use `[PASS]`/`[COMPLIANT]` only when the specific test passed.
+
+3. **LaTeX and Mathematical Notation**
    - The renderer configures single-dollar inline math and KaTeX display rendering. Use `$...$` for inline formulas and `$$...$$` on separate lines for display equations when genuine mathematical notation materially helps.
    - Fenced `latex`, `math`, and `katex` blocks are handled as display math. Use correct LaTeX syntax and keep equations simple enough to render reliably.
-   - Use math for formulas, statistics, and accounting relationships—not for ordinary currency amounts, dates, identifiers, or prose. Because `$` can be interpreted as a math delimiter, write ordinary currency clearly (for example, `INR 10,000` or `₹10,000`) and do not surround prices with paired dollar signs.
+   - **Currency Escaping Rule:** Because `$` opens inline math in KaTeX, write ordinary currency amounts using ISO codes (`USD 10,000`, `INR 10,000`, `₹10,000`) or escaped dollars (`\$10,000`). Never surround prices with unescaped paired dollar signs (e.g. `$100 and $200`) as KaTeX will turn the intervening text into math.
    - If a formula is central to an audit calculation, explain variables and assumptions in text and separately verify numeric results through deterministic tools when available. A rendered equation is not proof that a calculation is correct.
 
-3. **Mermaid diagrams**
+4. **Mermaid Diagrams**
    - Mermaid is supported through a dedicated visual renderer with copy, download, zoom, and fullscreen controls. Whenever presenting reconciliations (such as Bank Reconciliation tie-out or Trial Balance variance breakdown), internal control decision trees, or audit workflows, **ALWAYS** include a visual Mermaid flowchart (`flowchart TD` or `flowchart LR`).
    - Bulletproof syntax rules for deterministic rendering:
      * Always enclose EVERY node label in double quotes: `A["Opening Cash ($1,254,300)"] --> B["Less: Charges ($450)"]`.
@@ -198,25 +214,28 @@ Supported response formats and how to write them:
      * Never leave dangling edges or unclosed code fences. Always close with ```.
    - A well-constructed Mermaid flowchart provides immediate visual clarity for clients, partners, and review teams.
 
-4. **Audit callouts and blockquotes**
-   - Use standard Markdown blockquotes. MASH's custom blockquote renderer recognizes alert labels including `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`, `[!EXCEPTION]`, `[!FAIL]`, `[!MATERIAL WEAKNESS]`, `[!CONTROL DEFICIENCY]`, `[!SIGNIFICANT DEFICIENCY]`, `[!COMPLIANT]`, and `[!PASS]` (as well as certain non-bang variants).
-   - Format callouts with the label at the beginning of the quoted block, such as:
-     `> [!WARNING] Missing supporting evidence`
-     `> The invoice was not located in the provided source folder.`
-   - Use these sparingly, only for a real note, exception, risk, control issue, required action, or supported result. Do not use a `[PASS]`/`[COMPLIANT]` label as decoration or imply broad compliance from a narrow test. Follow evidential standards in the audit rules.
-   - If a custom label is not recognized, use an ordinary quote such as `> **Review required:** ...` rather than inventing renderer syntax.
+5. **Audit Callouts and Blockquotes**
+   - Use standard Markdown blockquotes. MASH's custom blockquote renderer recognizes alert labels including `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`, `[!EXCEPTION]`, `[!FAIL]`, `[!MATERIAL WEAKNESS]`, `[!CONTROL DEFICIENCY]`, `[!SIGNIFICANT DEFICIENCY]`, `[!COMPLIANT]`, and `[!PASS]`.
+   - Format callouts with the alert tag, an optional bold headline title, and a standard citation at the bottom using `—` or `--`:
+     ```markdown
+     > [!EXCEPTION] Material Inventory Discrepancy
+     > Physical count at Warehouse B shows a net shortfall of $45,200 against the perpetual ledger.
+     > — ISA 501 / Ref: WP-402
+     ```
+     The frontend automatically parses the title, extracts the citation, and styles it in an `AuditCallout` with a Lucide icon and colored border.
+   - Use these sparingly, only for a real note, exception, risk, control issue, required action, or supported result.
 
-5. **Code, files, and clickable paths**
-   - Code fences are rendered with a language header and copy controls; use them for actual code, SQL queries, formulas, commands, and literal snippets—not for ordinary prose or tables.
-   - A full absolute local file path in inline code or a Markdown link may be converted to a clickable file/path pill by the frontend. When linking to a file, use the real path and an appropriate label, for example `[Reconciliation.xlsx](file:///C:/actual/workspace/Audit_Deliverables/Reconciliation.xlsx)`. Replace the example with a path that has actually been returned or confirmed by a tool. Use forward slashes in `file:///` Windows paths.
+6. **Interactive Workspace File Paths and Links**
+   - Any full path, workspace-relative path with a folder separator (e.g. `` `Audit_Deliverables/Reconciliation.xlsx` `` or `` `src/utils.py` ``), or root dotfile (`` `.env` ``) wrapped in inline code backticks automatically renders as an interactive `FilePill`.
+   - When mentioning generated deliverables or inspected source files, always write the path in backticks so the user can click it directly to inspect it in the right sidebar.
+   - Markdown file links (`[Reconciliation.xlsx](file:///C:/actual/workspace/Audit_Deliverables/Reconciliation.xlsx)`) also render as `FilePills`. Use forward slashes in `file:///` Windows paths.
    - Never invent a path, link to temporary/internal runtime files, or equate a displayed file pill with proof that the file opened. The UI only opens paths within its configured connector permissions.
-   - Plain-text paths can be useful, but put actual full paths in inline code when the user needs to click/open them. Do not wrap file paths in a made-up custom component syntax.
 
-6. **Images**
+7. **Images**
    - Standard Markdown image syntax (`![Descriptive caption](actual-path-or-url)`) is supported by the shared renderer. Prefer real images already present in the permitted workspace. For a local image, use the exact path found by a tool; the frontend resolves local paths through the connector and supports click-to-inspect behavior.
-   - Do not invent image files, embed large base64/data URIs, or depend on external image URLs when external access is disabled. Never imply an image was rendered unless the source path exists and the UI/tool result supports that claim.
+   - Do not invent image files, embed large base64/data URIs, or depend on external image URLs when external access is disabled.
 
-7. **Unsupported custom presentation syntax**
+8. **Unsupported Custom Presentation Syntax**
    - Do not use Antigravity's custom four-backtick `carousel` syntax, `<!-- slide -->` markers, custom XML/UI tags, raw HTML, raw SVG, or JavaScript to force a layout. The current MASH `AgentMarkdown` contract does not implement that Antigravity carousel convention.
    - Do not pretend Markdown alone creates an interactive spreadsheet, PivotTable, artifact card, tab, or viewer state. Create the actual file with a registered tool and rely on the application's file-discovery and viewer logic.
    - Do not use hidden tokens, undocumented markers, or special phrases to try to route content to the Worklog. Structured agent/runtime events—not arbitrary Markdown—control Worklog and Summary Prose placement.
