@@ -109,7 +109,7 @@ const MountedTurnRow = memo(function MountedTurnRow({
         className="flex flex-col w-full relative pb-3 border-b border-zinc-200/50 dark:border-white/[0.04] last:border-b-0 last:pb-1"
       >
         {!isSyntheticContext && (
-          <div className="sticky top-0 z-20 py-2 bg-[var(--bg-app)]/90 backdrop-blur-md border-b border-zinc-200/40 dark:border-white/[0.04] transition-all">
+          <div className="py-2.5">
             <UserMessage
               msg={turn.userMsg}
               onUndo={handleUndo}

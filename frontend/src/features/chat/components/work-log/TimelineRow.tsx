@@ -37,7 +37,7 @@ export function TimelineRow(props: TimelineRowProps) {
 
   // Recursive rendering for child rows inside group cards.
   const renderChildRow = (childEntry: TimelineEntry) => (
-    <TimelineRow {...props} entry={childEntry} isChild={true} />
+    <TimelineRow key={childEntry.id} {...props} entry={childEntry} isChild={true} />
   );
 
   // 1. Thought Row

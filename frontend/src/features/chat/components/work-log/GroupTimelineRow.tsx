@@ -69,7 +69,11 @@ export function GroupTimelineRow({
       {/* Decomposed child rows: clean indentation without vertical border line */}
       {expanded && (
         <div className="mt-1 mb-1.5 pl-4 flex flex-col gap-1">
-          {entry.items?.map((child) => renderChildRow(child))}
+          {entry.items?.map((child) => (
+            <React.Fragment key={child.id}>
+              {renderChildRow(child)}
+            </React.Fragment>
+          ))}
         </div>
       )}
     </div>
