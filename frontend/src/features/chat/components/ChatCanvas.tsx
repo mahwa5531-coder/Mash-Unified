@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import ChatComposer from '@/features/chat/components/ChatComposer';
 import { QuotaBanner, InvalidMediaBanner } from '@/primitives';
 import { classifyError } from '@/lib/errorClassification';
@@ -9,9 +10,6 @@ import AssistantMessage from '@/features/chat/components/messages/AssistantMessa
 import { ScrollToBottomButton } from '@/features/chat/components/ScrollToBottomButton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useChatStream } from '@/features/chat/hooks/useChatStream';
-import { useScrollToBottom } from '@/features/chat/hooks/useScrollToBottom';
-import { useTurnViewportWindow } from '@/features/chat/hooks/useTurnViewportWindow';
-import { useReverseInfiniteScroll } from '@/features/chat/hooks/useReverseInfiniteScroll';
 import { TurnViewportProvider } from '@/features/chat/context/TurnViewportContext';
 import type { Turn } from '@/types/chat';
 import { ChatHeroView } from './ChatHeroView';
@@ -51,7 +49,6 @@ interface MountedTurnRowProps {
   onRetryTurn: (content: string, sid?: string) => void;
   onApproveTool?: (toolCallId: string, action: 'allow_once' | 'allow' | 'deny', feedback?: string) => Promise<boolean | void> | boolean | void;
   onUndo: (flatIdx: number, content: string, turnIdx?: number, turnId?: string) => void;
-  onMeasureHeight: (turnKey: string, height: number) => void;
 }
 
 const MountedTurnRow = memo(function MountedTurnRow({
@@ -66,33 +63,9 @@ const MountedTurnRow = memo(function MountedTurnRow({
   onRetryTurn,
   onApproveTool,
   onUndo,
-  onMeasureHeight,
 }: MountedTurnRowProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const isSyntheticContext = turn.userMsg.content === '[Earlier Context]';
   const turnIdx = turn.turnIndex ?? globalTurnIdx;
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    if (el.offsetHeight > 0) {
-      onMeasureHeight(turnKey, el.offsetHeight);
-    }
-
-    if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const h = entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight;
-          if (h > 0) {
-            onMeasureHeight(turnKey, Math.round(h));
-          }
-        }
-      });
-      ro.observe(el);
-      return () => ro.disconnect();
-    }
-  }, [turnKey, onMeasureHeight]);
 
   const handleRetry = useCallback(() => {
     onRetryTurn(turn.userMsg.content, turn.userMsg.sessionId);
@@ -105,7 +78,6 @@ const MountedTurnRow = memo(function MountedTurnRow({
   return (
     <TurnViewportProvider isNearViewport={true}>
       <div 
-        ref={containerRef}
         className="flex flex-col w-full relative pb-3 border-b border-zinc-200/50 dark:border-white/[0.04] last:border-b-0 last:pb-1"
       >
         {!isSyntheticContext && (
@@ -144,7 +116,8 @@ const MountedTurnRow = memo(function MountedTurnRow({
          prev.isLastTurn === next.isLastTurn &&
          prev.isStreaming === next.isStreaming &&
          prev.globalTurnIdx === next.globalTurnIdx &&
-         prev.turnKey === next.turnKey;
+         prev.turnKey === next.turnKey &&
+         prev.artifactsByTurnMsg === next.artifactsByTurnMsg;
 });
 
 export default function ChatCanvas({ 
@@ -181,14 +154,10 @@ export default function ChatCanvas({
     }
   }, [sessionId]);
 
-  // Velocity-aware scroll retention hook (synchronous pin ref passed to stream flusher)
-  const {
-    autoScroll,
-    hitBottom,
-    isPinnedToBottomRef,
-    scrollDomToBottom,
-    onChatBodyScroll,
-  } = useScrollToBottom(chatScrollContainerRef);
+  // Virtuoso ref for programmatic scrolling (e.g. scroll-to-bottom button)
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const [firstItemIndex, setFirstItemIndex] = useState(100_000);
+  const [hitBottom, setHitBottom] = useState(true);
 
   const {
     chatMessages,
@@ -221,7 +190,6 @@ export default function ChatCanvas({
     pendingWorkspacePath, 
     onSessionCreated,
     scrollContainerRef: chatScrollContainerRef,
-    isPinnedToBottomRef,
     permissionMode,
   });
 
@@ -230,53 +198,34 @@ export default function ChatCanvas({
   const [showInvalidMediaBanner, setShowInvalidMediaBanner] = useState<boolean>(false);
   const [invalidMediaReason, setInvalidMediaReason] = useState<string>("Maximum number of attachments reached");
 
-  // Milestone 1: Zero-dependency dynamic viewport windowing & DOM culling
-  const {
-    startIndex,
-    endIndex,
-    turnHeightCache,
-    recordTurnHeight,
-    estimateTurnHeight,
-  } = useTurnViewportWindow({
-    containerRef: chatScrollContainerRef,
-    turns,
-    isStreaming,
-  });
+  // Reset state when session changes
+  useEffect(() => {
+    setFirstItemIndex(100_000);
+    setShowQuotaBanner(false);
+    setShowInvalidMediaBanner(false);
+  }, [sessionId]);
 
   const handleRetryTurn = useCallback((content: string, sid?: string) => {
     retry(content, sid);
   }, [retry]);
 
-  // Reset quota/media banners when session changes
-  useEffect(() => {
-    setShowQuotaBanner(false);
-    setShowInvalidMediaBanner(false);
-  }, [sessionId]);
+  const scrollDomToBottom = useCallback(() => {
+    virtuosoRef.current?.scrollToIndex({
+      index: turns.length - 1,
+      align: 'end',
+      behavior: 'smooth',
+    });
+  }, [turns.length]);
 
-  // Milestone 2: Seamless Reverse Infinite Scroll with Scroll-Anchoring
-  const { topSentinelRef } = useReverseInfiniteScroll({
-    containerRef: chatScrollContainerRef,
-    hasEarlierTurns,
-    isLoadingEarlier,
-    loadEarlierTurns,
-    turnsCount: turns.length,
-  });
+  const handleLoadEarlier = useCallback(async () => {
+    if (isLoadingEarlier || !hasEarlierTurns) return;
+    await loadEarlierTurns((prependedCount) => {
+      setFirstItemIndex((prev) => prev - prependedCount);
+    });
+  }, [isLoadingEarlier, hasEarlierTurns, loadEarlierTurns]);
 
   const lastTurn = turns[turns.length - 1];
   const lastAiMsg = lastTurn?.aiMsgs[lastTurn.aiMsgs.length - 1];
-
-  // Auto-scroll strictly to bottom when new turns arrive or streaming starts
-  // (Token-by-token follow scroll is handled smoothly by useSseBufferFlusher at 60fps)
-  useEffect(() => {
-    if (autoScroll) {
-      scrollDomToBottom();
-    }
-  }, [
-    turns.length, 
-    isStreaming, 
-    autoScroll, 
-    scrollDomToBottom,
-  ]);
 
   // Trigger quota banner ONLY if backend/model returns a rate limit or quota exceeded error
   useEffect(() => {
@@ -298,10 +247,6 @@ export default function ChatCanvas({
     scrollDomToBottom();
   }, [send, scrollDomToBottom]);
 
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    onChatBodyScroll(e.currentTarget);
-  }, [onChatBodyScroll]);
-
   const handleEditQueued = (index = 0) => {
     const msg = queuedMessages?.[index] || queuedMessage;
     if (msg) {
@@ -313,98 +258,94 @@ export default function ChatCanvas({
   return (
     <div className="flex-1 min-w-0 min-h-0 bg-[var(--bg-app)] flex flex-col h-full overflow-hidden relative font-sans text-[var(--text-primary)] transition-colors">
       
-      {/* Main Chat Feed (Scrollable) */}
-      <div 
-        ref={chatScrollContainerRef} 
-        onScroll={handleScroll} 
-        className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 custom-scrollbar relative"
-      >
-        <div className="max-w-3xl mx-auto flex flex-col min-h-full pb-6 w-full">
-          
-          <ChatHistoryLoadState
-            sessionId={sessionId}
-            isHistoryLoaded={isHistoryLoaded}
-            historyLoadError={historyLoadError}
-            retryLoadHistory={retryLoadHistory}
-          />
-
-          {/* Messages Feed */}
-          {chatMessages.length > 0 && (
-            <div className="flex flex-col pt-3 space-y-3.5">
-              {/* Milestone 2: Top Sentinel for Reverse Infinite Scroll */}
-              {hasEarlierTurns && (
-                <div
-                  ref={topSentinelRef}
-                  className="flex justify-center -mt-1 -mb-1 pb-1.5 min-h-[24px]"
-                  aria-hidden={!earlierLoadError}
-                >
-                  {earlierLoadError ? (
-                    <button
-                      type="button"
-                      onClick={() => loadEarlierTurns()}
-                      className="text-xs text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 underline font-medium cursor-pointer py-1 px-2 rounded bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
-                    >
-                      Failed to load earlier turns. Click to retry.
-                    </button>
-                  ) : isLoadingEarlier ? (
-                    <div className="flex items-center gap-2 text-xs text-zinc-400">
-                      <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
-                      <span>Loading earlier turns...</span>
-                    </div>
-                  ) : null}
-                </div>
-              )}
-
-              {turns.map((turn, i) => {
-                const globalTurnIdx = i;
-                const isLastTurn = globalTurnIdx === turns.length - 1;
-                const turnKey = turn.id || `turn_${turn.flatIdx}_${globalTurnIdx}`;
-                const isPinnedStreaming = isStreaming && isLastTurn;
-                const isVisible = (i >= startIndex && i <= endIndex) || isPinnedStreaming;
-
-                if (!isVisible) {
-                  const cachedHeight = turnHeightCache.get(turnKey) || estimateTurnHeight(turn);
-                  return (
-                    <div
-                      key={turnKey}
-                      data-turn-idx={globalTurnIdx}
-                      data-turn-culled="true"
-                      style={{
-                        height: `${cachedHeight}px`,
-                        containIntrinsicSize: `auto ${cachedHeight}px`,
-                        contentVisibility: 'auto',
-                      }}
-                      className="w-full shrink-0 border-b border-zinc-200/50 dark:border-white/[0.04]"
-                      aria-hidden="true"
-                    />
-                  );
-                }
-
-                return (
-                  <MountedTurnRow
-                    key={turnKey}
-                    turn={turn}
-                    turnKey={turnKey}
-                    globalTurnIdx={globalTurnIdx}
-                    isLastTurn={isLastTurn}
-                    isStreaming={isLastTurn && isStreaming}
-                    artifactsByTurnMsg={artifactsByTurnMsg}
-                    onOpenFile={onOpenFile}
-                    onContinue={handleContinue}
-                    onRetryTurn={handleRetryTurn}
-                    onApproveTool={approveToolCall}
-                    onUndo={undo}
-                    onMeasureHeight={recordTurnHeight}
-                  />
-                );
-              })}
-
-              {/* Terminal anchor for browser-native scroll-anchoring */}
-              <div className="h-px shrink-0 w-full [overflow-anchor:auto]" aria-hidden="true" />
-            </div>
-          )}
+      {/* Main Chat Feed (Powered by react-virtuoso for zero-jank dynamic virtualization & prepending) */}
+      {chatMessages.length === 0 ? (
+        <div 
+          ref={chatScrollContainerRef} 
+          className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 custom-scrollbar relative"
+        >
+          <div className="max-w-3xl mx-auto flex flex-col min-h-full pb-6 w-full">
+            <ChatHistoryLoadState
+              sessionId={sessionId}
+              isHistoryLoaded={isHistoryLoaded}
+              historyLoadError={historyLoadError}
+              retryLoadHistory={retryLoadHistory}
+            />
+          </div>
         </div>
-      </div>
+      ) : (
+        <Virtuoso
+          ref={virtuosoRef}
+          data={turns}
+          firstItemIndex={firstItemIndex}
+          initialTopMostItemIndex={Math.max(0, turns.length - 1)}
+          followOutput={(isAtBottom) => isAtBottom ? 'smooth' : false}
+          startReached={handleLoadEarlier}
+          computeItemKey={(_, turn) => turn.id || String(turn.flatIdx)}
+          atBottomStateChange={setHitBottom}
+          increaseViewportBy={{ top: 1200, bottom: 1200 }}
+          scrollerRef={(el) => {
+            if (el instanceof HTMLElement) {
+              (chatScrollContainerRef as any).current = el;
+            }
+          }}
+          className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 custom-scrollbar relative"
+          components={{
+            Header: () => (
+              <div className="max-w-3xl mx-auto w-full pt-2">
+                <ChatHistoryLoadState
+                  sessionId={sessionId}
+                  isHistoryLoaded={isHistoryLoaded}
+                  historyLoadError={historyLoadError}
+                  retryLoadHistory={retryLoadHistory}
+                />
+                {hasEarlierTurns && (
+                  <div className="flex justify-center -mt-1 -mb-1 pb-1.5 min-h-[24px]">
+                    {earlierLoadError ? (
+                      <button
+                        type="button"
+                        onClick={handleLoadEarlier}
+                        className="text-xs text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 underline font-medium cursor-pointer py-1 px-2 rounded bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
+                      >
+                        Failed to load earlier turns. Click to retry.
+                      </button>
+                    ) : isLoadingEarlier ? (
+                      <div className="flex items-center gap-2 text-xs text-zinc-400">
+                        <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                        <span>Loading earlier turns...</span>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            ),
+            Footer: () => (
+              <div className="max-w-3xl mx-auto w-full pb-6" aria-hidden="true" />
+            ),
+          }}
+          itemContent={(index, turn) => {
+            const isLastTurn = index === turns.length - 1;
+            const turnKey = turn.id || `turn_${turn.flatIdx}_${index}`;
+            return (
+              <div className="max-w-3xl mx-auto w-full py-1">
+                <MountedTurnRow
+                  turn={turn}
+                  turnKey={turnKey}
+                  globalTurnIdx={index}
+                  isLastTurn={isLastTurn}
+                  isStreaming={isLastTurn && isStreaming}
+                  artifactsByTurnMsg={artifactsByTurnMsg}
+                  onOpenFile={onOpenFile}
+                  onContinue={handleContinue}
+                  onRetryTurn={handleRetryTurn}
+                  onApproveTool={approveToolCall}
+                  onUndo={undo}
+                />
+              </div>
+            );
+          }}
+        />
+      )}
 
       {/* Bottom Composer Dock */}
       <div className="shrink-0 w-full z-20 bg-transparent pb-3 px-4 sm:px-6 relative">

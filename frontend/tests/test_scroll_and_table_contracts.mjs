@@ -28,17 +28,11 @@ assert.ok(chatStreamSrc.includes('isPinnedToBottomRef?: React.MutableRefObject<b
 assert.ok(chatStreamSrc.includes('isAtBottomRef: activePinnedRef'), 'useChatStream must pass activePinnedRef to useSseBufferFlusher');
 console.log('✓ PASS: useChatStream correctly bridges isPinnedToBottomRef to buffer flusher');
 
-// 5. Verify ChatCanvas wires isPinnedToBottomRef and pruned redundant stream-follow effect dependencies
+// 5. Verify ChatCanvas uses Virtuoso followOutput and eliminated redundant manual autoScroll effects
 const chatCanvasSrc = fs.readFileSync('frontend/src/features/chat/components/ChatCanvas.tsx', 'utf8');
-assert.ok(chatCanvasSrc.includes('isPinnedToBottomRef,'), 'ChatCanvas must retrieve isPinnedToBottomRef from useScrollToBottom');
-assert.ok(chatCanvasSrc.includes('isPinnedToBottomRef,'), 'ChatCanvas must pass isPinnedToBottomRef into useChatStream');
-
-// Check that lastAiContent, lastAiThoughts, lastAiTools are pruned from the effect
-const effectSnippet = chatCanvasSrc.substring(chatCanvasSrc.indexOf('// Auto-scroll strictly to bottom when new turns arrive'), chatCanvasSrc.indexOf('// Trigger quota banner'));
-assert.ok(!effectSnippet.includes('lastAiContent'), 'Pruned redundant lastAiContent dependency from autoScroll effect');
-assert.ok(!effectSnippet.includes('lastAiThoughts'), 'Pruned redundant lastAiThoughts dependency from autoScroll effect');
-assert.ok(!effectSnippet.includes('lastAiTools'), 'Pruned redundant lastAiTools dependency from autoScroll effect');
-console.log('✓ PASS: ChatCanvas pruned redundant token change dependencies from autoScroll effect');
+assert.ok(chatCanvasSrc.includes('followOutput='), 'ChatCanvas must use Virtuoso followOutput for zero-yank output tracking');
+assert.ok(chatCanvasSrc.includes('atBottomStateChange={setHitBottom}'), 'ChatCanvas must track bottom state via Virtuoso');
+console.log('✓ PASS: ChatCanvas uses Virtuoso followOutput and eliminated fragile manual autoScroll loops');
 
 // 6. Verify TableContainer supports isChat with max-height ceiling and sticky headers
 assert.ok(tableContainerSrc.includes('isChat'), 'TableContainer must accept isChat prop');

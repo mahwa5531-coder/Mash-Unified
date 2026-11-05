@@ -197,8 +197,13 @@ export function useChatStream({
     [turns, isStreaming]
   );
 
-  const handleLoadEarlier = useCallback(async () => {
-    await history.loadEarlierTurns((olderMsgs) => setChatMessages([...olderMsgs]));
+  const handleLoadEarlier = useCallback(async (onOlderTurnsLoaded?: (count: number) => void) => {
+    await history.loadEarlierTurns((olderMsgs, count) => {
+      if (onOlderTurnsLoaded && count && count > 0) {
+        onOlderTurnsLoaded(count);
+      }
+      setChatMessages([...olderMsgs]);
+    });
   }, [history]);
 
   useEffect(() => {

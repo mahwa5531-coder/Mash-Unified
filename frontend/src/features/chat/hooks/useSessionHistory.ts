@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { fetchTranscript } from '@/services/sessions';
-import { parseSessionHistory } from '@/features/chat/utils/turns';
+import { parseSessionHistory, buildTurns } from '@/features/chat/utils/turns';
 import { sessionStore, type SessionRuntimeState } from '../state/sessionStore';
 import type { Message } from '@/types/chat';
 
@@ -42,7 +42,7 @@ export function useSessionHistory({
     setHistoryRetryNonce(n => n + 1);
   }, []);
 
-  const loadEarlierTurns = useCallback(async (onPrepend: (olderMsgs: Message[]) => void) => {
+  const loadEarlierTurns = useCallback(async (onPrepend: (olderMsgs: Message[], prependedTurnsCount?: number) => void) => {
     const curSid = activeSessionIdRef.current;
     if (!curSid) return;
     const s = sessionStore.get(curSid);
@@ -57,11 +57,8 @@ export function useSessionHistory({
     setIsLoadingEarlier(true);
     setEarlierLoadError(false);
     try {
-      const container = scrollContainerRef?.current;
-      const prevScrollHeight = container ? container.scrollHeight : 0;
-      const prevScrollTop = container ? container.scrollTop : 0;
-
-      const PAGE_SIZE = 100;
+      // ponytail: Paginate in smoother 40-item chunks rather than massive 100-line blocks
+      const PAGE_SIZE = 40;
       const resp = await fetchTranscript(curSid, PAGE_SIZE, true, s.loadedRawCount);
       const olderLines = resp.lines || [];
 
@@ -71,22 +68,13 @@ export function useSessionHistory({
         s.totalHistoryCount = resp.total || s.totalHistoryCount;
 
         const olderMsgs = parseSessionHistory(olderLines);
+        const olderTurns = buildTurns(olderMsgs);
         s.chatMessages = [...olderMsgs, ...s.chatMessages];
 
         if (activeSessionIdRef.current === curSid) {
-          onPrepend(s.chatMessages);
+          // ponytail: pass the exact count of prepended turns so Virtuoso's firstItemIndex decrements atomically
+          onPrepend(s.chatMessages, olderTurns.length);
           updatePaginationState(s);
-
-          requestAnimationFrame(() => {
-            if (container && prevScrollHeight > 0) {
-              const newScrollHeight = container.scrollHeight;
-              const expectedTop = newScrollHeight - prevScrollHeight + prevScrollTop;
-              // Only apply fallback if not already compensated by synchronous useLayoutEffect
-              if (Math.abs(container.scrollTop - expectedTop) > 2) {
-                container.scrollTop = expectedTop;
-              }
-            }
-          });
         }
       } else {
         s.loadedRawCount = s.totalHistoryCount;
@@ -101,7 +89,7 @@ export function useSessionHistory({
       isFetchingEarlierRef.current = false;
       setIsLoadingEarlier(false);
     }
-  }, [activeSessionIdRef, isLoadingEarlier, scrollContainerRef, updatePaginationState]);
+  }, [activeSessionIdRef, isLoadingEarlier, updatePaginationState]);
 
   return {
     isHistoryLoaded,
