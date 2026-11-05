@@ -104,10 +104,10 @@ console.log('\n[Test Suite 3] Production Codebase Architecture Assertions...');
 {
   // 1. TerminalViewer must use virtualized line rendering
   const termViewerCode = fs.readFileSync(path.resolve(__dirname, '../src/features/viewer/components/TerminalViewer.tsx'), 'utf-8');
-  assert.ok(termViewerCode.includes('startIndex') && termViewerCode.includes('endIndex'), 'TerminalViewer must compute startIndex and endIndex window');
-  assert.ok(termViewerCode.includes('topSpacerHeight') && termViewerCode.includes('bottomSpacerHeight'), 'TerminalViewer must use top and bottom spacers');
-  assert.ok(termViewerCode.includes('visibleLines'), 'TerminalViewer must render only visibleLines');
-  console.log('  [PASS] 3A. TerminalViewer is 100% line-windowed with zero-dependency spacers.');
+  assert.ok(termViewerCode.includes('Virtuoso'), 'TerminalViewer must use Virtuoso for dynamic line virtualization');
+  assert.ok(termViewerCode.includes('followOutput'), 'TerminalViewer must configure followOutput for live streaming tasks');
+  assert.ok(termViewerCode.includes('logLines'), 'TerminalViewer must pass logLines to Virtuoso');
+  console.log('  [PASS] 3A. TerminalViewer is 100% dynamically virtualized via react-virtuoso.');
 
   // 2. SafeFileViewer must format minified JSON and eliminate 5k truncation on JSON
   const safeViewerCode = fs.readFileSync(path.resolve(__dirname, '../src/features/viewer/components/SafeFileViewer.tsx'), 'utf-8');

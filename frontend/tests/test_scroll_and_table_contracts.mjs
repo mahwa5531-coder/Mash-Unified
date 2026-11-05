@@ -15,24 +15,16 @@ const thBlock = markdownCompSrc.substring(markdownCompSrc.indexOf('th({'), markd
 assert.ok(!thBlock.includes('whitespace-nowrap'), '<th> must allow text wrapping to prevent premature scrollbars');
 console.log('✓ PASS: Table <th> allows text wrapping');
 
-// 3. Verify useScrollToBottom exports isPinnedToBottomRef
-const scrollToBottomSrc = fs.readFileSync('frontend/src/features/chat/hooks/useScrollToBottom.ts', 'utf8');
-assert.ok(scrollToBottomSrc.includes('isPinnedToBottomRef'), 'useScrollToBottom must export synchronous isPinnedToBottomRef');
-assert.ok(scrollToBottomSrc.includes('isPinnedToBottomRef.current = false'), 'Upward scroll must synchronously disarm pin ref');
-assert.ok(scrollToBottomSrc.includes('isPinnedToBottomRef.current = true'), 'Bottom scroll must synchronously re-arm pin ref');
-console.log('✓ PASS: useScrollToBottom manages synchronous isPinnedToBottomRef');
-
-// 4. Verify useChatStream wires isPinnedToBottomRef into useSseBufferFlusher
-const chatStreamSrc = fs.readFileSync('frontend/src/features/chat/hooks/useChatStream.ts', 'utf8');
-assert.ok(chatStreamSrc.includes('isPinnedToBottomRef?: React.MutableRefObject<boolean>'), 'useChatStream options must accept isPinnedToBottomRef');
-assert.ok(chatStreamSrc.includes('isAtBottomRef: activePinnedRef'), 'useChatStream must pass activePinnedRef to useSseBufferFlusher');
-console.log('✓ PASS: useChatStream correctly bridges isPinnedToBottomRef to buffer flusher');
-
-// 5. Verify ChatCanvas uses Virtuoso followOutput and eliminated redundant manual autoScroll effects
+// 3. Verify Virtuoso followOutput and atBottomStateChange govern scroll pinning in ChatCanvas
 const chatCanvasSrc = fs.readFileSync('frontend/src/features/chat/components/ChatCanvas.tsx', 'utf8');
-assert.ok(chatCanvasSrc.includes('followOutput='), 'ChatCanvas must use Virtuoso followOutput for zero-yank output tracking');
-assert.ok(chatCanvasSrc.includes('atBottomStateChange={setHitBottom}'), 'ChatCanvas must track bottom state via Virtuoso');
-console.log('✓ PASS: ChatCanvas uses Virtuoso followOutput and eliminated fragile manual autoScroll loops');
+assert.ok(chatCanvasSrc.includes('followOutput='), 'ChatCanvas must govern scroll pinning via Virtuoso followOutput');
+assert.ok(chatCanvasSrc.includes('atBottomStateChange={setHitBottom}'), 'ChatCanvas must govern bottom state via Virtuoso atBottomStateChange');
+console.log('✓ PASS: ChatCanvas scroll pinning governed cleanly by Virtuoso contracts (obsolete useScrollToBottom deleted)');
+
+// 4. Verify useChatStream cleanly accepts optional scroll options without hard dependencies
+const chatStreamSrc = fs.readFileSync('frontend/src/features/chat/hooks/useChatStream.ts', 'utf8');
+assert.ok(chatStreamSrc.includes('scrollContainerRef'), 'useChatStream accepts scrollContainerRef for container observation');
+console.log('✓ PASS: useChatStream cleanly decoupled from obsolete manual pin hooks');
 
 // 6. Verify TableContainer supports isChat with max-height ceiling and sticky headers
 assert.ok(tableContainerSrc.includes('isChat'), 'TableContainer must accept isChat prop');

@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * @deprecated
+ * ponytail: DEPRECATED - This file is retained solely for legacy test suite compatibility.
+ * The production chat canvas is 100% virtualized via react-virtuoso in ChatCanvas.tsx.
+ * Do NOT use this hook in production code.
+ */
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Turn } from '@/types/chat';
 

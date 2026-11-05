@@ -1,7 +1,9 @@
 "use client";
 
-// Terminal tab body: task header + status chip + line-windowed virtualized monospace log.
-import React, { useState, useEffect, useMemo, MouseEvent as ReactMouseEvent } from 'react';
+// Terminal tab body: task header + status chip + dynamically virtualized monospace log.
+// Powered by react-virtuoso for zero-jank dynamic line measurement & live output tracking.
+import React, { useState, useMemo, MouseEvent as ReactMouseEvent } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 import { StopCircle, Copy, Check } from 'lucide-react';
 import { Button } from '@/primitives';
 import type { TabItem } from '../types';
@@ -13,9 +15,6 @@ interface TerminalViewerProps {
   handleKillTask: (e: ReactMouseEvent, pid: number) => void;
   terminalPreRef: React.RefObject<HTMLDivElement | null>;
 }
-
-const LINE_HEIGHT = 22; // px per monospace terminal line
-const OVERSCAN = 20; // buffer lines above and below viewport
 
 export function TerminalViewer({
   activeTab,
@@ -30,43 +29,8 @@ export function TerminalViewer({
 
   // Fast memoized line splitting
   const logLines = useMemo(() => rawLog.split('\n'), [rawLog]);
-  const totalLines = logLines.length;
 
-  const [scrollTop, setScrollTop] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(600);
   const [copied, setCopied] = useState(false);
-
-  // Measure container height dynamically
-  useEffect(() => {
-    const el = terminalPreRef.current;
-    if (!el) return;
-
-    setViewportHeight(el.clientHeight || 600);
-
-    if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const h = entry.contentRect?.height || entry.borderBoxSize?.[0]?.blockSize;
-          if (h && h > 0) {
-            setViewportHeight(Math.round(h));
-          }
-        }
-      });
-      ro.observe(el);
-      return () => ro.disconnect();
-    }
-  }, [terminalPreRef]);
-
-  // Zero-dependency line virtualization window
-  const startIndex = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - OVERSCAN);
-  const visibleCount = Math.ceil(viewportHeight / LINE_HEIGHT) + 2 * OVERSCAN;
-  const endIndex = Math.min(totalLines, startIndex + visibleCount);
-
-  const topSpacerHeight = startIndex * LINE_HEIGHT;
-  const bottomSpacerHeight = Math.max(0, (totalLines - endIndex) * LINE_HEIGHT);
-  const visibleLines = useMemo(() => {
-    return logLines.slice(startIndex, endIndex);
-  }, [logLines, startIndex, endIndex]);
 
   const handleCopyLog = (e: ReactMouseEvent) => {
     e.stopPropagation();
@@ -123,23 +87,23 @@ export function TerminalViewer({
         </div>
       </div>
 
-      {/* Line-Windowed Monospace Virtualized Terminal Log */}
-      <div 
-        ref={terminalPreRef} 
-        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+      {/* Dynamically Virtualized Monospace Terminal Log (Powered by react-virtuoso) */}
+      <Virtuoso
+        scrollerRef={(el) => {
+          if (el instanceof HTMLElement && terminalPreRef) {
+            (terminalPreRef as any).current = el;
+          }
+        }}
+        data={logLines}
+        followOutput={isRunning ? 'smooth' : false}
+        initialTopMostItemIndex={Math.max(0, logLines.length - 1)}
         className="p-3 overflow-auto custom-scrollbar font-mono text-[11.5px] leading-relaxed text-zinc-300 flex-1 bg-[#0d0d0f]"
-      >
-        {topSpacerHeight > 0 && (
-          <div style={{ height: `${topSpacerHeight}px` }} aria-hidden="true" />
-        )}
-
-        {visibleLines.map((line, offset) => {
-          const idx = startIndex + offset;
+        itemContent={(idx, line) => {
           const displayLine = line.length > 10000 ? line.slice(0, 10000) + '... [line truncated for browser safety]' : line;
           return (
             <div 
               key={idx} 
-              className="flex hover:bg-white/[0.02] py-0.5 px-1 rounded-sm h-[22px] items-center shrink-0 min-w-full w-max"
+              className="flex hover:bg-white/[0.02] py-0.5 px-1 rounded-sm items-center shrink-0 min-w-full w-max"
             >
               <span className="select-none text-zinc-600 w-9 text-right pr-3.5 shrink-0 tabular-nums font-mono text-[11px]">
                 {idx + 1}
@@ -149,12 +113,8 @@ export function TerminalViewer({
               </span>
             </div>
           );
-        })}
-
-        {bottomSpacerHeight > 0 && (
-          <div style={{ height: `${bottomSpacerHeight}px` }} aria-hidden="true" />
-        )}
-      </div>
+        }}
+      />
     </div>
   );
 }
