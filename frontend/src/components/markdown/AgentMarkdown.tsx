@@ -3,7 +3,6 @@
 import React, { memo } from 'react';
 import katex from 'katex';
 import { Streamdown } from 'streamdown';
-import { code } from '@streamdown/code';
 import { createMathPlugin } from '@streamdown/math';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
@@ -14,7 +13,7 @@ import MermaidRenderer from '@/components/renderers/MermaidRenderer';
 
 /**
  * AgentMarkdown — unified markdown renderer powered directly by Streamdown.
- * Uses official @streamdown/code (Shiki) for 200+ language TextMate syntax highlighting,
+ * Uses native MASH CodeBlock component for syntax highlighting & line count,
  * official @streamdown/math for KaTeX equations, and custom Pele MermaidRenderer.
  * Code blocks never truncate or collapse; codeBlockMaxHeight={0} enforces full view.
  */
@@ -99,7 +98,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   onImageClick,
   className,
 }: AgentMarkdownProps) {
-  const components = useAgentMarkdownComponents({ mode, sessionId, onOpenFile, onImageClick });
+  const components = useAgentMarkdownComponents({ mode, sessionId, onOpenFile, onImageClick, isStreaming });
   const sanitizedContent = React.useMemo(() => {
     if (!content) return '';
     return escapeCurrencyInMarkdown(content);
@@ -120,7 +119,6 @@ export const AgentMarkdown = memo(function AgentMarkdown({
       <Streamdown
         mode={isStreaming ? 'streaming' : 'static'}
         plugins={{
-          code,
           math: mathPlugin,
           renderers: [
             { component: LatexBlock, language: LATEX_LANGUAGES },

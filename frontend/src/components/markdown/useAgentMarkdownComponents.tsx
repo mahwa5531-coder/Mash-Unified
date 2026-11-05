@@ -10,6 +10,7 @@ import {
 } from '@/primitives';
 import CalloutBlockquote from '@/components/renderers/CalloutBlockquote';
 import TableContainer from '@/components/renderers/TableContainer';
+import CodeBlock from '@/components/renderers/CodeBlock';
 import { normalizePath } from '@/utils/normalizePath';
 import { BASE_URL } from '@/services/client';
 import type { LightboxImageData } from '@/features/chat/components/messages/ImageLightboxModal';
@@ -28,15 +29,15 @@ import {
  * artifact mode so file pills, audit badges, math, tables, and images behave
  * identically everywhere.
  *
- * Fenced code blocks, Mermaid diagrams, and math are intentionally NOT
- * overridden here: they are owned by the streamdown plugins
- * (@streamdown/code, @streamdown/mermaid, @streamdown/math).
+ * Fenced code blocks are owned by MASH CodeBlock; Mermaid diagrams are
+ * owned by Pele MermaidRenderer; Math is owned by @streamdown/math.
  */
 export interface UseAgentMarkdownComponentsOptions {
   mode: 'chat' | 'artifact';
   sessionId?: string;
   onOpenFile?: (path: string) => void;
   onImageClick?: (img: LightboxImageData) => void;
+  isStreaming?: boolean;
 }
 
 export function useAgentMarkdownComponents({
@@ -44,6 +45,7 @@ export function useAgentMarkdownComponents({
   sessionId,
   onOpenFile,
   onImageClick,
+  isStreaming = false,
 }: UseAgentMarkdownComponentsOptions) {
   const isChat = mode === 'chat';
 
@@ -190,6 +192,22 @@ export function useAgentMarkdownComponents({
       return <strong className="text-zinc-950 dark:text-white font-semibold" {...props}>{children}</strong>;
     },
 
+    /**
+     * Fenced code block — delegates directly to MASH CodeBlock component
+     * (single source for line counts, copy button, syntax highlight, Unit 17 styling).
+     */
+    pre({ children, node: _node, ...props }: any) {
+      const child = React.isValidElement(children) ? (children as React.ReactElement<any>) : null;
+      const className = child?.props?.className || '';
+      const match = /language-(\w+)/.exec(className);
+      const language = match ? match[1] : '';
+      const code = typeof child?.props?.children === 'string'
+        ? child.props.children
+        : extractChildText(children);
+
+      return <CodeBlock language={language} code={code} isStreaming={isStreaming} />;
+    },
+
     /** Single-source naked table via MASH Unit 15 TableContainer — zero extra card/frame, zero clutter buttons */
     table({ children, node: _node, className: _cls, ...props }: any) {
       return <TableContainer isChat={isChat} {...props}>{children}</TableContainer>;
@@ -205,19 +223,19 @@ export function useAgentMarkdownComponents({
     },
 
     td({ children, node: _node, className, ...props }: any) {
-      const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
-      const rawText = extractChildText(children).trim();
-      const isNumericOrCurrency = /^[\u20b9$€£+\-—\d]/.test(rawText) || props.align === 'right';
-      const isCode = /^(?:[A-Z]{2,4}-\d+|\d{4,6}|SA\s*\d+)$/i.test(rawText);
-
-      const colorClass = isCode
-        ? "font-mono text-zinc-500 dark:text-zinc-400"
-        : isNumericOrCurrency
-        ? "font-mono tabular-nums text-zinc-900 dark:text-zinc-100"
-        : "";
+      const isRight = props.align === 'right';
+      const alignClass = isRight ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
 
       return (
-        <td className={cn("px-3.5 py-2 text-[13px] border-r border-zinc-200/40 dark:border-white/[0.04] last:border-r-0", isNumericOrCurrency && "whitespace-nowrap", colorClass, alignClass, className)} {...props}>
+        <td
+          className={cn(
+            "px-3.5 py-2 text-[13px] border-r border-zinc-200/40 dark:border-white/[0.04] last:border-r-0 text-zinc-900 dark:text-zinc-100",
+            isRight && "font-mono tabular-nums whitespace-nowrap",
+            alignClass,
+            className
+          )}
+          {...props}
+        >
           {processTextNodes(children, onOpenFile)}
         </td>
       );
