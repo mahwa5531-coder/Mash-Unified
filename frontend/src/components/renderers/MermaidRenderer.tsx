@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, ZoomIn, ZoomOut, RotateCcw, RefreshCw, AlertCircle } from "lucide-react";
+import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { useTurnViewport } from "@/features/chat/context/TurnViewportContext";
 import { cn } from "@/lib/utils";
 
@@ -156,11 +157,15 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
   const inlineContainerRef = useRef<HTMLDivElement>(null);
   const inlineMountedRef = useRef<{ destroy: () => void } | null>(null);
   const modalContainerRef = useRef<HTMLDivElement>(null);
+  const modalDiagramRef = useRef<HTMLDivElement>(null);
   const modalMountedRef = useRef<any>(null);
+  const panzoomRef = useRef<PanzoomObject | null>(null);
+  const fitScaleRef = useRef<number>(1);
+  const cleanupListenersRef = useRef<(() => void) | null>(null);
 
   // Mount inline static diagram (strictly no zoom gestures to prevent chat scroll traps)
   useEffect(() => {
-    // ponytail: Defer diagram rendering until within viewport (unless already loaded)
+    // Defer diagram rendering until within viewport (unless already loaded)
     if (!isNearViewport && !isRendered) return;
 
     let isCancelled = false;
@@ -238,9 +243,13 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
     };
   }, [chart, isNearViewport, isRendered, retryKey]);
 
-  // Mount modal lightbox diagram (trackpad pinch-to-zoom and click-and-drag pan fully active)
+  // Mount modal lightbox diagram powered by @panzoom/panzoom (infinite canvas, wheel zoom, pinch, 2D fit)
   useEffect(() => {
     if (!isModalOpen) {
+      cleanupListenersRef.current?.();
+      cleanupListenersRef.current = null;
+      panzoomRef.current?.destroy();
+      panzoomRef.current = null;
       modalMountedRef.current?.destroy();
       modalMountedRef.current = null;
       return;
@@ -251,8 +260,12 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
     if (!trimmed) return;
 
     getPele().then((pele) => {
-      if (isCancelled || !modalContainerRef.current) return;
+      if (isCancelled || !modalDiagramRef.current || !modalContainerRef.current) return;
 
+      cleanupListenersRef.current?.();
+      cleanupListenersRef.current = null;
+      panzoomRef.current?.destroy();
+      panzoomRef.current = null;
       modalMountedRef.current?.destroy();
       modalMountedRef.current = null;
 
@@ -262,12 +275,8 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
       }
 
       const mountModalInstance = (src: string) => {
-        return pele.mount(modalContainerRef.current!, src, {
-          zoom: {
-            always: true,
-            controls: false, // hide Pele's buttons; controlled via MASH Lucide toolbar
-            maxScale: 4,
-          },
+        return pele.mount(modalDiagramRef.current!, src, {
+          zoom: false, // Pele renders pure SVG; Panzoom owns 100% of gestures & canvas transformations
           links: false,
           images: false,
           onError: (err) => console.warn("Modal Pele diagram error:", err),
@@ -276,89 +285,105 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
 
       try {
         modalMountedRef.current = mountModalInstance(sourceToMount);
-        setModalZoomPercent(100);
       } catch {
         try {
           modalMountedRef.current = mountModalInstance(repairMermaidSyntax(sourceToMount));
-          setModalZoomPercent(100);
         } catch (modalErr) {
           console.warn("Failed to mount diagram in modal:", modalErr);
+          return;
         }
       }
+
+      if (isCancelled || !modalDiagramRef.current || !modalContainerRef.current) return;
+
+      const container = modalContainerRef.current;
+      const diagramEl = modalDiagramRef.current;
+
+      // Wire @panzoom/panzoom with canvas mode for infinite drag & pan
+      const panzoom = Panzoom(diagramEl, {
+        canvas: true,
+        minScale: 0.1,
+        maxScale: 6,
+        cursor: "grab",
+      });
+      panzoomRef.current = panzoom;
+
+      // 2D Auto-Fit: fit both width and height within container viewport
+      const svgEl = diagramEl.querySelector("svg");
+      if (svgEl) {
+        const svgRect = svgEl.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const padding = 64;
+        const availW = Math.max(100, containerRect.width - padding);
+        const availH = Math.max(100, containerRect.height - padding);
+        const naturalW = svgRect.width || parseFloat(svgEl.getAttribute("width") || "1") || 1;
+        const naturalH = svgRect.height || parseFloat(svgEl.getAttribute("height") || "1") || 1;
+        const fitScale = Math.min(availW / naturalW, availH / naturalH, 1);
+        fitScaleRef.current = fitScale;
+
+        panzoom.zoom(fitScale, { animate: false });
+        setModalZoomPercent(Math.round(fitScale * 100));
+      } else {
+        fitScaleRef.current = 1;
+        setModalZoomPercent(100);
+      }
+
+      // Natural mouse wheel zooming to cursor focal point
+      const onWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        panzoom.zoomWithWheel(e, { step: 0.15 });
+      };
+      container.addEventListener("wheel", onWheel, { passive: false });
+
+      // Real-time zoom percentage tracking via native panzoomchange event
+      const onPanzoomChange = (e: any) => {
+        if (e?.detail?.scale) {
+          setModalZoomPercent(Math.round(e.detail.scale * 100));
+        }
+      };
+      diagramEl.addEventListener("panzoomchange", onPanzoomChange);
+
+      // Keyboard escape
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          setIsModalOpen(false);
+        }
+      };
+      window.addEventListener("keydown", onKeyDown);
+
+      cleanupListenersRef.current = () => {
+        container.removeEventListener("wheel", onWheel);
+        diagramEl.removeEventListener("panzoomchange", onPanzoomChange);
+        window.removeEventListener("keydown", onKeyDown);
+      };
     });
 
     return () => {
       isCancelled = true;
+      cleanupListenersRef.current?.();
+      cleanupListenersRef.current = null;
+      panzoomRef.current?.destroy();
+      panzoomRef.current = null;
       modalMountedRef.current?.destroy();
       modalMountedRef.current = null;
     };
   }, [isModalOpen, chart]);
 
-  // Handle escape key, touchpad pinch gestures, and mouse wheel zoom in modal
-  useEffect(() => {
-    if (!isModalOpen) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsModalOpen(false);
-        setModalZoomPercent(100);
-      }
-    };
-
-    const container = modalContainerRef.current;
-    const onWheel = () => {
-      requestAnimationFrame(() => {
-        if (modalMountedRef.current?.zoom) {
-          const zoom = modalMountedRef.current.zoom;
-          const fit = zoom.fit || 1;
-          setModalZoomPercent(Math.round((zoom.scale / fit) * 100));
-        }
-      });
-    };
-
-    const onDblClick = () => {
-      requestAnimationFrame(() => {
-        if (modalMountedRef.current?.zoom) {
-          const zoom = modalMountedRef.current.zoom;
-          const fit = zoom.fit || 1;
-          setModalZoomPercent(Math.round((zoom.scale / fit) * 100));
-        }
-      });
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    container?.addEventListener("wheel", onWheel, { passive: true });
-    container?.addEventListener("dblclick", onDblClick);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      container?.removeEventListener("wheel", onWheel);
-      container?.removeEventListener("dblclick", onDblClick);
-    };
-  }, [isModalOpen]);
-
   const handleZoomIn = useCallback(() => {
-    if (modalMountedRef.current?.zoom) {
-      modalMountedRef.current.zoom.zoomBy(1.2);
-      const zoom = modalMountedRef.current.zoom;
-      const fit = zoom.fit || 1;
-      setModalZoomPercent(Math.round((zoom.scale / fit) * 100));
-    }
+    panzoomRef.current?.zoomIn({ step: 0.25 });
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    if (modalMountedRef.current?.zoom) {
-      modalMountedRef.current.zoom.zoomBy(1 / 1.2);
-      const zoom = modalMountedRef.current.zoom;
-      const fit = zoom.fit || 1;
-      setModalZoomPercent(Math.round((zoom.scale / fit) * 100));
-    }
+    panzoomRef.current?.zoomOut({ step: 0.25 });
   }, []);
 
   const handleResetZoom = useCallback(() => {
-    if (modalMountedRef.current?.zoom) {
-      modalMountedRef.current.zoom.reset();
-      setModalZoomPercent(100);
+    if (panzoomRef.current) {
+      panzoomRef.current.reset({ animate: true });
+      if (fitScaleRef.current) {
+        panzoomRef.current.zoom(fitScaleRef.current, { animate: true });
+        setModalZoomPercent(Math.round(fitScaleRef.current * 100));
+      }
     }
   }, []);
 
@@ -498,11 +523,15 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
               </div>
             </div>
 
-            {/* Modal Body with Interactive SVG */}
-            <div className="flex-1 overflow-hidden p-6 flex items-center justify-center relative min-h-[420px] max-h-[75vh]">
+            {/* Modal Body: Infinite Canvas Viewport */}
+            <div
+              ref={modalContainerRef}
+              className="flex-1 w-full min-h-[420px] max-h-[75vh] overflow-hidden p-6 relative flex items-center justify-center select-none bg-zinc-50/50 dark:bg-zinc-900/40"
+              style={{ touchAction: "none" }}
+            >
               <div
-                ref={modalContainerRef}
-                className="mash-mermaid w-full h-full min-h-[420px] max-h-[75vh] flex justify-center items-center select-none overflow-hidden"
+                ref={modalDiagramRef}
+                className="mash-mermaid inline-flex justify-center items-center select-none origin-center"
               />
             </div>
           </div>
