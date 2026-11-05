@@ -23,7 +23,7 @@ function ensureObserver() {
   });
 }
 
-// ponytail: Shared singleton MutationObserver avoids O(N) observers across dozens of CodeBlock instances
+// Shared singleton MutationObserver avoids O(N) observers across dozens of CodeBlock instances
 export function useIsDarkMode(): boolean {
   const [isDark, setIsDark] = useState<boolean>(getIsDark);
 

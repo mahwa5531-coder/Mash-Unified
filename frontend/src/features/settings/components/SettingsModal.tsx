@@ -25,7 +25,17 @@ export default function SettingsModal({
   onSignOut,
 }: SettingsModalProps) {
   const [mounted, setMounted] = useState(false);
-  const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    try {
+      const savedTheme = localStorage.getItem('mash_theme_settings');
+      if (savedTheme) {
+        const parsed = JSON.parse(savedTheme);
+        if (parsed.mode) return parsed.mode;
+      }
+    } catch {}
+    return 'dark';
+  });
   const [authInfo, setAuthInfo] = useState<AuthUser | null>(null);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState<'appearance' | 'usage' | 'account'>(
@@ -79,6 +89,10 @@ export default function SettingsModal({
       onThemeChange?.(isDark);
     };
 
+    try {
+      localStorage.setItem('mash_theme_settings', JSON.stringify({ mode: themeMode }));
+    } catch {}
+
     if (themeMode === 'system') {
       const mql = window.matchMedia('(prefers-color-scheme: dark)');
       applyTheme(mql.matches);
@@ -88,10 +102,6 @@ export default function SettingsModal({
     } else {
       applyTheme(themeMode === 'dark');
     }
-
-    try {
-      localStorage.setItem('mash_theme_settings', JSON.stringify({ mode: themeMode }));
-    } catch {}
   }, [themeMode, mounted, onThemeChange]);
 
   // Close on Escape key
