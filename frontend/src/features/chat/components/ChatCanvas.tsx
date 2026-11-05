@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import ChatComposer from '@/features/chat/components/ChatComposer';
 import { QuotaBanner, InvalidMediaBanner } from '@/primitives';
@@ -118,6 +118,11 @@ const MountedTurnRow = memo(function MountedTurnRow({
          prev.globalTurnIdx === next.globalTurnIdx &&
          prev.turnKey === next.turnKey &&
          prev.artifactsByTurnMsg === next.artifactsByTurnMsg;
+});
+
+// ponytail: Module-hoisted Virtuoso footer prevents component re-creation and DOM remounts on every render frame
+const VirtuosoFooter = memo(function VirtuosoFooter() {
+  return <div className="max-w-3xl mx-auto w-full pb-6" aria-hidden="true" />;
 });
 
 export default function ChatCanvas({ 
@@ -255,6 +260,50 @@ export default function ChatCanvas({
     }
   };
 
+  // ponytail: Hoisted components with stable identity prevent Virtuoso from unmounting & remounting the Header/Footer on every streaming token flush
+  const virtuosoComponents = useMemo(() => ({
+    Header: function VirtuosoHeader() {
+      return (
+        <div className="max-w-3xl mx-auto w-full pt-2">
+          <ChatHistoryLoadState
+            sessionId={sessionId}
+            isHistoryLoaded={isHistoryLoaded}
+            historyLoadError={historyLoadError}
+            retryLoadHistory={retryLoadHistory}
+          />
+          {hasEarlierTurns && (
+            <div className="flex justify-center -mt-1 -mb-1 pb-1.5 min-h-[24px]">
+              {earlierLoadError ? (
+                <button
+                  type="button"
+                  onClick={handleLoadEarlier}
+                  className="text-xs text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 underline font-medium cursor-pointer py-1 px-2 rounded bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
+                >
+                  Failed to load earlier turns. Click to retry.
+                </button>
+              ) : isLoadingEarlier ? (
+                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                  <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                  <span>Loading earlier turns...</span>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+      );
+    },
+    Footer: VirtuosoFooter,
+  }), [
+    sessionId,
+    isHistoryLoaded,
+    historyLoadError,
+    retryLoadHistory,
+    hasEarlierTurns,
+    earlierLoadError,
+    isLoadingEarlier,
+    handleLoadEarlier,
+  ]);
+
   return (
     <div className="flex-1 min-w-0 min-h-0 bg-[var(--bg-app)] flex flex-col h-full overflow-hidden relative font-sans text-[var(--text-primary)] transition-colors">
       
@@ -275,6 +324,7 @@ export default function ChatCanvas({
         </div>
       ) : (
         <Virtuoso
+          key={sessionId || 'default_session'}
           ref={virtuosoRef}
           data={turns}
           firstItemIndex={firstItemIndex}
@@ -290,39 +340,7 @@ export default function ChatCanvas({
             }
           }}
           className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 custom-scrollbar relative"
-          components={{
-            Header: () => (
-              <div className="max-w-3xl mx-auto w-full pt-2">
-                <ChatHistoryLoadState
-                  sessionId={sessionId}
-                  isHistoryLoaded={isHistoryLoaded}
-                  historyLoadError={historyLoadError}
-                  retryLoadHistory={retryLoadHistory}
-                />
-                {hasEarlierTurns && (
-                  <div className="flex justify-center -mt-1 -mb-1 pb-1.5 min-h-[24px]">
-                    {earlierLoadError ? (
-                      <button
-                        type="button"
-                        onClick={handleLoadEarlier}
-                        className="text-xs text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 underline font-medium cursor-pointer py-1 px-2 rounded bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
-                      >
-                        Failed to load earlier turns. Click to retry.
-                      </button>
-                    ) : isLoadingEarlier ? (
-                      <div className="flex items-center gap-2 text-xs text-zinc-400">
-                        <div className="w-3.5 h-3.5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
-                        <span>Loading earlier turns...</span>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </div>
-            ),
-            Footer: () => (
-              <div className="max-w-3xl mx-auto w-full pb-6" aria-hidden="true" />
-            ),
-          }}
+          components={virtuosoComponents}
           itemContent={(index, turn) => {
             const isLastTurn = index === turns.length - 1;
             const turnKey = turn.id || `turn_${turn.flatIdx}_${index}`;

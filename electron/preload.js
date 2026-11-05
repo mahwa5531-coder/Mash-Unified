@@ -25,10 +25,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   restartAndInstall: () => ipcRenderer.send('mash-restart-and-install'),
   onUpdateDownloading: (callback) => {
-    ipcRenderer.on('mash-update-downloading', (_event, data) => callback(data));
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('mash-update-downloading', handler);
+    return () => ipcRenderer.removeListener('mash-update-downloading', handler);
   },
   onUpdateReady: (callback) => {
-    ipcRenderer.on('mash-update-ready', (_event, data) => callback(data));
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('mash-update-ready', handler);
+    return () => ipcRenderer.removeListener('mash-update-ready', handler);
   },
 });
 

@@ -19,8 +19,11 @@ export function useDesktopAutoUpdate() {
 
     // 1. Electron Native IPC Listeners
     const electron = (window as any).electronAPI;
+    let unsubDownloading: (() => void) | undefined;
+    let unsubReady: (() => void) | undefined;
+
     if (electron?.onUpdateDownloading) {
-      electron.onUpdateDownloading((data: { progress?: number; version?: string }) => {
+      unsubDownloading = electron.onUpdateDownloading((data: { progress?: number; version?: string }) => {
         setUpdateState({
           status: 'downloading',
           progress: data?.progress,
@@ -30,7 +33,7 @@ export function useDesktopAutoUpdate() {
     }
 
     if (electron?.onUpdateReady) {
-      electron.onUpdateReady((data: { version?: string }) => {
+      unsubReady = electron.onUpdateReady((data: { version?: string }) => {
         setUpdateState({
           status: 'ready',
           version: data?.version,
@@ -74,6 +77,8 @@ export function useDesktopAutoUpdate() {
     return () => {
       isMounted = false;
       if (intervalId) clearInterval(intervalId);
+      if (typeof unsubDownloading === 'function') unsubDownloading();
+      if (typeof unsubReady === 'function') unsubReady();
       window.removeEventListener('mash:update-state', handleCustomUpdate as EventListener);
     };
   }, []);

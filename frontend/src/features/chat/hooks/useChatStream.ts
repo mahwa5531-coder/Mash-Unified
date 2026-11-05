@@ -37,14 +37,12 @@ export function useChatStream({
   const [isStreaming, setIsStreaming] = useState(false);
   const fallbackScrollRef = useRef<HTMLDivElement>(null);
   const scrollRef = scrollContainerRef || fallbackScrollRef;
-  const fallbackPinnedRef = useRef(true);
-  const activePinnedRef = isPinnedToBottomRef || fallbackPinnedRef;
 
   const activeSessionIdRef = useRef<string | null>(sessionId);
   useEffect(() => { activeSessionIdRef.current = sessionId; }, [sessionId]);
 
   const { flushActiveStreamBuffer, scheduleFlush, cancelFlush } = useSseBufferFlusher({
-    activeSessionIdRef, setChatMessages, scrollRef, isAtBottomRef: activePinnedRef,
+    activeSessionIdRef, setChatMessages,
   });
 
   const history = useSessionHistory({ sessionId, activeSessionIdRef, scrollContainerRef });
@@ -139,8 +137,7 @@ export function useChatStream({
     if (activeSid === activeSessionIdRef.current) {
       setChatMessages([...targetSession.chatMessages]);
       setIsStreaming(true);
-      activePinnedRef.current = true;
-      requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; });
+      if (isPinnedToBottomRef) isPinnedToBottomRef.current = true;
     }
     notifyStoreListeners();
 
@@ -151,7 +148,7 @@ export function useChatStream({
       flushBuffer: flushActiveStreamBuffer,
       onUpdateMessages: (msgs) => { if (activeSid === activeSessionIdRef.current) setChatMessages(msgs); },
       onStreamEnd: () => { if (activeSid === activeSessionIdRef.current) setIsStreaming(false); },
-      scrollToBottom: () => { if (scrollRef.current && activePinnedRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; },
+      scrollToBottom: () => {}, // ponytail: Virtuoso followOutput manages stream following natively; no manual scrollTop yanking
       onAutoDispatchQueue: (msg) => handleSendMessage(msg, false, false, activeSid),
       onSyncSteeringQueue: (q) => { if (activeSid === activeSessionIdRef.current) steering.setQueuedMessages(q); },
       onRestorePrompt: (prompt) => { if (activeSid === activeSessionIdRef.current) setInputPrompt(prompt); },

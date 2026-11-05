@@ -56,19 +56,6 @@ export async function fetchAuthMe(): Promise<AuthUser | null> {
   }
 }
 
-export async function syncAuthMe(): Promise<AuthUser | null> {
-  try {
-    const res = await safeFetch(`${BASE_URL}/api/auth/sync`, { method: "POST" });
-    if (!res.ok) return null;
-    const body = await res.json();
-    const data = body?.data || null;
-    return data;
-  } catch (err) {
-    console.warn("Failed to sync auth state:", err);
-    return null;
-  }
-}
-
 export async function logoutUser(): Promise<boolean> {
   try {
     if (typeof window !== 'undefined') {

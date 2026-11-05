@@ -27,7 +27,19 @@ interface TaskWorkLogAccordionProps {
   turnStartTime?: number;
 }
 
+// ponytail: Bounded LRU-100 accordion expansion cache avoids unbounded memory retention across long sessions
+const MAX_ACCORDION_MEMORY = 100;
 const userExpandedAccordions = new Map<string, boolean>();
+
+function recordAccordionExpanded(key: string, expanded: boolean) {
+  if (userExpandedAccordions.has(key)) {
+    userExpandedAccordions.delete(key);
+  } else if (userExpandedAccordions.size >= MAX_ACCORDION_MEMORY) {
+    const oldest = userExpandedAccordions.keys().next().value;
+    if (oldest) userExpandedAccordions.delete(oldest);
+  }
+  userExpandedAccordions.set(key, expanded);
+}
 
 export default function TaskWorkLogAccordion({
   id,
@@ -61,7 +73,7 @@ export default function TaskWorkLogAccordion({
   useEffect(() => {
     if (wasStreamingRef.current && !isStreaming) {
       setClusterOpen(false);
-      if (id) userExpandedAccordions.set(id, false);
+      if (id) recordAccordionExpanded(id, false);
     }
     wasStreamingRef.current = isStreaming;
   }, [isStreaming, id]);
@@ -69,7 +81,7 @@ export default function TaskWorkLogAccordion({
   const toggleCluster = () => {
     setClusterOpen((prev) => {
       const next = !prev;
-      if (id) userExpandedAccordions.set(id, next);
+      if (id) recordAccordionExpanded(id, next);
       return next;
     });
   };

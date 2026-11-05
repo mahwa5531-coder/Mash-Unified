@@ -304,7 +304,11 @@ export async function streamQuery(
             if (callId && deltaArg) {
               toolArgBuffers[callId] = (toolArgBuffers[callId] || "") + deltaArg;
               let parsedArgs: Record<string, any> = {};
-              try { parsedArgs = JSON.parse(toolArgBuffers[callId]); } catch { /* still buffering */ }
+              // ponytail: Fast pre-flight guard avoids O(N^2) syntax error exceptions on incomplete intermediate JSON chunks
+              const curBuf = toolArgBuffers[callId].trimEnd();
+              if (curBuf.endsWith('}')) {
+                try { parsedArgs = JSON.parse(curBuf); } catch { /* still buffering */ }
+              }
               if (onToolCall) {
                 const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
                 const toolSummary = parsedArgs?.toolSummary || parsedArgs?.tool_summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary;

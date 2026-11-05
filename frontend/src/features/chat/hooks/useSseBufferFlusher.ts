@@ -7,15 +7,13 @@ import type { Message } from '@/types/chat';
 interface UseSseBufferFlusherOptions {
   activeSessionIdRef: React.RefObject<string | null>;
   setChatMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  scrollRef: React.RefObject<HTMLDivElement | null>;
-  isAtBottomRef: React.RefObject<boolean>;
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
+  isAtBottomRef?: React.RefObject<boolean>;
 }
 
 export function useSseBufferFlusher({
   activeSessionIdRef,
   setChatMessages,
-  scrollRef,
-  isAtBottomRef,
 }: UseSseBufferFlusherOptions) {
   const rafIdRef = useRef<number | null>(null);
   const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
@@ -119,11 +117,9 @@ export function useSseBufferFlusher({
       s.chatMessages = next;
       setChatMessages(next);
     }
-
-    if (scrollRef.current && isAtBottomRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [activeSessionIdRef, isAtBottomRef, scrollRef, setChatMessages]);
+    // ponytail: Delegated scroll retention entirely to Virtuoso followOutput.
+    // Zero manual scrollTop mutations prevent yanking the user away from history during streaming.
+  }, [activeSessionIdRef, setChatMessages]);
 
   const scheduleFlush = useCallback(() => {
     // ponytail: Fall back to 100ms timer when document.hidden to drain tokens while tab is backgrounded

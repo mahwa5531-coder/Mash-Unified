@@ -17,10 +17,15 @@ export interface SessionItem {
   section?: 'workspace' | 'conversation';
 }
 
-// ponytail: Global deleted sessions tracking prevents background polling from resurrecting deleted sessions
+// ponytail: Global deleted sessions tracking prevents background polling from resurrecting deleted sessions (capped at 200)
+const MAX_DELETED_SESSIONS = 200;
 export const deletedSessionIds = new Set<string>();
 
 export function markSessionDeleted(sessionId: string): void {
+  if (deletedSessionIds.size >= MAX_DELETED_SESSIONS) {
+    const oldest = deletedSessionIds.values().next().value;
+    if (oldest) deletedSessionIds.delete(oldest);
+  }
   deletedSessionIds.add(sessionId);
 }
 

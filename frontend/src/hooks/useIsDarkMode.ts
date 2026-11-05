@@ -2,34 +2,43 @@
 
 import { useState, useEffect } from 'react';
 
-// ponytail: lightweight hook to reactively track dark vs light mode with zero overhead
-export function useIsDarkMode(): boolean {
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    if (typeof document !== 'undefined') {
-      return document.documentElement.classList.contains('dark') ||
-             document.documentElement.getAttribute('data-theme') === 'dark';
-    }
-    return true;
+function getIsDark(): boolean {
+  if (typeof document === 'undefined') return true;
+  return document.documentElement.classList.contains('dark') ||
+         document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
+const themeListeners = new Set<(dark: boolean) => void>();
+let sharedObserver: MutationObserver | null = null;
+
+function ensureObserver() {
+  if (sharedObserver || typeof document === 'undefined') return;
+  sharedObserver = new MutationObserver(() => {
+    const dark = getIsDark();
+    themeListeners.forEach((fn) => fn(dark));
   });
+  sharedObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class', 'data-theme'],
+  });
+}
+
+// ponytail: Shared singleton MutationObserver avoids O(N) observers across dozens of CodeBlock instances
+export function useIsDarkMode(): boolean {
+  const [isDark, setIsDark] = useState<boolean>(getIsDark);
 
   useEffect(() => {
-    if (typeof document === 'undefined') return;
+    setIsDark(getIsDark());
+    themeListeners.add(setIsDark);
+    ensureObserver();
 
-    const checkTheme = () => {
-      const dark = document.documentElement.classList.contains('dark') ||
-                   document.documentElement.getAttribute('data-theme') === 'dark';
-      setIsDark(dark);
+    return () => {
+      themeListeners.delete(setIsDark);
+      if (themeListeners.size === 0 && sharedObserver) {
+        sharedObserver.disconnect();
+        sharedObserver = null;
+      }
     };
-
-    checkTheme();
-
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme'],
-    });
-
-    return () => observer.disconnect();
   }, []);
 
   return isDark;
