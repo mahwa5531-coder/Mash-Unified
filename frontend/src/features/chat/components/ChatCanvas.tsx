@@ -139,6 +139,12 @@ const MountedTurnRow = memo(function MountedTurnRow({
       </div>
     </TurnViewportProvider>
   );
+}, (prev, next) => {
+  return prev.turn === next.turn &&
+         prev.isLastTurn === next.isLastTurn &&
+         prev.isStreaming === next.isStreaming &&
+         prev.globalTurnIdx === next.globalTurnIdx &&
+         prev.turnKey === next.turnKey;
 });
 
 export default function ChatCanvas({ 
@@ -381,7 +387,7 @@ export default function ChatCanvas({
                     turnKey={turnKey}
                     globalTurnIdx={globalTurnIdx}
                     isLastTurn={isLastTurn}
-                    isStreaming={isStreaming}
+                    isStreaming={isLastTurn && isStreaming}
                     artifactsByTurnMsg={artifactsByTurnMsg}
                     onOpenFile={onOpenFile}
                     onContinue={handleContinue}

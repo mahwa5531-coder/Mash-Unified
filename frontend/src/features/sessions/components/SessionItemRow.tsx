@@ -40,17 +40,7 @@ export const SessionItemRow = React.memo(function SessionItemRow({
   isStreaming: propIsStreaming,
   hasStoreUnread: propHasStoreUnread,
 }: SessionItemRowProps) {
-  // ponytail: Suppress unread blue dot blinking during cold boot until initial session selection resolves
-  const [localResolved, setLocalResolved] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLocalResolved(true);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const resolved = isSelectionResolved ?? localResolved;
+  const resolved = isSelectionResolved ?? true;
   const storeState = sessionStore.get(s.session_id);
   const isStreaming = propIsStreaming ?? isSessionStreaming(s.session_id);
   const hasStoreUnread = propHasStoreUnread ?? Boolean(storeState?.hasUnread);
@@ -63,10 +53,6 @@ export const SessionItemRow = React.memo(function SessionItemRow({
       data-testid="session-item"
       onClick={() => onSessionClick(s)}
       onContextMenu={(e) => onOpenMenu(e, s.session_id)}
-      style={{
-        contentVisibility: 'auto',
-        containIntrinsicSize: '0 30px',
-      }}
       className={`group/item relative h-[30px] mx-1 px-2.5 rounded-lg cursor-pointer flex justify-between items-center select-none transition-colors ${
         isSelected
           ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs'

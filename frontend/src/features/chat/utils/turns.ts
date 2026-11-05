@@ -2,6 +2,22 @@ import { Message, Turn } from '@/types/chat';
 
 export { parseSessionHistory } from './sessionHistoryParser';
 
+interface CachedTurnEntry {
+  turn: Turn;
+  userMsg: Message;
+  aiMsgCount: number;
+  aiMsgContent: string;
+  status?: string;
+  error?: string;
+}
+
+// ponytail: structural sharing cache so completed past turns retain exact object references across 60fps streaming ticks
+const completedTurnCache = new Map<string, CachedTurnEntry>();
+
+export function clearTurnStructuralCache() {
+  completedTurnCache.clear();
+}
+
 // ponytail: compute chat turn groupings in linear O(N) time with stable keys to avoid 120fps GC thrashing
 export function buildTurns(chatMessages: Message[]): Turn[] {
   const result: Turn[] = [];
@@ -139,6 +155,39 @@ export function buildTurns(chatMessages: Message[]): Turn[] {
       });
     }
     flatIdx++;
+  }
+
+  // ponytail: Structural sharing pass — reuse identical completed Turn object references to skip downstream React reconciliations
+  for (let t = 0; t < result.length; t++) {
+    const turn = result[t];
+    const lastAi = turn.aiMsgs[turn.aiMsgs.length - 1];
+    const isCompleted = turn.status !== 'running' && lastAi?.status !== 'running';
+    if (isCompleted && turn.id) {
+      const cached = completedTurnCache.get(turn.id);
+      if (
+        cached &&
+        cached.userMsg === turn.userMsg &&
+        cached.aiMsgCount === turn.aiMsgs.length &&
+        cached.aiMsgContent === (lastAi?.content || '') &&
+        cached.status === turn.status &&
+        cached.error === lastAi?.error
+      ) {
+        result[t] = cached.turn;
+      } else {
+        completedTurnCache.set(turn.id, {
+          turn,
+          userMsg: turn.userMsg,
+          aiMsgCount: turn.aiMsgs.length,
+          aiMsgContent: lastAi?.content || '',
+          status: turn.status,
+          error: lastAi?.error,
+        });
+        if (completedTurnCache.size > 500) {
+          const firstKey = completedTurnCache.keys().next().value;
+          if (firstKey) completedTurnCache.delete(firstKey);
+        }
+      }
+    }
   }
 
   return result;

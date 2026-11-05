@@ -111,6 +111,19 @@ export interface AgentMarkdownProps {
   className?: string;
 }
 
+// ponytail: Module-level stable references so Streamdown's built-in block memoization (Sr) never invalidates
+const STREAMDOWN_PLUGINS = {
+  math: mathPlugin,
+  renderers: [
+    { component: LatexBlock, language: LATEX_LANGUAGES },
+    { component: MermaidBlock, language: 'mermaid' },
+    { component: StreamdownCodeBlock, language: allOtherLanguages },
+  ],
+};
+
+const STREAMDOWN_REMARK_PLUGINS = [remarkGfm, ensureCodeLanguagePlugin];
+const STREAMDOWN_CONTROLS = { code: { copy: true } };
+
 export const AgentMarkdown = memo(function AgentMarkdown({
   content,
   mode,
@@ -139,17 +152,10 @@ export const AgentMarkdown = memo(function AgentMarkdown({
       className
     )}>
       <Streamdown
-        mode={isStreaming ? 'streaming' : 'static'}
-        plugins={{
-          math: mathPlugin,
-          renderers: [
-            { component: LatexBlock, language: LATEX_LANGUAGES },
-            { component: MermaidBlock, language: 'mermaid' },
-            { component: StreamdownCodeBlock, language: allOtherLanguages },
-          ],
-        }}
-        remarkPlugins={[remarkGfm, ensureCodeLanguagePlugin]}
-        controls={{ code: { copy: true } }}
+        mode="streaming"
+        plugins={STREAMDOWN_PLUGINS}
+        remarkPlugins={STREAMDOWN_REMARK_PLUGINS}
+        controls={STREAMDOWN_CONTROLS}
         components={components}
         urlTransform={safeUrlTransform}
         caret={isChat && isStreaming ? 'block' : undefined}

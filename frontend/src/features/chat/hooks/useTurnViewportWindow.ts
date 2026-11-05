@@ -154,6 +154,8 @@ export function useTurnViewportWindow(
 
   // Measured pixel height cache keyed by turn.id / turnKey
   const turnHeightCacheRef = useRef<Map<string, number>>(new Map());
+  const turnsRef = useRef(turns);
+  turnsRef.current = turns;
 
   const [range, setRange] = useState<{ startIndex: number; endIndex: number }>(() =>
     computeVisibleRange(containerRef.current, turns, turnHeightCacheRef.current, overscanScreens)
@@ -169,14 +171,14 @@ export function useTurnViewportWindow(
   }, []);
 
   const updateWindow = useCallback((container: HTMLDivElement | null) => {
-    const newRange = computeVisibleRange(container, turns, turnHeightCacheRef.current, overscanScreens);
+    const newRange = computeVisibleRange(container, turnsRef.current, turnHeightCacheRef.current, overscanScreens);
     setRange((prev) => {
       if (prev.startIndex === newRange.startIndex && prev.endIndex === newRange.endIndex) {
         return prev;
       }
       return newRange;
     });
-  }, [turns, overscanScreens]);
+  }, [overscanScreens]);
 
   // Scroll & resize listeners with 60 FPS RAF throttling
   useEffect(() => {
@@ -228,10 +230,11 @@ export function useTurnViewportWindow(
     };
   }, [containerRef, updateWindow]);
 
-  // Update window when turns change
+  // ponytail: Only update visible range when turns array length changes (turn added or removed)
+  // or when streaming starts/stops. NEVER recalculate on every 16ms raw token delta!
   useEffect(() => {
     updateWindow(containerRef.current);
-  }, [containerRef, turns, updateWindow]);
+  }, [containerRef, turns.length, _isStreaming, updateWindow]);
 
   return {
     startIndex: range.startIndex,
