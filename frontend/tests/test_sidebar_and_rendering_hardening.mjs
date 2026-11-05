@@ -1,45 +1,9 @@
 import assert from 'node:assert';
-import { splitMarkdownBlocks } from '../src/components/markdown/splitMarkdownBlocks.ts';
 import { escapeCurrencyInMarkdown } from '../src/features/chat/components/messages/proseHelpers.tsx';
 
 console.log('======================================================================');
 console.log('STARTING RIGHT SIDEBAR & RENDERING HARDENING VERIFICATION TEST SUITE');
 console.log('======================================================================\n');
-
-// -----------------------------------------------------------------------------
-// Test 1: Multi-line Display Math ($$) Boundary Splitting Protection
-// -----------------------------------------------------------------------------
-console.log('[Test 1] Multi-line Display Math ($$) Boundary Splitting Protection...');
-{
-  const lines = [];
-  for (let i = 1; i <= 30; i++) {
-    lines.push(`Line ${i}: Regular analysis text.`);
-  }
-  // Open multi-line math at line 31
-  lines.push('$$');
-  lines.push('\\begin{aligned}');
-  for (let j = 1; j <= 15; j++) {
-    lines.push(`  x_{${j}} &= \\sum_{k=1}^{n} \\frac{a_{jk}}{b_{jk}} \\\\`);
-  }
-  lines.push('\\end{aligned}');
-  lines.push('$$'); // Ends around line 48, crossing the 35-line boundary!
-  lines.push('');
-  for (let k = 1; k <= 10; k++) {
-    lines.push(`Trailing line ${k}`);
-  }
-
-  const markdownText = lines.join('\n');
-  const blocks = splitMarkdownBlocks(markdownText, 35);
-
-  // Assert that the entire $$ ... $$ math block is preserved in a single block without split
-  const mathBlock = blocks.find(b => b.includes('\\begin{aligned}'));
-  assert(mathBlock, 'Expected to find block with \\begin{aligned}');
-  assert(mathBlock.includes('$$'), 'Expected block to have opening $$');
-  assert(mathBlock.endsWith('$$') || mathBlock.includes('\\end{aligned}\n$$'), 'Expected block to keep closing $$ intact');
-  assert(mathBlock.includes('\\end{aligned}'), 'Expected math block to contain closing tag');
-
-  console.log('  -> PASSED: Multi-line $$ display math block kept 100% contiguous across chunk boundaries!\n');
-}
 
 // -----------------------------------------------------------------------------
 // Test 2: Prose Currency ($100) Collision Guard

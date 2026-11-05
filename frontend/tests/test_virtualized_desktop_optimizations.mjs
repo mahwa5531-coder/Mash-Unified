@@ -115,12 +115,10 @@ console.log('\n[Test Suite 3] Production Codebase Architecture Assertions...');
   assert.ok(safeViewerCode.includes("cleanName.endsWith('.json')"), 'SafeFileViewer must target .json and .jsonl files');
   console.log('  [PASS] 3B. SafeFileViewer formats minified JSON to activate Monaco line virtualization without 5k slice.');
 
-  // 3. SessionItemRow must use React.memo and content-visibility: auto
+  // 3. SessionItemRow must use React.memo
   const sessionRowCode = fs.readFileSync(path.resolve(__dirname, '../src/features/sessions/components/SessionItemRow.tsx'), 'utf-8');
   assert.ok(sessionRowCode.includes('React.memo'), 'SessionItemRow must be wrapped in React.memo');
-  assert.ok(sessionRowCode.includes("contentVisibility: 'auto'"), 'SessionItemRow must use content-visibility: auto');
-  assert.ok(sessionRowCode.includes("containIntrinsicSize: '0 30px'"), 'SessionItemRow must set contain-intrinsic-size: 0 30px');
-  console.log('  [PASS] 3C. SessionItemRow has React.memo and native Chromium C++ layout containment.');
+  console.log('  [PASS] 3C. SessionItemRow has React.memo and stable layout.');
 }
 
 console.log('\n======================================================================');

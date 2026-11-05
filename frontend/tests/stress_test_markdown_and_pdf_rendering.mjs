@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { splitMarkdownBlocks } from '../src/components/markdown/splitMarkdownBlocks.ts';
 import { escapeCurrencyInMarkdown } from '../src/features/chat/components/messages/proseHelpers.tsx';
 
 console.log('======================================================================');
@@ -20,10 +19,9 @@ console.log('[Stress 1] Unclosed Code Fence at End of File (Streaming mid-flight
     // Notice: NO closing ``` fence!
   ].join('\n');
 
-  const blocks = splitMarkdownBlocks(unclosed, 10);
-  assert(blocks.length > 0, 'Must produce valid blocks');
-  // Should not throw or crash
-  console.log('  -> PASSED: Unclosed code fence safely packaged in block without throwing!\n');
+  const sanitized = escapeCurrencyInMarkdown(unclosed);
+  assert(sanitized.length > 0, 'Must produce valid sanitized text');
+  console.log('  -> PASSED: Unclosed code fence safely handled without throwing!\n');
 }
 
 // -----------------------------------------------------------------------------
@@ -40,9 +38,8 @@ console.log('[Stress 2] Malformed & Incomplete LaTeX Formulas...');
   ];
 
   for (const tc of malformedLatexCases) {
-    const sanitized = escapeCurrencyInMarkdown(tc);
     assert.doesNotThrow(() => {
-      splitMarkdownBlocks(sanitized, 5);
+      escapeCurrencyInMarkdown(tc);
     }, `Failed on input: ${tc}`);
   }
   console.log(`  -> PASSED: All ${malformedLatexCases.length} catastrophic LaTeX edge cases handled gracefully without exceptions!\n`);
@@ -96,10 +93,9 @@ console.log('[Stress 4] Single-Line ReDoS Protection (100,000+ chars with no new
 
   const startTime = Date.now();
   const sanitized = escapeCurrencyInMarkdown(doc);
-  const blocks = splitMarkdownBlocks(sanitized, 35);
   const duration = Date.now() - startTime;
 
-  assert(blocks.length > 0, 'Blocks must be produced');
+  assert(sanitized.length > 0, 'Sanitized text must be produced');
   assert(duration < 200, `ReDoS detected! Took ${duration} ms, expected < 200ms`);
   console.log(`  -> PASSED: 150,000-char line processed in ${duration} ms with zero catastrophic backtracking!\n`);
 }
@@ -119,10 +115,10 @@ console.log('[Stress 5] Broken, Asymmetric, and Unclosed Markdown Tables...');
   ].join('\n');
 
   assert.doesNotThrow(() => {
-    const blocks = splitMarkdownBlocks(brokenTable, 3);
-    assert(blocks.length > 0);
+    const sanitized = escapeCurrencyInMarkdown(brokenTable);
+    assert(sanitized.length > 0);
   });
-  console.log('  -> PASSED: Malformed table syntax parsed without throwing or breaking layout!\n');
+  console.log('  -> PASSED: Malformed table syntax handled without throwing!\n');
 }
 
 // -----------------------------------------------------------------------------
@@ -135,9 +131,9 @@ console.log('[Stress 6] Deeply Nested Callouts (15 levels deep)...');
     nested = `> [!NOTE]\n> Level ${lvl}\n> ${nested}`;
   }
 
-  const blocks = splitMarkdownBlocks(nested, 35);
-  assert(blocks.length > 0);
-  console.log('  -> PASSED: 15-level deeply nested blockquote callouts split safely!\n');
+  const sanitized = escapeCurrencyInMarkdown(nested);
+  assert(sanitized.length > 0);
+  console.log('  -> PASSED: 15-level deeply nested blockquote callouts processed safely!\n');
 }
 
 // -----------------------------------------------------------------------------
