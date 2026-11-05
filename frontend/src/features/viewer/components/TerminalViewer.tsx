@@ -95,7 +95,7 @@ export function TerminalViewer({
           }
         }}
         data={logLines}
-        followOutput={isRunning ? 'smooth' : false}
+        followOutput={isRunning ? 'auto' : false}
         initialTopMostItemIndex={Math.max(0, logLines.length - 1)}
         className="p-3 overflow-auto custom-scrollbar font-mono text-[11.5px] leading-relaxed text-zinc-300 flex-1 bg-[#0d0d0f]"
         itemContent={(idx, line) => {

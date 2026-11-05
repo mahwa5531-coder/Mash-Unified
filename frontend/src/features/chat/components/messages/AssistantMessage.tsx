@@ -95,6 +95,10 @@ const AssistantMessage = memo(function AssistantMessage({
     return msg.content || '';
   }, [units, msg.content]);
 
+  const isCompleted = msg.status === 'completed' || msg.status === 'error' || msg.status === 'aborted';
+  const hasContent = Boolean(allProseText || artifacts.length > 0 || editedFilesData.files.length > 0);
+  const showFooter = isCompleted && !isStreaming && hasContent;
+
   return (
     <div className="text-[13.5px] text-[var(--text-primary)] w-full mb-1.5">
       {/* Interleaved Sequential Units (Thoughts, Tools, and Authentic Assistant Prose in Chronological Order) */}
@@ -170,12 +174,12 @@ const AssistantMessage = memo(function AssistantMessage({
         />
       )}
 
-      {/* Footer: timestamp on left, copy button on right */}
-      {!isActivelyStreaming && (
+      {/* Footer: timestamp on left, copy button on right — only rendered when turn has completed */}
+      {showFooter && (
         <AssistantMessageFooter
           displayTime={displayTime}
           rawText={allProseText}
-          hasPrecedingContent={!!(allProseText || artifacts.length > 0 || editedFilesData.files.length > 0)}
+          hasPrecedingContent={hasContent}
         />
       )}
 

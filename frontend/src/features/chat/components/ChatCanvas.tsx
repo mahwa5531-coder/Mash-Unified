@@ -329,7 +329,7 @@ export default function ChatCanvas({
           data={turns}
           firstItemIndex={firstItemIndex}
           initialTopMostItemIndex={Math.max(0, turns.length - 1)}
-          followOutput={(isAtBottom) => isAtBottom ? 'smooth' : false}
+          followOutput={(isAtBottom) => isAtBottom ? 'auto' : false}
           startReached={handleLoadEarlier}
           computeItemKey={(_, turn) => turn.id || String(turn.flatIdx)}
           atBottomStateChange={setHitBottom}
