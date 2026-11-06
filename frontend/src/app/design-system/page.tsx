@@ -28,6 +28,7 @@ const Unit19Typography = dynamic(() => import('./units').then(m => m.Unit19Typog
 const Unit20FileViewerStates = dynamic(() => import('./units').then(m => m.Unit20FileViewerStates), { ssr: false });
 const Unit21SignIn = dynamic(() => import('./units').then(m => m.Unit21SignIn), { ssr: false });
 const Unit22SettingsModal = dynamic(() => import('./units').then(m => m.Unit22SettingsModal), { ssr: false });
+const Unit23LLMResponseShowcase = dynamic(() => import('./units').then(m => m.Unit23LLMResponseShowcase), { ssr: false });
 
 export default function DesignSystemPreviewPage() {
   if (process.env.NODE_ENV === 'production') {
@@ -159,6 +160,9 @@ export default function DesignSystemPreviewPage() {
 
         {/* UNIT 22: Unified Settings Modal */}
         <Unit22SettingsModal />
+
+        {/* UNIT 23: Complete LLM Response Showcase */}
+        <Unit23LLMResponseShowcase />
 
       </div>
     </div>

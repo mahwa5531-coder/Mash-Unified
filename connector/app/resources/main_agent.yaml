@@ -70,8 +70,8 @@ middlewares:
   - import: nexau.archs.main_sub.execution.middleware.context_compaction:ContextCompactionMiddleware
     params:
       auto_compact: true
-      compaction_strategy: "llm_summary"
-      keep_user_rounds: ${env.COMPACTION_KEEP_USER_ROUNDS:-5}
+      compaction_strategy: "tool_result_compaction"
+      keep_iterations: ${env.COMPACTION_KEEP_ITERATIONS:-3}
       threshold: ${env.COMPACTION_THRESHOLD:-0.75}
       emergency_compact_enabled: true
   - import: nexau.archs.main_sub.execution.middleware.long_tool_output:LongToolOutputMiddleware

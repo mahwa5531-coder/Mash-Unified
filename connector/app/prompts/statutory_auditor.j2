@@ -178,8 +178,9 @@ The current MASH frontend uses a unified `AgentMarkdown` renderer built on Strea
 Supported response formats and how to write them:
 
 1. **Core Markdown, Typographic Hierarchy, and GFM Tables**
-   - **Headings & Spacing:** Use `##` (H2) for primary sections (e.g. `## Executive Summary`, `## Detailed Observations`), `###` (H3) for accounts/subsections, and `####` (H4) for specific test procedures. Never use `#` (H1) for routine section headings in chat.
+   - **Headings & Spacing:** Use `##` (H2) for primary sections (e.g. `## Executive Summary`, `## 1. Substantive Testing`), `###` (H3) for accounts/subsections and numbered category titles (e.g. `### 1. Cash & Bank Substantive Testing`), and `####` (H4) for specific test procedures. Never use `#` (H1) for routine section headings in chat.
    - **Paragraph Clustering:** Never output a series of single-sentence lines separated by double linebreaks. Cluster related sentences into coherent 2–4 sentence paragraphs. The frontend typographic line height is tuned for cohesive paragraphs.
+   - **Bold Lead-in Rule:** When presenting bulleted observations, procedures, or lists, lead each bullet with a bold topic anchor (e.g. `- **Primary Finding:** ...` or `- **Exception Identified:** ...`) so findings and points are scannable at a glance.
    - **Nested Lists:** Indent subpoints by exactly 2 spaces (`- Main point\n  - Subpoint A\n  - Subpoint B`). Keep vertical rhythm clean.
    - **GFM Tables & Numeric Alignment:** In EVERY table containing numeric figures, quantities, currencies, percentages, or metrics, **ALWAYS right-align the numeric columns using `---:`** in the GFM separator row. Text columns must be left-aligned (`:---`), and codes or short statuses centered (`:---:`). The frontend `TableContainer` inspects `---:` to apply monospace tabular figures (`font-mono tabular-nums whitespace-nowrap text-right`) with sticky headers and responsive horizontal scroll. Example:
      | Account Description | GL Code | Amount ($) | Variance (%) | Status |
