@@ -1,6 +1,6 @@
 // In-flight tool calls, args buffering, cleanup, and approval manager (<250 LOC).
 
-import type { Message, ToolCall } from '@/types/chat';
+import type { Message, ToolCall, ExecutionStep } from '@/types/chat';
 import { BASE_URL, safeFetch } from '@/services/client';
 import { findTargetAssistantIdx, sessionStore, notifyStoreListeners } from '../state/sessionStore';
 
@@ -277,13 +277,80 @@ export function createStreamCallbacks(
       handlers.onToolCallRender();
     },
     onError: (errText: string, errId?: string) => handlers.onStreamError(errText, errId),
-    onRetryAttempt: (attempt: number) => {
+    onCompaction: (cData: { type: string; trigger_reason?: string; summary?: string }) => {
       const s = sessionStore.get(activeSid);
       if (!s) return;
       const idx = findTargetAssistantIdx(s.chatMessages, s.activeTurnId);
+      if (idx < 0) return;
+
+      const next = [...s.chatMessages];
+      const target = { ...next[idx] };
+      let steps = target.steps ? [...target.steps] : [];
+      let tools = target.tools ? [...target.tools] : [];
+      const compactionId = `compaction_${activeSid}`;
+
+      if (cData.type === 'COMPACTION_STARTED') {
+        // Transient compaction tool item: renders as active "Compacting context..." pill while in flight
+        const compTool: ToolCall = {
+          id: compactionId,
+          name: 'compaction',
+          args: { reason: cData.trigger_reason },
+          status: 'running',
+          toolAction: 'Compacting context',
+          toolSummary: 'Compacting context',
+        };
+        const tIdx = tools.findIndex((t) => t.id === compactionId);
+        if (tIdx >= 0) tools[tIdx] = compTool;
+        else tools.push(compTool);
+
+        const compStep: ExecutionStep = {
+          id: compactionId,
+          type: 'tool',
+          name: 'compaction',
+          args: { reason: cData.trigger_reason },
+          status: 'running',
+          toolAction: 'Compacting context',
+          toolSummary: 'Compacting context',
+        };
+        const sIdx = steps.findIndex((st) => st.id === compactionId);
+        if (sIdx >= 0) steps[sIdx] = { ...compStep, step_index: sIdx };
+        else steps.push({ ...compStep, step_index: steps.length });
+
+        target.tools = tools;
+        target.steps = steps;
+        next[idx] = target;
+        s.chatMessages = next;
+        handlers.onUpdateMessages(s.chatMessages);
+        handlers.onToolCallRender();
+      } else if (cData.type === 'COMPACTION_FINISHED') {
+        // Compaction complete: VANISHES completely from the worklog with zero leftover trace!
+        target.tools = tools.filter((t) => t.id !== compactionId);
+        target.steps = steps.filter((st) => st.id !== compactionId);
+        next[idx] = target;
+        s.chatMessages = next;
+        handlers.onUpdateMessages(s.chatMessages);
+        handlers.onToolCallRender();
+      }
+    },
+    onRetryAttempt: (attempt: number) => {
+      const s = sessionStore.get(activeSid);
+      if (!s) return;
+      // Discard uncommitted partial stream buffers from the aborted attempt
+      s.tokenBuffer = "";
+      s.thoughtBuffer = "";
+      const idx = findTargetAssistantIdx(s.chatMessages, s.activeTurnId);
       if (idx >= 0) {
         const next = [...s.chatMessages];
-        next[idx] = { ...next[idx], retryAttempt: attempt > 0 ? attempt : undefined };
+        const target = { ...next[idx] };
+        target.retryAttempt = attempt > 0 ? attempt : undefined;
+        if (attempt > 1) {
+          // Provider retry initiated: strip partial uncommitted running text step and clear in-flight content
+          if (Array.isArray(target.steps)) {
+            target.steps = target.steps.filter((st: any) => !(st.type === "text" && st.status === "running"));
+          }
+          target.content = "";
+        }
+        next[idx] = target;
         s.chatMessages = next;
         handlers.onUpdateMessages(s.chatMessages);
         notifyStoreListeners();

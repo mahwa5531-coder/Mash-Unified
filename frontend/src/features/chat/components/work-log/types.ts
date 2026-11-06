@@ -9,6 +9,7 @@ export interface ToolCallItem {
   toolSummary?: string;
   toolAction?: string;
   decision?: 'allow' | 'allow_once' | 'deny' | null;
+  is_compacted?: boolean;
 }
 
 export interface ExecutionStep {
@@ -30,6 +31,7 @@ export interface ExecutionStep {
   tools?: ToolCallItem[];
   toolAction?: string;
   toolSummary?: string;
+  is_compacted?: boolean;
 }
 
 export interface TimelineEntry {

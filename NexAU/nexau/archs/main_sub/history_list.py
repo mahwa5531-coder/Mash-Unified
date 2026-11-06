@@ -159,6 +159,10 @@ class HistoryList(list[Message]):
         """Check if there are unflushed pending messages."""
         return bool(self._pending_messages)
 
+    def get_messages(self) -> list[Message]:
+        """Return the underlying list of messages for middleware and adapter contract parity."""
+        return list(self)
+
     def _resize_oversized_images(self, messages: Iterable[Message]) -> None:
         """ ``DEFAULT_IMAGE_MAX_PIXELS``,
          (``image_exceeds_hard_limit``: base64 > 20 MiB  > 60 MP)  omit

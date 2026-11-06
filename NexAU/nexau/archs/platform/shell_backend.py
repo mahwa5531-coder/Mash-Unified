@@ -146,6 +146,10 @@ class WindowsPowerShellBackend:
         self._executable_path = executable_path
         self._kind = kind
 
+    @property
+    def kind(self) -> Literal["pwsh", "powershell"]:
+        return self._kind
+
     def build_launch_config(self, command: str) -> ShellLaunchConfig:
         execution_policy_args: tuple[str, ...]
         if self._kind == "powershell":

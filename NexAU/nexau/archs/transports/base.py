@@ -302,7 +302,8 @@ class TransportBase[TTransportConfig](ABC):
                     return notice
                 return res
             except Exception as exc:
-                if "No response content or tool calls" in str(exc):
+                err_s = str(exc)
+                if "No response content or tool calls" in err_s or "never aggregated with any content" in err_s:
                     logger.info("Empty completion for session %s; yielding clean terminal notification.", session_id)
                     from nexau.archs.llm.llm_aggregators.events import RunFinishedEvent, TextMessageContentEvent
 

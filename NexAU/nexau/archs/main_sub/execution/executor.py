@@ -326,10 +326,13 @@ class Executor:
             session_id=session_id,
         )
         self.response_parser = ResponseParser()
+        effective_retries = retry_attempts
+        if effective_retries == 5 and getattr(llm_config, "max_retries", None) is not None:
+            effective_retries = llm_config.max_retries
         self.llm_caller = LLMCaller(
             openai_client,
             llm_config,
-            retry_attempts,
+            effective_retries,
             retry_backoff_max_seconds=retry_backoff_max_seconds,
             on_retry=self._build_retry_callback(llm_config),
             middleware_manager=self.middleware_manager,
@@ -758,7 +761,7 @@ class Executor:
                 )
                 token_trace_session.sync_external_messages(messages)
 
-            if self.middleware_manager and not agent_state.get("_before_agent_fired", False):
+            if self.middleware_manager and not getattr(agent_state, "_before_agent_fired", False):
                 before_agent_hook_input = BeforeAgentHookInput(
                     agent_state=agent_state,
                     messages=messages,
@@ -1061,7 +1064,7 @@ class Executor:
                     ).strip()
 
                 if tool_results:
-                    # ponytail: Graceful last-turn wrap-up reminder. Prevents harsh max_iterations guillotine.
+                    # Graceful last-turn wrap-up reminder. Prevents harsh max_iterations guillotine.
                     if self.max_iterations is not None and iteration >= self.max_iterations - 2:
                         tool_results += (
                             "\n\n[SYSTEM NOTICE: You are on your final turns of your turn budget. "
@@ -1423,7 +1426,7 @@ class Executor:
                 framework_context=state.framework_context,
             )
             try:
-                if not state.agent_state.get("_before_agent_fired", False):
+                if not getattr(state.agent_state, "_before_agent_fired", False):
                     state.messages = await asyncio.to_thread(
                         self.middleware_manager.run_before_agent,
                         before_agent_hook_input,
@@ -2782,7 +2785,7 @@ class Executor:
         error_output: dict[str, Any] = {"status": "error", "error": error_msg}
         hook_input = AfterToolHookInput(
             agent_state=agent_state,
-            # ponytail: pass active sandbox from agent_state so after_tool middleware (e.g. LongToolOutputMiddleware) can persist/truncate
+            # Pass active sandbox from agent_state so after_tool middleware (e.g. LongToolOutputMiddleware) can persist/truncate
             sandbox=agent_state.get_sandbox(),
             tool_name=tc.tool_name,
             tool_call_id=tc.tool_call_id or "",
@@ -2934,6 +2937,7 @@ class Executor:
                 client.close()
             except Exception as e:
                 logger.warning(f"⚠️ Error closing sync LLM client during cleanup: {e}")
+            self.llm_caller.openai_client = None
 
         async_client = self.llm_caller.async_openai_client
         if async_client is not None:

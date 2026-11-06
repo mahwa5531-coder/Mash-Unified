@@ -157,6 +157,11 @@ export function CommandTimelineRow({
               <div className="flex items-center gap-1.5 truncate">
                 <span className="text-zinc-500 font-mono text-[10.5px] select-none shrink-0">&gt;</span>
                 <span className="text-zinc-200 font-medium truncate text-[10.5px]">{entry.data?.fullCmd || entry.data?.cmd}</span>
+                {entry.data?.tool?.is_compacted && (
+                  <span className="text-[9.5px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 select-none">
+                    compacted in LLM
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button

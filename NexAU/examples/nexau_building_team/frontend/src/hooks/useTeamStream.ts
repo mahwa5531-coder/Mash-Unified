@@ -1,6 +1,54 @@
 import { useCallback, useRef, useState } from "react";
 import type { AgentState, TeamStreamEnvelope, TeamStreamEnvelopeResponse } from "../types";
-import { applyEnvelope } from "../utils/applyEnvelope";
+import { applyEnvelope } from "../state/applyEnvelope";
+
+export type TeamStream = ReturnType<typeof useTeamStream>;
+
+/**
+ * ponytail: extracted unified SSE stream parser eliminating 30 lines of duplication
+ * between startStream and subscribeToStream (R6b)
+ */
+export async function consumeSseStream(
+  response: Response,
+  onEnvelope: (envelope: TeamStreamEnvelope) => void,
+  onError: (error: string) => void
+): Promise<void> {
+  if (!response.body) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const json = line.slice(6).trim();
+      if (!json) continue;
+
+      try {
+        const msg: TeamStreamEnvelopeResponse = JSON.parse(json);
+        if (msg.type === "error") {
+          onError(msg.error ?? "Stream error");
+          return;
+        }
+        if (msg.type === "complete") {
+          return;
+        }
+        if (msg.type === "team_event" && msg.envelope) {
+          onEnvelope(msg.envelope);
+        }
+      } catch {
+        // skip malformed JSON
+      }
+    }
+  }
+}
 
 /** Hook for connecting to /team/stream SSE endpoint with history support. */
 export function useTeamStream() {
@@ -18,14 +66,11 @@ export function useTeamStream() {
     async (userId: string, sessionId: string): Promise<number> => {
       try {
         const url = `/team/history?user_id=${encodeURIComponent(userId)}&session_id=${encodeURIComponent(sessionId)}`;
-        console.log("[loadHistory] fetching:", url);
         const res = await fetch(url);
         if (!res.ok) {
-          console.warn("[loadHistory] HTTP error:", res.status, res.statusText);
           return 0;
         }
         const events: TeamStreamEnvelope[] = await res.json();
-        console.log("[loadHistory] got", events.length, "events");
         if (!events.length) return 0;
         setAgents(() => {
           let state: Record<string, AgentState> = {};
@@ -37,8 +82,7 @@ export function useTeamStream() {
           return state;
         });
         return events.length;
-      } catch (err) {
-        console.error("[loadHistory] error:", err);
+      } catch {
         return 0;
       }
     },
@@ -47,94 +91,73 @@ export function useTeamStream() {
 
   const startStream = useCallback(
     async (message: string, userId: string, sessionId: string) => {
-      // 中断已有的 subscribe/stream 连接，避免重复接收事件
       abortRef.current?.abort();
-      setIsStreaming(true);
-      setError(null);
-      // 不清空 agents — 保留上一轮的内容，新事件会追加到已有 blocks
-      activeSessionRef.current = { userId, sessionId };
 
       const controller = new AbortController();
       abortRef.current = controller;
+      activeSessionRef.current = { userId, sessionId };
+      setIsStreaming(true);
+      setError(null);
 
       try {
         const response = await fetch("/team/stream", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
           body: JSON.stringify({
+            message,
             user_id: userId,
             session_id: sessionId,
-            message,
           }),
           signal: controller.signal,
         });
 
-        if (!response.ok || !response.body) {
-          throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const json = line.slice(6).trim();
-            if (!json) continue;
-
-            try {
-              const msg: TeamStreamEnvelopeResponse = JSON.parse(json);
-              if (msg.type === "error") {
-                setError(msg.error);
-                return;
-              }
-              if (msg.type === "complete") {
-                return;
-              }
-              if (msg.type === "team_event" && msg.envelope) {
-                setAgents((prev) => applyEnvelope(prev, msg.envelope!));
-              }
-            } catch {
-              // skip malformed JSON
-            }
-          }
-        }
+        await consumeSseStream(
+          response,
+          (envelope) => setAgents((prev) => applyEnvelope(prev, envelope)),
+          (errMsg) => setError(errMsg)
+        );
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           setError((err as Error).message);
         }
       } finally {
         setIsStreaming(false);
-        activeSessionRef.current = null;
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+        }
       }
     },
     []
   );
 
   const sendUserMessage = useCallback(
-    async (content: string, toAgentId: string = "leader") => {
-      const session = activeSessionRef.current;
-      if (!session) return;
-
+    async (
+      content: string,
+      userId: string,
+      sessionId: string,
+      toAgentId?: string
+    ) => {
       try {
-        await fetch("/team/user-message", {
+        const res = await fetch("/team/message", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: session.userId,
-            session_id: session.sessionId,
             content,
+            user_id: userId,
+            session_id: sessionId,
             to_agent_id: toAgentId,
           }),
         });
+        if (!res.ok) {
+          throw new Error(`Failed to send message: ${res.statusText}`);
+        }
       } catch (err) {
         setError((err as Error).message);
       }
@@ -142,92 +165,57 @@ export function useTeamStream() {
     []
   );
 
-  const stopStream = useCallback(() => {
-    const session = activeSessionRef.current;
-    if (session) {
-      fetch("/team/stop", {
+  const stopStream = useCallback(async (userId: string, sessionId: string) => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsStreaming(false);
+
+    try {
+      await fetch("/team/stop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: session.userId,
-          session_id: session.sessionId,
-        }),
-      }).catch(() => {});
+        body: JSON.stringify({ user_id: userId, session_id: sessionId }),
+      });
+    } catch {
+      // abort locally even if server call fails
     }
-    abortRef.current?.abort();
-    setIsStreaming(false);
-    activeSessionRef.current = null;
   }, []);
 
-  /** Reconnect to an in-progress team run after browser refresh.
-   *  Subscribes to /team/subscribe starting from `after` (already-loaded event count). */
   const subscribeToStream = useCallback(
-    async (userId: string, sessionId: string, after: number) => {
-      // 如果 startStream 已在运行，跳过重连（避免重复接收事件）
-      if (activeSessionRef.current) return;
-
-      // Check if team is still running before subscribing
-      try {
-        const statusRes = await fetch(
-          `/team/status?user_id=${encodeURIComponent(userId)}&session_id=${encodeURIComponent(sessionId)}`
-        );
-        if (!statusRes.ok) return;
-        const status = await statusRes.json();
-        if (!status.running) return;
-      } catch {
-        return;
-      }
-
-      // Re-check after async fetch — startStream may have started during the await
-      if (activeSessionRef.current) return;
-
-      setIsStreaming(true);
-      setError(null);
-      activeSessionRef.current = { userId, sessionId };
+    async (userId: string, sessionId: string, lastEventId: number) => {
+      abortRef.current?.abort();
 
       const controller = new AbortController();
       abortRef.current = controller;
+      activeSessionRef.current = { userId, sessionId };
+      setIsStreaming(true);
+      setError(null);
 
       try {
-        const url = `/team/subscribe?user_id=${encodeURIComponent(userId)}&session_id=${encodeURIComponent(sessionId)}&after=${after}`;
-        const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok || !response.body) {
-          throw new Error(`HTTP ${response.status}`);
-        }
+        const url = `/team/stream?user_id=${encodeURIComponent(userId)}&session_id=${encodeURIComponent(sessionId)}&last_event_id=${lastEventId}`;
+        const response = await fetch(url, {
+          headers: { Accept: "text/event-stream" },
+          signal: controller.signal,
+        });
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const json = line.slice(6).trim();
-            if (!json) continue;
-            try {
-              const msg = JSON.parse(json);
-              if (msg.type === "error") { setError(msg.error); return; }
-              if (msg.type === "complete") return;
-              if (msg.type === "team_event" && msg.envelope) {
-                setAgents((prev) => applyEnvelope(prev, msg.envelope));
-              }
-            } catch { /* skip malformed */ }
+        if (!response.ok) {
+          if (response.status === 404) {
+            setIsStreaming(false);
+            return;
           }
+          throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
         }
+
+        await consumeSseStream(
+          response,
+          (envelope) => setAgents((prev) => applyEnvelope(prev, envelope)),
+          (errMsg) => setError(errMsg)
+        );
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           setError((err as Error).message);
         }
       } finally {
-        // Only clean up if we're still the active consumer
-        // (startStream may have taken over by replacing abortRef.current)
         if (abortRef.current === controller) {
           setIsStreaming(false);
           activeSessionRef.current = null;
@@ -237,5 +225,15 @@ export function useTeamStream() {
     []
   );
 
-  return { agents, setAgents, isStreaming, error, startStream, sendUserMessage, stopStream, loadHistory, subscribeToStream };
+  return {
+    agents,
+    setAgents,
+    isStreaming,
+    error,
+    startStream,
+    sendUserMessage,
+    stopStream,
+    loadHistory,
+    subscribeToStream,
+  };
 }

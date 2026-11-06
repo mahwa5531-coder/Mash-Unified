@@ -54,11 +54,13 @@ def create_compaction_strategy(config: CompactionConfig) -> CompactionStrategy:
         compactable_tools_set: frozenset[str] | None = None
         if config.compactable_tools is not None:
             compactable_tools_set = frozenset(config.compactable_tools)
-        return ToolResultCompaction(
-            keep_iterations=config.keep_iterations,
-            keep_user_rounds=config.keep_user_rounds,
-            compactable_tools=compactable_tools_set,
-        )
+        kwargs: dict[str, Any] = {
+            "keep_user_rounds": config.keep_user_rounds,
+            "compactable_tools": compactable_tools_set,
+        }
+        if "keep_iterations" in config.model_fields_set or config.keep_user_rounds == 0:
+            kwargs["keep_iterations"] = config.keep_iterations
+        return ToolResultCompaction(**kwargs)
 
     raise ValueError(f"Unknown compaction strategy: {config.compaction_strategy}")
 

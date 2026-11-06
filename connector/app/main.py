@@ -6,7 +6,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# ponytail: Load single unified root .env file
+# Load single unified root .env file
 from dotenv import load_dotenv
 
 _root_env = Path(__file__).resolve().parent.parent.parent / ".env"
@@ -123,6 +123,9 @@ def _build_agent_config() -> AgentConfig:
                 clean_gw = clean_gw[:-6]
             default_base_url = clean_gw if clean_gw.endswith("/v1") else f"{clean_gw}/v1"
 
+    retries = int(os.getenv("LLM_MAX_RETRIES", "3"))
+    agent_config.retry_attempts = retries
+
     agent_config.llm_config = LLMConfig(
         api_type="openai_chat_completion",
         model=active_model,
@@ -131,7 +134,7 @@ def _build_agent_config() -> AgentConfig:
         max_tokens=int(os.getenv("LLM_MAX_TOKENS")) if os.getenv("LLM_MAX_TOKENS") else None,
         timeout=float(os.getenv("LLM_TIMEOUT", "120.0")),
         stream_idle_timeout=float(os.getenv("LLM_STREAM_IDLE_TIMEOUT", "45.0")),
-        max_retries=int(os.getenv("LLM_MAX_RETRIES", "3")),
+        max_retries=retries,
     )
 
     agent_config.max_context_tokens = int(
@@ -240,7 +243,7 @@ app.include_router(system.router)
 app.include_router(auth.router)
 app.include_router(settings.router)
 
-# ponytail: B-16 root /health probe for external container/monitoring health checks
+# Root /health probe for external container/monitoring health checks
 @app.get("/health", tags=["system"])
 async def root_health():
     """Root health probe delegating directly to get_system_health."""
@@ -251,7 +254,7 @@ from app.routers.sessions import get_transcript as get_session_transcript_bridge
 
 if __name__ == "__main__":
     import uvicorn
-    # ponytail: Default to loopback for desktop security; override via HOST env for container deployment
+    # Default to loopback for desktop security; override via HOST env for container deployment
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run("app.main:app", host=host, port=port)

@@ -1,10 +1,9 @@
-import { Message } from '@/types/chat';
+import { Message, ToolCall } from '@/types/chat';
 
 const PROTOCOL_TAGS_REGEX = /<\/?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity|system_prompt|session_mode|file_storage_and_discipline|tool_execution_discipline|ui_presentation_format|runtime_context|skills|Skill[A-Za-z0-9_-]+|scratchpad|thought|thinking|tool_use|tool_result|tool_name|tool_output|use_parallel_tool_calls|parallel_tool|summary_data_json|empty)>\s*/gi;
 const PROTOCOL_BRACKETS_REGEX = /\[(?:sub_agent_id|SYSTEM NOTICE):[^\]]*\]\s*/gi;
 
-// ponytail: strip NexAU reasoning-only [empty] sentinel, [VERIFIED] marker, [DONE]/[END] protocol sentinels,
-// and prompt/protocol tag leakage (<user message>, <user_message>, etc.)
+// ponytail: strip NexAU protocol sentinels, [empty], and prompt tag leakage
 export function cleanAssistantContent(raw?: string): string {
   if (!raw || typeof raw !== 'string') return '';
   const trimmed = raw.trim();
@@ -19,7 +18,7 @@ export function cleanAssistantContent(raw?: string): string {
     .trim();
 }
 
-// ponytail: strip internal mid-flight steering protocol envelopes and prompt tags from user prompt text
+// ponytail: strip internal mid-flight steering protocol envelopes from user prompt text
 export function cleanUserSteeringEnvelope(text?: string): string {
   if (!text || typeof text !== 'string') return '';
   let cleaned = text;
@@ -45,7 +44,7 @@ export function cleanUserSteeringEnvelope(text?: string): string {
     .trim();
 }
 
-// ponytail: strip internal protocol envelopes, attachments, and boilerplate for composer textarea
+// ponytail: strip internal protocol envelopes and attachments for composer textarea
 export function cleanUserPromptForComposer(text?: string): string {
   if (!text || typeof text !== 'string') return '';
   let cleaned = text.replace(/\[Attached (?:file|files)[^\]]*\]/gi, '').replace(/<attachments>[\s\S]*?<\/attachments>/gi, '').trim();
@@ -53,182 +52,95 @@ export function cleanUserPromptForComposer(text?: string): string {
   return cleanUserSteeringEnvelope(cleaned);
 }
 
-// ponytail: transforms raw NexAU DB action records into structured chat Message[] for rendering
+// Helper: Normalize tool call attributes without inventing data (no fabricated 'Done.')
+function normalizeTool(t: any, idx: number, prefix: string): ToolCall {
+  const args = typeof t.args === 'object' && t.args !== null ? t.args : {};
+  return {
+    id: t.id || `${prefix}_tc_${idx}`,
+    name: t.name || 'action',
+    args,
+    output: typeof t.output === 'string' ? t.output : (t.output ? String(t.output) : ''),
+    status: t.status || 'completed',
+    decision: t.decision,
+    toolSummary: t.toolSummary || t.tool_summary || args.toolSummary || args.tool_summary || args.summary || args.description,
+    toolAction: t.toolAction || t.tool_action || args.toolAction || args.tool_action,
+    command: t.command || args.CommandLine || args.command || args.cmd,
+    path: t.path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path,
+    is_compacted: Boolean(t.is_compacted),
+  };
+}
+
+// ponytail: transforms normalized transcript lines into structured chat Message[] for rendering
 export function parseSessionHistory(rawLines: any[]): Message[] {
   const parsedMsgs: Message[] = [];
 
   for (const line of rawLines) {
     try {
       const step = typeof line === 'string' ? JSON.parse(line) : line;
+      if (!step || typeof step !== 'object') continue;
 
-      // Skip framework internal markers
-      if (step.type === 'compaction_boundary' || step.role === 'framework' || (step.role === 'system' && step.isCompacted)) {
+      // Compaction boundary handling: wire boundary and summary onto the preceding message
+      if (step.type === 'compaction_boundary' || (step.role === 'system' && step.isCompacted)) {
+        const lastMsg = parsedMsgs[parsedMsgs.length - 1];
+        if (lastMsg) {
+          lastMsg.compactionBoundary = true;
+          if (step.summary || step.content) {
+            lastMsg.compactionSummary = String(step.summary || step.content);
+          }
+        }
         continue;
       }
 
-      if (step.role === 'user' || step.source === 'USER_EXPLICIT' || step.source === 'USER' || step.type === 'USER_INPUT') {
-        let userText = typeof step.content === 'string' ? step.content : (step.value || '');
-        if (Array.isArray(step.content)) {
-          userText = step.content.map((b: any) => (typeof b === 'string' ? b : b?.text || '')).join('\n');
-        }
-
-        // Defensive sanitize: strip legacy handoff summary prefix if present
-        if (typeof userText === 'string' && userText.includes('The user request for this round is:')) {
-          const parts = userText.split('The user request for this round is:');
-          userText = parts[1].trim();
-        } else if (typeof userText === 'string' && userText.trim().startsWith('[SYSTEM NOTICE:')) {
-          continue;
-        }
-
-        userText = cleanUserSteeringEnvelope(userText);
-
+      if (step.role === 'user') {
+        const userText = cleanUserSteeringEnvelope(typeof step.content === 'string' ? step.content : '');
         parsedMsgs.push({
-          id: step.id || (step as any).action_id,
+          id: step.id || `m_${parsedMsgs.length}`,
           sessionId: step.session_id,
           turnId: step.turn_id,
           role: 'user',
           content: userText,
-          timestamp: step.created_at || (step as any).timestamp,
+          timestamp: step.created_at || step.timestamp,
           thoughts: [],
           tools: [],
           tasks: [],
         });
-      } else if (step.role === 'assistant' || step.source === 'MODEL' || step.type === 'PLANNER_RESPONSE') {
-        let content = cleanAssistantContent(typeof step.content === 'string' ? step.content : '');
-        const thoughts: string[] = Array.isArray(step.thoughts) ? [...step.thoughts] : (step.thinking ? [step.thinking] : []);
-        const rawTools: any[] = Array.isArray(step.tools) ? step.tools : (Array.isArray(step.tool_calls) ? step.tool_calls : []);
-        // ponytail: correct operator precedence so step_index check doesn't produce st_undefined when action_id exists
-        const stepPrefix =
-          (step as any).step_index !== undefined
-            ? `st_${(step as any).step_index}`
-            : (step.action_id || step.id || `m_${parsedMsgs.length}`);
-        const tools: any[] = [];
-        for (const t of rawTools) {
-          const name = t.name || t.function?.name || 'action';
-          let args = t.args || t.input || t.function?.arguments || {};
-          if (typeof args === 'string') {
-            try { args = JSON.parse(args); } catch { args = {}; }
-          }
-          const outputStr = String(t.output || '');
-          const isCancelled = t.status === 'cancelled';
-          const isDenied = t.status === 'denied' || t.decision === 'deny';
-          const isPending = t.status === 'pending_approval' || t.status === 'pending';
-          const status = isDenied ? 'denied' : isCancelled ? 'cancelled' : isPending ? 'pending_approval' : (t.status || 'completed');
-          const summaryRaw = t.toolSummary || t.tool_summary || args.toolSummary || args.tool_summary || args.summary || args.description;
-          const actionRaw = t.toolAction || t.tool_action || args.toolAction || args.tool_action;
-          tools.push({
-            id: t.id || `${stepPrefix}_tc_${tools.length}`,
-            name,
-            args,
-            output: outputStr,
-            status,
-            decision: t.decision,
-            toolSummary: summaryRaw ? String(summaryRaw).trim() : undefined,
-            toolAction: actionRaw ? String(actionRaw).trim() : undefined,
-            command: t.command || args.CommandLine || args.command || args.cmd,
-            path: t.path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path,
-          });
-        }
-        const tasks = step.tasks || [];
+      } else if (step.role === 'assistant') {
+        const content = cleanAssistantContent(typeof step.content === 'string' ? step.content : '');
+        const thoughts: string[] = Array.isArray(step.thoughts) ? step.thoughts.map(String) : [];
+        const prefix = step.id || `m_${parsedMsgs.length}`;
 
-        if (Array.isArray(step.content)) {
-          for (const b of step.content) {
-            if (b.type === 'text' && b.text) {
-              const cleanBText = cleanAssistantContent(b.text);
-              if (cleanBText) {
-                content += (content ? '\n' : '') + cleanBText;
-              }
-            }
-            if ((b.type === 'reasoning' || b.type === 'thinking') && (b.text || b.thinking)) {
-              thoughts.push(b.text || b.thinking);
-            }
-            if (b.type === 'tool_use' || b.type === 'tool_call') {
-              const name = b.name || b.function?.name || 'action';
-              let args = b.input || b.args || b.function?.arguments || {};
-              if (typeof args === 'string') {
-                try { args = JSON.parse(args); } catch { args = {}; }
-              }
-              const summaryRaw = b.toolSummary || b.tool_summary || args.toolSummary || args.tool_summary || args.summary || args.description;
-              const actionRaw = b.toolAction || b.tool_action || args.toolAction || args.tool_action;
-              tools.push({
-                id: b.id || `${stepPrefix}_tc_${tools.length}`,
-                name,
-                args,
-                output: b.output || '',
-                status: b.status || 'completed',
-                decision: b.decision,
-                toolSummary: summaryRaw ? String(summaryRaw).trim() : undefined,
-                toolAction: actionRaw ? String(actionRaw).trim() : undefined,
-                command: b.command || args.CommandLine || args.command || args.cmd,
-                path: b.path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path,
-              });
-            }
-          }
-        }
-        
+        const rawTools: any[] = Array.isArray(step.tools) ? step.tools : [];
+        const tools: ToolCall[] = rawTools.map((t, i) => normalizeTool(t, i, prefix));
+
+        const resolvedSteps = Array.isArray(step.steps)
+          ? step.steps.map((st: any) => ({
+              ...st,
+              toolSummary: st.toolSummary || st.args?.toolSummary,
+              toolAction: st.toolAction || st.args?.toolAction,
+            }))
+          : [];
+
+        const isAborted = step.status === 'aborted' || step.status === 'cancelled' || step.stop_reason === 'user_stopped' || step.stop_reason === 'cancelled';
+        const isError = step.status === 'error' || step.status === 'failed';
+        const status = isAborted ? 'aborted' : (isError ? 'error' : (step.status || 'completed'));
+
         const thinkingDurationSeconds = step.thinking_duration_seconds || step.thinkingDurationSeconds;
         const totalDurationSeconds = step.total_duration_seconds || step.totalDurationSeconds;
-        
-        const rawSteps = Array.isArray(step.steps) && step.steps.length > 0 ? step.steps : null;
-        let resolvedSteps: any[] = [];
-        if (rawSteps) {
-          resolvedSteps = rawSteps.map((st: any) => ({
-            ...st,
-            toolSummary: st.toolSummary || st.args?.toolSummary,
-            toolAction: st.toolAction || st.args?.toolAction,
-          }));
-        } else {
-          if (thoughts.length > 0) {
-            resolvedSteps.push({
-              id: `${stepPrefix}_th_${resolvedSteps.length}`,
-              step_index: resolvedSteps.length,
-              type: 'thinking',
-              content: thoughts.join('\n'),
-              status: 'completed',
-            });
-          }
-          if (tools.length > 0) {
-            for (const t of tools) {
-              resolvedSteps.push({
-                id: t.id || `${stepPrefix}_tc_${resolvedSteps.length}`,
-                step_index: resolvedSteps.length,
-                type: 'tool',
-                tool_call_id: t.id,
-                name: t.name,
-                args: t.args,
-                output: t.output || '',
-                status: t.status || 'completed',
-                decision: t.decision,
-                toolSummary: t.toolSummary,
-                toolAction: t.toolAction,
-              });
-            }
-          }
-          if (content && content.trim().length > 0) {
-            resolvedSteps.push({
-              id: `${stepPrefix}_tx_${resolvedSteps.length}`,
-              step_index: resolvedSteps.length,
-              type: 'text',
-              content: content,
-              status: 'completed',
-            });
-          }
-        }
 
         const prevMsg = parsedMsgs.length > 0 ? parsedMsgs[parsedMsgs.length - 1] : null;
         if (prevMsg && prevMsg.role === 'assistant') {
           prevMsg.thoughts.push(...thoughts);
           prevMsg.tools.push(...tools);
-          if (content) {
-            prevMsg.content = prevMsg.content ? (prevMsg.content + '\n\n' + content).trim() : content.trim();
+          // Only append prose content if this step was NOT an intermediate tool-invocation step
+          if (content && rawTools.length === 0) {
+            prevMsg.content = prevMsg.content ? `${prevMsg.content}\n\n${content}`.trim() : content.trim();
           }
-          if (tasks.length > 0) prevMsg.tasks = tasks;
           if (resolvedSteps.length > 0) {
             if (!prevMsg.steps) prevMsg.steps = [];
             for (const rStep of resolvedSteps) {
               const last = prevMsg.steps[prevMsg.steps.length - 1];
               if (last && last.type === 'thinking' && rStep.type === 'thinking') {
-                last.content = (last.content + '\n\n' + rStep.content).trim();
+                last.content = `${last.content}\n\n${rStep.content}`.trim();
                 if (rStep.thinkingDurationSeconds) {
                   last.thinkingDurationSeconds = (last.thinkingDurationSeconds || 0) + rStep.thinkingDurationSeconds;
                 }
@@ -237,105 +149,33 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
               }
             }
           }
-          const isAborted = step.status === 'aborted' || step.status === 'cancelled' || step.stop_reason === 'user_stopped' || step.stop_reason === 'cancelled';
-          const isError = step.status === 'error' || step.status === 'failed';
           if (isAborted) prevMsg.status = 'aborted';
           else if (isError) prevMsg.status = 'error';
-          if (step.created_at || (step as any).timestamp) {
-            prevMsg.timestamp = step.created_at || (step as any).timestamp;
-          }
+          if (step.created_at || step.timestamp) prevMsg.timestamp = step.created_at || step.timestamp;
           if (thinkingDurationSeconds) prevMsg.thinkingDurationSeconds = thinkingDurationSeconds;
           if (totalDurationSeconds) prevMsg.totalDurationSeconds = totalDurationSeconds;
         } else {
-          const isAborted = step.status === 'aborted' || step.status === 'cancelled' || step.stop_reason === 'user_stopped' || step.stop_reason === 'cancelled';
-          const isError = step.status === 'error' || step.status === 'failed';
-          parsedMsgs.push({ 
-            id: step.id || (step as any).action_id,
+          parsedMsgs.push({
+            id: step.id || `m_${parsedMsgs.length}`,
             sessionId: step.session_id,
             turnId: step.turn_id,
-            role: 'assistant', 
-            content: content.trim(), 
-            status: isAborted ? 'aborted' : (isError ? 'error' : (step.status || 'completed')),
-            thoughts: thoughts, 
-            tools: tools,
-            tasks: tasks,
+            role: 'assistant',
+            content: rawTools.length === 0 ? content.trim() : '',
+            status,
+            thoughts,
+            tools,
+            tasks: [],
             steps: resolvedSteps,
-            timestamp: step.created_at || (step as any).timestamp,
+            timestamp: step.created_at || step.timestamp,
             thinkingDurationSeconds,
             totalDurationSeconds,
           });
         }
-      } else if (step.role === 'tool') {
-        const prevMsg = parsedMsgs.length > 0 ? parsedMsgs[parsedMsgs.length - 1] : null;
-        if (prevMsg && prevMsg.role === 'assistant') {
-          const toolId = step.tool_call_id || step.id;
-          let outputText = step.content || step.output || '';
-          if (Array.isArray(step.content)) {
-            const resBlock = step.content.find((b: any) => b.type === 'tool_result');
-            if (resBlock) outputText = resBlock.content || '';
-          }
-          // ponytail: reverse scan finds the matching tool call in O(1) time at the tail
-          let target: any = null;
-          for (let ti = prevMsg.tools.length - 1; ti >= 0; ti--) {
-            if (prevMsg.tools[ti].id === toolId) {
-              target = prevMsg.tools[ti];
-              break;
-            }
-          }
-          if (target) {
-            target.output = outputText || 'Done.';
-            if (step.status) {
-              target.status = step.status;
-            } else if (!target.status || target.status === 'pending_approval') {
-              target.status = 'completed';
-            }
-          } else if (outputText) {
-            prevMsg.tools.push({
-              id: toolId || `tc_${prevMsg.tools.length}`,
-              name: step.name || 'action',
-              args: {},
-              output: outputText || 'Done.',
-              status: 'completed'
-            });
-          }
-          if (prevMsg.steps) {
-            let matchedStep = false;
-            for (let si = prevMsg.steps.length - 1; si >= 0; si--) {
-              const s = prevMsg.steps[si];
-              if (s.type === 'tool' && (s.tool_call_id === toolId || s.id === toolId)) {
-                s.output = outputText || 'Done.';
-                s.status = 'completed';
-                matchedStep = true;
-                break;
-              }
-              if (Array.isArray(s.tools)) {
-                for (let ti = s.tools.length - 1; ti >= 0; ti--) {
-                  if (s.tools[ti].id === toolId) {
-                    s.tools[ti].output = outputText || 'Done.';
-                    s.tools[ti].status = 'completed';
-                    matchedStep = true;
-                    break;
-                  }
-                }
-                if (matchedStep) break;
-              }
-            }
-            if (!matchedStep && outputText) {
-              prevMsg.steps.push({
-                id: toolId || `step_${prevMsg.steps.length}`,
-                step_index: prevMsg.steps.length,
-                type: 'tool',
-                tool_call_id: toolId,
-                name: step.name || 'action',
-                args: {},
-                output: outputText || 'Done.',
-                status: 'completed',
-              });
-            }
-          }
-        }
       }
-    } catch (_err) {}
+    } catch (err) {
+      console.warn('[sessionHistoryParser] Failed to parse transcript line:', err);
+    }
   }
+
   return parsedMsgs;
 }

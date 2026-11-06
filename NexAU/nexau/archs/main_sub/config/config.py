@@ -499,11 +499,15 @@ class ExecutionConfig:
     def from_agent_config(cls, agent_config: AgentConfig) -> ExecutionConfig:
         """Create execution configuration derived from an agent configuration."""
 
+        retries = agent_config.retry_attempts
+        if retries == 5 and agent_config.llm_config and getattr(agent_config.llm_config, "max_retries", None) is not None:
+            retries = agent_config.llm_config.max_retries
+
         return cls(
             max_iterations=agent_config.max_iterations,
             max_context_tokens=agent_config.max_context_tokens,
             max_running_subagents=agent_config.max_running_subagents,
-            retry_attempts=agent_config.retry_attempts,
+            retry_attempts=retries,
             retry_backoff_max_seconds=agent_config.retry_backoff_max_seconds,
             timeout=agent_config.timeout,
             tool_call_mode=agent_config.tool_call_mode,

@@ -1298,11 +1298,11 @@ class Agent:
                     try:
                         before_agent_input = BeforeAgentHookInput(
                             agent_state=agent_state,
-                            messages=self.history.get_messages(),
+                            messages=self.history.get_messages() if hasattr(self.history, "get_messages") and callable(self.history.get_messages) else list(self.history),
                             framework_context=resume_ctx,
                         )
                         self.executor.middleware_manager.run_before_agent(before_agent_input)
-                        agent_state.set("_before_agent_fired", True)
+                        setattr(agent_state, "_before_agent_fired", True)
                     except Exception as b_err:
                         logger.warning("Error running before_agent middleware on resume: %s", b_err)
 

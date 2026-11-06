@@ -59,7 +59,12 @@ export function prunePathPunctuation(raw: string): { cleanPath: string; trailing
 // Supports absolute paths, relative paths, known system audit roots, and relative folder/file paths.
 export function isFullFilePath(raw: string): boolean {
   if (!raw || typeof raw !== 'string') return false;
-  const clean = normalizePath(raw.trim());
+  const trimmed = raw.trim();
+  // ponytail: reject web URLs so external links (e.g. docs, sklearn) never become local FilePills
+  if (/^https?:\/\//i.test(trimmed)) return false;
+
+  const clean = normalizePath(trimmed);
+  if (/^https?:\/\//i.test(clean)) return false;
   if (clean.includes('/node_modules/') || clean.startsWith('node_modules/')) return false;
   if (!clean || clean.includes(' ') || clean.includes('\n') || clean.includes('*') || clean.includes('?')) return false;
   if (clean.endsWith('/') || clean.endsWith('\\')) return false;

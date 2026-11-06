@@ -11,11 +11,24 @@ export interface UpdateState {
   version?: string;
 }
 
+/** Detect whether the application is running inside an Electron desktop shell or desktop wrapper. */
+export function isDesktopShell(): boolean {
+  if (typeof window === 'undefined') return false;
+  return Boolean(
+    (window as any).electronAPI ||
+    (window as any).__MASH_DESKTOP__ ||
+    (typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron'))
+  );
+}
+
 export function useDesktopAutoUpdate() {
   const [updateState, setUpdateState] = useState<UpdateState>({ status: 'idle' });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    // Browser dev workflow: do not poll native desktop update endpoints outside desktop shells
+    if (!isDesktopShell()) return;
 
     // 1. Electron Native IPC Listeners
     const electron = (window as any).electronAPI;
@@ -84,19 +97,18 @@ export function useDesktopAutoUpdate() {
   }, []);
 
   const handleRestart = async () => {
-    if (typeof window !== 'undefined') {
-      const electron = (window as any).electronAPI;
-      if (electron?.restartAndInstall) {
-        electron.restartAndInstall();
-        return;
-      }
-      // HTTP connector fallback
-      try {
-        await safeFetch(`${BASE_URL}/api/system/updates/restart`, { method: 'POST' });
-      } catch {}
-      // Reset state upon restart trigger
-      setUpdateState({ status: 'idle' });
+    if (typeof window === 'undefined' || !isDesktopShell()) return;
+    const electron = (window as any).electronAPI;
+    if (electron?.restartAndInstall) {
+      electron.restartAndInstall();
+      return;
     }
+    // HTTP connector fallback for desktop dev
+    try {
+      await safeFetch(`${BASE_URL}/api/system/updates/restart`, { method: 'POST' });
+    } catch {}
+    // Reset state upon restart trigger
+    setUpdateState({ status: 'idle' });
   };
 
   return { updateState, handleRestart, setUpdateState };

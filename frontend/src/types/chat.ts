@@ -14,6 +14,9 @@ export interface ToolCall {
   toolSummary?: string;
   toolAction?: string;
   decision?: 'allow' | 'allow_once' | 'deny' | null;
+  command?: string;
+  path?: string;
+  is_compacted?: boolean;
 }
 
 export interface SubTask {

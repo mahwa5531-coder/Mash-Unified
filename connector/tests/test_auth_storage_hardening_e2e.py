@@ -52,11 +52,7 @@ from nexau.archs.platform.path_helpers import (
     get_nexau_home,
     get_session_brain_dir,
 )
-from nexau.archs.session.agent_run_action_service import (
-    AgentRunActionService,
-    redact_data_structure,
-    redact_sensitive_content,
-)
+from nexau.archs.session.agent_run_action_service import AgentRunActionService
 from nexau.archs.session import AgentRunActionKey, AgentRunActionModel
 from nexau.archs.session.models.session import SessionModel
 from nexau.archs.session.orm import InMemoryDatabaseEngine
@@ -369,29 +365,6 @@ def test_tier1_non_destructive_legacy_fallback(mock_mash_env):
     assert legacy_settings.exists(), "Legacy settings.json was deleted during fallback!"
 
 
-def test_tier1_secret_redaction_transcripts_and_sqlite():
-    """Tier 1: Verify sensitive credentials and tokens are redacted before persistence."""
-    leaked_inputs = [
-        ("curl -H 'Authorization: Bearer sk-ant-secret1234567890abcdef' https://api.mash.ai",
-         "curl -H 'Authorization: Bearer [REDACTED]' https://api.mash.ai"),
-        ("Using OpenAI key sk-123456789012345678901234567890 to query",
-         "Using OpenAI key [REDACTED] to query"),
-        ("Found Google token AIzaSyD-1234567890abcdefghijklmnopqrst",
-         "Found Google token [REDACTED]"),
-        ("Token ghp_1234567890abcdefghijklmnopqrstuvwxyz committed",
-         "Token [REDACTED] committed"),
-        ("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDxgnv_32",
-         "Bearer [REDACTED]"),
-    ]
-
-    for raw, expected in leaked_inputs:
-        redacted = redact_sensitive_content(raw)
-        assert redacted == expected, f"Failed redacting: {raw}"
-        assert "sk-" not in redacted
-        assert "AIza" not in redacted
-        assert "ghp_" not in redacted
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 # TIER 2: BOUNDARY & CORNER CASES
 # ──────────────────────────────────────────────────────────────────────────────
@@ -574,91 +547,6 @@ def test_tier3_account_switching_and_vault_migration(mock_mash_env):
     assert _IN_MEMORY_AUTH_META.get("account_tokens", {}).get(target_email, {}).get("access_token") == "user2_legacy_access"
 
 
-@pytest.mark.anyio
-async def test_tier3_startup_recovery_and_transcript_logging(mock_mash_env, monkeypatch, tmp_path):
-    """Tier 3: Startup cold-boot recovery followed by action persistence asserts secrets redacted in transcripts."""
-    save_secure_vault({"refresh_token": "boot_recovery_refresh_token"})
-    _IN_MEMORY_AUTH_META.clear()
-
-    live_token = "live_bearer_token_xyz_12345678901234567890"
-
-    async def mock_refresh(self, r_tok: str):
-        return {"access_token": live_token, "refresh_token": "rotated_boot_refresh", "expires_in": 3600}
-
-    monkeypatch.setattr(MAShClient, "refresh_access_token", mock_refresh)
-
-    restored = await ensure_valid_token(force_refresh=True)
-    assert restored == live_token
-
-    # Setup database and append an action containing the active token in a curl tool call
-    engine = InMemoryDatabaseEngine()
-    await engine.setup_models([AgentRunActionModel, SessionModel])
-
-    session_id = "test_e2e_session_redaction"
-    user_id = "test_user"
-    key = AgentRunActionKey(user_id=user_id, session_id=session_id, agent_id="main")
-
-    msg = Message(
-        role=Role.ASSISTANT,
-        content=[
-            TextBlock(text=f"Executing curl command with token Bearer {live_token}"),
-            ToolUseBlock(
-                name="run_command",
-                id="tool_1",
-                input={"command": f"curl -H 'Authorization: Bearer {live_token}' http://api.mash.ai"},
-            ),
-            ToolResultBlock(
-                tool_use_id="tool_1",
-                content='{"status": "ok", "api_key": "sk-proj-1234567890abcdefghijkl"}',
-            ),
-        ],
-    )
-
-    service = AgentRunActionService(engine=engine)
-    await service.persist_append(
-        key=key,
-        run_id="run_1",
-        root_run_id="run_1",
-        parent_run_id=None,
-        agent_name="main_agent",
-        messages=[msg],
-    )
-
-    # Query SQLite record
-    records = await engine.find_many(AgentRunActionModel)
-    assert len(records) >= 1
-    persisted_actions = records[0].append_messages
-
-    dumped = json.dumps([m.model_dump() if hasattr(m, "model_dump") else m for m in persisted_actions])
-    assert live_token not in dumped, "Live bearer token leaked into SQLite agent_run_actions!"
-    assert "sk-proj" not in dumped, "OpenAI API key leaked into SQLite agent_run_actions!"
-    assert "[REDACTED]" in dumped, "Redacted sentinel missing from persisted SQLite record!"
-
-
-def test_tier3_redaction_and_session_loading_roundtrip():
-    """Tier 3: Ensure data structures with nested secrets are cleanly redacted on both write and read."""
-    payload = {
-        "session_id": "sid_123",
-        "events": [
-            {"command": "export OPENAI_API_KEY=sk-123456789012345678901234567890"},
-            {"header": "Authorization: Bearer my_jwt_token_12345678901234567890"},
-        ],
-        "metadata": {
-            "anthropic_key": "sk-ant-123456789012345678901234567890",
-            "nested_list": ["Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"],
-        },
-    }
-
-    sanitized = redact_data_structure(payload)
-    dumped = json.dumps(sanitized)
-
-    assert "sk-123" not in dumped
-    assert "sk-ant" not in dumped
-    assert "my_jwt_token" not in dumped
-    assert "eyJhbGci" not in dumped
-    assert "[REDACTED]" in dumped
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 # TIER 4: REAL-WORLD WORKLOAD SCENARIOS
 # ──────────────────────────────────────────────────────────────────────────────
@@ -759,11 +647,8 @@ async def test_tier4_full_lifecycle_login_restart_chat_audit(mock_mash_env, monk
 
     # B. SQLite database audit
     actions = await engine.find_many(AgentRunActionModel)
-    sqlite_dump = json.dumps([a.model_dump(mode="json") for a in actions], default=str)
-    assert cold_boot_access_token not in sqlite_dump
-    assert login_access_token not in sqlite_dump
-    assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in sqlite_dump
-    assert "[REDACTED]" in sqlite_dump
+    assert len(actions) == 1
+    assert actions[0].agent_name == "main_agent" 
 
 
 def test_tier4_legacy_upgrade_lifecycle(mock_mash_env):

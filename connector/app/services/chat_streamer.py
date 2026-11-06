@@ -55,7 +55,7 @@ class StreamQueryPayload(BaseModel):
     client_request_id: str | None = None
 
 
-# ponytail: in-memory turn idempotency registry to deduplicate retried /stream requests
+# In-memory turn idempotency registry to deduplicate retried /stream requests
 @dataclass
 class _TurnExecutionRecord:
     session_id: str
@@ -95,7 +95,7 @@ class PermissionModePayload(BaseModel):
     permission_mode: str | None = None
 
     def resolved_mode(self) -> str:
-        # ponytail: accepts both 'mode' and 'permission_mode' to align frontend & backend contracts
+        # Accepts both 'mode' and 'permission_mode' to align frontend & backend contracts
         val = self.mode or self.permission_mode
         if not val:
             raise ValueError("Either 'mode' or 'permission_mode' must be provided")
@@ -138,7 +138,7 @@ async def generate_chat_sse_stream(
     else:
         event_iter = getattr(agent, "stream_run", agent)(**kwargs).__aiter__()
 
-    # ponytail: shield-and-re-await pattern prevents 15s timeout from cancelling underlying task
+    # Shield-and-re-await pattern prevents 15s timeout from cancelling underlying task
     anext_task = asyncio.ensure_future(event_iter.__anext__())
     last_run_id = last_run_id_hint
     run_started_emitted = False
@@ -167,9 +167,10 @@ async def generate_chat_sse_stream(
                 # Handle empty / whitespace-only model completion error cleanly
                 if event_type == "RUN_ERROR":
                     err_msg = getattr(event, "message", None) or ""
-                    if not err_msg and isinstance(data_str, str) and "No response content or tool calls" in data_str:
+                    if not err_msg and isinstance(data_str, str) and ("No response content or tool calls" in data_str or "never aggregated with any content" in data_str):
                         err_msg = "No response content or tool calls"
-                    if "No response content or tool calls" in str(err_msg):
+                    err_msg_s = str(err_msg)
+                    if "No response content or tool calls" in err_msg_s or "never aggregated with any content" in err_msg_s:
                         notice = "The model returned an empty response. Please rephrase your query or provide more context."
                         run_id = getattr(event, "run_id", None) or last_run_id or f"run_{session_id[:8]}"
                         if not run_started_emitted:
@@ -293,7 +294,7 @@ async def stream_chat_query(
     user_prompt = (payload.messages or payload.message or "").strip()
     resolved_context["_raw_message"] = user_prompt
 
-    # ponytail: handle client_request_id turn idempotency across /stream retries
+    # Handle client_request_id turn idempotency across /stream retries
     req_id = payload.client_request_id
     if req_id:
         _cleanup_idempotency_store()

@@ -1,65 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import hljs from "highlight.js";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
-import mermaid from "mermaid";
+import { MarkdownRenderer } from "./MarkdownRenderer";
+// mermaid imported in MarkdownRenderer
 import yaml from "js-yaml";
 import { detectYamlConfig, YamlConfigViewer } from "./YamlConfigViewer";
 
-mermaid.initialize({ startOnLoad: false, theme: "default" });
 
-let mermaidCounter = 0;
-
-function MermaidBlock({ chart }: { chart: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const id = `mermaid-${++mermaidCounter}`;
-    mermaid.render(id, chart).then(({ svg }) => {
-      if (containerRef.current) containerRef.current.innerHTML = svg;
-    }).catch(() => {
-      // mermaid v11 会在 DOM 中残留错误元素，清理掉
-      const errEl = document.getElementById(id);
-      if (errEl) errEl.remove();
-      // 语法错误时静默显示原始代码
-      if (containerRef.current) {
-        containerRef.current.textContent = chart;
-        Object.assign(containerRef.current.style, {
-          color: "#A09890",
-          whiteSpace: "pre-wrap",
-          fontSize: "12px",
-          fontFamily: "monospace",
-          padding: "10px 12px",
-          background: "#F5F0E8",
-          border: "1px solid #E8E0D4",
-          borderRadius: "6px",
-        });
-      }
-    });
-  }, [chart]);
-
-  return <div ref={containerRef} style={styles.mermaidContainer} />;
-}
-
-function MarkdownCode(props: React.HTMLAttributes<HTMLElement> & { children?: React.ReactNode; className?: string; node?: unknown }) {
-  const { children, className, node: _node, ...rest } = props;
-  const match = /language-(\w+)/.exec(className || "");
-  const lang = match?.[1];
-  const code = String(children).replace(/\n$/, "");
-
-  if (lang === "mermaid") {
-    return <MermaidBlock chart={code} />;
-  }
-
-  // inline code
-  if (!match) {
-    return <code style={styles.inlineCode} {...rest}>{children}</code>;
-  }
-
-  return <code className={className} {...rest}>{children}</code>;
-}
 
 /* ── SKILL.md frontmatter helpers ──────────────────────── */
 
@@ -172,11 +118,12 @@ interface FileContent {
 
 interface FileViewerProps {
   filePath: string | null;
+  sessionId?: string;
   /** Mock 模式：直接提供文件内容映射，跳过 API 请求 */
   mockFiles?: Record<string, FileContent>;
 }
 
-export function FileViewer({ filePath, mockFiles }: FileViewerProps) {
+export function FileViewer({ filePath, sessionId, mockFiles }: FileViewerProps) {
   const [file, setFile] = useState<FileContent | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -204,7 +151,8 @@ export function FileViewer({ filePath, mockFiles }: FileViewerProps) {
       return;
     }
 
-    fetch(`/files/content?path=${encodeURIComponent(filePath)}`)
+    const sessionParam = sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : "";
+    fetch(`/files/content?path=${encodeURIComponent(filePath)}${sessionParam}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load file");
         return res.json();
@@ -220,7 +168,7 @@ export function FileViewer({ filePath, mockFiles }: FileViewerProps) {
       });
 
     return () => { cancelled = true; };
-  }, [filePath, mockFiles]);
+  }, [filePath, sessionId, mockFiles]);
 
   // 语法高亮
   useEffect(() => {
@@ -276,13 +224,7 @@ export function FileViewer({ filePath, mockFiles }: FileViewerProps) {
         <div className="markdown-area" style={styles.markdownArea}>
           {skillParsed && <SkillFrontmatterCard meta={skillParsed.meta} />}
           <div style={skillParsed ? { padding: "0 24px 16px" } : undefined}>
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
-              components={{ code: MarkdownCode as never }}
-            >
-              {markdownContent}
-            </ReactMarkdown>
+            <MarkdownRenderer content={markdownContent} />
           </div>
         </div>
       </div>

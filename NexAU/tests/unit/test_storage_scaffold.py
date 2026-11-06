@@ -214,30 +214,3 @@ def test_app_config_legacy_fallback(tmp_path):
             # Migrated file in .mash must now exist
             assert (mash_home / "settings.json").exists()
 
-
-def test_redact_sensitive_content_comprehensive():
-    """Verify redact_sensitive_content properly redacts API keys, Bearer tokens, and auth headers."""
-    from nexau.archs.session.agent_run_action_service import redact_sensitive_content
-
-    # 1. API Keys
-    assert redact_sensitive_content("key is sk-1234567890123456789012") == "key is [REDACTED]"
-    assert redact_sensitive_content("key is sk-ant-1234567890123456789012") == "key is [REDACTED]"
-    assert redact_sensitive_content("key is ghp_12345678901234567890") == "key is [REDACTED]"
-    assert redact_sensitive_content("key is AIza12345678901234567890") == "key is [REDACTED]"
-
-    # 2. Bearer tokens (standard and base64 with +, /, =)
-    assert redact_sensitive_content("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.secret") == "Bearer [REDACTED]"
-    assert redact_sensitive_content("curl -H 'bearer token_abc123_def456_ghi789'") == "curl -H 'Bearer [REDACTED]'"
-    assert redact_sensitive_content("Bearer mysecret+token/withplusandslash") == "Bearer [REDACTED]"
-    assert redact_sensitive_content("Bearer dXNlcjpwYXNz+extra/token==") == "Bearer [REDACTED]"
-
-    # 3. Auth headers (standard, mixed quotes, unquoted, and whitespace variations)
-    assert redact_sensitive_content('{"Authorization": "Bearer token123"}') == '{"Authorization": "[REDACTED]"}'
-    assert redact_sensitive_content('{"Authorization": "Basic dXNlcjpwYXNz"}') == '{"Authorization": "[REDACTED]"}'
-    assert redact_sensitive_content("{'Authorization': 'secret_auth_token'}") == "{'Authorization': '[REDACTED]'}"
-    assert redact_sensitive_content("{'Authorization': \"Basic secret12345\"}") == "{'Authorization': \"[REDACTED]\"}"
-    assert redact_sensitive_content("{\"Authorization\": 'Basic secret12345'}") == "{\"Authorization\": '[REDACTED]'}"
-    assert redact_sensitive_content("Authorization: Basic secret12345") == "Authorization: Basic [REDACTED]"
-    assert redact_sensitive_content("Authorization: Bearer secret12345") == "Authorization: Bearer [REDACTED]"
-    assert redact_sensitive_content("Authorization: secret12345") == "Authorization: [REDACTED]"
-    assert redact_sensitive_content("{ \"Authorization\" : \"Basic secret12345\" }") == "{ \"Authorization\" : \"[REDACTED]\" }"

@@ -1,22 +1,44 @@
 # Copyright (c) Nex-AGI. All rights reserved.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# http://www.apache.org/licenses/LICENSE-2.0
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
 # Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS
+# distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
 """Tool result compaction strategy."""
 
+import json
 import logging
-from typing import ClassVar
+from typing import Any, ClassVar, cast
 
 from nexau.core.messages import BlockType, Message, Role, ToolResultBlock, ToolUseBlock
 
 logger = logging.getLogger(__name__)
+
+
+def _truncate_large_strings(obj: Any, max_length: int = 100) -> Any:
+    """Recursively truncates large strings in tool arguments."""
+    if isinstance(obj, str):
+        if len(obj) > max_length:
+            return obj[:50] + f"...<compacted {len(obj)} chars>..." + obj[-50:]
+        return obj
+    elif isinstance(obj, dict):
+        mapping = cast(dict[str, Any], obj)
+        return {key: _truncate_large_strings(value, max_length) for key, value in mapping.items()}
+    elif isinstance(obj, list):
+        items = cast(list[Any], obj)
+        return [_truncate_large_strings(item, max_length) for item in items]
+    return obj
+
+
+_UNSET = object()
 
 
 class ToolResultCompaction:
@@ -42,13 +64,13 @@ class ToolResultCompaction:
     def __init__(
         self,
         keep_system: bool = True,
-        keep_iterations: int = 3,
+        keep_iterations: int = _UNSET,  # type: ignore[assignment]
         keep_user_rounds: int = 0,
         compactable_tools: frozenset[str] | None = None,
     ):
         """Initialize tool result compaction.
 
-        micro-compact:  ToolResultCompaction, type
+        micro-compact: 增强 ToolResultCompaction，支持工具类型过滤
 
         Args:
             keep_system: Whether to preserve the system message. Default: True.
@@ -63,16 +85,17 @@ class ToolResultCompaction:
             ValueError: If both keep_iterations != 3 and keep_user_rounds > 0 are set.
             ValueError: If keep_iterations < 1 or keep_user_rounds < 0.
         """
-        if keep_iterations != 3 and keep_user_rounds > 0:
+        if keep_iterations is not _UNSET and keep_user_rounds > 0:
             raise ValueError("Cannot set both keep_iterations and keep_user_rounds")
 
-        if keep_iterations < 1:
-            raise ValueError(f"keep_iterations must be >= 1, got {keep_iterations}")
+        actual_iterations = 3 if keep_iterations is _UNSET else keep_iterations
+        if not isinstance(actual_iterations, int) or actual_iterations < 1:
+            raise ValueError(f"keep_iterations must be >= 1, got {actual_iterations}")
         if keep_user_rounds < 0:
             raise ValueError(f"keep_user_rounds must be >= 0, got {keep_user_rounds}")
 
         self.keep_system = keep_system
-        self.keep_iterations = keep_iterations
+        self.keep_iterations = actual_iterations
         self.keep_user_rounds = keep_user_rounds
         self.compactable_tools = compactable_tools
 
@@ -131,7 +154,7 @@ class ToolResultCompaction:
                             protected_indices.add(i)
                             break
 
-        # micro-compact: tool_use_id → tool_name, compactable_tools
+        # micro-compact: 构建 tool_use_id → tool_name 映射，用于 compactable_tools 过滤
         tool_use_id_to_name: dict[str, str] = {}
         if self.compactable_tools is not None:
             for msg in messages:
@@ -140,7 +163,21 @@ class ToolResultCompaction:
                         if isinstance(block, ToolUseBlock):
                             tool_use_id_to_name[block.id] = block.name
 
-        # Process all messages
+        # Pass 1: Identify which tool_use_ids are being compacted
+        compacted_tool_use_ids: set[str] = set()
+        for i in range(start_idx, len(messages)):
+            msg = messages[i]
+            if msg.role == Role.TOOL and i not in protected_indices:
+                for block in msg.content:
+                    if isinstance(block, ToolResultBlock):
+                        should_compact_block = True
+                        if self.compactable_tools is not None:
+                            tool_name = tool_use_id_to_name.get(block.tool_use_id, "")
+                            should_compact_block = tool_name in self.compactable_tools
+                        if should_compact_block:
+                            compacted_tool_use_ids.add(block.tool_use_id)
+
+        # Pass 2: Rebuild messages, compacting target ToolResultBlocks and ToolUseBlocks
         compacted_count = 0
         for i in range(start_idx, len(messages)):
             msg = messages[i]
@@ -149,29 +186,51 @@ class ToolResultCompaction:
                 new_blocks: list[BlockType] = []
                 any_compacted = False
                 for block in msg.content:
-                    if isinstance(block, ToolResultBlock):
-                        # micro-compact: compactable_tools --
-                        should_compact_block = True
-                        if self.compactable_tools is not None:
-                            tool_name = tool_use_id_to_name.get(block.tool_use_id, "")
-                            should_compact_block = tool_name in self.compactable_tools
+                    if isinstance(block, ToolResultBlock) and block.tool_use_id in compacted_tool_use_ids:
+                        # RFC-0024 & Forensic Audit: Preserve raw_output so post-compaction UI reload
+                        # retains full audit evidence while LLM context sees the compacted string.
+                        raw_out = block.raw_output
+                        if raw_out is None and block.content and block.content != "Tool call result has been compacted":
+                            raw_out = {"result": block.content} if isinstance(block.content, str) else None
 
-                        if should_compact_block:
-                            new_blocks.append(
-                                ToolResultBlock(
-                                    tool_use_id=block.tool_use_id,
-                                    content="Tool call result has been compacted",
-                                    is_error=block.is_error,
-                                ),
-                            )
-                            any_compacted = True
-                        else:
-                            new_blocks.append(block)
+                        new_blocks.append(
+                            ToolResultBlock(
+                                tool_use_id=block.tool_use_id,
+                                content="Tool call result has been compacted",
+                                is_error=block.is_error,
+                                raw_output=raw_out,
+                            ),
+                        )
+                        any_compacted = True
                     else:
                         new_blocks.append(block)
                 if any_compacted:
                     result.append(msg.model_copy(update={"content": new_blocks}))
                     compacted_count += 1
+                else:
+                    result.append(msg)
+            elif msg.role == Role.ASSISTANT:
+                # Truncate ToolUseBlock payloads if their result was compacted
+                assistant_blocks: list[BlockType] = []
+                any_compacted = False
+                for block in msg.content:
+                    if isinstance(block, ToolUseBlock) and block.id in compacted_tool_use_ids:
+                        truncated_input = _truncate_large_strings(block.input)
+                        truncated_raw_input = block.raw_input
+                        if truncated_raw_input is not None:
+                            try:
+                                parsed = json.loads(truncated_raw_input)
+                                truncated_raw_input = json.dumps(_truncate_large_strings(parsed), ensure_ascii=False)
+                            except Exception:
+                                pass  # fallback if parsing fails
+                        assistant_blocks.append(
+                            block.model_copy(update={"input": truncated_input, "raw_input": truncated_raw_input}),
+                        )
+                        any_compacted = True
+                    else:
+                        assistant_blocks.append(block)
+                if any_compacted:
+                    result.append(msg.model_copy(update={"content": assistant_blocks}))
                 else:
                     result.append(msg)
             else:

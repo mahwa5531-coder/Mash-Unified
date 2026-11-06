@@ -96,20 +96,9 @@ export function computeInterleavedUnits(msg: Message, isActivelyStreaming: boole
         .join('\n\n');
 
       if (!finalProse && postWorkSteps.length === 0 && msg.content) {
-        const intermediateTexts = workSteps
-          .filter((s) => s.type === 'text' && s.content)
-          .map((s) => cleanProseContent(s.content))
-          .filter(Boolean);
-        const cleanMsg = cleanProseContent(msg.content);
-        if (cleanMsg) {
-          const intermediateCombined = intermediateTexts.join('\n\n');
-          if (intermediateCombined && cleanMsg === intermediateCombined) {
-            finalProse = '';
-          } else if (intermediateCombined && cleanMsg.startsWith(intermediateCombined)) {
-            finalProse = cleanMsg.slice(intermediateCombined.length).trim();
-          } else {
-            finalProse = cleanMsg;
-          }
+        const hasToolsInWork = workSteps.some((s) => s.type === 'tool' || Boolean(s.name) || Boolean(s.tool_call_id));
+        if (!hasToolsInWork) {
+          finalProse = cleanProseContent(msg.content);
         }
       }
 

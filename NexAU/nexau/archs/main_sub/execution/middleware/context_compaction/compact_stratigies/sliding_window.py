@@ -1,10 +1,13 @@
 # Copyright (c) Nex-AGI. All rights reserved.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# http://www.apache.org/licenses/LICENSE-2.0
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
 # Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS
+# distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
@@ -98,8 +101,8 @@ class SlidingWindowCompaction:
     # Reserved tokens for compact_prompt + LLM output overhead
     _SUMMARY_RESERVED_TOKENS = 4096
 
-    # Hard truncation fallback token, fallback ""
-    # context window, →failure→→.
+    # Hard truncation fallback 的最大输出 token 数，避免 fallback "摘要"
+    # 与 context window 等大，导致压缩→失败→注入大文本→再压缩的死循环。
     _HARD_TRUNCATION_MAX_TOKENS = 10240
 
     def __init__(
@@ -313,20 +316,8 @@ class SlidingWindowCompaction:
             keep_count = self.keep_iterations
             group_name = "iterations"
         if len(groups) <= keep_count:
-            # ponytail: if user rounds <= keep_count (e.g. 1 user task prompt) but has many internal tool iterations
-            # fall back to compacting iterations so long autonomous tasks don't explode the context window
-            if self.keep_user_rounds > 0:
-                iter_groups = self._group_into_iterations(messages[start_idx:])
-                if len(iter_groups) > self.keep_iterations:
-                    groups = iter_groups
-                    keep_count = self.keep_iterations
-                    group_name = "iterations"
-                else:
-                    logger.info(f"[SlidingWindowCompaction] Skipping: {len(groups)} {group_name} <= {keep_count}")
-                    return messages.copy()
-            else:
-                logger.info(f"[SlidingWindowCompaction] Skipping: {len(groups)} {group_name} <= {keep_count}")
-                return messages.copy()
+            logger.info(f"[SlidingWindowCompaction] Skipping: {len(groups)} {group_name} <= {keep_count}")
+            return messages.copy()
 
         # Calculate how many groups to compress
         groups_to_compress = groups[:-keep_count]
@@ -359,11 +350,11 @@ class SlidingWindowCompaction:
     ) -> list[Message]:
         """Async version of compact().
 
-        P2 async/sync :  compact
+        P2 async/sync 技术债修复: 异步 compact 链
 
-         LLMCaller.call_llm_async()  sync call_llm,
-         LLM,  event loop.
-         sync .
+        使用 LLMCaller.call_llm_async() 替代 sync call_llm，
+        在主事件循环上执行 LLM 摘要调用，避免阻塞 event loop。
+        分组和窗口逻辑与 sync 版本相同。
         """
         self._last_compact_used_fallback = False
         logger.info(f"[SlidingWindowCompaction] Starting async compaction on {len(messages)} messages")
@@ -385,20 +376,8 @@ class SlidingWindowCompaction:
             group_name = "iterations"
 
         if len(groups) <= keep_count:
-            # ponytail: if user rounds <= keep_count (e.g. 1 user task prompt) but has many internal tool iterations
-            # fall back to compacting iterations so long autonomous tasks don't explode the context window
-            if self.keep_user_rounds > 0:
-                iter_groups = self._group_into_iterations(messages[start_idx:])
-                if len(iter_groups) > self.keep_iterations:
-                    groups = iter_groups
-                    keep_count = self.keep_iterations
-                    group_name = "iterations"
-                else:
-                    logger.info(f"[SlidingWindowCompaction] Skipping async: {len(groups)} {group_name} <= {keep_count}")
-                    return messages.copy()
-            else:
-                logger.info(f"[SlidingWindowCompaction] Skipping async: {len(groups)} {group_name} <= {keep_count}")
-                return messages.copy()
+            logger.info(f"[SlidingWindowCompaction] Skipping async: {len(groups)} {group_name} <= {keep_count}")
+            return messages.copy()
 
         groups_to_compress = groups[:-keep_count]
         groups_to_keep = groups[-keep_count:]
@@ -482,10 +461,10 @@ class SlidingWindowCompaction:
     async def _generate_summary_async(self, messages: list[Message]) -> str:
         """Async version of _generate_summary using LLMCaller.call_llm_async.
 
-        P2 async/sync :  LLM
+        P2 async/sync 技术债修复: 异步 LLM 摘要生成
 
-         LLMCaller.call_llm_async()  LLM,
-,  event loop.
+        使用 LLMCaller.call_llm_async() 调用 LLM 生成摘要，
+        在主事件循环上执行，避免阻塞 event loop。
         """
         llm_caller = self._ensure_llm_caller()
         summary_model_name = self.summary_llm_config.model if self.summary_llm_config is not None else self.summary_model
@@ -498,12 +477,7 @@ class SlidingWindowCompaction:
             llm_messages,
             tool_call_mode="structured",
         )
-        content_text = (model_response.content or "").strip() if model_response else ""
-        reasoning_text = (getattr(model_response, "reasoning_content", "") or "").strip() if model_response else ""
-        summary = content_text or reasoning_text
-        if not summary:
-            logger.warning("[SlidingWindowCompaction] Async summary LLM returned empty content, using hard truncation fallback")
-            summary = self._hard_truncation_fallback(messages)
+        summary = (model_response.content or "").strip() if model_response else ""
         logger.info("[SlidingWindowCompaction] Async LLM summary generated successfully")
         return summary
 
@@ -646,16 +620,27 @@ class SlidingWindowCompaction:
         retained_messages: list[Message] = []
 
         # Keep system message if present
+        system_kept = False
         if self.keep_system and messages and messages[0].role == Role.SYSTEM:
             retained_messages.append(messages[0])
             tokens_used += self.token_counter.count_tokens([messages[0]])
+            system_kept = True
 
-        # Iterate messages from newest to oldest
-        for msg in reversed(messages):
+        # Insert after the system message only when one was actually retained.
+        # Keying off self.keep_system instead would insert at index 1 of an
+        # empty list when the history carries no system message, which leaves
+        # the newest message stranded in front of the older ones.
+        insert_idx = 1 if system_kept else 0
+
+        # Iterate messages from newest to oldest. The system message is skipped
+        # because it is already retained; including it here would duplicate it
+        # and charge its tokens against the budget twice.
+        remaining = messages[1:] if system_kept else messages
+        for msg in reversed(remaining):
             msg_tokens = self.token_counter.count_tokens([msg])
             if tokens_used + msg_tokens > max_tokens:
                 break  # stop adding older messages
-            retained_messages.insert(1 if self.keep_system else 0, msg)
+            retained_messages.insert(insert_idx, msg)
             tokens_used += msg_tokens
 
         # Convert retained messages to concatenated text
@@ -682,7 +667,7 @@ class SlidingWindowCompaction:
         summary is merged into it (preserving the original user content).
         Otherwise a standalone summary USER message is inserted before the
         kept groups so that the LLM always sees the context summary early in
-        the conversation - not buried at the end after a long tool-call chain.
+        the conversation — not buried at the end after a long tool-call chain.
 
         Args:
             result: Result message list to append to (modified in place).
@@ -691,13 +676,13 @@ class SlidingWindowCompaction:
         """
         summary_prefix = with_handoff_prefix(summary)
 
-        # 1. Check if first kept message is USER
+        # 1. 判断保留组的第一条消息是否为真正的 USER 消息
         first_kept_msg: Message | None = None
         if groups_to_keep and groups_to_keep[0]:
             first_kept_msg = groups_to_keep[0][0]
 
         if first_kept_msg is not None and first_kept_msg.role == Role.USER:
-            # 2a. USER present: merge continuation prompt with original user request
+            # 2a. 第一条就是 USER → 合并摘要到该消息（位置已正确）
             merged = False
             for group_msgs in groups_to_keep:
                 for msg in group_msgs:
@@ -713,7 +698,8 @@ class SlidingWindowCompaction:
                     else:
                         result.append(msg)
         else:
-            # 2b. ASSISTANT/TOOL present: prepend standalone summary
+            # 2b. 保留组以 ASSISTANT/TOOL 开头（典型的工具调用链场景）
+            #     → 在所有保留消息之前插入独立的摘要 USER 消息
             summary_msg = Message(role=Role.USER, content=[TextBlock(text=summary_prefix)])
             summary_msg.metadata["isSummary"] = True
             if self._session_id is not None:
@@ -801,11 +787,6 @@ class SlidingWindowCompaction:
             llm_messages,
             tool_call_mode="structured",
         )
-        content_text = (model_response.content or "").strip() if model_response else ""
-        reasoning_text = (getattr(model_response, "reasoning_content", "") or "").strip() if model_response else ""
-        summary = content_text or reasoning_text
-        if not summary:
-            logger.warning("[SlidingWindowCompaction] Summary LLM returned empty content, using hard truncation fallback")
-            summary = self._hard_truncation_fallback(messages)
+        summary = (model_response.content or "").strip() if model_response else ""
         logger.info("[SlidingWindowCompaction] LLM summary generated successfully")
         return summary

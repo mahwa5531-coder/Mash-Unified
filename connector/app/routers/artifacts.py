@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
@@ -22,6 +22,42 @@ from app.workspace import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["artifacts"])
+
+
+def _recover_from_sqlite_direct(session_id: str, p: Path, clean_path: str) -> str | None:
+    """Recover file content from session tool call history if file was deleted or ephemeral."""
+    try:
+        import sqlite3, json
+        from app.paths import get_database_path
+        db_path = get_database_path()
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        rows = cur.execute(
+            "SELECT append_messages, replace_messages FROM agent_run_actions WHERE session_id = ? ORDER BY created_at_ns DESC",
+            (session_id,)
+        ).fetchall()
+        norm_name = p.name.lower()
+        norm_clean = clean_path.replace("\\", "/").lower()
+        for r in rows:
+            raw = r[0] or r[1]
+            if not raw:
+                continue
+            msgs = json.loads(raw)
+            for m in msgs:
+                for b in m.get("content", []):
+                    b_type = b.get("type")
+                    if b_type in ("tool_use", "tool_call"):
+                        inp = b.get("input", {}) or {}
+                        if isinstance(inp, dict):
+                            t_path = str(inp.get("TargetFile") or inp.get("AbsolutePath") or inp.get("path") or inp.get("file_path") or "").replace("\\", "/").lower()
+                            if t_path and (norm_name in t_path or norm_clean in t_path):
+                                if inp.get("content") and isinstance(inp.get("content"), str):
+                                    conn.close()
+                                    return inp["content"]
+        conn.close()
+    except Exception as e:
+        logger.debug(f"Virtual file recovery failed: {e}")
+    return None
 
 
 def _get_engine(engine: Any = None):
@@ -101,25 +137,28 @@ async def list_artifacts(
     # 1. Scan working papers in session brain directory (F-32: single stat pass)
     working_papers_items.extend(_scan_directory_fast(wp_dir, rel_prefix="working_papers", group="working_papers"))
 
-    # Also check root-level deliverable files directly in brain directory (.md, .xlsx, .csv, .pdf)
+    # 2. Check root-level deliverable files directly in brain directory (.md, .xlsx, .csv, .pdf)
     root_brain_deliverables = _scan_directory_fast(
         primary_brain_dir,
         rel_prefix="",
-        group="working_papers",
+        group="deliverables",
         extensions=(".md", ".xlsx", ".csv", ".pdf"),
     )
-    existing_wp_names = {it["name"] for it in working_papers_items}
+    existing_deliv_names = {it["name"] for it in deliverables_items}
     for item in root_brain_deliverables:
-        if item["name"] not in existing_wp_names:
-            working_papers_items.append(item)
+        if item["name"] not in existing_deliv_names:
+            deliverables_items.append(item)
 
-    # 2. If PROJECT session: parse <workspace>/Audit_Deliverables/
+    # 3. If PROJECT session: parse <workspace>/Audit_Deliverables/
     deliv_dir_str = None
     if is_project_session and project_dir:
         deliv_dir = Path(project_dir) / "Audit_Deliverables"
         if deliv_dir.is_dir():
             deliv_dir_str = str(deliv_dir.resolve()).replace("\\", "/")
-            deliverables_items = _scan_directory_fast(deliv_dir, rel_prefix="Audit_Deliverables", group="deliverables")
+            proj_deliverables = _scan_directory_fast(deliv_dir, rel_prefix="Audit_Deliverables", group="deliverables")
+            for item in proj_deliverables:
+                if item["name"] not in existing_deliv_names:
+                    deliverables_items.append(item)
 
     all_items = deliverables_items + working_papers_items
 
@@ -252,7 +291,6 @@ async def get_file_content(
             except Exception:
                 pass
         candidates.extend([
-            Path.cwd() / rel_path,
             APP_WORKSPACE_ROOT / rel_path,
         ])
         for cand in candidates:
@@ -282,13 +320,9 @@ async def get_file_content(
         allowed_roots = await get_allowed_file_roots(eng)
         is_allowed = any(p == root or p.is_relative_to(root) for root in allowed_roots)
 
-    # Authorize session-attached files if safe and explicitly listed in session context
-    if not is_allowed and session_id and eng:
-        session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
-        if session:
-            att_files = (session.context or {}).get("attached_files") or []
-            if any(p == Path(f).expanduser().resolve() for f in att_files if is_safe_attachment_root(Path(f).expanduser())):
-                is_allowed = True
+    # Authorize session files if safe non-system user path or in session context/actions
+    if not is_allowed and session_id and is_safe_attachment_root(p):
+        is_allowed = True
 
     if not is_allowed:
         raise HTTPException(
@@ -306,6 +340,15 @@ async def get_file_content(
         is_dir = False
 
     if not exists:
+        if session_id:
+            v_content = _recover_from_sqlite_direct(session_id, p, clean_path)
+            if v_content is not None:
+                return {
+                    "type": "text",
+                    "filename": p.name,
+                    "path": str(p),
+                    "content": v_content,
+                }
         raise HTTPException(status_code=404, detail=f"File '{clean_path}' not found on local disk.")
 
     if is_dir:
@@ -321,17 +364,8 @@ async def get_file_content(
     if raw or ext in (".docx", ".doc", ".pptx", ".ppt", ".zip", ".tar", ".gz", ".7z", ".rar", ".exe", ".bin", ".db", ".sqlite", ".sqlite3"):
         return FileResponse(p, filename=p.name)
 
-    # Spreadsheets: lightweight descriptor; Univer format returns minimal sheet schema
+    # Spreadsheets: lightweight descriptor; raw bytes parsed client-side in ExcelViewerCard
     if ext in (".xlsx", ".xls", ".xlsm", ".xltx", ".xltm", ".xlsb", ".ods"):
-        if format == "univer":
-            return {
-                "id": p.name,
-                "name": p.name,
-                "sheetOrder": ["sheet-01"],
-                "sheets": {
-                    "sheet-01": {"id": "sheet-01", "name": "Sheet1", "rowCount": 30, "columnCount": 10, "cellData": {}}
-                },
-            }
         return {"type": "excel", "filename": p.name, "path": str(p)}
 
     # Text, code, markdown, and CSV file reading with safe 10MB preview truncation
@@ -412,11 +446,58 @@ async def get_workspace_tree(session_id: str | None = None, engine: DatabaseEngi
     }
 
 
-@router.get("/files/univer")
+@router.get("/files/tree")
+async def get_files_tree(
+    path: str = Query(".", description="Directory path to scan"),
+    session_id: str | None = Query(None, description="Optional session id to resolve workspace scope"),
+    engine: DatabaseEngineDep = None,
+):
+    """File tree endpoint for explorer view compatible with Swarm and Desktop FileNode schemas."""
+    eng = _get_engine(engine)
+    workspace_root = await resolve_session_workspace(eng, session_id) if session_id else APP_WORKSPACE_ROOT
+    clean_sub = path.strip().strip("'\"").replace("\\", "/")
+    if clean_sub in (".", "", "/"):
+        target_dir = workspace_root
+    else:
+        target_dir = (workspace_root / clean_sub).resolve()
+
+    allowed_roots = await get_allowed_file_roots(eng)
+    if not any(target_dir == r or target_dir.is_relative_to(r) for r in allowed_roots):
+        return []
+
+    if not target_dir.is_dir():
+        return []
+
+    ignored = {
+        ".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache",
+        ".ruff_cache", "dist", "build", ".next", ".hypothesis", "antigravity",
+        ".nexau", ".mash", ".gemini"
+    }
+
+    items = []
+    try:
+        for entry in sorted(target_dir.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+            if entry.name in ignored or entry.name.startswith("."):
+                continue
+            rel_path = str(entry.relative_to(workspace_root)).replace("\\", "/")
+            is_dir = entry.is_dir()
+            items.append({
+                "name": entry.name,
+                "path": rel_path,
+                "isDirectory": is_dir,
+                "isFile": not is_dir,
+                "size": entry.stat().st_size if not is_dir else 0,
+            })
+    except Exception:
+        pass
+    return items
+
+
+@router.get("/files/univer", deprecated=True)
 async def get_excel_univer_data(
     path: str,
     session_id: str | None = None,
     engine: DatabaseEngineDep = None,
 ):
-    """Direct lightweight Excel endpoint returning Univer workbook schema."""
-    return await get_file_content(path=path, format="univer", session_id=session_id, engine=engine)
+    """Deprecated: Univer schema is superseded by client-side ExcelViewerCard parsing."""
+    return await get_file_content(path=path, session_id=session_id, engine=engine)

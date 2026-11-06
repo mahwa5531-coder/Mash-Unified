@@ -375,6 +375,11 @@ class LLMCaller:
         token_trace_session: TokenTraceSession | None = None,
         framework_context: FrameworkContext | None = None,
     ) -> ModelCallParams:
+        if self.openai_client is None and self.llm_config:
+            try:
+                self.openai_client = openai.OpenAI(**self.llm_config.to_client_kwargs())
+            except Exception as e:
+                logger.warning(f"Failed to lazy-reinitialize sync OpenAI client: {e}")
         runtime_client = openai_client if openai_client is not None else self.openai_client
         if not runtime_client and not self.middleware_manager:
             raise RuntimeError(

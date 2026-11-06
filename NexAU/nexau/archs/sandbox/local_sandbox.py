@@ -143,7 +143,7 @@ class LocalSandbox(BaseSandbox):
                     return [scripts, candidate] if scripts.exists() else [candidate]
 
         # 3. Development mode: sys.executable
-        # ponytail: prioritize Scripts/bin and venv root for tools and interpreter isolation
+        # Prioritize Scripts/bin and venv root for tools and interpreter isolation
         parent = Path(sys.executable).parent
         if parent.name.lower() in ("scripts", "bin"):
             return [parent, parent.parent]
@@ -305,7 +305,36 @@ class LocalSandbox(BaseSandbox):
         return base
 
     @staticmethod
-    def _normalize_powershell_command(command: str) -> str:
+    def _translate_powershell_chaining(command: str) -> str:
+        """Translate Bash '&&' and '||' operators into PowerShell 5.1 control flow
+        using shlex tokenization so quoted strings and arguments remain intact.
+        """
+        if "&&" not in command and "||" not in command:
+            return command
+
+        try:
+            lexer = shlex.shlex(command, posix=False, punctuation_chars="|&;")
+            lexer.whitespace_split = True
+            parts: list[str] = []
+            cur: list[str] = []
+            for tok in lexer:
+                if tok == "&&":
+                    parts.append(" ".join(cur) + " ; if ($?) { ")
+                    cur = []
+                elif tok == "||":
+                    parts.append(" ".join(cur) + " ; if (-not $?) { ")
+                    cur = []
+                else:
+                    cur.append(tok)
+            if cur:
+                parts.append(" ".join(cur))
+            opens = sum(p.count("{") for p in parts)
+            return "".join(parts) + (" }" * opens)
+        except Exception:
+            return command
+
+    @classmethod
+    def _normalize_powershell_command(cls, command: str, is_pwsh: bool = False) -> str:
         """Normalize common Unix / Bash syntax into valid Windows PowerShell 5.1 syntax."""
         if not command or not command.strip():
             return command
@@ -314,15 +343,14 @@ class LocalSandbox(BaseSandbox):
         command = re.sub(r"/mnt/([a-zA-Z])/", r"\1:/", command)
 
         # 2. Command chaining: PowerShell 5.1 does not support && or ||
-        # Replace && with ; and || with ; (when used as command separators)
-        command = re.sub(r"\s+&&\s+", " ; ", command)
-        command = re.sub(r"\s+\|\|\s+", " ; ", command)
+        if not is_pwsh:
+            command = cls._translate_powershell_chaining(command)
 
         # 3. python3 alias -> python (avoids Windows Store stub crash on Windows)
         command = re.sub(r"\bpython3(\.exe)?\b", "python", command)
 
-        # 4. which -> Get-Command (PowerShell equivalent)
-        command = re.sub(r"\bwhich\s+", "Get-Command ", command)
+        # 4. which -> Get-Command (PowerShell equivalent, word-bounded to command position)
+        command = re.sub(r"(^|[;&|{}()\n]\s*)which\s+", r"\1Get-Command ", command)
 
         # 5. Handle unquoted Windows executable path with spaces:
         # e.g. C:\Program Files\Python\python.exe -c ... -> & "C:\Program Files\Python\python.exe" -c ...
@@ -350,7 +378,8 @@ class LocalSandbox(BaseSandbox):
         opt into Git Bash.
         """
         if isinstance(self._shell_backend, WindowsPowerShellBackend):
-            command = self._normalize_powershell_command(command)
+            is_pwsh = getattr(self._shell_backend, "kind", getattr(self._shell_backend, "_kind", "powershell")) == "pwsh"
+            command = self._normalize_powershell_command(command, is_pwsh=is_pwsh)
 
         if not contains_heredoc(command):
             return command
@@ -604,7 +633,7 @@ class LocalSandbox(BaseSandbox):
                 )
 
             # Foreground mode: in-memory pipe with smart spill-to-disk
-            # ponytail: run foreground commands in-memory via communicate() to prevent disk clutter;
+            # Run foreground commands in-memory via communicate() to prevent disk clutter;
             # spill to output_dir ONLY when output exceeds threshold (or always_create_output_dir is True).
             process = subprocess.Popen(
                 launch_config.argv,
@@ -1101,7 +1130,7 @@ class LocalSandbox(BaseSandbox):
             if create_directories:
                 full_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # ponytail: atomic write via same-directory staging file + os.replace prevents 0-byte corruption on crash
+            # Atomic write via same-directory staging file + os.replace prevents 0-byte corruption on crash
             temp_path = full_path.with_name(f".{full_path.name}.tmp_{os.getpid()}_{time.time_ns()}")
             try:
                 if binary:

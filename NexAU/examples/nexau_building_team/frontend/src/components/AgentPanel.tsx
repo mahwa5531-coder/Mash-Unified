@@ -1,3 +1,4 @@
+import { getToolKeyFields } from "../utils/toolSchema";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parse as parsePartialJson } from "partial-json";
 import type { AgentState } from "../types";
@@ -274,43 +275,14 @@ function buildInputRows(toolNameRaw: string, argsObj: Record<string, unknown> | 
     rows.push({ key, value: JSON.stringify(v) });
   };
 
-  if (toolName === "read_file") {
-    add("file_path", argsObj.file_path);
-    add("offset", argsObj.offset);
-    add("limit", argsObj.limit);
-    return rows;
+  const prioritizedKeys = getToolKeyFields(toolName);
+  const remainingKeys = Object.keys(argsObj).filter((k) => !prioritizedKeys.includes(k));
+  for (const k of prioritizedKeys) {
+    if (k in argsObj) add(k, argsObj[k]);
   }
-
-  if (toolName === "list_directory") {
-    add("dir_path", argsObj.dir_path);
-    add("ignore", argsObj.ignore);
-    add("file_filtering_options", argsObj.file_filtering_options);
-    return rows;
+  for (const k of remainingKeys) {
+    add(k, argsObj[k]);
   }
-
-  if (toolName === "search_file_content") {
-    add("pattern", argsObj.pattern);
-    add("dir_path", argsObj.dir_path);
-    add("include", argsObj.include);
-    return rows;
-  }
-
-  if (toolName === "glob") {
-    add("pattern", argsObj.pattern);
-    add("dir_path", argsObj.dir_path);
-    add("case_sensitive", argsObj.case_sensitive);
-    add("respect_git_ignore", argsObj.respect_git_ignore);
-    return rows;
-  }
-
-  if (toolName === "run_shell_command") {
-    add("command", argsObj.command);
-    add("dir_path", argsObj.dir_path);
-    add("description", argsObj.description);
-    return rows;
-  }
-
-  for (const [k, v] of Object.entries(argsObj)) add(k, v);
   return rows;
 }
 
@@ -356,17 +328,6 @@ function ToolCallBlock({
   const parsedArgs = tryParseJson(args, !argsDone);
   const argsObj = isRecord(parsedArgs) ? parsedArgs : null;
   const prettyArgs = argsObj ? JSON.stringify(argsObj, null, 2) : args;
-
-  // DEBUG: 打印 ToolCallBlock 数据，帮助定位输入/输出渲染错乱问题
-  if (argsDone) {
-    console.log(
-      `[ToolCallBlock DEBUG] name=${name}`,
-      `argsLen=${args.length}`,
-      `argsObjKeys=${argsObj ? Object.keys(argsObj).join(",") : "NULL"}`,
-      `resultLen=${result?.length ?? "null"}`,
-      `prettyArgsLen=${prettyArgs.length}`,
-    );
-  }
 
   const parsedResult = result ? tryParseJson(result) : null;
   const outputObj = isRecord(parsedResult) ? parsedResult : null;

@@ -7,10 +7,7 @@ from typing import Any
 
 from fastapi import HTTPException
 from nexau.archs.session import AgentRunActionKey, AgentRunActionService
-from nexau.archs.session.agent_run_action_service import (
-    redact_data_structure,
-    redact_sensitive_content,
-)
+
 import json
 from nexau.archs.session.models import AgentRunActionModel, SessionModel
 from nexau.archs.session.orm import ComparisonFilter
@@ -124,14 +121,26 @@ def messages_to_transcript_lines(
     # 1. Index all tool results by tool_use_id
     tool_results: dict[str, str] = {}
     tool_errors: dict[str, bool] = {}
+    tool_compacted: dict[str, bool] = {}
     for m in messages:
         for b in m.content:
             if isinstance(b, ToolResultBlock):
                 content_str = b.content if isinstance(b.content, str) else str(b.content)
+                is_comp = (content_str == "Tool call result has been compacted")
+                if is_comp and getattr(b, "raw_output", None):
+                    raw = b.raw_output
+                    if isinstance(raw, dict) and "result" in raw and isinstance(raw["result"], str):
+                        content_str = raw["result"]
+                    elif isinstance(raw, str):
+                        content_str = raw
+                    elif isinstance(raw, (dict, list)):
+                        import json
+                        content_str = json.dumps(raw, indent=2, ensure_ascii=False)
                 if shallow_tools and len(content_str) > 3000:
                     content_str = content_str[:3000] + f"\n... [Truncated for rapid UI loading; {len(content_str)} total characters]"
-                tool_results[str(b.tool_use_id)] = redact_sensitive_content(content_str)
+                tool_results[str(b.tool_use_id)] = content_str
                 tool_errors[str(b.tool_use_id)] = bool(getattr(b, "is_error", False))
+                tool_compacted[str(b.tool_use_id)] = is_comp
 
     lines = []
     for msg_idx, msg in enumerate(messages):
@@ -144,37 +153,37 @@ def messages_to_transcript_lines(
 
         for b in msg.content:
             if isinstance(b, TextBlock):
-                c_text = redact_sensitive_content(clean_protocol_sentinels(clean_user_steering_envelope(b.text) if role_str == "user" else b.text))
+                c_text = clean_protocol_sentinels(clean_user_steering_envelope(b.text) if role_str == "user" else b.text)
                 text_parts.append(c_text)
                 steps.append({"id": f"step_{msg_idx}_{step_idx}", "step_index": step_idx, "type": "text", "content": c_text, "status": "completed"})
                 step_idx += 1
             elif hasattr(b, "thinking") and b.thinking:
-                th = redact_sensitive_content(re.sub(r"</?(?:thought|thinking)>", "", str(b.thinking), flags=re.I).strip())
+                th = re.sub(r"</?(?:thought|thinking)>", "", str(b.thinking), flags=re.I).strip()
                 thoughts.append(th)
                 steps.append({"id": f"step_{msg_idx}_{step_idx}", "step_index": step_idx, "type": "thinking", "content": th, "status": "completed"})
                 step_idx += 1
             elif getattr(b, "type", "") in ("thinking", "reasoning"):
                 t_text = getattr(b, "text", "") or getattr(b, "thinking", "")
                 if t_text:
-                    th = redact_sensitive_content(re.sub(r"</?(?:thought|thinking)>", "", str(t_text), flags=re.I).strip())
+                    th = re.sub(r"</?(?:thought|thinking)>", "", str(t_text), flags=re.I).strip()
                     thoughts.append(th)
                     steps.append({"id": f"step_{msg_idx}_{step_idx}", "step_index": step_idx, "type": "thinking", "content": th, "status": "completed"})
                     step_idx += 1
             elif isinstance(b, ToolUseBlock):
                 tc_id, tc_name = str(b.id), str(b.name)
-                t_args = redact_data_structure(b.input) if isinstance(b.input, dict) else {}
+                t_args = b.input if isinstance(b.input, dict) else {}
                 tool_action = get_tool_action_type(tc_name)
 
                 output_val = tool_results.get(tc_id, "")
                 is_pending = bool(pending_map and tc_id in pending_map and not pending_map[tc_id].get("decision"))
                 decision_val = pending_map.get(tc_id, {}).get("decision") if pending_map else None
-                # ponytail: preserve audit trail of denied tool calls on reload even after pending_tool_calls is cleared
+                # Preserve audit trail of denied tool calls on reload even after pending_tool_calls is cleared
                 is_denied = (decision_val == "deny") or ("Permission denied" in str(output_val))
                 if is_denied:
                     decision_val = "deny"
                 is_failed = tool_errors.get(tc_id, False)
                 tool_status = "pending_approval" if is_pending else ("denied" if is_denied else ("failed" if is_failed else "completed"))
-                # ponytail: schema normalization boundary - extract canonical tool properties
+                # Schema normalization boundary - extract canonical tool properties
                 summary_raw = (
                     t_args.get("toolSummary")
                     or t_args.get("tool_summary")
@@ -182,7 +191,7 @@ def messages_to_transcript_lines(
                     or t_args.get("description")
                     or (pending_map.get(tc_id, {}).get("prompt") if pending_map else None)
                 )
-                summary_str = redact_sensitive_content(str(summary_raw)) if summary_raw else None
+                summary_str = str(summary_raw) if summary_raw else None
                 action_str = t_args.get("toolAction") or t_args.get("tool_action")
                 cmd_raw = (
                     t_args.get("CommandLine")
@@ -208,6 +217,7 @@ def messages_to_transcript_lines(
                     "status": tool_status, "decision": decision_val,
                     "toolSummary": summary_str,
                     "toolAction": action_str, "action_type": tool_action,
+                    "is_compacted": tool_compacted.get(tc_id, False),
                 }
                 if cmd_raw:
                     tool_dict["command"] = str(cmd_raw)
@@ -220,12 +230,13 @@ def messages_to_transcript_lines(
                     "tool_call_id": tc_id, "name": tc_name, "args": t_args, "output": output_val,
                     "status": tool_status, "decision": decision_val, "action_type": tool_action,
                     "toolSummary": summary_str, "toolAction": action_str,
+                    "is_compacted": tool_compacted.get(tc_id, False),
                     **({"command": str(cmd_raw)} if cmd_raw else {}),
                     **({"path": str(path_raw)} if path_raw else {}),
                 })
                 step_idx += 1
 
-        combined_text = redact_sensitive_content("\n\n".join(text_parts).strip())
+        combined_text = "\n\n".join(text_parts).strip()
         if not combined_text and not tools and not thoughts:
             continue
 
@@ -333,7 +344,7 @@ async def load_session_transcript(
                     app_msgs = getattr(a, "append_messages", None) or getattr(a, "replace_messages", None) or []
                     for m in app_msgs:
                         mid = str(getattr(m, "id", "") or "")
-                        if mid:
+                        if mid and (atype != "replace" or mid not in msg_to_run):
                             msg_to_run[mid] = rid
                             m_ts = getattr(m, "created_at", None) or getattr(a, "created_at", None)
                             if m_ts:

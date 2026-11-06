@@ -18,6 +18,7 @@ interface Props {
   tasks: TaskInfo[];
   agentTaskProgress: Record<string, { done: number; total: number }>;
   taskModifiedFiles: Record<string, string[]>;
+  sessionFiles?: string[];
   resolveAgentName: (id: string) => string;
   onSelectTask: (task: TaskInfo) => void;
   onSelectFile: (path: string) => void;
@@ -40,7 +41,95 @@ function taskProgress(
   return { ...p, pct: Math.round((p.done / p.total) * 100) };
 }
 
-export function ArtifactPanel({ tasks, agentTaskProgress, taskModifiedFiles, resolveAgentName, onSelectTask, onSelectFile }: Props) {
+interface TaskCardProps {
+  task: TaskInfo;
+  prog: { done: number; total: number; pct: number } | null;
+  files?: string[];
+  cat?: { bg: string; border: string; color: string };
+  onSelectTask: (task: TaskInfo) => void;
+  onSelectFile: (path: string) => void;
+  resolveAgentName: (id: string) => string;
+}
+
+// ponytail: unified TaskCard component eliminating duplicated JSX between categorized and uncategorized task lists (R5b)
+function TaskCard({
+  task,
+  prog,
+  files,
+  cat,
+  onSelectTask,
+  onSelectFile,
+  resolveAgentName,
+}: TaskCardProps) {
+  const isCompleted = task.status === "completed";
+  const borderClasses = isCompleted && cat
+    ? `${cat.bg} ${cat.border}`
+    : "bg-white border-slate-200";
+
+  return (
+    <div
+      key={task.task_id}
+      className={`border p-2.5 shadow-sm transition-all cursor-pointer hover:border-slate-300 ${borderClasses}`}
+      onClick={() => onSelectTask(task)}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <span className="text-[9px] font-mono text-slate-400 block">{task.task_id}</span>
+          <span className="text-xs font-semibold text-slate-700 leading-tight block">{task.title}</span>
+        </div>
+        {statusIcon(task.status)}
+      </div>
+      {task.assignee_agent_id && (
+        <div className="mt-1.5 text-[10px] font-mono text-slate-500 bg-slate-50 px-1.5 py-0.5 border border-slate-200 inline-block">
+          {resolveAgentName(task.assignee_agent_id)}
+        </div>
+      )}
+      {files && files.length > 0 && (
+        <div className="mt-1.5 space-y-0.5">
+          {files.map((fp) => (
+            <button
+              key={fp}
+              type="button"
+              className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline truncate max-w-full text-left"
+              title={fp}
+              onClick={(e) => { e.stopPropagation(); onSelectFile(fp); }}
+            >
+              <FolderOpen size={10} className="shrink-0 text-slate-400" />
+              <span className="truncate">{fp.split("/").pop()}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {prog && (
+        <div className="mt-2">
+          <div className="flex justify-between text-[9px] text-slate-400 mb-0.5">
+            <span>TODO Progress</span>
+            <span className="font-mono">{prog.done}/{prog.total} ({prog.pct}%)</span>
+          </div>
+          <div className="h-1 w-full bg-slate-100 overflow-hidden">
+            <div
+              className="h-full transition-all duration-500"
+              style={{
+                width: `${prog.pct}%`,
+                backgroundColor: prog.pct === 100 ? "#10b981" : (cat?.color || "#94a3b8"),
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ArtifactPanel({
+  tasks,
+  agentTaskProgress,
+  taskModifiedFiles,
+  sessionFiles,
+  resolveAgentName,
+  onSelectTask,
+  onSelectFile,
+}: Props) {
   // Group tasks by category prefix
   const grouped = CATEGORIES.map((cat) => {
     const items = tasks.filter((t) => t.task_id.startsWith(cat.prefix));
@@ -115,69 +204,19 @@ export function ArtifactPanel({ tasks, agentTaskProgress, taskModifiedFiles, res
               </div>
             )}
 
-            {/* Task cards */}
-            {cat.items.map((task) => {
-              const prog = taskProgress(task, agentTaskProgress);
-              const files = taskModifiedFiles[task.task_id];
-              return (
-                <div
-                  key={task.task_id}
-                  className={`border p-2.5 shadow-sm transition-all cursor-pointer hover:border-slate-300 ${
-                    task.status === "completed"
-                      ? `${cat.bg} ${cat.border}`
-                      : "bg-white border-slate-200"
-                  }`}
-                  onClick={() => onSelectTask(task)}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="text-[9px] font-mono text-slate-400 block">{task.task_id}</span>
-                      <span className="text-xs font-semibold text-slate-700 leading-tight block">{task.title}</span>
-                    </div>
-                    {statusIcon(task.status)}
-                  </div>
-                  {task.assignee_agent_id && (
-                    <div className="mt-1.5 text-[10px] font-mono text-slate-500 bg-slate-50 px-1.5 py-0.5 border border-slate-200 inline-block">
-                      {resolveAgentName(task.assignee_agent_id)}
-                    </div>
-                  )}
-                  {/* Modified files */}
-                  {files && files.length > 0 && (
-                    <div className="mt-1.5 space-y-0.5">
-                      {files.map((fp) => (
-                        <button
-                          key={fp}
-                          className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline truncate max-w-full text-left"
-                          title={fp}
-                          onClick={(e) => { e.stopPropagation(); onSelectFile(fp); }}
-                        >
-                          <FolderOpen size={10} className="shrink-0 text-slate-400" />
-                          <span className="truncate">{fp.split("/").pop()}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {/* Builder TODO progress */}
-                  {prog && (
-                    <div className="mt-2">
-                      <div className="flex justify-between text-[9px] text-slate-400 mb-0.5">
-                        <span>TODO Progress</span>
-                        <span className="font-mono">{prog.done}/{prog.total} ({prog.pct}%)</span>
-                      </div>
-                      <div className="h-1 w-full bg-slate-100 overflow-hidden">
-                        <div
-                          className="h-full transition-all duration-500"
-                          style={{
-                            width: `${prog.pct}%`,
-                            backgroundColor: prog.pct === 100 ? "#10b981" : cat.color,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {/* Task cards via unified TaskCard (R5b) */}
+            {cat.items.map((task) => (
+              <TaskCard
+                key={task.task_id}
+                task={task}
+                prog={taskProgress(task, agentTaskProgress)}
+                files={taskModifiedFiles[task.task_id]}
+                cat={cat}
+                onSelectTask={onSelectTask}
+                onSelectFile={onSelectFile}
+                resolveAgentName={resolveAgentName}
+              />
+            ))}
           </div>
         );
       })}
@@ -189,61 +228,53 @@ export function ArtifactPanel({ tasks, agentTaskProgress, taskModifiedFiles, res
             <Wrench size={14} className="text-slate-500" />
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Other</span>
           </div>
-          {uncategorized.map((task) => {
-            const prog = taskProgress(task, agentTaskProgress);
-            const files = taskModifiedFiles[task.task_id];
-            return (
-              <div
-                key={task.task_id}
-                className="bg-white border border-slate-200 p-2.5 shadow-sm cursor-pointer hover:border-slate-300"
-                onClick={() => onSelectTask(task)}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <span className="text-[9px] font-mono text-slate-400 block">{task.task_id}</span>
-                    <span className="text-xs font-semibold text-slate-700 leading-tight block">{task.title}</span>
-                  </div>
-                  {statusIcon(task.status)}
-                </div>
-                {task.assignee_agent_id && (
-                  <div className="mt-1.5 text-[10px] font-mono text-slate-500 bg-slate-50 px-1.5 py-0.5 border border-slate-200 inline-block">
-                    {resolveAgentName(task.assignee_agent_id)}
-                  </div>
-                )}
-                {files && files.length > 0 && (
-                  <div className="mt-1.5 space-y-0.5">
-                    {files.map((fp) => (
-                      <button
-                        key={fp}
-                        className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 hover:underline truncate max-w-full text-left"
-                        title={fp}
-                        onClick={(e) => { e.stopPropagation(); onSelectFile(fp); }}
-                      >
-                        <FolderOpen size={10} className="shrink-0 text-slate-400" />
-                        <span className="truncate">{fp.split("/").pop()}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {prog && (
-                  <div className="mt-2">
-                    <div className="flex justify-between text-[9px] text-slate-400 mb-0.5">
-                      <span>TODO Progress</span>
-                      <span className="font-mono">{prog.done}/{prog.total} ({prog.pct}%)</span>
-                    </div>
-                    <div className="h-1 w-full bg-slate-100 overflow-hidden">
-                      <div
-                        className="h-full bg-slate-400 transition-all duration-500"
-                        style={{ width: `${prog.pct}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {uncategorized.map((task) => (
+            <TaskCard
+              key={task.task_id}
+              task={task}
+              prog={taskProgress(task, agentTaskProgress)}
+              files={taskModifiedFiles[task.task_id]}
+              onSelectTask={onSelectTask}
+              onSelectFile={onSelectFile}
+              resolveAgentName={resolveAgentName}
+            />
+          ))}
         </div>
       )}
+
+      {/* Deliverables / Unassigned session files from authoritative server endpoint (R11) */}
+      {(() => {
+        const assigned = new Set(Object.values(taskModifiedFiles).flat());
+        const unassigned = (sessionFiles || []).filter((f) => !assigned.has(f));
+        if (unassigned.length === 0) return null;
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <FolderOpen size={14} className="text-blue-500" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600">
+                产出物 / Deliverables
+              </span>
+              <span className="text-[9px] font-mono text-slate-400 ml-auto">
+                {unassigned.length}
+              </span>
+            </div>
+            <div className="border border-slate-200 p-2.5 bg-white shadow-sm space-y-1">
+              {unassigned.map((fp) => (
+                <button
+                  key={fp}
+                  type="button"
+                  className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 hover:underline truncate w-full text-left py-0.5"
+                  title={fp}
+                  onClick={() => onSelectFile(fp)}
+                >
+                  <FolderOpen size={12} className="shrink-0 text-slate-400" />
+                  <span className="truncate">{fp.split("/").pop()}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

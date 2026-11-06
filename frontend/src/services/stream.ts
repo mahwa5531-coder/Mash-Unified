@@ -10,9 +10,10 @@ export interface StreamEventHandlers {
   onToolCall?: (tool: ToolCall) => void;
   onError?: (error: string, errorId?: string) => void;
   onRetryAttempt?: (attempt: number) => void;
+  onCompaction?: (data: { type: string; trigger_reason?: string; summary?: string }) => void;
 }
 
-// ponytail: normalize raw backend stack traces, 404s, and provider JSON envelopes into clean user notices
+// Normalize raw backend stack traces, 404s, and provider JSON envelopes into clean user notices
 export function formatErrorMessage(rawErr: string): string {
   if (!rawErr) return "An unexpected error occurred during execution.";
 
@@ -93,6 +94,7 @@ export async function streamQuery(
   const onToolCall = typeof handlers === 'object' ? handlers.onToolCall : undefined;
   const onError = typeof handlers === 'object' ? handlers.onError : undefined;
   const onRetryAttempt = typeof handlers === 'object' ? handlers.onRetryAttempt : undefined;
+  const onCompaction = typeof handlers === 'object' ? handlers.onCompaction : undefined;
 
   // Track raw argument buffers per tool_call_id
   const toolArgBuffers: Record<string, string> = {};
@@ -122,7 +124,7 @@ export async function streamQuery(
     }
   };
 
-  // ponytail: stable client_request_id for turn idempotency across retry attempts
+  // Stable client_request_id for turn idempotency across retry attempts
   const clientRequestId = (context?.client_request_id as string) ||
     (typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
@@ -304,7 +306,7 @@ export async function streamQuery(
             if (callId && deltaArg) {
               toolArgBuffers[callId] = (toolArgBuffers[callId] || "") + deltaArg;
               let parsedArgs: Record<string, any> = {};
-              // ponytail: Fast pre-flight guard avoids O(N^2) syntax error exceptions on incomplete intermediate JSON chunks
+              // Fast pre-flight guard avoids O(N^2) syntax error exceptions on incomplete intermediate JSON chunks
               const curBuf = toolArgBuffers[callId].trimEnd();
               if (curBuf.endsWith('}')) {
                 try { parsedArgs = JSON.parse(curBuf); } catch { /* still buffering */ }
@@ -359,7 +361,7 @@ export async function streamQuery(
               const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
               const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary;
               const toolAction = finalArgs?.toolAction || finalArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
-              // ponytail: Only flag failed if wire protocol explicitly stamps event as failed/error.
+              // Only flag failed if wire protocol explicitly stamps event as failed/error.
               // Tool stdout/stderr (e.g. CLI non-zero returns or not-found) is valid observation
               // context for the LLM to inspect and self-correct, not a UI failure.
               const isFailed = Boolean(
@@ -400,6 +402,21 @@ export async function streamQuery(
             }
           }
 
+          // 6c. Compaction events (RFC-0021 / RFC-0024) - Transient status only, vanishes when complete
+          else if (eventType === "COMPACTION_STARTED") {
+            const reason = event.trigger_reason || data.trigger_reason || "Token threshold reached";
+            if (onCompaction) {
+              onCompaction({ type: eventType, trigger_reason: reason });
+            }
+          }
+          else if (eventType === "COMPACTION_FINISHED") {
+            const tokensSaved = event.tokens_saved ?? data.tokens_saved;
+            const summary = tokensSaved ? `Saved ${tokensSaved.toLocaleString()} tokens` : "Compaction complete";
+            if (onCompaction) {
+              onCompaction({ type: eventType, summary });
+            }
+          }
+
           // 7. Run fully finished
           else if (eventType === "RUN_FINISHED") {
             // stream is done — finalize any in-flight running tools
@@ -418,6 +435,14 @@ export async function streamQuery(
               onToken(`\n\n⚠️ ${formatted}`);
             }
           }
+
+          // 9. Provider retry event — reset uncommitted partial stream buffer across retries
+          else if (eventType === "RETRY") {
+            const attempt = Number(event.attempt ?? data.attempt ?? 1);
+            if (onRetryAttempt) {
+              onRetryAttempt(attempt);
+            }
+          }
         } catch {
           // Malformed JSON line — skip silently
         }
@@ -432,7 +457,7 @@ export async function streamQuery(
     onRetryAttempt?.(0);
     console.warn("Error streaming query:", err);
 
-    // ponytail: Detect WiFi / network disconnection with clear status messages
+    // Detect WiFi / network disconnection with clear status messages
     const isOffline = typeof window !== 'undefined' && typeof navigator !== 'undefined' && !navigator.onLine;
     const isFetchErr = err?.name === "TypeError" || 
       String(err?.message || "").toLowerCase().includes("failed to fetch") ||
