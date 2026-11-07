@@ -72,7 +72,7 @@ class RenameSessionPayload(BaseModel):
 
 
 class UndoPayload(BaseModel):
-    from_turn: int = 0
+    from_turn: int | None = None
     turn_id: str | None = None
     run_id: str | None = None
 

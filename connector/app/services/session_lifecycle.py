@@ -284,7 +284,7 @@ async def mark_session_as_viewed(engine: Any, session_id: str) -> dict[str, Any]
 
 
 async def undo_session_turn(
-    engine: Any, session_id: str, from_turn: int = 0, turn_id: str | None = None, run_id: str | None = None
+    engine: Any, session_id: str, from_turn: int | None = None, turn_id: str | None = None, run_id: str | None = None
 ) -> dict[str, Any]:
     _validate_id(session_id, "session_id")
     eng = _get_engine(engine)
@@ -292,7 +292,7 @@ async def undo_session_turn(
         raise HTTPException(status_code=503, detail="Database engine is unavailable")
     try:
         actions = sorted(await eng.find_many(AgentRunActionModel, filters=ComparisonFilter.eq("session_id", session_id)), key=lambda a: getattr(a, "created_at_ns", 0) or 0)
-        user_turn_count, target_run_id = 0, None
+        target_run_id = None
 
         # 1. Direct run_id match
         if run_id:
@@ -311,18 +311,25 @@ async def undo_session_turn(
                 if target_run_id:
                     break
 
-        # 3. Fallback: integer turn count
+        # 3. Fallback: integer turn count or latest turn
         if not target_run_id:
+            user_runs: list[str] = []
             for a in actions:
                 act = getattr(a, "action_type", "")
                 if (act.value if hasattr(act, "value") else str(act)) not in ("append", "replace"):
                     continue
                 msgs = a.append_messages or a.replace_messages or []
                 if any(getattr(m, "role", None) == "user" or (isinstance(m, dict) and m.get("role") == "user") for m in msgs):
-                    if user_turn_count >= from_turn:
-                        target_run_id = getattr(a, "run_id", "")
-                        break
-                    user_turn_count += 1
+                    r_id = getattr(a, "run_id", "")
+                    if r_id:
+                        user_runs.append(r_id)
+
+            if user_runs:
+                if from_turn is not None and 0 <= from_turn < len(user_runs):
+                    target_run_id = user_runs[from_turn]
+                elif from_turn is None:
+                    # Default: undo the most recent turn
+                    target_run_id = user_runs[-1]
         if not target_run_id:
             return {"status": "success", "deleted": 0}
         s = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))

@@ -214,13 +214,13 @@ class LoginPayload(BaseModel):
     code: str | None = None  # Desktop exchange code: mcode_<64hex>
     email: str | None = None
     name: str = "Auditor"
-    plan: str = "pro"
+    plan: str | None = None
     api_key: str | None = None
     access_token: str | None = None
     refresh_token: str | None = None
     id_token: str | None = None
     expires_at: int | None = None
-    credits_remaining: int = 500
+    credits_remaining: int | None = None
 
 
 class SwitchAccountPayload(BaseModel):
@@ -464,8 +464,15 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
         "credits_remaining": effective_credits,
     })
 
+    is_authenticated = bool(
+        payload.access_token
+        or payload.api_key
+        or payload.refresh_token
+        or (payload.code and 'data' in locals() and data.get("access_token"))
+    )
+
     meta_dict = {
-        "authenticated": True,
+        "authenticated": is_authenticated,
         "email": payload.email,
         "name": payload.name,
         "plan": effective_plan,
@@ -479,11 +486,11 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
     config = AppConfig.load()
     config.user.email = payload.email
     config.user.name = payload.name
-    config.user.plan = payload.plan
-    config.user.credits_remaining = payload.credits_remaining
+    config.user.plan = effective_plan
+    config.user.credits_remaining = effective_credits
     config.save()
 
-    return {"success": True, "authenticated": True, "email": payload.email, "accounts": meta_accounts}
+    return {"success": True, "authenticated": is_authenticated, "email": payload.email, "accounts": meta_accounts}
 
 
 @router.post("/switch")

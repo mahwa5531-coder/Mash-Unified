@@ -153,7 +153,7 @@ async def list_all_projects(engine: DatabaseEngineDep):
         p_dict["session_count"] = count
         results.append(p_dict)
 
-    return {"projects": list(reversed(results))}
+    return {"projects": results}
 
 
 @router.get("/{user_id}")
@@ -186,7 +186,7 @@ async def list_projects(user_id: str, engine: DatabaseEngineDep):
         p_dict["session_count"] = count
         results.append(p_dict)
 
-    return {"projects": list(reversed(results))}
+    return {"projects": results}
 
 
 class RenameProjectRequest(BaseModel):
