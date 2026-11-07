@@ -76,11 +76,12 @@ middlewares:
       emergency_compact_enabled: true
   - import: nexau.archs.main_sub.execution.middleware.long_tool_output:LongToolOutputMiddleware
     params:
-      max_output_chars: 10000
-      head_lines: 50
-      tail_lines: 30
+      max_output_chars: 2500
+      head_lines: 30
+      tail_lines: 20
+      head_chars: 1200
+      tail_chars: 1000
       bypass_tool_names:
-        - run_shell_command
         - audit_skill_tool
   - import: nexau.archs.main_sub.execution.middleware.round_and_token_reminder:RoundAndTokenReminderMiddleware
     params:

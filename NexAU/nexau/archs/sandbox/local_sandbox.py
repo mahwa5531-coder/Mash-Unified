@@ -34,7 +34,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, ClassVar, override
 
-from nexau.archs.platform.path_helpers import get_local_bash_tool_results_dir, get_local_temp_root
+from nexau.archs.platform.path_helpers import get_local_bash_tool_results_dir, get_local_temp_root, get_local_tool_output_dir
 from nexau.archs.platform.process_compat import graceful_kill
 from nexau.archs.platform.shell_backend import ShellBackend, WindowsCmdBackend, WindowsPowerShellBackend, create_shell_backend
 
@@ -98,6 +98,10 @@ class LocalSandbox(BaseSandbox):
     def get_temp_dir(self) -> str:
         """Return the local host temp directory managed by NexAU."""
         return str(get_local_temp_root())
+
+    def get_tool_output_dir(self) -> str:
+        """Return the session-scoped base directory used for persisted long tool outputs."""
+        return str(get_local_tool_output_dir(self.sandbox_id))
 
     def to_shell_path(self, path: str | Path) -> str:
         """Convert a local native path into the active shell backend format."""
@@ -1759,6 +1763,7 @@ class LocalSandboxManager(BaseSandboxManager[LocalSandbox]):
         (brain_dir / ".system_generated" / "logs").mkdir(parents=True, exist_ok=True)
         (brain_dir / ".system_generated" / "tasks").mkdir(parents=True, exist_ok=True)
         (brain_dir / ".system_generated" / "messages").mkdir(parents=True, exist_ok=True)
+        (brain_dir / ".system_generated" / "nexau_tool_outputs").mkdir(parents=True, exist_ok=True)
         (brain_dir / ".user_uploaded").mkdir(parents=True, exist_ok=True)
         (brain_dir / "media").mkdir(parents=True, exist_ok=True)
         (brain_dir / "scratch").mkdir(parents=True, exist_ok=True)
