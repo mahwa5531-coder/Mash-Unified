@@ -8,6 +8,7 @@ Comprehensive Security, Workspace Containment & Cross-Session Isolation Suite:
 6. Workspace Directory Escape Guard (Boundary enforcement on registered project paths)
 """
 
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -21,7 +22,8 @@ from app.main import app, lifespan
 @pytest.mark.anyio
 async def test_cross_session_isolation_and_workspace_containment(tmp_path):
     # Setup two mock session brain directories inside .mash/brain
-    mock_brain_root = Path.home() / ".mash" / "brain"
+    mash_home = Path(os.environ.get("MASH_HOME", Path.home() / ".mash"))
+    mock_brain_root = mash_home / "brain"
     session_a_id = f"test_session_a_{tmp_path.name}"
     session_b_id = f"test_session_b_{tmp_path.name}"
 
