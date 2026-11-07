@@ -53,10 +53,10 @@ export const SessionItemRow = React.memo(function SessionItemRow({
       data-testid="session-item"
       onClick={() => onSessionClick(s)}
       onContextMenu={(e) => onOpenMenu(e, s.session_id)}
-      className={`group/item relative h-[30px] mx-1 px-2.5 rounded-lg cursor-pointer flex justify-between items-center select-none transition-colors ${
+      className={`group/item relative h-[34px] my-0.5 mx-1.5 px-2.5 rounded-lg cursor-pointer flex justify-between items-center select-none transition-colors ${
         isSelected
-          ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs'
-          : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/[0.04] dark:hover:bg-zinc-800/40'
+          ? 'bg-zinc-200/90 dark:bg-white/[0.08] text-zinc-950 dark:text-white font-medium border border-zinc-300/40 dark:border-white/[0.06] shadow-2xs'
+          : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
       }`}
     >
       {isEditing ? (
@@ -75,7 +75,7 @@ export const SessionItemRow = React.memo(function SessionItemRow({
       ) : (
         <div className="flex items-center min-w-0 flex-1 mr-2 overflow-hidden">
           <span className={`truncate leading-snug transition-colors text-[13px] ${
-            isSelected ? 'text-zinc-900 dark:text-white font-medium' : 'text-zinc-600 dark:text-zinc-400 group-hover/item:text-zinc-900 dark:group-hover/item:text-zinc-200'
+            isSelected ? 'text-zinc-950 dark:text-white font-medium' : 'text-zinc-700 dark:text-zinc-300 group-hover/item:text-zinc-950 dark:group-hover/item:text-white'
           }`}>
             {generateCleanSessionTitle(s.custom_title || s.title || '', s.session_id)}
           </span>
@@ -83,32 +83,37 @@ export const SessionItemRow = React.memo(function SessionItemRow({
       )}
 
       {!isEditing && (
-        <div className="flex items-center justify-end shrink-0 ml-1.5 gap-1.5 min-w-[28px]">
-          {/* Active Status Indicators: Always visible and hoverable */}
-          {isStreaming ? (
-            <span 
-              className="w-3 h-3 rounded-full border-[1.5px] border-sky-400/30 border-t-sky-400 animate-spin shrink-0" 
-              title="Running in background..." 
-            />
-          ) : showUnread ? (
-            <div 
-              className="w-4 h-4 rounded-full bg-blue-100 dark:bg-[#182433] flex items-center justify-center shrink-0 select-none group-hover/item:hidden" 
-              title="Completed - unread activity" 
-            >
-              <span className="w-[6.5px] h-[6.5px] rounded-full bg-[#2f81f7] shrink-0" />
-            </div>
-          ) : (
-            <span className={`text-[11.5px] font-mono shrink-0 group-hover/item:hidden ${isSelected ? 'text-zinc-700 dark:text-zinc-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
-              {formatRelativeTime(s.updated_at)}
-            </span>
-          )}
+        <div className="relative flex items-center justify-end shrink-0 w-[30px] h-[20px]">
+          {/* Default Status Slot: Streaming spinner / Unread badge / Relative Time */}
+          <div className="flex items-center justify-end w-full group-hover/item:opacity-0 transition-opacity duration-150">
+            {isStreaming ? (
+              <span 
+                className="w-3 h-3 rounded-full border-[1.5px] border-sky-400/30 border-t-sky-400 animate-spin shrink-0" 
+                title="Running in background..." 
+              />
+            ) : showUnread ? (
+              <div 
+                className="w-4 h-4 rounded-full bg-blue-100 dark:bg-[#182433] flex items-center justify-center shrink-0 select-none" 
+                title="Completed - unread activity" 
+              >
+                <span className="w-[6.5px] h-[6.5px] rounded-full bg-[#2f81f7] shrink-0" />
+              </div>
+            ) : (
+              <span className={`text-[11px] font-mono shrink-0 tabular-nums ${isSelected ? 'text-zinc-700 dark:text-zinc-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                {formatRelativeTime(s.updated_at)}
+              </span>
+            )}
+          </div>
 
-          {/* When hovering: Show vertical 3-dots button */}
-          <div className="hidden group-hover/item:flex items-center justify-end shrink-0">
+          {/* Smooth Fade Overlay: 3-dots button covers the timestamp without shifting text */}
+          <div className="absolute right-0 flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity duration-150">
             <button
               type="button"
-              onClick={(e) => onOpenMenu(e, s.session_id)}
-              className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer p-0.5 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.1]"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenMenu(e, s.session_id);
+              }}
+              className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer p-0.5 rounded hover:bg-black/[0.08] dark:hover:bg-white/[0.12]"
               title="More options"
               aria-label="More options"
             >

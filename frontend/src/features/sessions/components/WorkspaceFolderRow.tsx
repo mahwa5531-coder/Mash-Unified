@@ -39,7 +39,7 @@ export function WorkspaceFolderRow({
       {/* Ghost Project Folder Row: Clean neutral text, outlined folder, right-aligned hover actions */}
       <div 
         onClick={onToggle}
-        className="group/folder h-[30px] mx-1 px-2.5 rounded-lg cursor-pointer flex items-center justify-between text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors"
+        className="group/folder h-[32px] mx-1.5 px-2.5 rounded-lg cursor-pointer flex items-center justify-between text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors"
       >
         {/* Left: Folder Icon (toggles between Folder and FolderOpen) + Project Name */}
         <div className="flex items-center min-w-0 flex-1 overflow-hidden">
@@ -48,11 +48,11 @@ export function WorkspaceFolderRow({
           ) : (
             <Folder size={14} className="mr-2 text-zinc-500 dark:text-zinc-400 group-hover/folder:text-zinc-800 dark:group-hover/folder:text-zinc-300 shrink-0 transition-colors" />
           )}
-          <span className="text-[13px] truncate font-medium tracking-normal text-zinc-800 dark:text-zinc-300 group-hover/folder:text-zinc-950 dark:group-hover/folder:text-white transition-colors">
+          <span className="text-[13px] truncate font-medium tracking-normal text-zinc-800 dark:text-zinc-200 group-hover/folder:text-zinc-950 dark:group-hover/folder:text-white transition-colors">
             {repoName}
           </span>
           {repoSessions.length > 0 && (
-            <span className="text-[10px] font-mono text-zinc-500 ml-2 opacity-70">
+            <span className="px-1.5 py-0.2 rounded-full bg-zinc-200/70 dark:bg-white/[0.06] text-[10px] font-mono text-zinc-500 dark:text-zinc-400 border border-zinc-200/60 dark:border-white/[0.04] ml-2 shrink-0 tabular-nums">
               {repoSessions.length}
             </span>
           )}

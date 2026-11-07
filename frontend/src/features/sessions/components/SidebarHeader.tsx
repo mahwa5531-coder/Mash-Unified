@@ -34,14 +34,14 @@ export function SidebarHeader({
       </div>
 
       {/* Top Quick Actions (+ New Conversation, Conversation History) */}
-      <div className="px-2.5 pt-3 pb-2 flex flex-col space-y-1 shrink-0">
-        {/* + New Conversation (rounded bordered pill) */}
+      <div className="px-2.5 pt-2.5 pb-2 flex flex-col space-y-1 shrink-0">
+        {/* + New Conversation (rounded bordered pill with elevated surface) */}
         <button
           type="button"
           onClick={() => onNewSession('No Repo')}
-          className="w-full flex items-center justify-start py-1.5 px-3 rounded-lg border border-zinc-200/80 dark:border-white/[0.08] bg-zinc-200/40 dark:bg-white/[0.04] hover:bg-zinc-200/80 dark:hover:bg-white/[0.08] cursor-pointer transition-colors text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-white text-[13px] font-medium shadow-2xs"
+          className="w-full flex items-center justify-start h-[34px] px-3 rounded-lg border border-zinc-200/90 dark:border-white/[0.08] bg-white hover:bg-zinc-50 dark:bg-white/[0.05] dark:hover:bg-white/[0.08] cursor-pointer transition-colors text-zinc-900 dark:text-zinc-100 text-[13px] font-medium shadow-2xs group"
         >
-          <Plus size={14} className="mr-2 text-zinc-600 dark:text-zinc-400" />
+          <Plus size={14} className="mr-2.5 text-zinc-600 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors shrink-0" />
           <span>New Conversation</span>
         </button>
         
@@ -49,10 +49,10 @@ export function SidebarHeader({
         <button
           type="button"
           onClick={onOpenHistory}
-          className={`w-full flex items-center text-[13px] py-1.5 px-3 rounded-lg cursor-pointer transition-colors select-none ${
+          className={`w-full flex items-center h-[32px] text-[13px] px-3 rounded-lg cursor-pointer transition-colors select-none ${
             isHistoryActive
-              ? 'bg-zinc-200/80 dark:bg-white/[0.1] text-zinc-950 dark:text-white font-medium'
-              : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-white/[0.04] hover:text-zinc-900 dark:hover:text-zinc-200'
+              ? 'bg-zinc-200/90 dark:bg-white/[0.08] text-zinc-950 dark:text-white font-medium border border-zinc-300/40 dark:border-white/[0.06] shadow-2xs'
+              : 'text-zinc-600 dark:text-zinc-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-zinc-900 dark:hover:text-zinc-200'
           }`}
         >
           <Clock size={14} className="mr-2.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
