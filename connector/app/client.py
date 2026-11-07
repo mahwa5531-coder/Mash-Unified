@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 class MAShClient:
     """Centralized client for all desktop-to-cloud communications.
 
-    ponytail: Single source of truth for cloud network calls. Prevents scattered
+    Single source of truth for cloud network calls. Prevents scattered
     httpx/requests logic across the codebase.
     """
 

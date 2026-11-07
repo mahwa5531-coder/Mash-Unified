@@ -25,7 +25,7 @@ function formatUserTimestamp(ts?: string): string {
 }
 
 // ----------------------------------------------------------------------
-// ponytail: memoize UserMessage so past turns never re-render during token streaming
+// memoize UserMessage so past turns never re-render during token streaming
 const UserMessage = memo(function UserMessage({ 
   msg, 
   onUndo, 

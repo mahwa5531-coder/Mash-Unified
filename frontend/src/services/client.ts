@@ -6,14 +6,14 @@ export const BASE_URL = (
   "http://127.0.0.1:8000"
 ).replace(/\/+$/, "");
 
-// ponytail: Eagerly purge legacy token from localStorage to guarantee zero browser token retention
+// Eagerly purge legacy token from localStorage to guarantee zero browser token retention
 if (typeof window !== 'undefined') {
   try {
     localStorage.removeItem('nexau_access_token');
   } catch {}
 }
 
-// ponytail: Defensively sanitize caller init headers against Authorization leaks
+// Defensively sanitize caller init headers against Authorization leaks
 function sanitizeInit(init?: RequestInit): RequestInit | undefined {
   if (!init || !init.headers) return init;
   if (typeof Headers !== 'undefined' && init.headers instanceof Headers) {
@@ -37,14 +37,14 @@ function sanitizeInit(init?: RequestInit): RequestInit | undefined {
   return init;
 }
 
-// ponytail: safeFetch retries once on transient network drops ONLY for idempotent methods (GET, HEAD).
+// safeFetch retries once on transient network drops ONLY for idempotent methods (GET, HEAD).
 // Local connector daemon manages upstream auth; frontend sends no bearer tokens across trust boundary.
 export async function safeFetch(url: string, init?: RequestInit): Promise<Response> {
   const sanitizedInit = sanitizeInit(init);
   const method = (sanitizedInit?.method || 'GET').toUpperCase();
   const isIdempotent = method === 'GET' || method === 'HEAD';
 
-  // ponytail: relative paths starting with / must target connector BASE_URL (:8000), not Next.js (:3000) (Blocker B-1)
+  // relative paths starting with / must target connector BASE_URL (:8000), not Next.js (:3000) (Blocker B-1)
   const targetUrl = url.startsWith('/') ? `${BASE_URL}${url}` : url;
 
   try {

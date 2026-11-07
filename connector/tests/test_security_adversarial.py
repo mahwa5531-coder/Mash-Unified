@@ -203,7 +203,7 @@ async def test_bug_6_directory_listing_disclosure():
             assert res_uploads.status_code == 400
             assert "Invalid session_id" in res_uploads.json()["detail"]
 
-            res_artifacts = await client.get("/artifacts/default_user/sess_traversal..hack")
+            res_artifacts = await client.get("/artifacts/session/sess_traversal..hack")
             assert res_artifacts.status_code == 400
             assert "Invalid session_id" in res_artifacts.json()["detail"]
 

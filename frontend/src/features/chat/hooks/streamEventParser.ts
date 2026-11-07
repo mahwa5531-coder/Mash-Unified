@@ -104,7 +104,7 @@ export async function rehydrateSessionTranscript(
   onError?: () => void
 ) {
   try {
-    const resp = await fetchTranscript(sessionId, 100, true, 0);
+    const resp = await fetchTranscript(sessionId, 100, false, 0);
     const s = sessionStore.get(sessionId);
     if (!s || (s.isHistoryLoaded && s.loadedRawCount > 0 && !s.isStreaming)) return;
     const rawLines = resp.lines || [];

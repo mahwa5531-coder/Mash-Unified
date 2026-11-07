@@ -60,7 +60,7 @@ export function prunePathPunctuation(raw: string): { cleanPath: string; trailing
 export function isFullFilePath(raw: string): boolean {
   if (!raw || typeof raw !== 'string') return false;
   const trimmed = raw.trim();
-  // ponytail: reject web URLs so external links (e.g. docs, sklearn) never become local FilePills
+  // reject web URLs so external links (e.g. docs, sklearn) never become local FilePills
   if (/^https?:\/\//i.test(trimmed)) return false;
 
   const clean = normalizePath(trimmed);
@@ -69,13 +69,17 @@ export function isFullFilePath(raw: string): boolean {
   if (!clean || clean.includes(' ') || clean.includes('\n') || clean.includes('*') || clean.includes('?')) return false;
   if (clean.endsWith('/') || clean.endsWith('\\')) return false;
 
-  const FILE_EXT_REGEX = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|pyw|ipynb|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|db|sqlite|md|markdown|txt|log|html|css|scss|xml|xbrl|sh|bash|zsh|ps1|rs|go|c|cpp|h|java|zip|tar|gz|png|jpe?g|gif|svg|webp|env)$/i;
-
-  if (!FILE_EXT_REGEX.test(clean) && !/\.env(?:\.[a-zA-Z0-9_-]+)?$/i.test(clean)) return false;
-
   const parts = clean.split(/[/\\]/);
   const filename = parts.pop() || '';
-  if (!filename || (filename.startsWith('.') && !filename.startsWith('.env') && !filename.startsWith('.git'))) return false;
+
+  const KNOWN_EXTENSIONLESS_FILES = /^(?:Makefile|Dockerfile|Procfile|Gemfile|Rakefile|Vagrantfile|Containerfile|LICENSE|NOTICE)$/i;
+  if (KNOWN_EXTENSIONLESS_FILES.test(filename)) return true;
+
+  const FILE_EXT_REGEX = /\.(xlsx?|xlsm|xlsb|ods|csv|tsv|parquet|pdf|docx?|pptx?|py|pyw|ipynb|tsx?|jsx?|mjs|cjs|json|ya?ml|toml|sql|db|sqlite|md|markdown|txt|log|html|css|scss|xml|xbrl|sh|bash|zsh|ps1|rs|go|c|cpp|h|java|zip|tar|gz|png|jpe?g|gif|svg|webp|env)$/i;
+
+  if (!FILE_EXT_REGEX.test(clean) && !/\.env(?:\.[a-zA-Z0-9_-]+)?$/i.test(clean) && !/^\.(?:gitignore|bashrc|zshrc|profile|editorconfig)$/i.test(filename)) return false;
+
+  if (!filename || (filename.startsWith('.') && !filename.startsWith('.env') && !filename.startsWith('.git') && !filename.startsWith('.bash') && !filename.startsWith('.zsh'))) return false;
 
   return true;
 }
@@ -112,7 +116,7 @@ const FILE_PATH_IN_PROSE_REGEX = /((?:\.env(?:\.[a-zA-Z0-9_-]+)?|(?:(?:file:\/\/
 
 export function processTextNodes(children: any, onOpenFile?: (path: string) => void): any {
   if (typeof children === 'string') {
-    // ponytail: O(1) fast-path bailout for ordinary text with no audit tags or file paths
+    // O(1) fast-path bailout for ordinary text with no audit tags or file paths
     if (!children.includes('[') && !children.includes('/') && !children.includes('\\') && !children.includes(':')) {
       return children;
     }

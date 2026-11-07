@@ -1,7 +1,7 @@
 # Copyright (c) Mash. All rights reserved.
 """Workspace, session, and brain storage path helpers for Mash Desktop.
 
-ponytail: Re-exports from canonical nexau.archs.platform.path_helpers to eliminate
+Re-exports from canonical nexau.archs.platform.path_helpers to eliminate
 redundancy between Desktop Connector and Agent Runtime.
 """
 

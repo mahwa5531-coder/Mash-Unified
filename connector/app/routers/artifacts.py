@@ -11,13 +11,7 @@ from nexau.archs.session.orm import ComparisonFilter
 
 from app.dependencies import DatabaseEngineDep
 from app.paths import get_mash_home, get_session_brain_dir, validate_safe_id
-from app.workspace import (
-    APP_WORKSPACE_ROOT,
-    get_allowed_file_roots,
-    is_path_in_base_roots,
-    is_safe_attachment_root,
-    resolve_session_workspace,
-)
+from app.workspace import APP_WORKSPACE_ROOT, resolve_session_workspace
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +48,27 @@ def _recover_from_sqlite_direct(session_id: str, p: Path, clean_path: str) -> st
                                 if inp.get("content") and isinstance(inp.get("content"), str):
                                     conn.close()
                                     return inp["content"]
+
+        # cross-session SQLite recovery fallback if not found in current session
+        fallback_rows = cur.execute(
+            "SELECT append_messages, replace_messages FROM agent_run_actions WHERE session_id != ? ORDER BY created_at_ns DESC LIMIT 50",
+            (session_id,)
+        ).fetchall()
+        for r in fallback_rows:
+            raw = r[0] or r[1]
+            if not raw:
+                continue
+            msgs = json.loads(raw)
+            for m in msgs:
+                for b in m.get("content", []):
+                    if b.get("type") in ("tool_use", "tool_call"):
+                        inp = b.get("input", {}) or {}
+                        if isinstance(inp, dict):
+                            t_path = str(inp.get("TargetFile") or inp.get("AbsolutePath") or inp.get("path") or inp.get("file_path") or "").replace('\\', "/").lower()
+                            if t_path and (norm_name in t_path or norm_clean in t_path):
+                                if inp.get("content") and isinstance(inp.get("content"), str):
+                                    conn.close()
+                                    return inp["content"]
         conn.close()
     except Exception as e:
         logger.debug(f"Virtual file recovery failed: {e}")
@@ -67,21 +82,13 @@ def _get_engine(engine: Any = None):
     return global_eng
 
 
-def get_brain_dir(session_id: str, session: SessionModel | None = None) -> str:
-    """Get the session brain directory path."""
-    if session and (session.context or {}).get("brain_directory"):
-        return session.context["brain_directory"]
-    project_id = (session.context or {}).get("project_id") if session else None
-    return str(get_session_brain_dir(session_id, project_id))
-
-
 def _scan_directory_fast(
     dir_path: Path,
     rel_prefix: str = "",
     group: str = "working_papers",
     extensions: tuple[str, ...] | None = None,
 ) -> list[dict[str, Any]]:
-    """ponytail: F-32 single-stat os.scandir scan preventing quad-stat overhead."""
+    """F-32 single-stat os.scandir scan preventing quad-stat overhead."""
     items = []
     if not dir_path.is_dir():
         return items
@@ -108,12 +115,10 @@ def _scan_directory_fast(
     return items
 
 
-@router.get("/artifacts/{user_id}/{session_id}")
 @router.get("/artifacts/session/{session_id}")
 async def list_artifacts(
     session_id: str,
     engine: DatabaseEngineDep,
-    user_id: str = "default_user",
 ):
     """List deliverables and working papers for a session."""
     try:
@@ -128,11 +133,13 @@ async def list_artifacts(
     is_project_session = bool(ws and ws.is_dir() and ws != APP_WORKSPACE_ROOT)
     project_dir = str(ws.resolve()) if is_project_session and ws else None
 
-    primary_brain_dir = Path(get_brain_dir(session_id, session)).resolve()
+    project_id = (session.context or {}).get("project_id") if session else None
+    primary_brain_dir = Path(get_session_brain_dir(session_id, project_id)).resolve()
     wp_dir = primary_brain_dir / "working_papers"
 
     deliverables_items: list[dict[str, Any]] = []
     working_papers_items: list[dict[str, Any]] = []
+    seen_names: set[str] = set()
 
     # 1. Scan working papers in session brain directory (F-32: single stat pass)
     working_papers_items.extend(_scan_directory_fast(wp_dir, rel_prefix="working_papers", group="working_papers"))
@@ -144,9 +151,9 @@ async def list_artifacts(
         group="deliverables",
         extensions=(".md", ".xlsx", ".csv", ".pdf"),
     )
-    existing_deliv_names = {it["name"] for it in deliverables_items}
     for item in root_brain_deliverables:
-        if item["name"] not in existing_deliv_names:
+        if item["name"] not in seen_names:
+            seen_names.add(item["name"])
             deliverables_items.append(item)
 
     # 3. If PROJECT session: parse <workspace>/Audit_Deliverables/
@@ -157,7 +164,8 @@ async def list_artifacts(
             deliv_dir_str = str(deliv_dir.resolve()).replace("\\", "/")
             proj_deliverables = _scan_directory_fast(deliv_dir, rel_prefix="Audit_Deliverables", group="deliverables")
             for item in proj_deliverables:
-                if item["name"] not in existing_deliv_names:
+                if item["name"] not in seen_names:
+                    seen_names.add(item["name"])
                     deliverables_items.append(item)
 
     all_items = deliverables_items + working_papers_items
@@ -176,85 +184,14 @@ async def list_artifacts(
     }
 
 
-@router.get("/artifacts/{user_id}/{session_id}/{filename:path}")
-@router.get("/artifacts/session/{session_id}/{filename:path}")
-async def get_artifact(
-    session_id: str,
-    filename: str,
-    engine: DatabaseEngineDep,
-    user_id: str = "default_user",
-):
-    """Stream or retrieve content for a deliverable file or working paper."""
-    try:
-        validate_safe_id(session_id, "session_id")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    clean_name = unquote(filename).strip().lstrip("/\\")
-    if ".." in clean_name or clean_name.startswith("/") or clean_name.startswith("\\"):
-        raise HTTPException(status_code=400, detail="Invalid artifact path traversal attempt.")
-
-    eng = _get_engine(engine)
-    session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id)) if eng else None
-
-    # Search candidates in priority order: workspace deliverables -> session brain -> scratch
-    candidate_paths: list[Path] = []
-    ws = await resolve_session_workspace(eng, session_id) if session else None
-    if ws and ws.is_dir() and ws != APP_WORKSPACE_ROOT:
-        candidate_paths.extend([
-            ws / "Audit_Deliverables" / clean_name,
-            ws / clean_name,
-        ])
-
-    primary_brain_dir = Path(get_brain_dir(session_id, session)).resolve()
-    candidate_paths.extend([
-        primary_brain_dir / "working_papers" / clean_name,
-        primary_brain_dir / clean_name,
-        primary_brain_dir / "scratch" / clean_name,
-    ])
-
-    target_file = None
-    for cand in candidate_paths:
-        try:
-            cand_resolved = cand.resolve()
-            if cand_resolved.is_file():
-                target_file = cand_resolved
-                break
-        except Exception:
-            continue
-
-    if not target_file:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Artifact '{clean_name}' not found for session {session_id}."
-        )
-
-    ext = target_file.suffix.lower()
-    if ext == ".pdf":
-        return FileResponse(target_file, media_type="application/pdf", content_disposition_type="inline")
-    if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".svg"):
-        return FileResponse(target_file, content_disposition_type="inline")
-    if ext in (".xlsx", ".xlsm", ".xls", ".xlsb", ".ods"):
-        return FileResponse(target_file, filename=target_file.name)
-
-    try:
-        return target_file.read_text(encoding="utf-8", errors="replace")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read artifact: {e}")
-
-
 @router.api_route("/files/content", methods=["GET", "HEAD"])
 async def get_file_content(
     path: str,
     raw: bool = False,
-    page: int = 0,
-    page_size: int = 100,
-    sheet: str | None = None,
     session_id: str | None = None,
     engine: DatabaseEngineDep = None,
-    format: str | None = None,
 ):
-    """Read and return file content or stream on local disk with strict workspace containment."""
+    """Read and return file content or stream on local disk."""
     clean_path = unquote(path).strip()
     if not clean_path:
         raise HTTPException(status_code=400, detail="File path cannot be empty.")
@@ -298,7 +235,22 @@ async def get_file_content(
                 p = cand.resolve()
                 break
         else:
-            p = p.resolve()
+            # cross-session relative fallback — search sibling session brains before 404
+            brain_root = (get_mash_home() / "brain").resolve()
+            if brain_root.is_dir():
+                rel_clean = rel_path.replace('\\', "/").lstrip("/")
+                found = next(brain_root.glob(f"*/{rel_clean}"), None)
+                if not found and "/" not in rel_clean:
+                    found = (
+                        next(brain_root.glob(f"*/working_papers/{rel_clean}"), None)
+                        or next(brain_root.glob(f"*/scratch/{rel_clean}"), None)
+                    )
+                if found and found.is_file():
+                    p = found.resolve()
+                else:
+                    p = p.resolve()
+            else:
+                p = p.resolve()
     else:
         p = p.resolve()
 
@@ -312,23 +264,7 @@ async def get_file_content(
             )
         validate_safe_id(session_id, "session_id")
 
-
-
-    # Workspace containment: verify within registered or base workspace roots
-    is_allowed = is_path_in_base_roots(p)
-    if not is_allowed:
-        allowed_roots = await get_allowed_file_roots(eng)
-        is_allowed = any(p == root or p.is_relative_to(root) for root in allowed_roots)
-
-    # Authorize session files if safe non-system user path or in session context/actions
-    if not is_allowed and session_id and is_safe_attachment_root(p):
-        is_allowed = True
-
-    if not is_allowed:
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied: Path is outside authorized workspace directories."
-        )
+    # desktop read model — any local file the host OS user can read is viewable
 
     try:
         exists = p.exists()
@@ -393,111 +329,3 @@ async def get_file_content(
         return {"content": clean_text}
     except Exception as e:
         return {"content": f"Error reading file: {e}"}
-
-
-@router.get("/workspace/tree")
-async def get_workspace_tree(session_id: str | None = None, engine: DatabaseEngineDep = None):
-    """Scan and return workspace file tree focusing on deliverables, data files, and session artifacts."""
-    eng = _get_engine(engine)
-    workspace_root = await resolve_session_workspace(eng, session_id) if session_id else APP_WORKSPACE_ROOT
-    scratch_dir = workspace_root / ".scratch" if (workspace_root / ".scratch").exists() else workspace_root / "scratch"
-    deliverables_dir = workspace_root / "Audit_Deliverables"
-
-    ignored = {
-        ".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache",
-        ".ruff_cache", "dist", "build", ".next", ".hypothesis", "antigravity",
-        "backup_frontend", ".nexau", ".mash", ".gemini"
-    }
-
-    def scan_dir(dir_path: Path, max_depth: int = 2, current_depth: int = 0):
-        if current_depth > max_depth or not dir_path.exists():
-            return []
-        items = []
-        try:
-            for entry in sorted(dir_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
-                if entry.name in ignored or entry.name.startswith("."):
-                    continue
-                rel_path = str(entry.relative_to(workspace_root)).replace("\\", "/")
-                if entry.is_dir():
-                    if current_depth == 0 and entry.name != "Audit_Deliverables" and not any(k in entry.name.lower() for k in ("data", "doc", "paper", "audit", "sheet")):
-                        continue
-                    items.append({
-                        "name": entry.name,
-                        "path": rel_path,
-                        "type": "directory",
-                        "children": scan_dir(entry, max_depth, current_depth + 1),
-                    })
-                else:
-                    items.append({
-                        "name": entry.name,
-                        "path": rel_path,
-                        "type": "file",
-                        "size": entry.stat().st_size,
-                    })
-        except Exception:
-            pass
-        return items
-
-    return {
-        "workspace": scan_dir(workspace_root),
-        "scratch": scan_dir(scratch_dir) if scratch_dir.exists() else [],
-        "artifacts": scan_dir(deliverables_dir) if deliverables_dir.exists() else [],
-        "root": str(workspace_root).replace("\\", "/"),
-    }
-
-
-@router.get("/files/tree")
-async def get_files_tree(
-    path: str = Query(".", description="Directory path to scan"),
-    session_id: str | None = Query(None, description="Optional session id to resolve workspace scope"),
-    engine: DatabaseEngineDep = None,
-):
-    """File tree endpoint for explorer view compatible with Swarm and Desktop FileNode schemas."""
-    eng = _get_engine(engine)
-    workspace_root = await resolve_session_workspace(eng, session_id) if session_id else APP_WORKSPACE_ROOT
-    clean_sub = path.strip().strip("'\"").replace("\\", "/")
-    if clean_sub in (".", "", "/"):
-        target_dir = workspace_root
-    else:
-        target_dir = (workspace_root / clean_sub).resolve()
-
-    allowed_roots = await get_allowed_file_roots(eng)
-    if not any(target_dir == r or target_dir.is_relative_to(r) for r in allowed_roots):
-        return []
-
-    if not target_dir.is_dir():
-        return []
-
-    ignored = {
-        ".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache",
-        ".ruff_cache", "dist", "build", ".next", ".hypothesis", "antigravity",
-        ".nexau", ".mash", ".gemini"
-    }
-
-    items = []
-    try:
-        for entry in sorted(target_dir.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
-            if entry.name in ignored or entry.name.startswith("."):
-                continue
-            rel_path = str(entry.relative_to(workspace_root)).replace("\\", "/")
-            is_dir = entry.is_dir()
-            items.append({
-                "name": entry.name,
-                "path": rel_path,
-                "isDirectory": is_dir,
-                "isFile": not is_dir,
-                "size": entry.stat().st_size if not is_dir else 0,
-            })
-    except Exception:
-        pass
-    return items
-
-
-@router.get("/files/univer", deprecated=True)
-async def get_excel_univer_data(
-    path: str,
-    session_id: str | None = None,
-    engine: DatabaseEngineDep = None,
-):
-    """Deprecated: Univer schema is superseded by client-side ExcelViewerCard parsing."""
-    return await get_file_content(path=path, session_id=session_id, engine=engine)

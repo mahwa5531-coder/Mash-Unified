@@ -17,7 +17,7 @@ export interface SessionItem {
   section?: 'workspace' | 'conversation';
 }
 
-// ponytail: Global deleted sessions tracking prevents background polling from resurrecting deleted sessions (capped at 200)
+// Global deleted sessions tracking prevents background polling from resurrecting deleted sessions (capped at 200)
 const MAX_DELETED_SESSIONS = 200;
 export const deletedSessionIds = new Set<string>();
 
@@ -71,7 +71,7 @@ export interface TranscriptResponse {
 export async function fetchTranscript(
   sessionId: string, 
   limit: number = 30, 
-  shallowTools: boolean = true,
+  shallowTools: boolean = false,
   offset: number = 0
 ): Promise<TranscriptResponse> {
   const params = new URLSearchParams();

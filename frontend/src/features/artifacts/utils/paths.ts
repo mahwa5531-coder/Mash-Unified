@@ -34,7 +34,7 @@ export function isArtifactPath(p: string): boolean {
   return lower.endsWith('.md');
 }
 
-// ponytail: canonical group for doc artifacts so revised plans/walkthroughs vanish from past turns
+// canonical group for doc artifacts so revised plans/walkthroughs vanish from past turns
 export function getArtifactCanonicalGroup(filePathOrTitle: string): string {
   if (!filePathOrTitle) return '';
   const clean = normalizePath(filePathOrTitle);

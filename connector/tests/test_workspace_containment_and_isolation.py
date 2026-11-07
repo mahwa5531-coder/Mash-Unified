@@ -132,22 +132,19 @@ async def test_cross_session_isolation_and_workspace_containment(tmp_path):
                 assert "PROJECT_SPEC = 'v1.0'" in res_ws_legit.json().get("content", "")
 
                 # -------------------------------------------------------------
-                # 8. Workspace Directory Escape Attempt:
-                #    Escaping workspace boundary via .. to access forbidden_outside -> 403
+                # 8. External Local File Read: desktop mode allows host viewing
                 # -------------------------------------------------------------
                 res_outside = await client.get("/files/content", params={"path": str(outside_secret)})
-                assert res_outside.status_code == 403
-                assert "Access denied" in res_outside.json().get("detail", "")
-
-                # -------------------------------------------------------------
-                # 9. Out of bounds OS system directory escape -> MUST BE 403
+                assert res_outside.status_code == 200
+                assert "DATABASE_PASSWORD" in res_outside.json().get("content", "")
+                # 9. Host OS files: viewable in desktop mode if user has OS read permissions
                 # -------------------------------------------------------------
                 sys_target = "/etc/hosts" if Path("/etc/hosts").exists() else "C:/Windows/System32/drivers/etc/hosts"
                 res_sys_escape = await client.get("/files/content", params={
                     "path": sys_target,
                     "session_id": session_a_id,
                 })
-                assert res_sys_escape.status_code == 403
+                assert res_sys_escape.status_code == 200
 
     finally:
         # Cleanup mock test files

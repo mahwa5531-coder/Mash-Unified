@@ -35,10 +35,10 @@ export function useChatAttachments(
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createdBlobUrlsRef = useRef<Set<string>>(new Set());
   const stagedSidRef = useRef<string | null>(null);
-  // ponytail: Synchronous reservation counter prevents concurrent drop/paste batches from exceeding 5 files
+  // Synchronous reservation counter prevents concurrent drop/paste batches from exceeding 5 files
   const inFlightCountRef = useRef<number>(0);
 
-  // ponytail: ensure pre-send uploads isolate to their own clean session ID instead of
+  // ensure pre-send uploads isolate to their own clean session ID instead of
   // sharing a 'default_session' folder (Bug 12). When the user submits, this ID is adopted.
   const getEffectiveSessionId = (): string => {
     if (sessionId) {
@@ -55,7 +55,7 @@ export function useChatAttachments(
     return stagedSidRef.current;
   };
 
-  // ponytail: revoke blob preview URLs only on unmount or explicit removal, not on attachment changes (M-04)
+  // revoke blob preview URLs only on unmount or explicit removal, not on attachment changes (M-04)
   useEffect(() => {
     const urls = createdBlobUrlsRef.current;
     return () => {
@@ -68,7 +68,7 @@ export function useChatAttachments(
     const validFiles = Array.from(files);
     if (validFiles.length === 0) return;
 
-    // ponytail: Single root guard protecting all 3 vectors with synchronous reservation
+    // Single root guard protecting all 3 vectors with synchronous reservation
     const currentTotal = attachedFiles.length + inFlightCountRef.current;
     if (currentTotal + validFiles.length > MAX_CHAT_ATTACHMENTS) {
       setHasInvalidMedia(true);
@@ -87,7 +87,7 @@ export function useChatAttachments(
 
     try {
       for (const file of filesToUpload) {
-        // ponytail: Native Electron desktop file path optimization.
+        // Native Electron desktop file path optimization.
         // For local files (e.g. 500MB audit datasets), reference local path directly without redundant HTTP copying.
         const nativePath =
           (typeof window !== 'undefined' &&
@@ -95,7 +95,7 @@ export function useChatAttachments(
           null;
 
         if (nativePath && typeof nativePath === 'string') {
-          // ponytail: DeepSeek Harness POSIX convention - normalize backslashes to forward slashes
+          // DeepSeek Harness POSIX convention - normalize backslashes to forward slashes
           const normalizedPath = nativePath.replace(/\\/g, '/');
           const isImg = file.type?.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(file.name);
           let previewUrl: string | undefined = undefined;
@@ -173,7 +173,7 @@ export function useChatAttachments(
       }
     }
     if (files.length > 0) {
-      // ponytail: Preserve text payload if clipboard contains both text and file(s)
+      // Preserve text payload if clipboard contains both text and file(s)
       const hasText = e.clipboardData?.getData('text/plain');
       if (!hasText) {
         e.preventDefault();

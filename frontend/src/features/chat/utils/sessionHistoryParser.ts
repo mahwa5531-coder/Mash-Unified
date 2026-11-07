@@ -3,7 +3,7 @@ import { Message, ToolCall } from '@/types/chat';
 const PROTOCOL_TAGS_REGEX = /<\/?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity|system_prompt|session_mode|file_storage_and_discipline|tool_execution_discipline|ui_presentation_format|runtime_context|skills|Skill[A-Za-z0-9_-]+|scratchpad|thought|thinking|tool_use|tool_result|tool_name|tool_output|use_parallel_tool_calls|parallel_tool|summary_data_json|empty)>\s*/gi;
 const PROTOCOL_BRACKETS_REGEX = /\[(?:sub_agent_id|SYSTEM NOTICE):[^\]]*\]\s*/gi;
 
-// ponytail: strip NexAU protocol sentinels, [empty], and prompt tag leakage
+// strip NexAU protocol sentinels, [empty], and prompt tag leakage
 export function cleanAssistantContent(raw?: string): string {
   if (!raw || typeof raw !== 'string') return '';
   const trimmed = raw.trim();
@@ -18,7 +18,7 @@ export function cleanAssistantContent(raw?: string): string {
     .trim();
 }
 
-// ponytail: strip internal mid-flight steering protocol envelopes from user prompt text
+// strip internal mid-flight steering protocol envelopes from user prompt text
 export function cleanUserSteeringEnvelope(text?: string): string {
   if (!text || typeof text !== 'string') return '';
   let cleaned = text;
@@ -44,7 +44,7 @@ export function cleanUserSteeringEnvelope(text?: string): string {
     .trim();
 }
 
-// ponytail: strip internal protocol envelopes and attachments for composer textarea
+// strip internal protocol envelopes and attachments for composer textarea
 export function cleanUserPromptForComposer(text?: string): string {
   if (!text || typeof text !== 'string') return '';
   let cleaned = text.replace(/\[Attached (?:file|files)[^\]]*\]/gi, '').replace(/<attachments>[\s\S]*?<\/attachments>/gi, '').trim();
@@ -70,7 +70,7 @@ function normalizeTool(t: any, idx: number, prefix: string): ToolCall {
   };
 }
 
-// ponytail: transforms normalized transcript lines into structured chat Message[] for rendering
+// transforms normalized transcript lines into structured chat Message[] for rendering
 export function parseSessionHistory(rawLines: any[]): Message[] {
   const parsedMsgs: Message[] = [];
 

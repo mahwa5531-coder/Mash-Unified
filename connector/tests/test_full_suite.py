@@ -80,11 +80,6 @@ async def test_full_system_verification():
             assert tr_res.status_code == 200
             assert "lines" in tr_res.json()
 
-            # 8. Workspace tree
-            tree_res = await client.get("/api/workspace/tree")
-            assert tree_res.status_code == 200
-            assert "workspace" in tree_res.json()
-
             # Cleanup project
             del_res = await client.delete(f"/api/projects/{proj_id}")
             assert del_res.status_code == 200

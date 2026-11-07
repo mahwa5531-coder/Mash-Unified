@@ -134,7 +134,7 @@ export default function Home() {
     }
   }, []);
 
-  // ponytail: remember active session and sidebar open state across F5 browser reloads (F-5)
+  // remember active session and sidebar open state across F5 browser reloads (F-5)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -153,7 +153,7 @@ export default function Home() {
     } catch {}
   }, [isRightSidebarOpen]);
 
-  // ponytail: stable callbacks to prevent unneeded re-mounts/re-renders of ChatCanvas and Sidebar
+  // stable callbacks to prevent unneeded re-mounts/re-renders of ChatCanvas and Sidebar
   const handleSelectSession = useCallback((sessionId: string, title?: string, repoName?: string) => {
     setSelectedSessionId(sessionId);
     if (title) setSelectedSessionTitle(title);
@@ -168,7 +168,7 @@ export default function Home() {
     setSelectedSessionRepo(repoName || 'No Repo');
     setPendingWorkspacePath(folderPath || null);
     setIsHistoryActive(false);
-    // ponytail: brand new conversation starts clean without leaking previous session's open right sidebar
+    // brand new conversation starts clean without leaking previous session's open right sidebar
     setIsRightSidebarOpen(false);
     setIsRightSidebarMaximized(false);
     setFileToOpen(null);

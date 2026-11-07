@@ -88,7 +88,7 @@ async def test_artifact_path_traversal_and_retrieval():
             scratch_file.write_text("print(sum([100, 200, 300]))\n", encoding="utf-8")
 
             # 2. Query artifact list
-            res_list = await client.get(f"/api/artifacts/{user_id}/{sess_id}")
+            res_list = await client.get(f"/api/artifacts/session/{sess_id}")
             assert res_list.status_code == 200
             files = res_list.json().get("files", [])
             assert "audit_checklist.md" in files
@@ -96,17 +96,17 @@ async def test_artifact_path_traversal_and_retrieval():
             assert "scratch/calc_totals.py" not in files
 
             # 3. Retrieve valid artifact content
-            res_content = await client.get(f"/api/artifacts/{user_id}/{sess_id}/audit_checklist.md")
+            res_content = await client.get(f"/files/content?path={artifact_file}&session_id={sess_id}")
             assert res_content.status_code == 200
-            assert "Audit Checklist" in res_content.text
+            assert "Audit Checklist" in res_content.json()["content"]
 
             # 4. Retrieve valid scratch file content
-            res_scratch = await client.get(f"/api/artifacts/{user_id}/{sess_id}/scratch/calc_totals.py")
+            res_scratch = await client.get(f"/files/content?path={scratch_file}&session_id={sess_id}")
             assert res_scratch.status_code == 200
-            assert "calc_totals.py" in res_scratch.text or "sum(" in res_scratch.text
+            assert "print(sum(" in res_scratch.json()["content"] or "sum(" in res_scratch.json()["content"]
 
             # 5. Verify path traversal attempt is blocked (400, 403, or 404)
-            res_traversal = await client.get(f"/api/artifacts/{user_id}/{sess_id}/../../../../Windows/win.ini")
+            res_traversal = await client.get(f"/files/content?path=../../../../Windows/win.ini&session_id={sess_id}")
             assert res_traversal.status_code in (400, 403, 404)
 
             # Cleanup

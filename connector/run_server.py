@@ -10,7 +10,7 @@ sys.path.insert(0, str(backend_dir))
 import uvicorn
 
 if __name__ == '__main__':
-    # ponytail: Support dual-mode execution (FastAPI backend supervisor vs embedded Python CLI runner)
+    # Support dual-mode execution (FastAPI backend supervisor vs embedded Python CLI runner)
     args = sys.argv[1:]
     is_cli = (
         os.path.basename(sys.argv[0]).lower().startswith("python")
@@ -41,7 +41,7 @@ if __name__ == '__main__':
             sys.exit(0)
 
     from app.main import app
-    # ponytail: Support dynamic ephemeral port from desktop process supervisor
+    # Support dynamic ephemeral port from desktop process supervisor
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run(app, host=host, port=port, log_level='info')

@@ -82,12 +82,12 @@ async def create_quick_project(request: QuickProjectRequest, engine: DatabaseEng
 
 @router.post("")
 async def create_project(request: CreateProjectRequest, engine: DatabaseEngineDep):
-    # ponytail: B-11 validate stripped name immediately
+    # B-11 validate stripped name immediately
     clean_name = request.name.strip()
     if not clean_name:
         raise HTTPException(status_code=400, detail="Project name cannot be empty")
 
-    # ponytail: B-07 guard workspace folder exists as directory prior to creation
+    # B-07 guard workspace folder exists as directory prior to creation
     folder_path = Path(request.local_folder_path)
     if not folder_path.is_dir():
         raise HTTPException(status_code=422, detail="Workspace directory does not exist or is not a directory")
@@ -99,7 +99,7 @@ async def create_project(request: CreateProjectRequest, engine: DatabaseEngineDe
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create directory: {e}")
 
-    # ponytail: B-12 case-insensitive uniqueness check & return existing project with stripped name
+    # B-12 case-insensitive uniqueness check & return existing project with stripped name
     all_projects = await engine.find_many(ProjectModel)
     for p in all_projects:
         p_norm_path = os.path.normpath(p.local_folder_path).replace("\\", "/") if p.local_folder_path else ""
@@ -231,7 +231,7 @@ async def delete_project(project_id: str, engine: DatabaseEngineDep):
                 project = p
                 break
     if not project:
-        # ponytail: Return 404 on missing project to standardize deletion contract with sessions (B-13)
+        # Return 404 on missing project to standardize deletion contract with sessions (B-13)
         raise HTTPException(status_code=404, detail=f"Project '{clean_id}' not found")
 
     deleted_sessions_count = 0

@@ -150,10 +150,7 @@ export default function SafeFileViewer({
   );
 
   if (isAccessDenied) {
-    const noticeMsg = content.includes('strictly forbidden')
-      ? "Access denied: cross-session access forbidden"
-      : (content.includes('outside authorized') ? content : "Access denied: file is outside authorized workspace directories");
-    return <FileViewerNotice message={noticeMsg} filename={filename} path={path} onRetry={onRetry} />;
+    return <FileViewerNotice message={content || "Access denied: permission denied by operating system"} filename={filename} path={path} onRetry={onRetry} />;
   }
 
   const isFileNotFound = Boolean(

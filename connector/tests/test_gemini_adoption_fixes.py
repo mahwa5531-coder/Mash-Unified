@@ -1,3 +1,4 @@
+import uuid
 """
 Unit tests for Gemini CLI adoption fixes in MASH:
 1. Atomic file writing in LocalSandbox (os.replace).
@@ -89,7 +90,7 @@ async def test_pdf_and_file_head_preflight_rfc9110(tmp_path):
             # Register workspace folder to authorize access
             proj_res = await client.post("/api/projects", json={
                 "user_id": "test_viewer_user",
-                "name": "PDF Preflight Project",
+                "name": f"PDF Preflight Project {uuid.uuid4().hex[:6]}",
                 "local_folder_path": str(tmp_path)
             })
             assert proj_res.status_code == 200

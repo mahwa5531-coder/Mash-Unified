@@ -363,8 +363,8 @@ async def test_missing_or_deleted_physical_artifact_files_clean_404():
             sid = f"sess_art_{test_id}"
             user_id = f"user_{test_id}"
 
-            # 1. Non-existent file via /artifacts endpoint
-            res_missing_art = await client.get(f"/artifacts/{user_id}/{sid}/ghost_file_12345.pdf")
+            # 1. Non-existent file via /api/files/content
+            res_missing_art = await client.get(f"/api/files/content?path=ghost_file_12345.pdf&session_id={sid}")
             assert res_missing_art.status_code == 404
             err_data = res_missing_art.json()
             assert "detail" in err_data
@@ -394,13 +394,9 @@ async def test_missing_or_deleted_physical_artifact_files_clean_404():
             assert res_after_delete.status_code == 404
             assert "not found" in res_after_delete.json()["detail"].lower()
 
-            # 4. Univer endpoint with missing workbook
-            res_univer_missing = await client.get(f"/api/files/univer?path=ghost_sheet.xlsx&session_id={sid}")
+            # 4. Missing workbook returns clean 404
+            res_univer_missing = await client.get(f"/api/files/content?path=ghost_sheet.xlsx&session_id={sid}")
             assert res_univer_missing.status_code == 404
-
-            # 5. Direct session-level artifact route
-            res_session_art = await client.get(f"/artifacts/session/{sid}/ghost_file_12345.pdf")
-            assert res_session_art.status_code == 404
 
             # 6. Directory path passed to /api/files/content must return 403, never 500
             res_dir = await client.get(f"/api/files/content?path=.&session_id={sid}")

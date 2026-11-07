@@ -65,7 +65,7 @@ export function loadPersistedQueue(sid: string): string[] {
   return [];
 }
 
-// ponytail: Strict 6-session LRU ceiling to protect low-RAM desktop environments
+// Strict 6-session LRU ceiling to protect low-RAM desktop environments
 const MAX_CACHED_SESSIONS = 6;
 
 export function getOrCreateSessionState(sid: string): SessionRuntimeState {

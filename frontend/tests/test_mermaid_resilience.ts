@@ -1,7 +1,7 @@
 import assert from "node:assert";
 
 // Test suite for Mermaid rendering resilience and syntax repair
-// ponytail: Ensures LLM-generated Mermaid syntax never drops to raw text or leaks DOM orphans
+// Ensures LLM-generated Mermaid syntax never drops to raw text or leaks DOM orphans
 
 function repairMermaidSyntax(raw: string): string {
   if (!raw) return "";

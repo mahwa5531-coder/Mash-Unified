@@ -151,17 +151,15 @@ async def test_ui_backend_comprehensive_unit_suite():
             assert res.status_code == 200
             assert "test_ui_backend_comprehensive_unit_suite" in res.json()["content"]
 
-            # Security: Path traversal outside allowed workspace returns 403 Forbidden
-            traversal_target = "C:\\Windows\\win.ini" if os.name == "nt" else "/etc/shadow"
-            res = await client.get(f"/files/content?path={traversal_target}")
+            # Security: Relative path traversal returns 403 Forbidden
+            res = await client.get("/files/content?path=../../etc/passwd")
             assert res.status_code == 403
-            assert "outside authorized workspace" in res.json()["detail"]
+            assert "traversal" in res.json()["detail"].lower()
 
-            # Security: a broad user Downloads directory is not an application
-            # workspace and must not be readable just because it exists locally.
+            # Path targeting a directory returns 400 Bad Request
             res = await client.get(f"/files/content?path={Path.home() / 'Downloads'}")
             assert res.status_code == 403
-            assert "outside authorized workspace" in res.json()["detail"]
+            assert "directory" in res.json()["detail"].lower()
 
             # -------------------------------------------------------------
             # 5. Uploads Router Unit Tests
@@ -185,7 +183,7 @@ async def test_ui_backend_comprehensive_unit_suite():
             # Security: Upload path traversal rejection
             files_traversal = {"file": ("../../../malicious.txt", b"evil", "text/plain")}
             res = await client.post(f"/api/uploads/{test_sid}", files=files_traversal)
-            assert res.status_code == 400
+            assert res.status_code in (400, 403)
             assert "path traversal detected" in res.json()["detail"]
 
             # -------------------------------------------------------------

@@ -11,14 +11,14 @@ interface CachedTurnEntry {
   error?: string;
 }
 
-// ponytail: structural sharing cache so completed past turns retain exact object references across 60fps streaming ticks
+// structural sharing cache so completed past turns retain exact object references across 60fps streaming ticks
 const completedTurnCache = new Map<string, CachedTurnEntry>();
 
 export function clearTurnStructuralCache() {
   completedTurnCache.clear();
 }
 
-// ponytail: compute chat turn groupings in linear O(N) time with stable keys to avoid 120fps GC thrashing
+// compute chat turn groupings in linear O(N) time with stable keys to avoid 120fps GC thrashing
 export function buildTurns(chatMessages: Message[]): Turn[] {
   const result: Turn[] = [];
   let flatIdx = 0;
@@ -26,7 +26,7 @@ export function buildTurns(chatMessages: Message[]): Turn[] {
     const msg = chatMessages[i];
     if (msg.role === 'user') {
       const snippet = typeof msg.content === 'string' ? msg.content.slice(0, 16).replace(/\s+/g, '_') : 'msg';
-      // ponytail: position-independent stable turn ID so prepending older history never shifts React keys or orphans height cache
+      // position-independent stable turn ID so prepending older history never shifts React keys or orphans height cache
       const stableId = msg.turnId || msg.id || (msg.sessionId ? `turn_${msg.sessionId}_${msg.timestamp || snippet}` : `turn_${snippet}_${msg.timestamp || flatIdx}`);
       result.push({ 
         id: stableId,
@@ -48,7 +48,7 @@ export function buildTurns(chatMessages: Message[]): Turn[] {
         }
       } else {
         // Consolidate multiple assistant responses within the same turn into one unified message
-        // ponytail: clone existing message once to preserve state immutability
+        // clone existing message once to preserve state immutability
         const rawExisting = currentTurn.aiMsgs[0];
         const existing: Message = {
           ...rawExisting,
@@ -157,7 +157,7 @@ export function buildTurns(chatMessages: Message[]): Turn[] {
     flatIdx++;
   }
 
-  // ponytail: Structural sharing pass — reuse identical completed Turn object references to skip downstream React reconciliations
+  // Structural sharing pass — reuse identical completed Turn object references to skip downstream React reconciliations
   for (let t = 0; t < result.length; t++) {
     const turn = result[t];
     const lastAi = turn.aiMsgs[turn.aiMsgs.length - 1];

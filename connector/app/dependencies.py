@@ -20,7 +20,7 @@ def init_engine(db_url: str) -> LoopSafeDatabaseEngine:
     async_engine = create_async_engine(db_url, connect_args=connect_args)
 
     if "sqlite" in db_url:
-        # ponytail: configure SQLite WAL mode, fast commits, and concurrency pragmas
+        # configure SQLite WAL mode, fast commits, and concurrency pragmas
         @event.listens_for(async_engine.sync_engine, "connect")
         def set_sqlite_pragma(dbapi_connection, connection_record):
             cursor = dbapi_connection.cursor()

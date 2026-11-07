@@ -48,7 +48,7 @@ async def resolve_workspace_directory(engine: Any, project_id: str | None) -> Pa
 
     project = await engine.find_first(ProjectModel, filters=ComparisonFilter.eq("id", project_id))
     if project is None:
-        # ponytail: never crash the stream if a project was deleted. Fallback to default root.
+        # never crash the stream if a project was deleted. Fallback to default root.
         return APP_WORKSPACE_ROOT
 
     workspace = Path(project.local_folder_path).expanduser().resolve()

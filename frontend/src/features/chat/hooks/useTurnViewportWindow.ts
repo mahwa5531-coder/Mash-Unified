@@ -2,7 +2,7 @@
 
 /**
  * @deprecated
- * ponytail: DEPRECATED - This file is retained solely for legacy test suite compatibility.
+ * DEPRECATED - This file is retained solely for legacy test suite compatibility.
  * The production chat canvas is 100% virtualized via react-virtuoso in ChatCanvas.tsx.
  * Do NOT use this hook in production code.
  */
@@ -209,7 +209,7 @@ export function useTurnViewportWindow(
     container.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onResize, { passive: true });
 
-    // ponytail: observe desktop container width directly (detects panel splitter and workspace resizing)
+    // observe desktop container width directly (detects panel splitter and workspace resizing)
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined') {
       let lastWidth = container.clientWidth;
@@ -237,7 +237,7 @@ export function useTurnViewportWindow(
     };
   }, [containerRef, updateWindow]);
 
-  // ponytail: Only update visible range when turns array length changes (turn added or removed)
+  // Only update visible range when turns array length changes (turn added or removed)
   // or when streaming starts/stops. NEVER recalculate on every 16ms raw token delta!
   useEffect(() => {
     updateWindow(containerRef.current);

@@ -22,8 +22,11 @@ export function safeUrlTransform(url: string): string {
   }
 
   // Allow safe file URIs and Windows absolute paths (desktop environment)
-  if (/^(?:file:\/\/\/?|[a-zA-Z]:[\/\\])/i.test(trimmed)) {
+  if (/^file:\/\/\/?/i.test(trimmed)) {
     return trimmed;
+  }
+  if (/^[a-zA-Z]:[/\\]/.test(trimmed)) {
+    return `file:///${trimmed.replace(/\\/g, '/')}`;
   }
 
   // Allow relative links and bare filenames/paths without an explicit foreign scheme (F-1)

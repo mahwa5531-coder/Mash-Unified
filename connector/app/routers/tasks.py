@@ -114,7 +114,7 @@ async def kill_task(pid: int):
 
 
 def _normalize_task_id(raw_id: str) -> tuple[int | None, str]:
-    # ponytail: strictly reject path traversal, slashes, and null bytes
+    # strictly reject path traversal, slashes, and null bytes
     if not raw_id or any(c in raw_id for c in ("/", "\\", "\x00", "..")):
         raise ValueError(f"Invalid task_id: {raw_id!r}")
     clean = raw_id.strip()
@@ -182,7 +182,7 @@ async def get_task_log(task_id: str):
 @router.get("/tasks/{task_id:path}/stream")
 async def stream_task_log(task_id: str, request: Request):
     """Stream live task terminal logs as SSE (OpenHands pattern)."""
-    # ponytail: tail active sandbox stdout/stderr or task log file asynchronously with chunk deltas
+    # tail active sandbox stdout/stderr or task log file asynchronously with chunk deltas
     async def generate():
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
         from nexau.archs.tool.builtin._sandbox_utils import get_sandbox

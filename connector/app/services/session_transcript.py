@@ -26,7 +26,7 @@ def _get_engine(engine: Any = None) -> Any:
 
 
 def clean_user_steering_envelope(text: str) -> str:
-    """ponytail: Strip internal mid-flight steering protocol envelope from user prompt text."""
+    """Strip internal mid-flight steering protocol envelope from user prompt text."""
     if not text or not isinstance(text, str):
         return text or ""
     if "<USER_STEERING>" in text or "[USER MID-FLIGHT INSTRUCTION]:" in text or "</USER_STEERING>" in text:
@@ -44,7 +44,7 @@ def clean_user_steering_envelope(text: str) -> str:
 
 
 def clean_protocol_sentinels(text: str) -> str:
-    """ponytail: strip protocol sentinels, prompt tags, and section wrappers."""
+    """strip protocol sentinels, prompt tags, and section wrappers."""
     if not text or not isinstance(text, str):
         return text or ""
     tag_pat = (
@@ -62,7 +62,7 @@ def clean_protocol_sentinels(text: str) -> str:
 
 
 def generate_clean_session_title(raw_text: str, sid: str = "") -> str:
-    """ponytail: concise session title generator without tag or bracket leakage."""
+    """concise session title generator without tag or bracket leakage."""
     fallback = "New Conversation"
     if not raw_text or not isinstance(raw_text, str) or not raw_text.strip():
         return fallback
@@ -137,7 +137,10 @@ def messages_to_transcript_lines(
                         import json
                         content_str = json.dumps(raw, indent=2, ensure_ascii=False)
                 if shallow_tools and len(content_str) > 3000:
-                    content_str = content_str[:3000] + f"\n... [Truncated for rapid UI loading; {len(content_str)} total characters]"
+                    head = content_str[:1200]
+                    tail = content_str[-1500:]
+                    omitted = len(content_str) - (len(head) + len(tail))
+                    content_str = f"{head}\n\n... [{omitted:,} characters elided; Truncated for rapid UI loading] ...\n\n{tail}"
                 tool_results[str(b.tool_use_id)] = content_str
                 tool_errors[str(b.tool_use_id)] = bool(getattr(b, "is_error", False))
                 tool_compacted[str(b.tool_use_id)] = is_comp
@@ -292,7 +295,7 @@ async def load_session_transcript(
         key = AgentRunActionKey(user_id=user_id, session_id=session_id, agent_id="")
         messages = await agent_run_service.load_messages(key=key)
 
-        # ponytail: Hydrate nanosecond durations, run outcome status, and timestamps from native ledger
+        # Hydrate nanosecond durations, run outcome status, and timestamps from native ledger
         try:
             raw_actions = await eng.find_many(
                 AgentRunActionModel,

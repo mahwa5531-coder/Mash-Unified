@@ -6,7 +6,6 @@ import { fetchFileContent, getFileContentFromCache, isFileTruncatedFromCache, in
 import { deletedSessionIds } from '@/services/sessions';
 import { fetchTaskLog } from '@/services/tasks';
 import { normalizePath } from '@/utils/normalizePath';
-import { isDirectoryPath } from '@/features/chat/components/messages/proseHelpers';
 import { UNSUPPORTED_DOC_REGEX } from '../utils/artifactPresentation';
 
 export function isFileLoadError(content?: string): boolean {
@@ -87,7 +86,7 @@ export function computeCloseTab(
   return { nextTabs, nextActiveId };
 }
 
-// ponytail: sessionStorage fallback guarantees tabs survive browser F5 reload per session
+// sessionStorage fallback guarantees tabs survive browser F5 reload per session
 function getPersistedSidebarMemory(sessionId: string): SessionRightSidebarMemory | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -256,8 +255,8 @@ export function useViewerTabs(sessionId?: string) {
   // Atomic Tab Opening (Guarantees zero duplicate tabs and enforces MAX_VIEWER_TABS ceiling with true LRU eviction)
   const openFileTab = useCallback((name: string, fullPath: string, type: 'file' | 'image' = 'file') => {
     const normalizedPath = normalizePath(fullPath);
-    // ponytail: directories are strictly non-clickable and never open as viewer tabs
-    if (!normalizedPath || normalizedPath.endsWith('/') || normalizedPath.endsWith('\\') || isDirectoryPath(normalizedPath)) {
+    // trailing slashes designate directories; extension-less files proceed to backend stat check
+    if (!normalizedPath || normalizedPath.endsWith('/') || normalizedPath.endsWith('\\')) {
       return;
     }
 
@@ -311,7 +310,7 @@ export function useViewerTabs(sessionId?: string) {
         inFlightTabFetchesRef.current.add(tabId);
         setIsLoadingContent(true);
         fetchFileContent(normalizedPath, sessionId).then(content => {
-          // ponytail: discard stale fetch if tab was closed or session switched mid-flight
+          // discard stale fetch if tab was closed or session switched mid-flight
           if (sessionIdRef.current !== capturedSessionId) return;
           if (!openTabsRef.current.some(t => t.id === tabId)) return;
           setTabContent(c => ({ ...c, [tabId]: content }));

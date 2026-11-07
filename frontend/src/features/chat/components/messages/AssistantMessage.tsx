@@ -41,7 +41,7 @@ function formatTurnTimestamp(ts?: string): string {
   }
 }
 
-// ponytail: memoize AssistantMessage so past turns never re-render during 120fps streaming
+// memoize AssistantMessage so past turns never re-render during 120fps streaming
 const AssistantMessage = memo(function AssistantMessage({
   msg,
   artifacts: passedArtifacts,
@@ -67,7 +67,7 @@ const AssistantMessage = memo(function AssistantMessage({
   const editedFilesData = useMemo(() => isActivelyStreaming ? { files: [], totalAdded: 0, totalDeleted: 0 } : extractEditedFiles(msg), [msg.tools, isActivelyStreaming]);
 
   // Filter edited files to exclude files already displayed as prominent artifact/deliverable cards
-  // ponytail: Hardened path deduplication ensures Windows drive letters, file:/// URIs, and basenames match
+  // Hardened path deduplication ensures Windows drive letters, file:/// URIs, and basenames match
   const nonArtifactEditedFiles = useMemo(() => {
     const artifactSet = new Set(
       artifacts.flatMap(a => {

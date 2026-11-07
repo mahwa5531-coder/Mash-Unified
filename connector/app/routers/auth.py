@@ -151,7 +151,7 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
 async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | None:
     """Syncs authoritative user identity, plan, models, and rolling quotas from Cloud API /v1/me.
 
-    ponytail: Single entrypoint to sync cloud quota windows into local metadata.
+    Single entrypoint to sync cloud quota windows into local metadata.
     """
     if not token:
         token = await ensure_valid_token()
@@ -187,7 +187,7 @@ async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | 
             if isinstance(quota_data, dict) and "windows" in quota_data and isinstance(quota_data["windows"], list):
                 for win in quota_data["windows"]:
                     if isinstance(win, dict):
-                        # ponytail: normalize quota percent between cloud API (used_percent) and UI (percent)
+                        # normalize quota percent between cloud API (used_percent) and UI (percent)
                         if "percent" not in win and "used_percent" in win:
                             win["percent"] = win["used_percent"]
                         elif "used_percent" not in win and "percent" in win:

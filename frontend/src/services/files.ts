@@ -90,7 +90,7 @@ export async function fetchFileContent(filePath: string, sessionId?: string, byp
           return `File '${cleanKey}' not found on local disk.`;
         }
         if (res.status === 403) {
-          return "Access denied: file is outside authorized workspace directories.";
+          return "Access denied: permission denied by operating system.";
         }
         return "Failed to load file content.";
       }
@@ -100,7 +100,7 @@ export async function fetchFileContent(filePath: string, sessionId?: string, byp
         return csvContent;
       }
       const data = await res.json();
-      if (data.type === 'excel' || data.type === 'univer') {
+      if (data.type === 'excel') {
         const serialized = JSON.stringify(data);
         cacheFileContent(cacheKey, serialized);
         return serialized;

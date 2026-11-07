@@ -11,7 +11,7 @@ export function isToolRunning(tool?: ToolCallItem, isStreaming?: boolean): boole
     tool.status === 'denied'
   ) return false;
   if (tool.status === 'running') return true;
-  // ponytail: explicit status preferred; fallback only when streaming and output has not arrived
+  // explicit status preferred; fallback only when streaming and output has not arrived
   return !!(isStreaming && tool.output === undefined);
 }
 
@@ -38,7 +38,7 @@ export function formatDurationDisplay(secs: number): string {
   return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
 }
 
-// ponytail: Keyed Slot Registry for O(1) canonical tool category dispatch (replaces 160-line substring regex ladder)
+// Keyed Slot Registry for O(1) canonical tool category dispatch (replaces 160-line substring regex ladder)
 const EXACT_TOOL_CATEGORY_MAP: Record<string, TimelineEntry['type']> = {
   run_shell_command: 'command',
   run_command: 'command',

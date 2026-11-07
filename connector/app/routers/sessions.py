@@ -155,7 +155,7 @@ async def rename_session(session_id: str, payload: RenameSessionPayload, engine:
 
 @router.delete("/sessions/{session_id}/undo")
 @router.delete("/api/sessions/{session_id}/undo")
-# ponytail: default payload allows DELETE without request body
+# default payload allows DELETE without request body
 async def undo_session(session_id: str, engine: DatabaseEngineDep, payload: UndoPayload = UndoPayload()) -> dict[str, Any]:
     return await undo_session_turn(engine=engine, session_id=session_id, from_turn=payload.from_turn, turn_id=payload.turn_id, run_id=payload.run_id)
 
@@ -176,7 +176,7 @@ async def queue_session_steering(
     # 1. Maintain in-memory mailbox for middleware polling
     queue_steering_message(session_id, msg)
 
-    # 2. ponytail: DeepSeek Harness pattern - bridge directly to active running agent executor
+    # 2. DeepSeek Harness pattern - bridge directly to active running agent executor
     # so mid-flight steering interrupts or is queued natively without dropping on final turn.
     delivered_to_agent = False
     if request:

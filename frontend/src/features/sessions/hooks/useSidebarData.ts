@@ -100,7 +100,7 @@ export function useSidebarData({
   externalArchivedSessionIds,
   externalOnToggleArchive,
 }: UseSidebarDataProps) {
-  // ponytail: Synchronous lazy initializers eliminate cold boot empty-to-loaded layout jump
+  // Synchronous lazy initializers eliminate cold boot empty-to-loaded layout jump
   const [sessions, setSessions] = useState<SessionItem[]>(() => {
     return loadCache<SessionItem[]>('mash_cached_sessions', [], 'nexau_cached_sessions');
   });
@@ -204,7 +204,7 @@ export function useSidebarData({
 
   const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
 
-  // ponytail: Reconcile localStorage cached state with SQLite response without re-sorting jitter
+  // Reconcile localStorage cached state with SQLite response without re-sorting jitter
   const isRefreshingRef = useRef(false);
   const errorCountRef = useRef(0);
 

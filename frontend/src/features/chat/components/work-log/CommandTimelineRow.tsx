@@ -56,7 +56,7 @@ export function CommandTimelineRow({
       ? expandedCmds.has(toolId)
       : Boolean(expandedCmds?.[toolId]);
 
-  // ponytail: Defer JSON parsing of command output until user expands the terminal drawer
+  // Defer JSON parsing of command output until user expands the terminal drawer
   let displayOutput = outputText;
   if (isCmdExpanded && outputText.startsWith('{') && outputText.endsWith('}')) {
     try {

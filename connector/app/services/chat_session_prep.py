@@ -40,7 +40,7 @@ __all__ = [
 
 def normalize_project_id(raw_id: Any) -> str | None:
     """Normalize string representations of null ('null', 'undefined', 'none', '') to None."""
-    # ponytail: stdlib string check handles JS null/undefined strings at boundary
+    # stdlib string check handles JS null/undefined strings at boundary
     if raw_id is None:
         return None
     val = str(raw_id).strip()
@@ -83,7 +83,7 @@ async def ensure_project_and_context(
     if not eng:
         return
 
-    # ponytail: restore stored workspace binding if client passed degraded 'No Repo' / None (F-6, D5)
+    # restore stored workspace binding if client passed degraded 'No Repo' / None (F-6, D5)
     existing_session = None
     try:
         existing_session = await eng.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", sid))
@@ -142,7 +142,7 @@ async def ensure_project_and_context(
     except Exception as e:
         logger.warning("Project auto-create error: %s", e)
 
-    # ponytail: NexAU's _get_or_create_session creates a bare SessionModel with no context.
+    # NexAU's _get_or_create_session creates a bare SessionModel with no context.
     # The sidebar needs title, workspace_uri, section, last_user_view_time etc.
     # We pre-create/update the session with app-specific metadata so NexAU reuses it.
     try:
@@ -179,7 +179,7 @@ async def ensure_project_and_context(
                 resolved_context["section"] = "workspace" if workspace_target != "No Repo" else "conversation"
             resolved_context["last_user_view_time"] = now_iso
 
-            # ponytail: extract attached files from user prompt or resolved context
+            # extract attached files from user prompt or resolved context
             raw_msg = resolved_context.get("_raw_message") or ""
             parsed_attachments = list(resolved_context.get("attached_files") or [])
             for m in re.finditer(r'<file\s+[^>]*path=["\']([^"\']+)["\']', raw_msg, re.I):
@@ -234,7 +234,7 @@ async def ensure_project_and_context(
             title_val = ctx.get("custom_title") or ctx.get("title") or "New Conversation"
             resolved_context["title"] = resolved_context["custom_title"] = title_val
             ctx["permission_mode"] = resolved_context.get("permission_mode") or ctx.get("permission_mode") or "default"
-            # ponytail: preserve valid workspace bindings against degraded incoming payloads (F-6, D5)
+            # preserve valid workspace bindings against degraded incoming payloads (F-6, D5)
             if ctx.get("workspace_uri") and ctx.get("workspace_uri") != "No Repo":
                 if resolved_context.get("workspace_uri") in ("No Repo", None, ""):
                     resolved_context["workspace_uri"] = ctx["workspace_uri"]
@@ -260,7 +260,7 @@ def setup_sandbox_and_model(
     live_token: str | None = None,
 ) -> Any:
     """Resolve sandbox directories and dynamic LLM credentials into config."""
-    # ponytail: Bind deliverables and sandbox work_dir into context and agent config
+    # Bind deliverables and sandbox work_dir into context and agent config
     target_work_dir = resolve_sandbox_work_dir(
         resolved_context.get("working_directory"),
         resolved_context.get("scratch_directory"),

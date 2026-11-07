@@ -24,7 +24,7 @@ export interface ChatComposerProps {
   onPermissionModeChange?: (mode: PermissionMode) => void;
 }
 
-// ponytail: DeepSeek Harness relative path normalizer - posix slashes + workspace relativization
+// DeepSeek Harness relative path normalizer - posix slashes + workspace relativization
 export function relativizePath(fullPath: string, workspaceRoot?: string): string {
   const normPath = fullPath.replace(/\\/g, '/');
   if (!workspaceRoot || workspaceRoot === 'No Repo') return normPath;
@@ -101,7 +101,7 @@ export default function ChatComposer({
     const savedPrompt = localPrompt;
     const savedAttachments = [...attachedFiles];
 
-    // ponytail: Format attachments as clean structured XML blocks with normalized POSIX paths (DeepSeek Harness convention)
+    // Format attachments as clean structured XML blocks with normalized POSIX paths (DeepSeek Harness convention)
     if (attachedFiles.length > 0) {
       const fileRefs = attachedFiles
         .map((f) => {
@@ -121,7 +121,7 @@ export default function ChatComposer({
     try {
       await onSend(text, !sessionId ? stagedSessionId || undefined : undefined);
     } catch (_err) {
-      // ponytail: Acknowledgment-based restore on failure protects user drafts from disappearing
+      // Acknowledgment-based restore on failure protects user drafts from disappearing
       setLocalPrompt(savedPrompt);
       setInputPrompt?.(savedPrompt);
       setAttachedFiles(savedAttachments);
@@ -131,7 +131,7 @@ export default function ChatComposer({
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // ponytail: Protect IME composition (Japanese, Chinese, Korean Enter-to-convert must NOT submit)
+    // Protect IME composition (Japanese, Chinese, Korean Enter-to-convert must NOT submit)
     if (e.nativeEvent.isComposing || e.keyCode === 229) {
       return;
     }

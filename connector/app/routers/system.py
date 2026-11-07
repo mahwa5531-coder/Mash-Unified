@@ -305,7 +305,7 @@ async def open_system_file(request: OpenFileRequest):
     if not p.exists():
         return {"status": "error", "message": f"Path '{clean_path}' does not exist on local disk."}
 
-    # ponytail: allow valid user files on host disk
+    # allow valid user files on host disk
     is_allowed = is_path_in_base_roots(p)
     if not is_allowed:
         from app.dependencies import _engine as global_eng

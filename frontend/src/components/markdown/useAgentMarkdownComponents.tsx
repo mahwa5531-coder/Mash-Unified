@@ -23,6 +23,15 @@ import {
   processTextNodes,
 } from '@/features/chat/components/messages/proseHelpers';
 
+function slugifyHeading(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 /**
  * Unified component map for AgentMarkdown — used by BOTH chat mode and
  * artifact mode so file pills, audit badges, tables, and links behave
@@ -131,9 +140,10 @@ export function useAgentMarkdownComponents({
       );
     },
 
-    h1({ children, node: _node, ...props }: any) {
+    h1({ children, node: _node, id: propId, ...props }: any) {
+      const headingId = propId || slugifyHeading(extractChildText(children));
       return (
-        <h1 className={isChat
+        <h1 id={headingId || undefined} className={isChat
           ? "mt-7 mb-3 text-[22px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0 [&+h2]:mt-3 [&+h3]:mt-2"
           : "mt-8 mb-4 text-[24px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0 [&+h2]:mt-3"
         } {...props}>
@@ -142,9 +152,10 @@ export function useAgentMarkdownComponents({
       );
     },
 
-    h2({ children, node: _node, ...props }: any) {
+    h2({ children, node: _node, id: propId, ...props }: any) {
+      const headingId = propId || slugifyHeading(extractChildText(children));
       return (
-        <h2 className={isChat
+        <h2 id={headingId || undefined} className={isChat
           ? "mt-7 mb-3 text-[20px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0 [&+h3]:mt-2.5 [&+h4]:mt-2"
           : "mt-7 mb-3.5 text-[20px] font-bold text-zinc-950 dark:text-white tracking-tight first:mt-0 border-b border-zinc-200/60 dark:border-white/[0.08] pb-1.5 [&+h3]:mt-2.5"
         } {...props}>
@@ -153,33 +164,37 @@ export function useAgentMarkdownComponents({
       );
     },
 
-    h3({ children, node: _node, ...props }: any) {
+    h3({ children, node: _node, id: propId, ...props }: any) {
+      const headingId = propId || slugifyHeading(extractChildText(children));
       return (
-        <h3 className="mt-5 mb-2 text-[16.5px] font-semibold text-zinc-950 dark:text-zinc-100 tracking-tight first:mt-0 [&+h4]:mt-1.5" {...props}>
+        <h3 id={headingId || undefined} className="mt-5 mb-2 text-[16.5px] font-semibold text-zinc-950 dark:text-zinc-100 tracking-tight first:mt-0 [&+h4]:mt-1.5" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h3>
       );
     },
 
-    h4({ children, node: _node, ...props }: any) {
+    h4({ children, node: _node, id: propId, ...props }: any) {
+      const headingId = propId || slugifyHeading(extractChildText(children));
       return (
-        <h4 className="mt-4 mb-1.5 text-[14.5px] font-semibold text-zinc-900 dark:text-zinc-200 tracking-tight first:mt-0 [&+h5]:mt-1" {...props}>
+        <h4 id={headingId || undefined} className="mt-4 mb-1.5 text-[14.5px] font-semibold text-zinc-900 dark:text-zinc-200 tracking-tight first:mt-0 [&+h5]:mt-1" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h4>
       );
     },
 
-    h5({ children, node: _node, ...props }: any) {
+    h5({ children, node: _node, id: propId, ...props }: any) {
+      const headingId = propId || slugifyHeading(extractChildText(children));
       return (
-        <h5 className="mt-2 mb-0.5 text-[13px] font-medium text-zinc-800 dark:text-zinc-200 tracking-tight first:mt-0" {...props}>
+        <h5 id={headingId || undefined} className="mt-2 mb-0.5 text-[13px] font-medium text-zinc-800 dark:text-zinc-200 tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h5>
       );
     },
 
-    h6({ children, node: _node, ...props }: any) {
+    h6({ children, node: _node, id: propId, ...props }: any) {
+      const headingId = propId || slugifyHeading(extractChildText(children));
       return (
-        <h6 className="mt-1.5 mb-0.5 text-[12.5px] font-medium text-zinc-600 dark:text-zinc-400 tracking-tight first:mt-0" {...props}>
+        <h6 id={headingId || undefined} className="mt-1.5 mb-0.5 text-[12.5px] font-medium text-zinc-600 dark:text-zinc-400 tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h6>
       );
@@ -224,6 +239,27 @@ export function useAgentMarkdownComponents({
     /** Links: file paths become FilePills, external links use WebLink (feature #1). */
     a({ href, children, node: _node, ...props }: any) {
       if (!href) return <span {...props}>{children}</span>;
+
+      // In-document anchor links: smoothly scroll target heading into view
+      if (href.startsWith('#')) {
+        const targetId = href.slice(1);
+        return (
+          <a
+            href={href}
+            onClick={(e) => {
+              e.preventDefault();
+              const el = document.getElementById(targetId) || document.getElementById(decodeURIComponent(targetId));
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }}
+            className="text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 underline underline-offset-2 cursor-pointer font-medium"
+            {...props}
+          >
+            {children}
+          </a>
+        );
+      }
 
       const isFileUri = href.startsWith('file:///') || href.startsWith('file://');
       const isWinPath = /^[a-zA-Z]:[/\\]/.test(href);

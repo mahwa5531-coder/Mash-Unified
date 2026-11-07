@@ -349,7 +349,7 @@ async def test_l5_heartbeat_idle_watchdog():
 @pytest.mark.anyio
 def test_m1_strict_1gb_ram_guardrail_verification():
     """M-1 to M-5: Continuous verification that memory growth during operations is bounded.
-    ponytail: pytest process RSS includes cumulative import weight of third-party native libraries
+    pytest process RSS includes cumulative import weight of third-party native libraries
     (duckdb, polars, PyMuPDF). Guard against runtime memory leaks during operation rather than baseline import size.
     """
     import gc

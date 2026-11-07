@@ -1,6 +1,6 @@
 from pathlib import Path
 
-# ponytail: Dynamically resolve repository root so tests pass on any machine or CI
+# Dynamically resolve repository root so tests pass on any machine or CI
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 

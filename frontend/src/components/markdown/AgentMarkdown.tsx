@@ -2,7 +2,7 @@
 
 import React, { memo } from 'react';
 import katex from 'katex';
-import { Streamdown } from 'streamdown';
+import { Streamdown, defaultRehypePlugins } from 'streamdown';
 import { createMathPlugin } from '@streamdown/math';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
@@ -124,6 +124,27 @@ const STREAMDOWN_PLUGINS = {
 const STREAMDOWN_REMARK_PLUGINS = [remarkGfm, ensureCodeLanguagePlugin];
 const STREAMDOWN_CONTROLS = { code: { copy: true } };
 
+const [sanitizeFn, defaultSanitizeSchema] = (Array.isArray(defaultRehypePlugins.sanitize)
+  ? defaultRehypePlugins.sanitize
+  : [defaultRehypePlugins.sanitize, {}]) as [any, any];
+
+const DESKTOP_REHYPE_PLUGINS = [
+  defaultRehypePlugins.raw,
+  [
+    sanitizeFn,
+    {
+      ...defaultSanitizeSchema,
+      protocols: {
+        ...(defaultSanitizeSchema?.protocols || {}),
+        href: [
+          ...((defaultSanitizeSchema?.protocols && defaultSanitizeSchema.protocols.href) || []),
+          'file', 'c', 'C', 'd', 'D', 'e', 'E', 'f', 'F', 'z', 'Z'
+        ]
+      }
+    }
+  ]
+];
+
 export const AgentMarkdown = memo(function AgentMarkdown({
   content,
   mode,
@@ -155,6 +176,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
         mode="streaming"
         plugins={STREAMDOWN_PLUGINS}
         remarkPlugins={STREAMDOWN_REMARK_PLUGINS}
+        rehypePlugins={DESKTOP_REHYPE_PLUGINS as any}
         controls={STREAMDOWN_CONTROLS}
         components={components}
         urlTransform={safeUrlTransform}

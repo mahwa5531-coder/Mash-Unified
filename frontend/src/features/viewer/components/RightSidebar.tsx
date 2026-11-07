@@ -269,7 +269,8 @@ export default function RightSidebar({
                     hideToolbar={true}
                     onRetry={() => retryTabContent(activeTab?.id)}
                     onOpenFile={(p) => {
-                      const norm = normalizePath(p);
+                      const [pathWithoutAnchor] = p.split('#');
+                      const norm = normalizePath(pathWithoutAnchor);
                       const base = norm.split(/[/\\]/).pop() || norm;
                       openFileTab(base, norm);
                     }}

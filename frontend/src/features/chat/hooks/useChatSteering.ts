@@ -40,7 +40,7 @@ export function useChatSteering({
     notifyStoreListeners();
 
     if (s.isStreaming) {
-      // ponytail: Send mid-flight steering message directly to the running agent (DeepSeek Harness pattern)
+      // Send mid-flight steering message directly to the running agent (DeepSeek Harness pattern)
       try {
         const ok = await queueSteeringMessage(activeSid, msgToInject);
         if (!ok) {

@@ -122,11 +122,8 @@ async def test_scenario_matrix():
             assert stop2_status == 200
             print("  -> Verified immediate re-entry (zero deadlock on force-release)")
 
-            # 5. Chat: Workspace Tree & Cross-Project Sandboxing
+            # 5. Chat: Cross-Project Sandboxing & Path Traversal Guard
             print("\n[Test 5] Cross-Project Sandboxing & Path Traversal Guard")
-            tree_status, tree_data = await request(client, "/api/workspace/tree")
-            print(f"  -> Workspace tree query: status={tree_status}, root_items={len(tree_data.get('workspace', []))}")
-            assert tree_status == 200
 
             # Legitimate file inside allowed workspace
             good_file = str((Path(__file__).resolve().parent.parent.parent / "RUN_GUIDE.md").resolve()).replace("\\", "/")
@@ -134,7 +131,7 @@ async def test_scenario_matrix():
             print(f"  -> Legitimate workspace file read: status={good_status}")
             assert good_status == 200
 
-            bad_path = "C:/Windows/System32/cmd.exe" if os.name == "nt" else "/etc/shadow"
+            bad_path = "../../etc/passwd"
             bad_status, bad_data = await request(client, f"/api/files/content?path={urllib.parse.quote(bad_path)}")
             print(f"  -> Path traversal attempt ({bad_path}): status={bad_status}")
             assert bad_status == 403, f"Expected 403 Forbidden, got {bad_status}"

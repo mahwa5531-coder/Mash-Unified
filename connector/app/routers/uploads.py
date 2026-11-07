@@ -44,7 +44,7 @@ async def upload_file(session_id: str, file: UploadFile, engine: DatabaseEngineD
     if not safe_filename or safe_filename in (".", ".."):
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    # ponytail: Collision-safe filename resolution to prevent silent overwrite of same-name files
+    # Collision-safe filename resolution to prevent silent overwrite of same-name files
     dest_path = (Path(save_dir) / safe_filename).resolve()
     if dest_path.exists():
         stem = Path(safe_filename).stem
@@ -81,7 +81,7 @@ async def upload_file(session_id: str, file: UploadFile, engine: DatabaseEngineD
                 pass
         raise HTTPException(status_code=500, detail=f"Could not save file: {e}")
 
-    # ponytail: Normalize returned file path to forward slashes (DeepSeek / POSIX convention)
+    # Normalize returned file path to forward slashes (DeepSeek / POSIX convention)
     return {"status": "success", "path": dest.replace("\\", "/"), "size": total_bytes, "filename": safe_filename}
 
 

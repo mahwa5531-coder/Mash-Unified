@@ -57,9 +57,9 @@ export function useSessionHistory({
     setIsLoadingEarlier(true);
     setEarlierLoadError(false);
     try {
-      // ponytail: Paginate in smoother 40-item chunks rather than massive 100-line blocks
+      // Paginate in smoother 40-item chunks rather than massive 100-line blocks
       const PAGE_SIZE = 40;
-      const resp = await fetchTranscript(curSid, PAGE_SIZE, true, s.loadedRawCount);
+      const resp = await fetchTranscript(curSid, PAGE_SIZE, false, s.loadedRawCount);
       const olderLines = resp.lines || [];
 
       if (olderLines.length > 0) {
@@ -72,7 +72,7 @@ export function useSessionHistory({
         s.chatMessages = [...olderMsgs, ...s.chatMessages];
 
         if (activeSessionIdRef.current === curSid) {
-          // ponytail: pass the exact count of prepended turns so Virtuoso's firstItemIndex decrements atomically
+          // pass the exact count of prepended turns so Virtuoso's firstItemIndex decrements atomically
           onPrepend(s.chatMessages, olderTurns.length);
           updatePaginationState(s);
         }

@@ -15,7 +15,7 @@ interface State {
   error: Error | null;
 }
 
-// ponytail: Resilient React error boundary preventing single-turn/markdown errors from crashing the entire app
+// Resilient React error boundary preventing single-turn/markdown errors from crashing the entire app
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,

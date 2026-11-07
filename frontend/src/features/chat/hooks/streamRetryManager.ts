@@ -268,7 +268,7 @@ export async function runChatStream(
     const s = sessionStore.get(activeSid);
     if (s?.queuedMessages && options.onSyncSteeringQueue) options.onSyncSteeringQueue([...s.queuedMessages]);
     if (nextQueuedMsg) {
-      // ponytail: shifting next-turn queue must NOT delete from backend steering mailbox
+      // shifting next-turn queue must NOT delete from backend steering mailbox
       setTimeout(() => options.onAutoDispatchQueue(nextQueuedMsg), 80);
     }
   }

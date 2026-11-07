@@ -27,7 +27,7 @@ interface TaskWorkLogAccordionProps {
   turnStartTime?: number;
 }
 
-// ponytail: Bounded LRU-100 accordion expansion cache avoids unbounded memory retention across long sessions
+// Bounded LRU-100 accordion expansion cache avoids unbounded memory retention across long sessions
 const MAX_ACCORDION_MEMORY = 100;
 const userExpandedAccordions = new Map<string, boolean>();
 
