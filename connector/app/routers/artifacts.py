@@ -48,27 +48,6 @@ def _recover_from_sqlite_direct(session_id: str, p: Path, clean_path: str) -> st
                                 if inp.get("content") and isinstance(inp.get("content"), str):
                                     conn.close()
                                     return inp["content"]
-
-        # cross-session SQLite recovery fallback if not found in current session
-        fallback_rows = cur.execute(
-            "SELECT append_messages, replace_messages FROM agent_run_actions WHERE session_id != ? ORDER BY created_at_ns DESC LIMIT 50",
-            (session_id,)
-        ).fetchall()
-        for r in fallback_rows:
-            raw = r[0] or r[1]
-            if not raw:
-                continue
-            msgs = json.loads(raw)
-            for m in msgs:
-                for b in m.get("content", []):
-                    if b.get("type") in ("tool_use", "tool_call"):
-                        inp = b.get("input", {}) or {}
-                        if isinstance(inp, dict):
-                            t_path = str(inp.get("TargetFile") or inp.get("AbsolutePath") or inp.get("path") or inp.get("file_path") or "").replace('\\', "/").lower()
-                            if t_path and (norm_name in t_path or norm_clean in t_path):
-                                if inp.get("content") and isinstance(inp.get("content"), str):
-                                    conn.close()
-                                    return inp["content"]
         conn.close()
     except Exception as e:
         logger.debug(f"Virtual file recovery failed: {e}")
@@ -235,22 +214,7 @@ async def get_file_content(
                 p = cand.resolve()
                 break
         else:
-            # cross-session relative fallback — search sibling session brains before 404
-            brain_root = (get_mash_home() / "brain").resolve()
-            if brain_root.is_dir():
-                rel_clean = rel_path.replace('\\', "/").lstrip("/")
-                found = next(brain_root.glob(f"*/{rel_clean}"), None)
-                if not found and "/" not in rel_clean:
-                    found = (
-                        next(brain_root.glob(f"*/working_papers/{rel_clean}"), None)
-                        or next(brain_root.glob(f"*/scratch/{rel_clean}"), None)
-                    )
-                if found and found.is_file():
-                    p = found.resolve()
-                else:
-                    p = p.resolve()
-            else:
-                p = p.resolve()
+            p = p.resolve()
     else:
         p = p.resolve()
 

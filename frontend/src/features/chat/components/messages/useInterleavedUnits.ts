@@ -96,9 +96,14 @@ export function computeInterleavedUnits(msg: Message, isActivelyStreaming: boole
         .join('\n\n');
 
       if (!finalProse && postWorkSteps.length === 0 && msg.content) {
-        const hasToolsInWork = workSteps.some((s) => s.type === 'tool' || Boolean(s.name) || Boolean(s.tool_call_id));
-        if (!hasToolsInWork) {
-          finalProse = cleanProseContent(msg.content);
+        let remaining = cleanProseContent(msg.content);
+        for (const ws of workSteps) {
+          if (ws.type === 'text' && ws.content) {
+            remaining = remaining.replace(cleanProseContent(ws.content), '').trim();
+          }
+        }
+        if (remaining) {
+          finalProse = remaining;
         }
       }
 

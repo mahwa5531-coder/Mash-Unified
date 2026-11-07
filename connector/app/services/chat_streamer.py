@@ -166,6 +166,15 @@ async def generate_chat_sse_stream(
 
                 # Handle empty / whitespace-only model completion error cleanly
                 if event_type == "RUN_ERROR":
+                    has_pending = False
+                    if sm and session_id:
+                        with contextlib.suppress(Exception):
+                            pending = await sm.get_pending_tool_calls(user_id=user_id, session_id=session_id)
+                            has_pending = any(not ptc.get("decision") for ptc in (pending or {}).values())
+                    if has_pending:
+                        anext_task = asyncio.ensure_future(event_iter.__anext__())
+                        continue
+
                     err_msg = getattr(event, "message", None) or ""
                     if not err_msg and isinstance(data_str, str) and ("No response content or tool calls" in data_str or "never aggregated with any content" in data_str):
                         err_msg = "No response content or tool calls"

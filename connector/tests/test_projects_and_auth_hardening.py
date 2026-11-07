@@ -62,16 +62,22 @@ def test_delete_project_is_idempotent(client):
     # 1. Create a quick project
     res = client.post("/api/projects/quick", json={"name": f"TempToDelete_{uuid.uuid4().hex[:6]}", "user_id": "test_user"})
     assert res.status_code == 200
-    proj_id = res.json()["id"]
+    proj_data = res.json()
+    proj_id = proj_data["id"]
 
-    # 2. First delete call -> succeeds
-    del1 = client.delete(f"/api/projects/{proj_id}")
-    assert del1.status_code == 200
-    assert del1.json()["status"] == "success"
+    try:
+        # 2. First delete call -> succeeds
+        del1 = client.delete(f"/api/projects/{proj_id}")
+        assert del1.status_code == 200
+        assert del1.json()["status"] == "success"
 
-    # 3. Second delete call -> returns 404 (standardized contract per B-13)
-    del2 = client.delete(f"/api/projects/{proj_id}")
-    assert del2.status_code == 404
+        # 3. Second delete call -> returns 404 (standardized contract per B-13)
+        del2 = client.delete(f"/api/projects/{proj_id}")
+        assert del2.status_code == 404
+    finally:
+        folder = proj_data.get("local_folder_path")
+        if folder and os.path.exists(folder):
+            shutil.rmtree(folder, ignore_errors=True)
 
 
 @pytest.mark.anyio

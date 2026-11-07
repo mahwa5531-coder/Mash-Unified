@@ -289,29 +289,34 @@ class TransportBase[TTransportConfig](ABC):
         async with self._running_agents_lock:
             self._running_agents[agent_key] = agent
 
+        async def has_pending_approval() -> bool:
+            if not self._session_manager:
+                return False
+            try:
+                pending = await self._session_manager.get_pending_tool_calls(user_id=user_id, session_id=session_id)
+                return any(not ptc.get("decision") for ptc in (pending or {}).values())
+            except Exception:
+                return False
+
+        def emit_empty_notice() -> str:
+            notice = "The model returned an empty response. Please rephrase your query or provide more context."
+            from nexau.archs.llm.llm_aggregators.events import RunFinishedEvent, TextMessageContentEvent
+            run_id = getattr(agent, "run_id", None) or f"run_{session_id[:8]}"
+            event_queue.put_nowait(TextMessageContentEvent(delta=notice, run_id=run_id, message_id=f"msg_{session_id[:8]}"))
+            event_queue.put_nowait(RunFinishedEvent(run_id=run_id, thread_id=session_id, result=notice))
+            return notice
+
         async def run_agent() -> str:
             try:
                 res = cast(str, await agent.run_async(message=message, context=context, variables=variables))
-                if isinstance(res, str) and not res.strip():
-                    notice = "The model returned an empty response. Please rephrase your query or provide more context."
-                    from nexau.archs.llm.llm_aggregators.events import RunFinishedEvent, TextMessageContentEvent
-
-                    run_id = getattr(agent, "run_id", None) or f"run_{session_id[:8]}"
-                    event_queue.put_nowait(TextMessageContentEvent(delta=notice, run_id=run_id, message_id=f"msg_{session_id[:8]}"))
-                    event_queue.put_nowait(RunFinishedEvent(run_id=run_id, thread_id=session_id, result=notice))
-                    return notice
+                if isinstance(res, str) and not res.strip() and not await has_pending_approval():
+                    return emit_empty_notice()
                 return res
             except Exception as exc:
                 err_s = str(exc)
-                if "No response content or tool calls" in err_s or "never aggregated with any content" in err_s:
+                if ("No response content or tool calls" in err_s or "never aggregated with any content" in err_s) and not await has_pending_approval():
                     logger.info("Empty completion for session %s; yielding clean terminal notification.", session_id)
-                    from nexau.archs.llm.llm_aggregators.events import RunFinishedEvent, TextMessageContentEvent
-
-                    run_id = getattr(agent, "run_id", None) or f"run_{session_id[:8]}"
-                    notice = "The model returned an empty response. Please rephrase your query or provide more context."
-                    event_queue.put_nowait(TextMessageContentEvent(delta=notice, run_id=run_id, message_id=f"msg_{session_id[:8]}"))
-                    event_queue.put_nowait(RunFinishedEvent(run_id=run_id, thread_id=session_id, result=notice))
-                    return notice
+                    return emit_empty_notice()
                 # ponytail: Defect 2 - emit RunErrorEvent to event_queue so SSE delivers it to client instead of hanging
                 logger.error("Unhandled exception in agent run (session_id: %s): %s", session_id, exc, exc_info=True)
                 from nexau.archs.llm.llm_aggregators.events import RunErrorEvent

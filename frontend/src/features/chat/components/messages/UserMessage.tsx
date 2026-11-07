@@ -69,6 +69,7 @@ const UserMessage = memo(function UserMessage({
     }
   }
   rawText = rawText.replace(/<attachments>[\s\S]*?<\/attachments>/gi, '').trim();
+  rawText = rawText.replace(/<file\s+[^>]*\/?>/gi, '').trim();
   rawText = rawText.replace(/^Please inspect and analyze the attached (?:audit )?documents?:?\s*/i, '').trim();
 
   const cleanText = cleanUserSteeringEnvelope(rawText);

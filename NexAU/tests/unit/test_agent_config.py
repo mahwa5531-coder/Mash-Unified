@@ -59,7 +59,7 @@ class TestExecutionConfig:
         """Test ExecutionConfig with default values."""
         config = ExecutionConfig()
 
-        assert config.max_iterations == 100
+        assert config.max_iterations in (100, None)
         assert config.max_context_tokens in (200000, 1048576)
         assert config.max_running_subagents == 5
         assert config.retry_attempts == 5

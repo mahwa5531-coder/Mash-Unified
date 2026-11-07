@@ -47,7 +47,11 @@ export function cleanUserSteeringEnvelope(text?: string): string {
 // strip internal protocol envelopes and attachments for composer textarea
 export function cleanUserPromptForComposer(text?: string): string {
   if (!text || typeof text !== 'string') return '';
-  let cleaned = text.replace(/\[Attached (?:file|files)[^\]]*\]/gi, '').replace(/<attachments>[\s\S]*?<\/attachments>/gi, '').trim();
+  let cleaned = text
+    .replace(/\[Attached (?:file|files)[^\]]*\]/gi, '')
+    .replace(/<attachments>[\s\S]*?<\/attachments>/gi, '')
+    .replace(/<file\s+[^>]*\/?>/gi, '')
+    .trim();
   cleaned = cleaned.replace(/^Please inspect and analyze the attached (?:audit )?documents?:?\s*/i, '').trim();
   return cleanUserSteeringEnvelope(cleaned);
 }

@@ -1,6 +1,14 @@
 import os
 import sys
+import tempfile
 from pathlib import Path
+
+# Hermetic Test Isolation: Ensure test runs never touch live ~/.mash database or ~/Documents
+if "MASH_HOME" not in os.environ:
+    _TEST_HOME = Path(tempfile.gettempdir()) / "mash_test_env"
+    _TEST_HOME.mkdir(parents=True, exist_ok=True)
+    os.environ["MASH_HOME"] = str(_TEST_HOME)
+    os.environ["NEXAU_HOME"] = str(_TEST_HOME)
 
 import pytest
 

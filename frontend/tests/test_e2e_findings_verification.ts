@@ -18,7 +18,7 @@ assert.strictEqual(safeUrlTransform("#section-2"), "#section-2", "Anchor links m
 assert.strictEqual(safeUrlTransform("https://example.com/test"), "https://example.com/test", "HTTPS must be permitted");
 assert.strictEqual(safeUrlTransform("mailto:test@example.com"), "mailto:test@example.com", "Mailto must be permitted");
 assert.strictEqual(safeUrlTransform("data:image/png;base64,iVBORw0KGgo="), "data:image/png;base64,iVBORw0KGgo=", "Base64 image must be permitted");
-assert.strictEqual(safeUrlTransform("C:\\audit\\report.xlsx"), "C:\\audit\\report.xlsx", "Windows absolute path must be permitted");
+assert.strictEqual(safeUrlTransform("C:\\audit\\report.xlsx"), "file:///C:/audit/report.xlsx", "Windows absolute path must be permitted and normalized to file URI");
 assert.strictEqual(safeUrlTransform("file:///C:/audit/report.xlsx"), "file:///C:/audit/report.xlsx", "File URI must be permitted");
 
 // Security checks: dangerous schemes must be stripped

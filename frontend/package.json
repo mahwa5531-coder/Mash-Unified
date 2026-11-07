@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "npm run copy:monaco && next dev",
     "build": "npm run copy:monaco && tsc --noEmit && next build",
     "start": "next start",
     "lint": "eslint src",
