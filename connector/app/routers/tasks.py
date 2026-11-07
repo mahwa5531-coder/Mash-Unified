@@ -127,6 +127,23 @@ def _normalize_task_id(raw_id: str) -> tuple[int | None, str]:
     return pid, clean
 
 
+def _find_task_log_candidates(clean_id: str) -> list[Path]:
+    task_root = (Path.cwd() / ".system_generated" / "tasks").resolve()
+    candidate_paths = [
+        task_root / f"task-{clean_id}.log",
+        task_root / f"{clean_id}.log",
+    ]
+    import glob
+    for brain_base in [Path.home() / ".mash" / "brain", Path.home() / ".nexau" / "brain"]:
+        b_resolved = brain_base.resolve()
+        if b_resolved.is_dir():
+            for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"task-{clean_id}.log")):
+                candidate_paths.append(Path(p_str))
+            for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"{clean_id}.log")):
+                candidate_paths.append(Path(p_str))
+    return candidate_paths
+
+
 @router.get("/tasks/{task_id:path}/log")
 async def get_task_log(task_id: str):
     """Return task execution log content for the UI viewer as JSON."""
@@ -156,19 +173,7 @@ async def get_task_log(task_id: str):
     except Exception:
         pass
 
-    task_root = (Path.cwd() / ".system_generated" / "tasks").resolve()
-    candidate_paths = [
-        task_root / f"task-{clean}.log",
-        task_root / f"{clean}.log",
-    ]
-    import glob
-    for brain_base in [Path.home() / ".mash" / "brain", Path.home() / ".nexau" / "brain"]:
-        b_resolved = brain_base.resolve()
-        if b_resolved.is_dir():
-            for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"task-{clean}.log")):
-                candidate_paths.append(Path(p_str))
-            for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"{clean}.log")):
-                candidate_paths.append(Path(p_str))
+    candidate_paths = _find_task_log_candidates(clean)
 
     for p in candidate_paths:
         if p.exists() and p.is_file():
@@ -283,19 +288,7 @@ async def stream_task_log(task_id: str, request: Request):
             return
 
         # 2. Not active or already completed: check disk logs
-        task_root = (Path.cwd() / ".system_generated" / "tasks").resolve()
-        candidate_paths = [
-            task_root / f"task-{clean}.log",
-            task_root / f"{clean}.log",
-        ]
-        import glob
-        for brain_base in [Path.home() / ".mash" / "brain", Path.home() / ".nexau" / "brain"]:
-            b_resolved = brain_base.resolve()
-            if b_resolved.is_dir():
-                for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"task-{clean}.log")):
-                    candidate_paths.append(Path(p_str))
-                for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"{clean}.log")):
-                    candidate_paths.append(Path(p_str))
+        candidate_paths = _find_task_log_candidates(clean)
 
         target_file = next((p for p in candidate_paths if p.exists()), None)
         if target_file:

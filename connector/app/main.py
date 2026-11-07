@@ -249,8 +249,6 @@ async def root_health():
     """Root health probe delegating directly to get_system_health."""
     return await system.get_system_health()
 
-# Backwards compatibility re-exports
-from app.routers.sessions import get_transcript as get_session_transcript_bridge  # noqa: F401
 
 if __name__ == "__main__":
     import uvicorn

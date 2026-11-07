@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 
-from app.dependencies import DatabaseEngineDep
+from app.dependencies import DatabaseEngineDep, resolve_engine as _get_engine
 from app.paths import get_mash_home, get_session_brain_dir, validate_safe_id
 from app.workspace import APP_WORKSPACE_ROOT, resolve_session_workspace
 
@@ -52,13 +52,6 @@ def _recover_from_sqlite_direct(session_id: str, p: Path, clean_path: str) -> st
     except Exception as e:
         logger.debug(f"Virtual file recovery failed: {e}")
     return None
-
-
-def _get_engine(engine: Any = None):
-    if engine is not None:
-        return engine
-    from app.dependencies import _engine as global_eng
-    return global_eng
 
 
 def _scan_directory_fast(

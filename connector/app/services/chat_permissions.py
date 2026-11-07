@@ -97,20 +97,6 @@ async def handle_preemptive_steer(
                 session_id=session_id,
                 steer_prompt=user_prompt,
             )
-        pending = await sm.get_pending_tool_calls(user_id=user_id, session_id=session_id)
-        if pending and any(v.get("decision") is None for v in pending.values()):
-            prompt_text = user_prompt.strip()
-            for ptc in pending.values():
-                if ptc.get("decision") is None:
-                    ptc["decision"] = "deny"
-                    ptc["feedback"] = f"Superseded by user message: {prompt_text}"
-            await sm.update_pending_tool_calls(
-                user_id=user_id,
-                session_id=session_id,
-                pending_tool_calls=pending,
-            )
-            logger.info("Auto-denied pending tool calls in session %s due to user steer prompt.", session_id)
-            return True
     except Exception as steer_err:
         logger.warning("Error resolving preemptive steer for session %s: %s", session_id, steer_err)
 

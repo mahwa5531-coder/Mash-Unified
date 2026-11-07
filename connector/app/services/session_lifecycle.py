@@ -206,36 +206,8 @@ async def delete_existing_session(engine: Any, session_id: str) -> dict[str, str
         except Exception:
             sm = None
 
-    if sm and hasattr(sm, "delete_session"):
-        await sm.delete_session(user_id=user_id, session_id=session_id)
-    else:
-        from nexau.archs.session.models import (
-            AgentLockModel,
-            AgentModel,
-            AgentRunActionModel,
-            PermissionRuleModel,
-            TeamMemberModel,
-            TeamMessageModel,
-            TeamModel,
-            TeamTaskLockModel,
-            TeamTaskModel,
-        )
-
-        models_to_delete = [
-            AgentRunActionModel,
-            PermissionRuleModel,
-            AgentLockModel,
-            AgentModel,
-            TeamModel,
-            TeamMemberModel,
-            TeamMessageModel,
-            TeamTaskModel,
-            TeamTaskLockModel,
-            SessionModel,
-        ]
-        for m in models_to_delete:
-            with contextlib.suppress(Exception):
-                await eng.delete(m, filters=ComparisonFilter.eq("session_id", session_id))
+    session_mgr = sm if (sm and hasattr(sm, "delete_session")) else SessionManager(engine=eng)
+    await session_mgr.delete_session(user_id=user_id, session_id=session_id)
 
     # 4. Safely unlink brain directories
     try:

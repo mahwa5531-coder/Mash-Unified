@@ -39,7 +39,7 @@ from app.services.chat_session_prep import setup_sandbox_and_model
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "build_shielded_chat_stream", "generate_chat_sse_stream", "create_chat_event_stream",
+    "build_shielded_chat_stream", "generate_chat_sse_stream",
     "stream_chat_query", "check_session_id", "StreamQueryPayload", "StopPayload",
     "PlanApprovalPayload", "PermissionModePayload",
 ]
@@ -284,9 +284,6 @@ def build_shielded_chat_stream(
         session_id=session_id, sm=sm, eng=eng, client_request_id=client_request_id,
     )
     return gen if as_generator else StreamingResponse(gen, media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
-
-
-create_chat_event_stream = generate_chat_sse_stream
 
 
 async def stream_chat_query(

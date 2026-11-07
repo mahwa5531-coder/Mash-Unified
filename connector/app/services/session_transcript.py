@@ -13,16 +13,10 @@ from nexau.archs.session.models import AgentRunActionModel, SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 from nexau.core.messages import Message, Role, TextBlock, ToolResultBlock, ToolUseBlock
 
+from app.dependencies import resolve_engine as _get_engine
 from app.paths import validate_safe_id
 
 logger = logging.getLogger(__name__)
-
-
-def _get_engine(engine: Any = None) -> Any:
-    if engine is not None:
-        return engine
-    from app.dependencies import _engine as global_eng
-    return global_eng
 
 
 def clean_user_steering_envelope(text: str) -> str:

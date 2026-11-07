@@ -118,9 +118,6 @@ async def get_transcript(
     return await load_session_transcript(engine=engine, session_id=session_id, limit=limit, offset=offset, shallow_tools=shallow_tools)
 
 
-get_session_transcript_bridge = get_transcript
-
-
 @router.get("/api/sessions/{user_id}/{session_id}/history")
 @router.get("/sessions/{user_id}/{session_id}/history")
 async def get_history(user_id: str, session_id: str, engine: DatabaseEngineDep) -> dict[str, Any]:
@@ -271,7 +268,6 @@ __all__ = [
     "generate_clean_session_title",
     "get_history",
     "get_session_queue",
-    "get_session_transcript_bridge",
     "get_subagent_transcript",
     "get_transcript",
     "list_sessions",

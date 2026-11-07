@@ -7,16 +7,10 @@ from fastapi import HTTPException
 from nexau.archs.session.models import AgentRunActionModel
 from nexau.archs.session.orm import ComparisonFilter
 
+from app.dependencies import resolve_engine as _get_engine
 from app.paths import validate_safe_id
 
 logger = logging.getLogger(__name__)
-
-
-def _get_engine(engine: Any = None) -> Any:
-    if engine is not None:
-        return engine
-    from app.dependencies import _engine as global_eng
-    return global_eng
 
 
 async def get_subagents_summary(engine: Any, session_id: str) -> dict[str, Any]:

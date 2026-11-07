@@ -13,7 +13,6 @@ from nexau.archs.session.orm import ComparisonFilter
 from nexau.archs.transports.http.sse_server import SSETransportServer
 
 from app.dependencies import get_engine
-from app.paths import resolve_deliverables_dir, resolve_sandbox_work_dir
 from app.services.chat_permissions import resolve_tool_approval
 from app.services.chat_session_prep import ensure_project_and_context
 from app.services.chat_streamer import (
@@ -90,7 +89,6 @@ async def approve_tool_call_bridge(payload: PlanApprovalPayload, session_id: str
     )
 
 
-approve_plan_bridge = approve_tool_call_bridge
 for _p in ("/approve", "/api/chat/approve", "/sessions/{session_id}/approve", "/api/chat/{session_id}/approve"):
     router.add_api_route(_p, approve_tool_call_bridge, methods=["POST"])
 
@@ -115,7 +113,6 @@ async def update_session_permission_mode(session_id: str, payload: PermissionMod
     return {"status": "success", "session_id": session_id, "permission_mode": mode}
 
 
-set_session_permission_mode = update_session_permission_mode
 for _p in ("/api/sessions/{session_id}/permissions/mode", "/sessions/{session_id}/permissions/mode"):
     router.add_api_route(_p, update_session_permission_mode, methods=["POST"])
 
@@ -136,7 +133,6 @@ for _p in ("/api/sessions/{session_id}/permissions", "/sessions/{session_id}/per
 __all__ = [
     "router", "_sse_server", "get_sse_server", "StreamQueryPayload", "StopPayload",
     "PlanApprovalPayload", "PermissionModePayload", "stream_query_bridge", "stop_agent_bridge",
-    "approve_plan_bridge", "approve_tool_call_bridge", "update_session_permission_mode",
-    "set_session_permission_mode", "get_session_permissions", "_ensure_project_and_context",
-    "resolve_deliverables_dir", "resolve_sandbox_work_dir",
+    "approve_tool_call_bridge", "update_session_permission_mode",
+    "get_session_permissions", "_ensure_project_and_context",
 ]
