@@ -1,3 +1,4 @@
+import uuid
 """Unit tests for API Hygiene & Health fixes (B-07, B-11, B-12, B-13, B-14, B-15, B-16)."""
 
 import pytest
@@ -35,15 +36,18 @@ def test_create_project_succeeds_with_existing_directory(client, tmp_path):
     valid_dir = tmp_path / "valid_workspace_dir"
     valid_dir.mkdir(parents=True, exist_ok=True)
 
+    proj_name = f"ValidDirProject_{uuid.uuid4().hex[:6]}"
     res = client.post("/api/projects", json={
-        "name": "ValidDirProject",
+        "name": proj_name,
         "local_folder_path": str(valid_dir),
         "user_id": "test_user",
     })
     assert res.status_code == 200
     data = res.json()
-    assert data["name"] == "ValidDirProject"
+    assert data["name"] == proj_name
     assert "id" in data
+    # Clean up project so test is idempotent and doesn't pollute DB
+    client.delete(f"/api/projects/{data['id']}")
 
 
 # ==============================================================================
@@ -81,21 +85,22 @@ def test_create_project_enforces_case_insensitive_uniqueness(client, tmp_path):
     dir1 = tmp_path / "dir_unique_1"
     dir1.mkdir(parents=True, exist_ok=True)
 
+    base_name = f"UniqueAlpha_{uuid.uuid4().hex[:6]}"
     res1 = client.post("/api/projects", json={
-        "name": "  UniqueAlphaProject  ",
+        "name": f"  {base_name}  ",
         "local_folder_path": str(dir1),
         "user_id": "test_user",
     })
     assert res1.status_code == 200
     data1 = res1.json()
-    assert data1["name"] == "UniqueAlphaProject"
+    assert data1["name"] == base_name
     proj_id = data1["id"]
 
     # Re-post with different casing and whitespace on a DIFFERENT folder -> 409 Conflict
     dir2 = tmp_path / "dir_unique_2"
     dir2.mkdir(parents=True, exist_ok=True)
     res2 = client.post("/api/projects", json={
-        "name": "uniquealphaproject",
+        "name": base_name.lower(),
         "local_folder_path": str(dir2),
         "user_id": "test_user",
     })
@@ -103,12 +108,15 @@ def test_create_project_enforces_case_insensitive_uniqueness(client, tmp_path):
 
     # Re-post with same folder -> 200 returning existing project
     res_same = client.post("/api/projects", json={
-        "name": "uniquealphaproject",
+        "name": base_name.lower(),
         "local_folder_path": str(dir1),
         "user_id": "test_user",
     })
     assert res_same.status_code == 200
     assert res_same.json()["id"] == proj_id
+
+    # Clean up project so test is idempotent and doesn't pollute DB
+    client.delete(f"/api/projects/{proj_id}")
 
 
 # ==============================================================================

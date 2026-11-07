@@ -41,6 +41,7 @@ from nexau.archs.main_sub.token_trace_session import TokenTraceSession
 from nexau.archs.tool.tool import (
     StructuredToolDefinitionLike,
     normalize_structured_tool_definition,
+    structured_tool_definition_to_anthropic,
     structured_tool_definition_to_openai,
 )
 from nexau.archs.tracer.context import TraceContext, get_current_span
@@ -184,18 +185,31 @@ def _extract_error_detail(payload: object) -> str:
 
 
 def _raw_message_metadata(payload: Any) -> dict[str, Any]:
+    res: dict[str, Any] = {}
     if isinstance(payload, dict):
-        return payload
-    if hasattr(payload, "model_dump"):
+        res = dict(payload)
+    elif hasattr(payload, "model_dump"):
         try:
             dumped = payload.model_dump()
             if isinstance(dumped, dict):
-                return dumped
+                res = dict(dumped)
         except Exception:
             pass
-    if hasattr(payload, "__dict__"):
-        return payload.__dict__
-    return {}
+    elif hasattr(payload, "__dict__"):
+        res = dict(payload.__dict__)
+    elif hasattr(payload, "__slots__"):
+        res = {s: getattr(payload, s, None) for s in payload.__slots__}
+
+    choices = res.get("choices")
+    if choices is not None and isinstance(choices, (list, tuple)):
+        res["choices_count"] = len(choices)
+        if len(choices) > 0:
+            first = choices[0]
+            finish_reason = getattr(first, "finish_reason", None) if not isinstance(first, dict) else first.get("finish_reason")
+            if finish_reason is not None:
+                res["choice_finish_reason"] = finish_reason
+
+    return res
 
 
 def _ensure_tool_results(messages: list[Message]) -> list[Message]:
@@ -259,14 +273,17 @@ def _adapt_structured_tools_for_provider(
     tool_streaming: bool = True,
     strict: bool = False,
 ) -> list[Mapping[str, object]] | None:
-    """Adapt neutral structured tools for OpenAI format."""
+    """Adapt neutral structured tools for provider format."""
     if not tools:
         return None
 
     adapted_tools: list[Mapping[str, object]] = []
     for tool in tools:
         normalized = normalize_structured_tool_definition(tool)
-        adapted_tools.append(structured_tool_definition_to_openai(normalized, strict=strict))
+        if provider_target == "anthropic":
+            adapted_tools.append(structured_tool_definition_to_anthropic(normalized, tool_streaming=tool_streaming))
+        else:
+            adapted_tools.append(structured_tool_definition_to_openai(normalized, strict=strict))
 
     return adapted_tools
 
@@ -375,13 +392,8 @@ class LLMCaller:
         token_trace_session: TokenTraceSession | None = None,
         framework_context: FrameworkContext | None = None,
     ) -> ModelCallParams:
-        if self.openai_client is None and self.llm_config:
-            try:
-                self.openai_client = openai.OpenAI(**self.llm_config.to_client_kwargs())
-            except Exception as e:
-                logger.warning(f"Failed to lazy-reinitialize sync OpenAI client: {e}")
         runtime_client = openai_client if openai_client is not None else self.openai_client
-        if not runtime_client and not self.middleware_manager:
+        if not runtime_client:
             raise RuntimeError(
                 "OpenAI client is not available. Please check your API configuration.",
             )

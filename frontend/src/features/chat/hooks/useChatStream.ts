@@ -69,9 +69,9 @@ export function useChatStream({
       setChatMessages,
       setIsStreaming,
       setInputPrompt,
-      scrollRef: scrollContainerRef || fallbackScrollRef,
+      scrollRef,
     });
-  }, [sessionId, history.historyRetryNonce, scrollContainerRef, cancelFlush, flushActiveStreamBuffer, history.updatePaginationState]);
+  }, [sessionId, history.historyRetryNonce, scrollRef, cancelFlush, flushActiveStreamBuffer, history.updatePaginationState]);
 
   const handleSetInputPrompt = useCallback((val: string | ((prev: string) => string)) => {
     setInputPrompt((prev) => {

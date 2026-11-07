@@ -2,7 +2,7 @@
 
 // One session row in the sidebar list: title (or rename input), streaming
 // spinner / unread dot / relative time, hover vertical 3-dots button.
-import React, { useState, useEffect, MouseEvent as ReactMouseEvent } from 'react';
+import React, { MouseEvent as ReactMouseEvent } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { sessionStore, isSessionStreaming } from '@/features/chat';
 import { formatRelativeTime } from '@/utils/formatting';

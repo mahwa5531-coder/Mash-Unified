@@ -21,6 +21,7 @@ POSIX-style paths on Windows.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import sys
@@ -54,8 +55,12 @@ def is_windows_host() -> bool:
 
 
 def get_nexau_home() -> Path:
-    """Return the global ~/.mash directory."""
-    p = Path.home() / ".mash"
+    """Return the global ~/.mash directory (honors MASH_HOME / NEXAU_HOME env overrides)."""
+    env_override = os.environ.get("MASH_HOME") or os.environ.get("NEXAU_HOME")
+    if env_override:
+        p = Path(env_override).resolve()
+    else:
+        p = Path.home() / ".mash"
     p.mkdir(parents=True, exist_ok=True)
     return p
 

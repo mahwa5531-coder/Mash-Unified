@@ -79,7 +79,7 @@ export default function RightSidebar({
   } = useViewerTabs(sessionId);
 
   // Live Terminal Log Streamer for Background Process Tabs
-  const { terminalStatuses, terminalPreRef } = useTerminalLogStream({
+  const { terminalStatuses, terminalPreRef, setTerminalScroller } = useTerminalLogStream({
     activeTab,
     viewMode,
     tabContent,
@@ -250,6 +250,7 @@ export default function RightSidebar({
                     tabContent={tabContent}
                     handleKillTask={handleKillTask}
                     terminalPreRef={terminalPreRef}
+                    onScrollerRef={setTerminalScroller}
                   />
                 </ErrorBoundary>
               </div>

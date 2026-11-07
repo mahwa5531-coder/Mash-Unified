@@ -66,6 +66,7 @@ def test_build_local_envs_smart_usersite(tmp_path: Path, monkeypatch: pytest.Mon
     assert "PYTHONNOUSERSITE" not in envs_host
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows venv layout (Scripts/ directory)")
 def test_build_local_envs_prepends_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies PATH prepends the runtime Python directories without duplicating existing entries."""
     runtime_dir = tmp_path / "mock_py_runtime"
@@ -106,6 +107,7 @@ def test_audit_libraries_importable_in_subshell(tmp_path: Path) -> None:
     assert "AUDIT_OK" in result.stdout
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows venv layout (Scripts/ directory)")
 def test_resolve_runtime_python_dirs_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies MASH_PYTHON_RUNTIME_DIR override returns [Scripts, root] correctly."""
     override_dir = tmp_path / "custom_python"
@@ -121,6 +123,7 @@ def test_resolve_runtime_python_dirs_override(tmp_path: Path, monkeypatch: pytes
     assert dirs_scripts == [scripts_dir, override_dir]
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows venv layout (Scripts/ directory)")
 def test_resolve_runtime_python_dirs_frozen_candidates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies frozen desktop app probes runtime/python and resources/python_runtime."""
     fake_exe = tmp_path / "MashApp.exe"
@@ -155,6 +158,7 @@ def test_get_python_command_probes_runtime_dirs(tmp_path: Path, monkeypatch: pyt
     assert str(fake_python_exe) in cmd
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows venv layout (Scripts/ directory)")
 def test_build_local_envs_preserves_custom_path_and_deduplicates(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

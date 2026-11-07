@@ -91,7 +91,9 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
         continue;
       }
 
-      if (step.role === 'user') {
+      const role = step.role || (step.type === 'USER_INPUT' ? 'user' : (step.type === 'PLANNER_RESPONSE' ? 'assistant' : undefined));
+
+      if (role === 'user') {
         const userText = cleanUserSteeringEnvelope(typeof step.content === 'string' ? step.content : '');
         parsedMsgs.push({
           id: step.id || `m_${parsedMsgs.length}`,
@@ -104,7 +106,7 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
           tools: [],
           tasks: [],
         });
-      } else if (step.role === 'assistant') {
+      } else if (role === 'assistant') {
         const content = cleanAssistantContent(typeof step.content === 'string' ? step.content : '');
         const thoughts: string[] = Array.isArray(step.thoughts) ? step.thoughts.map(String) : [];
         const prefix = step.id || `m_${parsedMsgs.length}`;

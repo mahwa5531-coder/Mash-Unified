@@ -16,7 +16,7 @@ interface UseSessionHistoryOptions {
 export function useSessionHistory({
   sessionId,
   activeSessionIdRef,
-  scrollContainerRef,
+  scrollContainerRef: _scrollContainerRef,
   onHistoryLoaded: _onHistoryLoaded,
 }: UseSessionHistoryOptions) {
   const [isHistoryLoaded, setIsHistoryLoaded] = useState<boolean>(

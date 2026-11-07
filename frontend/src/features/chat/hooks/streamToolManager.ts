@@ -285,8 +285,8 @@ export function createStreamCallbacks(
 
       const next = [...s.chatMessages];
       const target = { ...next[idx] };
-      let steps = target.steps ? [...target.steps] : [];
-      let tools = target.tools ? [...target.tools] : [];
+      const steps = target.steps ? [...target.steps] : [];
+      const tools = target.tools ? [...target.tools] : [];
       const compactionId = `compaction_${activeSid}`;
 
       if (cData.type === 'COMPACTION_STARTED') {

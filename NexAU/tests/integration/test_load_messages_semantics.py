@@ -844,6 +844,16 @@ def test_persist_rejects_when_only_message_is_reasoning_only():
                 role=Role.ASSISTANT,
                 content=[ReasoningBlock(text="only thinking")],
             )
+            res = await svc.persist_append(
+                key=AgentRunActionKey(**_KW),
+                run_id="r1",
+                root_run_id="r1",
+                parent_run_id=None,
+                agent_name="a",
+                messages=[reasoning_only],
+            )
+            assert res is None
+
             with _pytest.raises(ValueError, match="no messages"):
                 await svc.persist_append(
                     key=AgentRunActionKey(**_KW),
@@ -851,7 +861,7 @@ def test_persist_rejects_when_only_message_is_reasoning_only():
                     root_run_id="r1",
                     parent_run_id=None,
                     agent_name="a",
-                    messages=[reasoning_only],
+                    messages=[],
                 )
 
     asyncio.run(run())

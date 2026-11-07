@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { TabItem } from '../types';
 import { fetchTaskLog } from '@/services/tasks';
 import { BASE_URL } from '@/services/client';
@@ -20,6 +20,9 @@ export function useTerminalLogStream({
 }: UseTerminalLogStreamProps) {
   const [terminalStatuses, setTerminalStatuses] = useState<Record<string, 'running' | 'completed' | 'failed'>>({});
   const terminalPreRef = useRef<HTMLDivElement>(null);
+  const setTerminalScroller = useCallback((el: HTMLElement | null) => {
+    (terminalPreRef as any).current = el;
+  }, []);
 
   // Auto-scroll terminal on new streamed output only if user is already near bottom
   const currentTerminalContent = activeTab?.type === 'terminal' ? tabContent[activeTab.id] : undefined;
@@ -130,5 +133,6 @@ export function useTerminalLogStream({
   return {
     terminalStatuses,
     terminalPreRef,
+    setTerminalScroller,
   };
 }

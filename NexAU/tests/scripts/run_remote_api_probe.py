@@ -106,13 +106,16 @@ def _extract_usage(case_id: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_cases() -> list[ProbeCase]:
+    probe_base_url = os.environ.get("PROBE_BASE_URL", "http://127.0.0.1:3001").rstrip("/")
+    probe_api_key = os.environ.get("PROBE_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
+
     return [
         ProbeCase(
             case_id="responses_rayinai_gpt54",
             method="POST",
             url="https://code.rayinai.com/v1/responses",
             headers={
-                "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+                "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY', '')}",
                 "Content-Type": "application/json",
             },
             body={
@@ -126,9 +129,9 @@ def _build_cases() -> list[ProbeCase]:
         ProbeCase(
             case_id="chat_14_gpt5",
             method="POST",
-            url="http://14.103.60.158:3001/v1/chat/completions",
+            url=f"{probe_base_url}/v1/chat/completions",
             headers={
-                "Authorization": "Bearer sk-8JoEeRVplrADEMiwc7XbEdtrEBxdCbCZkWhboMHEPNWlzgQk",
+                "Authorization": f"Bearer {probe_api_key}",
                 "Content-Type": "application/json",
             },
             body={
@@ -141,9 +144,9 @@ def _build_cases() -> list[ProbeCase]:
         ProbeCase(
             case_id="responses_14_gpt5",
             method="POST",
-            url="http://14.103.60.158:3001/v1/responses",
+            url=f"{probe_base_url}/v1/responses",
             headers={
-                "Authorization": "Bearer sk-8JoEeRVplrADEMiwc7XbEdtrEBxdCbCZkWhboMHEPNWlzgQk",
+                "Authorization": f"Bearer {probe_api_key}",
                 "Content-Type": "application/json",
             },
             body={
@@ -157,9 +160,9 @@ def _build_cases() -> list[ProbeCase]:
         ProbeCase(
             case_id="anthropic_14_claude46",
             method="POST",
-            url="http://14.103.60.158:3001/v1/messages",
+            url=f"{probe_base_url}/v1/messages",
             headers={
-                "x-api-key": os.environ["ANTHROPIC_API_KEY"],
+                "x-api-key": os.environ.get("ANTHROPIC_API_KEY", probe_api_key),
                 "anthropic-version": "2023-06-01",
                 "Content-Type": "application/json",
             },
@@ -173,7 +176,7 @@ def _build_cases() -> list[ProbeCase]:
         ProbeCase(
             case_id="gemini_14_gemini31",
             method="POST",
-            url="http://14.103.60.158:3001/v1beta/models/gemini-3.1-pro-preview:generateContent?key=sk-8JoEeRVplrADEMiwc7XbEdtrEBxdCbCZkWhboMHEPNWlzgQk",
+            url=f"{probe_base_url}/v1beta/models/gemini-3.1-pro-preview:generateContent?key={probe_api_key}",
             headers={"Content-Type": "application/json"},
             body={
                 "contents": [

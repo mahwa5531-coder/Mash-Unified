@@ -1,3 +1,4 @@
+import uuid
 import os
 import shutil
 
@@ -40,24 +41,26 @@ def test_auth_me_unauthenticated_fails_closed(client):
 
 def test_create_quick_project_sanitizes_and_succeeds(client):
     """Verify create_quick_project sanitizes illegal Windows characters and creates folder safely."""
-    illegal_name = 'Audit:Project*With<Illegal>Chars'
+    illegal_name = f'Audit:Project*With<Illegal>Chars_{uuid.uuid4().hex[:6]}'
     res = client.post("/api/projects/quick", json={"name": illegal_name, "user_id": "test_user"})
     assert res.status_code == 200
     project = res.json()
-    assert "id" in project
-    assert ":" not in project["name"]
-    assert "<" not in project["name"]
-    assert ">" not in project["name"]
-    assert "*" not in project["name"]
-    assert os.path.exists(project["local_folder_path"])
-
-    # Clean up created directory
-    shutil.rmtree(project["local_folder_path"], ignore_errors=True)
+    proj_id = project["id"]
+    try:
+        assert "id" in project
+        assert ":" not in project["name"]
+        assert "<" not in project["name"]
+        assert ">" not in project["name"]
+        assert "*" not in project["name"]
+        assert os.path.exists(project["local_folder_path"])
+    finally:
+        client.delete(f"/api/projects/{proj_id}")
+        shutil.rmtree(project["local_folder_path"], ignore_errors=True)
 
 def test_delete_project_is_idempotent(client):
     """Verify workspace deletion succeeds cleanly and is idempotent (no 404 error on repeat delete)."""
     # 1. Create a quick project
-    res = client.post("/api/projects/quick", json={"name": "TempToDelete", "user_id": "test_user"})
+    res = client.post("/api/projects/quick", json={"name": f"TempToDelete_{uuid.uuid4().hex[:6]}", "user_id": "test_user"})
     assert res.status_code == 200
     proj_id = res.json()["id"]
 

@@ -13,7 +13,8 @@ interface TerminalViewerProps {
   terminalStatuses: Record<string, 'running' | 'completed' | 'failed'>;
   tabContent: Record<string, string>;
   handleKillTask: (e: ReactMouseEvent, pid: number) => void;
-  terminalPreRef: React.RefObject<HTMLDivElement | null>;
+  terminalPreRef?: React.RefObject<HTMLDivElement | null>;
+  onScrollerRef?: (el: HTMLElement | null) => void;
 }
 
 export function TerminalViewer({
@@ -21,7 +22,8 @@ export function TerminalViewer({
   terminalStatuses,
   tabContent,
   handleKillTask,
-  terminalPreRef,
+  terminalPreRef: _terminalPreRef,
+  onScrollerRef,
 }: TerminalViewerProps) {
   const currentPid = parseInt(activeTab.id.replace('terminal-', ''), 10);
   const isRunning = (terminalStatuses[activeTab.id] || 'running') === 'running';
@@ -90,8 +92,8 @@ export function TerminalViewer({
       {/* Dynamically Virtualized Monospace Terminal Log (Powered by react-virtuoso) */}
       <Virtuoso
         scrollerRef={(el) => {
-          if (el instanceof HTMLElement && terminalPreRef) {
-            (terminalPreRef as any).current = el;
+          if (el instanceof HTMLElement || el === null) {
+            onScrollerRef?.(el as HTMLElement | null);
           }
         }}
         data={logLines}
