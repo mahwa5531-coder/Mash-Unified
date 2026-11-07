@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 class UserProfile(BaseModel):
     email: str | None = None
     name: str | None = None
-    plan: str = "pro"
-    credits_remaining: int = 500
+    plan: str | None = None
+    credits_remaining: int | None = None
 
 
 class ModelSettings(BaseModel):
@@ -80,6 +80,6 @@ class AppConfig(BaseModel):
     def save(self) -> None:
         path = self.get_config_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        # ponytail: Exclude user account identity/quotas from disk persistence — user state is held in RAM only
+        # Exclude user account identity/quotas from disk persistence — user state is held in RAM only
         data = self.model_dump(exclude={"user"})
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")

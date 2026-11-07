@@ -44,14 +44,25 @@ export interface AuthUser {
   }>;
 }
 
-export async function fetchAuthMe(): Promise<AuthUser | null> {
+export async function fetchAuthMe(fresh = false): Promise<AuthUser | null> {
   try {
-    const res = await safeFetch(`${BASE_URL}/api/auth/me`);
+    const url = fresh ? `${BASE_URL}/api/auth/me?fresh=true` : `${BASE_URL}/api/auth/me`;
+    const res = await safeFetch(url);
     if (!res.ok) return null;
     const data = await res.json();
     return data;
   } catch (err) {
     console.warn("Failed to fetch auth state:", err);
+    return null;
+  }
+}
+
+export async function syncAuthUsage(): Promise<AuthUser | null> {
+  try {
+    await safeFetch(`${BASE_URL}/api/auth/sync`, { method: "POST" });
+    return await fetchAuthMe(true);
+  } catch (err) {
+    console.warn("Failed to sync auth usage:", err);
     return null;
   }
 }

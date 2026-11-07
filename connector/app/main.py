@@ -97,9 +97,6 @@ def _build_agent_config() -> AgentConfig:
 
     active_key = (
         _IN_MEMORY_AUTH_META.get("access_token")
-        or (vault.get("api_key") if vault else None)
-        or os.getenv("LLM_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
         or "bearer-pending-auth"
     )
     # The desktop uses the abstract model alias "mash/auto" unless overridden by env.

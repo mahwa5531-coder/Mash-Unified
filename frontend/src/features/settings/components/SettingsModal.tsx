@@ -42,10 +42,10 @@ export default function SettingsModal({
     initialTab === 'usage' ? 'usage' : initialTab === 'account' ? 'account' : 'appearance'
   );
 
-  // Load auth state
-  const loadAuth = async () => {
+  // Load auth state with optional fresh sync from cloud
+  const loadAuth = async (fresh = false) => {
     try {
-      const info = await fetchAuthMe();
+      const info = await fetchAuthMe(fresh);
       if (info) setAuthInfo(info);
     } catch (err) {
       console.warn("Failed to load auth:", err);
@@ -66,12 +66,12 @@ export default function SettingsModal({
     } catch {}
   }, []);
 
-  // When modal opens, refresh auth
+  // When modal opens or tab changes to usage, refresh auth live
   useEffect(() => {
     if (isOpen) {
-      loadAuth();
+      loadAuth(activeTab === 'usage');
     }
-  }, [isOpen]);
+  }, [isOpen, activeTab]);
 
   // Apply theme dynamically to document root
   useEffect(() => {

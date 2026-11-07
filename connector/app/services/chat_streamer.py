@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -340,6 +341,8 @@ async def stream_chat_query(
     try:
         from app.routers.auth import ensure_valid_token
         live_token = await ensure_valid_token()
+        if not live_token and os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes"):
+            live_token = "mock-test-token"
         if not live_token or live_token == "bearer-pending-auth":
             raise HTTPException(status_code=401, detail="Authentication required. Please sign in to MASH.")
 

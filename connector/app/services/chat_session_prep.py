@@ -284,7 +284,7 @@ def setup_sandbox_and_model(
             if (not llm_cfg.model or llm_cfg.model == "mash/auto") and env_model
             else (llm_cfg.model or "mash/auto")
         )
-        api_key = live_token or llm_cfg.api_key or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+        api_key = live_token or llm_cfg.api_key or "bearer-pending-auth"
         if llm_cfg.api_key != api_key or llm_cfg.model != target_model:
             new_llm = copy.copy(llm_cfg)
             new_llm.api_key, new_llm.model = api_key, target_model

@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 VAULT_FILE = get_nexau_home() / "auth.vault"
 
-# ponytail: In-memory session state for user profile, quotas, and tier.
+# In-memory session state for user profile, quotas, and tier.
 # Held strictly in RAM — never written as unencrypted JSON to user's hard drive.
 _IN_MEMORY_AUTH_META: dict[str, Any] = {}
 
@@ -55,7 +55,7 @@ def get_in_memory_auth_meta() -> dict[str, Any]:
 def save_secure_vault(secrets_dict: dict[str, Any], meta_dict: dict[str, Any] | None = None) -> bool:
     """Encrypts secret credentials using Windows DPAPI and saves to ~/.mash/auth.vault.
 
-    ponytail: Access and ID tokens reside strictly in RAM (_IN_MEMORY_AUTH_META)
+    Access and ID tokens reside strictly in RAM (_IN_MEMORY_AUTH_META)
     and are purged from disk persistence to enforce process-memory isolation.
     """
     # 1. Update in-memory metadata if provided, preserving existing tokens in RAM unless unauthenticated
@@ -267,11 +267,11 @@ def get_auth_metadata() -> dict[str, Any]:
             else (raw_accounts if isinstance(raw_accounts, list) else [])
         )
         vault_meta = {
-            "authenticated": True,
+            "authenticated": bool(_IN_MEMORY_AUTH_META.get("access_token")),
             "email": acc_email,
             "name": acc_info.get("name") or "User",
-            "plan": acc_info.get("plan") or "pro",
-            "credits_remaining": acc_info.get("credits_remaining", 500),
+            "plan": acc_info.get("plan"),
+            "credits_remaining": acc_info.get("credits_remaining"),
             "accounts": [
                 {
                     "email": acc.get("email"),
@@ -283,7 +283,7 @@ def get_auth_metadata() -> dict[str, Any]:
                 if isinstance(acc, dict) and acc.get("email")
             ],
         }
-        _IN_MEMORY_AUTH_META.update({k: v for k, v in vault_meta.items() if k not in _IN_MEMORY_AUTH_META})
+        _IN_MEMORY_AUTH_META.update({k: v for k, v in vault_meta.items() if k not in _IN_MEMORY_AUTH_META and v is not None})
         return _IN_MEMORY_AUTH_META.copy()
     return {"authenticated": False}
 

@@ -64,10 +64,10 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
     2. If expired, expiring soon, or force_refresh=True, uses the 30-day refresh_token to contact the Cloud
        Gateway at /v1/auth/refresh, updating _IN_MEMORY_AUTH_META with the newly issued access_token
        and saving rotated refresh_token in the vault.
-    3. Fallback: returns in-memory access_token, api_key, or env LLM_API_KEY.
+    3. Fallback: returns live in-memory access_token or None if offline/unauthenticated.
     """
     if os.getenv("MASH_BYPASS_AUTH", "").lower() in ("true", "1", "yes"):
-        dev_token = _IN_MEMORY_AUTH_META.get("access_token") or os.getenv("LLM_API_KEY") or os.getenv("MASH_API_KEY") or os.getenv("OPENAI_API_KEY") or "dev-bypass-token"
+        dev_token = _IN_MEMORY_AUTH_META.get("access_token") or "dev-bypass-token"
         _IN_MEMORY_AUTH_META["access_token"] = dev_token
         _IN_MEMORY_AUTH_META["authenticated"] = True
         return dev_token
@@ -142,7 +142,7 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
                 save_secure_vault(vault, {"authenticated": False})
                 return None
 
-    live_token = _IN_MEMORY_AUTH_META.get("access_token") or (vault.get("api_key") if vault else None) or os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+    live_token = _IN_MEMORY_AUTH_META.get("access_token")
     if not live_token and not (vault and vault.get("refresh_token")):
         _IN_MEMORY_AUTH_META["authenticated"] = False
     return live_token
@@ -213,7 +213,7 @@ async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | 
 class LoginPayload(BaseModel):
     code: str | None = None  # Desktop exchange code: mcode_<64hex>
     email: str | None = None
-    name: str = "Auditor"
+    name: str | None = None
     plan: str | None = None
     api_key: str | None = None
     access_token: str | None = None
@@ -252,43 +252,31 @@ async def get_auth_config() -> dict[str, Any]:
 
 
 @router.get("/me")
-async def get_current_user_auth() -> dict[str, Any]:
-    if os.getenv("MASH_BYPASS_AUTH", "").lower() in ("true", "1", "yes"):
-        return {
-            "authenticated": True,
-            "email": "user@mash.local",
-            "name": "Local User",
-            "plan": "pro",
-            "subscription_status": "active",
-            "quota": {"windows": [{"window": "weekly", "percent": 0}]},
-            "usage": {"used_tokens": 0, "remaining_percent": 100},
-        }
-
+async def get_current_user_auth(fresh: bool = False) -> dict[str, Any]:
     meta = get_auth_metadata()
     vault = load_secure_vault()
 
     if not meta.get("authenticated") or vault is None or not meta.get("email"):
-        return {
-            "authenticated": False,
-        }
+        if not (vault and vault.get("refresh_token") and vault.get("active_account")):
+            return {
+                "authenticated": False,
+            }
 
     # Ensure live valid token exists; if absent, attempt to acquire or validate one
-    live_token = _IN_MEMORY_AUTH_META.get("access_token") or (vault.get("api_key") if vault else None)
+    live_token = _IN_MEMORY_AUTH_META.get("access_token")
     if not live_token:
         live_token = await ensure_valid_token()
         meta = get_auth_metadata()
 
-    # If still no valid token could be produced, fail closed to unauthenticated
+    # If still no valid token could be produced (e.g. cold boot offline), fail closed to unauthenticated
     if not live_token or not meta.get("authenticated"):
-        if not (vault and vault.get("refresh_token")):
-            _IN_MEMORY_AUTH_META["authenticated"] = False
         return {
             "authenticated": False,
         }
 
     token = _IN_MEMORY_AUTH_META.get("access_token")
-    # Proactively sync rolling quota position if not present
-    if token and not meta.get("quota"):
+    # Proactively sync rolling quota position if requested or if not yet populated
+    if token and (fresh or not meta.get("quota")):
         await sync_user_account_state(token)
         meta = get_auth_metadata()
 
@@ -296,15 +284,15 @@ async def get_current_user_auth() -> dict[str, Any]:
         "authenticated": True,
         "email": meta.get("email"),
         "name": meta.get("name") or "User",
-        "plan": meta.get("plan", "pro"),
-        "subscription_status": meta.get("subscription_status", "active"),
+        "plan": meta.get("plan"),
+        "subscription_status": meta.get("subscription_status"),
         "quota": meta.get("quota"),
         "usage": meta.get("usage"),
         "limits": meta.get("limits"),
         "models": meta.get("models", []),
-        "credits_remaining": meta.get("credits_remaining", 500),
+        "credits_remaining": meta.get("credits_remaining"),
         "accounts": meta.get("accounts", []),
-        "has_access_token": bool(_IN_MEMORY_AUTH_META.get("access_token") or (vault and vault.get("api_key"))),
+        "has_access_token": bool(_IN_MEMORY_AUTH_META.get("access_token")),
     }
 
 
@@ -409,18 +397,18 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
     accounts = vault.get("accounts", {})
     existing_acc = accounts.get(payload.email) or {}
 
-    # Determine authoritative plan & credits:
-    # Cloud OAuth exchange is authoritative. For direct local login without cloud verification,
-    # default to "free" tier unless an existing verified plan is already recorded.
+    # Determine authoritative plan & credits from cloud OAuth exchange if present
     if payload.code and 'data' in locals() and data.get("user"):
-        effective_plan = data.get("user", {}).get("plan", "pro")
-        effective_credits = data.get("user", {}).get("credits_remaining", 500)
+        effective_plan = data.get("user", {}).get("plan")
+        effective_credits = data.get("user", {}).get("credits_remaining")
     elif existing_acc.get("plan"):
         effective_plan = existing_acc["plan"]
-        effective_credits = existing_acc.get("credits_remaining", 100)
+        effective_credits = existing_acc.get("credits_remaining")
     else:
-        effective_plan = payload.plan or "free"
-        effective_credits = payload.credits_remaining if payload.credits_remaining is not None else 100
+        effective_plan = payload.plan
+        effective_credits = payload.credits_remaining
+
+    resolved_name = payload.name or (user_info.get("display_name") if 'user_info' in locals() and isinstance(user_info, dict) else None) or "User"
 
     # Populate in-memory access and id tokens strictly in RAM
     if payload.access_token:
@@ -435,22 +423,34 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
         "id_token": payload.id_token,
         "expires_at": payload.expires_at,
     }
-
-    accounts[payload.email] = {
+    _IN_MEMORY_AUTH_META.setdefault("account_profiles", {})[payload.email] = {
         "email": payload.email,
-        "name": payload.name,
+        "name": resolved_name,
         "plan": effective_plan,
-        "api_key": payload.api_key,
-        "refresh_token": payload.refresh_token,
         "credits_remaining": effective_credits,
     }
 
-    secrets = {
+    # Secure DPAPI vault strictly holds credentials needed for background sliding token refresh:
+    acc_disk: dict[str, Any] = {
+        "email": payload.email,
+        "name": resolved_name,
+        "plan": effective_plan,
+        "refresh_token": payload.refresh_token,
+        "credits_remaining": effective_credits,
+    }
+    if payload.api_key:
+        acc_disk["api_key"] = payload.api_key
+    accounts[payload.email] = acc_disk
+
+    secrets: dict[str, Any] = {
         "active_account": payload.email,
-        "api_key": payload.api_key,
         "refresh_token": payload.refresh_token,
         "accounts": accounts,
     }
+    if payload.api_key:
+        secrets["api_key"] = payload.api_key
+
+    resolved_name = payload.name or (user_info.get("display_name") if 'user_info' in locals() and isinstance(user_info, dict) else None) or "User"
 
     meta_accounts = meta.get("accounts", [])
     if isinstance(meta_accounts, list):
@@ -459,7 +459,7 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
         meta_accounts = []
     meta_accounts.append({
         "email": payload.email,
-        "name": payload.name,
+        "name": resolved_name,
         "plan": effective_plan,
         "credits_remaining": effective_credits,
     })
@@ -474,21 +474,13 @@ async def handle_login(payload: LoginPayload) -> dict[str, Any]:
     meta_dict = {
         "authenticated": is_authenticated,
         "email": payload.email,
-        "name": payload.name,
+        "name": resolved_name,
         "plan": effective_plan,
         "credits_remaining": effective_credits,
         "accounts": meta_accounts,
     }
 
     save_secure_vault(secrets, meta_dict)
-
-    # Also update AppConfig user profile
-    config = AppConfig.load()
-    config.user.email = payload.email
-    config.user.name = payload.name
-    config.user.plan = effective_plan
-    config.user.credits_remaining = effective_credits
-    config.save()
 
     return {"success": True, "authenticated": is_authenticated, "email": payload.email, "accounts": meta_accounts}
 
@@ -502,14 +494,8 @@ async def handle_account_switch(payload: SwitchAccountPayload) -> dict[str, Any]
 
     target = accounts.get(payload.email, {})
 
-    if payload.api_key:
-        target["api_key"] = payload.api_key
     if payload.refresh_token:
         target["refresh_token"] = payload.refresh_token
-    if payload.name:
-        target["name"] = payload.name
-    if payload.plan:
-        target["plan"] = payload.plan
     target["email"] = payload.email
 
     accounts[payload.email] = target
@@ -533,40 +519,34 @@ async def handle_account_switch(payload: SwitchAccountPayload) -> dict[str, Any]
 
     secrets = {
         "active_account": payload.email,
-        "api_key": target.get("api_key"),
         "refresh_token": target.get("refresh_token"),
         "accounts": accounts,
     }
+    if payload.api_key or target.get("api_key"):
+        secrets["api_key"] = payload.api_key or target.get("api_key")
 
     has_creds = bool(
         acc_tokens.get("access_token")
         or payload.access_token
-        or target.get("api_key")
         or target.get("refresh_token")
-        or payload.api_key
         or payload.refresh_token
+        or secrets.get("api_key")
     )
+    target_prof = _IN_MEMORY_AUTH_META.get("account_profiles", {}).get(payload.email, {})
     meta["authenticated"] = has_creds
     meta["email"] = payload.email
-    meta["name"] = target.get("name", meta.get("name", "Auditor"))
-    meta["plan"] = target.get("plan", meta.get("plan", "pro"))
-    meta["credits_remaining"] = target.get("credits_remaining", meta.get("credits_remaining", 500))
+    meta["name"] = payload.name or target_prof.get("name") or target.get("name") or "User"
+    meta["plan"] = payload.plan or target_prof.get("plan") or target.get("plan")
+    meta["credits_remaining"] = target_prof.get("credits_remaining") if target_prof.get("credits_remaining") is not None else target.get("credits_remaining")
 
     save_secure_vault(secrets, meta)
-
-    config = AppConfig.load()
-    config.user.email = payload.email
-    config.user.name = meta["name"]
-    config.user.plan = meta["plan"]
-    config.user.credits_remaining = meta["credits_remaining"]
-    config.save()
 
     return {
         "success": True,
         "active_email": payload.email,
         "name": meta["name"],
-        "plan": meta["plan"],
-        "credits_remaining": meta["credits_remaining"],
+        "plan": meta.get("plan"),
+        "credits_remaining": meta.get("credits_remaining"),
         "accounts": meta.get("accounts", []),
     }
 
@@ -576,36 +556,15 @@ async def handle_logout() -> dict[str, Any]:
     """Clears local secure vault on logout and revokes cloud session if present."""
     vault = load_secure_vault() or {}
     refresh_token = vault.get("refresh_token")
-    access_token = _IN_MEMORY_AUTH_META.get("access_token") or vault.get("access_token")
 
-    # Best-effort cloud session revocation in background
-    if refresh_token or access_token:
-        config = AppConfig.load()
-        gateway_url = (
-            os.getenv("CLOUD_GATEWAY_URL")
-            or os.getenv("GATEWAY_URL")
-            or os.getenv("NEXAU_CLOUD_API_URL")
-            or config.model.gateway_url
-            or "https://api.mash.ai"
-        ).rstrip("/")
+    if refresh_token:
         try:
-            headers = {"Content-Type": "application/json"}
-            if access_token:
-                headers["Authorization"] = f"Bearer {access_token}"
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                await client.post(
-                    f"{gateway_url}/v1/auth/logout",
-                    json={"refresh_token": refresh_token or ""},
-                    headers=headers,
-                )
+            client = MAShClient()
+            await client.logout(refresh_token)
         except Exception as e:
             logger.debug("Cloud session revocation skipped or offline: %s", e)
 
     clear_vault()
-    config = AppConfig.load()
-    config.user.email = None
-    config.user.name = None
-    config.save()
     return {"success": True, "authenticated": False}
 
 
@@ -620,6 +579,6 @@ async def handle_manual_refresh() -> dict[str, Any]:
         "success": True,
         "authenticated": True,
         "email": meta.get("email"),
-        "credits_remaining": meta.get("credits_remaining", 500),
+        "credits_remaining": meta.get("credits_remaining"),
     }
 

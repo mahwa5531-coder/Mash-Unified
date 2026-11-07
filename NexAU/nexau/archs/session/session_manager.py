@@ -507,7 +507,7 @@ class SessionManager:
             for ptc in pending.values():
                 if ptc.get("decision") is None:
                     ptc["decision"] = "deny"
-                    ptc["feedback"] = f"Superseded by user steer instruction: {prompt_text}"
+                    ptc["feedback"] = f"Superseded by user message: {prompt_text}"
             await self.update_pending_tool_calls(
                 user_id=user_id,
                 session_id=session_id,
