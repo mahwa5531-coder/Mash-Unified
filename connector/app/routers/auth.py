@@ -67,7 +67,12 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
     3. Fallback: returns live in-memory access_token or None if offline/unauthenticated.
     """
     if os.getenv("MASH_BYPASS_AUTH", "").lower() in ("true", "1", "yes"):
-        dev_token = _IN_MEMORY_AUTH_META.get("access_token") or "dev-bypass-token"
+        dev_token = (
+            os.getenv("LLM_API_KEY")
+            or os.getenv("OPENAI_API_KEY")
+            or _IN_MEMORY_AUTH_META.get("access_token")
+            or "dev-bypass-token"
+        )
         _IN_MEMORY_AUTH_META["access_token"] = dev_token
         _IN_MEMORY_AUTH_META["authenticated"] = True
         return dev_token
@@ -253,6 +258,24 @@ async def get_auth_config() -> dict[str, Any]:
 
 @router.get("/me")
 async def get_current_user_auth(fresh: bool = False) -> dict[str, Any]:
+    if os.getenv("MASH_BYPASS_AUTH", "").lower() in ("true", "1", "yes"):
+        token = await ensure_valid_token()
+        return {
+            "authenticated": True,
+            "email": "auditor@mash.local",
+            "name": "Dev Auditor",
+            "plan": "pro",
+            "subscription_status": "active",
+            "credits_remaining": 999999,
+            "accounts": [{
+                "email": "auditor@mash.local",
+                "name": "Dev Auditor",
+                "plan": "pro",
+                "credits_remaining": 999999,
+            }],
+            "has_access_token": bool(token),
+        }
+
     meta = get_auth_metadata()
     vault = load_secure_vault()
 
