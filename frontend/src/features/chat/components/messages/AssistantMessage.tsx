@@ -60,11 +60,12 @@ const AssistantMessage = memo(function AssistantMessage({
   );
   const displayTime = (msg.timestamp && formatTurnTimestamp(msg.timestamp)) || latchedTime;
   const isActivelyStreaming = isLast && isStreaming;
+  const isStillStreaming = isStreaming || isActivelyStreaming || msg.status === 'running';
 
   // Extract artifacts and generated files on completed turns
-  const localArtifacts = useMemo(() => isActivelyStreaming ? [] : extractArtifacts(msg), [msg.content, msg.tools, isActivelyStreaming]);
+  const localArtifacts = useMemo(() => isStillStreaming ? [] : extractArtifacts(msg), [msg.content, msg.tools, isStillStreaming]);
   const artifacts = passedArtifacts !== undefined ? passedArtifacts : localArtifacts;
-  const editedFilesData = useMemo(() => isActivelyStreaming ? { files: [], totalAdded: 0, totalDeleted: 0 } : extractEditedFiles(msg), [msg.tools, isActivelyStreaming]);
+  const editedFilesData = useMemo(() => isStillStreaming ? { files: [], totalAdded: 0, totalDeleted: 0 } : extractEditedFiles(msg), [msg.tools, isStillStreaming]);
 
   // Filter edited files to exclude files already displayed as prominent artifact/deliverable cards
   // Hardened path deduplication ensures Windows drive letters, file:/// URIs, and basenames match
@@ -148,8 +149,8 @@ const AssistantMessage = memo(function AssistantMessage({
         onContinue={onContinue}
       />
 
-      {/* 4. Deliverable & Working Paper Cards (Walkthrough, Plans, Spreadsheets, Memos) */}
-      {artifacts.length > 0 && (
+      {/* 4. Deliverable & Working Paper Cards (Walkthrough, Plans, Spreadsheets, Memos) - renders strictly after streaming completes */}
+      {artifacts.length > 0 && !isStillStreaming && (
         <div className="mt-3 flex flex-col gap-2">
           {artifacts.map((art) => (
             <ArtifactCard 

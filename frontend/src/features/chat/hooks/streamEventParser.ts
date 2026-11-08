@@ -2,7 +2,7 @@
 
 import type { Message, Turn } from '@/types/chat';
 import type { ArtifactItem } from '@/types/artifacts';
-import { extractArtifacts, getArtifactCanonicalGroup } from '@/features/artifacts/utils/extraction';
+import { extractArtifacts } from '@/features/artifacts/utils/extraction';
 import { fetchTranscript, fetchSessionQueue } from '@/services/sessions';
 import { parseSessionHistory } from '@/features/chat/utils/turns';
 import { sessionStore, getOrCreateSessionState, notifyStoreListeners } from '../state/sessionStore';
@@ -49,7 +49,7 @@ export function extractThoughtDelta(event: StreamWireEvent): string {
 const messageArtifactCache = new WeakMap<Message, ArtifactItem[]>();
 
 export function getCachedArtifacts(msg: Message, isStreamingMsg: boolean): ArtifactItem[] {
-  if (isStreamingMsg) return [];
+  if (isStreamingMsg || msg.status === 'running') return [];
   let cached = messageArtifactCache.get(msg);
   if (!cached) {
     cached = extractArtifacts(msg);
@@ -61,37 +61,24 @@ export function getCachedArtifacts(msg: Message, isStreamingMsg: boolean): Artif
 export function buildTurnArtifactMap(
   turns: Turn[],
   isStreaming: boolean,
-  streamingCache: Map<string, ArtifactItem[]>
+  streamingCache?: Map<string, ArtifactItem[]>
 ): Map<string, ArtifactItem[]> {
-  if (isStreaming && streamingCache.size > 0) return streamingCache;
-  const locMap = new Map<string, string>();
-  const rawMap = new Map<string, ArtifactItem[]>();
+  const resMap = new Map<string, ArtifactItem[]>();
   const lastTurnIdx = turns.length - 1;
 
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
     const isLastTurn = i === lastTurnIdx;
+    const turnIdx = turn.turnIndex ?? i;
     for (let j = 0; j < turn.aiMsgs.length; j++) {
-      const key = `${i}_${j}`;
+      const key = `${turnIdx}_${j}`;
       const isStreamingAiMsg = isStreaming && isLastTurn && j === turn.aiMsgs.length - 1;
       const arts = getCachedArtifacts(turn.aiMsgs[j], isStreamingAiMsg);
-      rawMap.set(key, arts);
-      for (const art of arts) {
-        const group = getArtifactCanonicalGroup(art.filePath || art.title || art.id);
-        if (group) locMap.set(group, key);
-      }
+      resMap.set(key, arts);
     }
   }
 
-  const resMap = new Map<string, ArtifactItem[]>();
-  for (const [key, arts] of rawMap.entries()) {
-    const visible = arts.filter((art) => {
-      const group = getArtifactCanonicalGroup(art.filePath || art.title || art.id);
-      return !group || locMap.get(group) === key;
-    });
-    resMap.set(key, visible);
-  }
-  if (!isStreaming) {
+  if (streamingCache) {
     streamingCache.clear();
     for (const [k, v] of resMap.entries()) streamingCache.set(k, v);
   }

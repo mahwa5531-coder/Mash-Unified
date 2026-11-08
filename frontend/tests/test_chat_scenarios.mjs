@@ -3,6 +3,7 @@ import assert from 'node:assert';
 // Real production imports (zero duplicate mock emulation)
 import { buildTurns } from '../src/features/chat/utils/turns.ts';
 import { isToolRunning } from '../src/features/chat/components/work-log/toolTimeline.ts';
+import { buildTurnArtifactMap } from '../src/features/chat/hooks/streamEventParser.ts';
 
 console.log("======================================================================");
 console.log("STARTING FRONTEND CHAT RENDERING & TURN ISOLATION TESTS");
@@ -212,8 +213,102 @@ assert.strictEqual(mockSession.queuedMessages.length, 0, "Queue must now be empt
 
 console.log("  -> PASSED: Multi-item queue accumulation, index discard, and auto-dispatch 100% verified");
 
+// Test 8: Per-Turn Artifact Deliverable Isolation & Post-Streaming Timing
+console.log("\n[Frontend Test 8] Per-Turn Artifact Deliverable Isolation & Post-Streaming Timing");
+
+// 8a. Turn 1 writes implementation_plan.md while streaming
+const liveTurn1Msgs = [
+  { role: 'user', content: 'Create an implementation plan', turnId: 'turn_100' },
+  {
+    role: 'assistant',
+    content: 'Creating the plan now...',
+    turnId: 'turn_100',
+    status: 'running',
+    tools: [
+      { id: 't1', name: 'write_file', args: { path: 'implementation_plan.md' }, status: 'completed', output: 'File written.' },
+    ],
+  },
+];
+const turns1Streaming = buildTurns(liveTurn1Msgs);
+const streamCache = new Map();
+const artifactsDuringStream = buildTurnArtifactMap(turns1Streaming, true, streamCache);
+assert.strictEqual(
+  (artifactsDuringStream.get('0_0') || []).length,
+  0,
+  "Artifacts must NOT be delivered to the UI while streaming is actively in flight"
+);
+
+// 8b. Turn 1 stream completes: deliverable card extracted for Turn 1
+liveTurn1Msgs[1].status = 'completed';
+liveTurn1Msgs[1].content = 'Plan created successfully.';
+const turns1Done = buildTurns(liveTurn1Msgs);
+const artifactsPostStream = buildTurnArtifactMap(turns1Done, false, streamCache);
+const turn1Artifacts = artifactsPostStream.get('0_0') || [];
+assert.strictEqual(turn1Artifacts.length, 1, "Turn 1 must render exactly 1 artifact card upon stream completion");
+assert.strictEqual(turn1Artifacts[0].filePath, 'implementation_plan.md');
+
+// 8c. Turn 2 starts (streaming): user asks to execute plan
+const multiTurnMsgs = [
+  ...liveTurn1Msgs,
+  { role: 'user', content: 'Proceed with execution', turnId: 'turn_101' },
+  {
+    role: 'assistant',
+    content: 'Executing plan...',
+    turnId: 'turn_101',
+    status: 'running',
+    tools: [
+      { id: 't2', name: 'write_file', args: { path: 'walkthrough.md' }, status: 'completed', output: 'Walkthrough saved.' },
+    ],
+  },
+];
+const turns2Streaming = buildTurns(multiTurnMsgs);
+const artifactsTurn2Streaming = buildTurnArtifactMap(turns2Streaming, true, streamCache);
+
+// Turn 1's deliverable MUST NOT vanish or be evicted while Turn 2 is streaming!
+const turn1Retained = artifactsTurn2Streaming.get('0_0') || [];
+assert.strictEqual(turn1Retained.length, 1, "Turn 1 must retain its implementation_plan.md card across turns");
+assert.strictEqual(turn1Retained[0].filePath, 'implementation_plan.md');
+
+// Turn 2 is currently streaming: must NOT render its deliverable card yet
+const turn2StreamingArts = artifactsTurn2Streaming.get('1_0') || [];
+assert.strictEqual(turn2StreamingArts.length, 0, "Turn 2 deliverable must NOT render while Turn 2 is streaming");
+
+// 8d. Turn 2 stream completes: both turns retain their respective deliverables with zero duplicates
+multiTurnMsgs[3].status = 'completed';
+const turns2Done = buildTurns(multiTurnMsgs);
+const artifactsTurn2Done = buildTurnArtifactMap(turns2Done, false, streamCache);
+
+const finalTurn1 = artifactsTurn2Done.get('0_0') || [];
+const finalTurn2 = artifactsTurn2Done.get('1_0') || [];
+assert.strictEqual(finalTurn1.length, 1, "Turn 1 must cleanly retain implementation_plan.md");
+assert.strictEqual(finalTurn1[0].filePath, 'implementation_plan.md');
+assert.strictEqual(finalTurn2.length, 1, "Turn 2 must cleanly display walkthrough.md");
+assert.strictEqual(finalTurn2[0].filePath, 'walkthrough.md');
+
+// 8e. Deduplication verification: intra-turn duplicate tool touches on same file
+const duplicateToolMsgs = [
+  { role: 'user', content: 'Update the plan twice', turnId: 'turn_102' },
+  {
+    role: 'assistant',
+    content: 'Plan updated twice.',
+    turnId: 'turn_102',
+    status: 'completed',
+    tools: [
+      { id: 't3a', name: 'write_file', args: { path: 'audit_plan.md' }, status: 'completed', output: 'Initial write.' },
+      { id: 't3b', name: 'edit_file', args: { path: 'audit_plan.md' }, status: 'completed', output: 'Section added.' },
+    ],
+  },
+];
+const dupTurns = buildTurns(duplicateToolMsgs);
+const dupArtifacts = buildTurnArtifactMap(dupTurns, false);
+const dupList = dupArtifacts.get('0_0') || [];
+assert.strictEqual(dupList.length, 1, "Multiple tool modifications on the same file in one turn must NOT produce duplicate cards");
+assert.strictEqual(dupList[0].filePath, 'audit_plan.md');
+
+console.log("  -> PASSED: Post-streaming timing verified, per-turn isolation verified, zero duplicate cards guaranteed");
+
 console.log("\n======================================================================");
-console.log("ALL FRONTEND CHAT RENDERING TESTS PASSED (7/7)");
+console.log("ALL FRONTEND CHAT RENDERING TESTS PASSED (8/8)");
 console.log("======================================================================");
 
 
