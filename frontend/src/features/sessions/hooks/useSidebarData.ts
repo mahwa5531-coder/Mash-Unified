@@ -240,7 +240,7 @@ export function useSidebarData({
             reconciled.push({
               ...old,
               ...fresh,
-              title: (curId === old.session_id && curTitle) ? curTitle : (fresh.custom_title || fresh.title || old.title),
+              title: (curId === old.session_id && curTitle && !/^(new conversation|new chat)$/i.test(curTitle.trim())) ? curTitle : (fresh.custom_title || fresh.title || old.title),
               has_unread: curId === old.session_id ? false : fresh.has_unread,
             });
             seen.add(old.session_id);
@@ -255,7 +255,7 @@ export function useSidebarData({
           if (!seen.has(s.session_id) && !deletedSessionIds.has(s.session_id)) {
             reconciled.unshift({
               ...s,
-              title: (curId === s.session_id && curTitle) ? curTitle : (s.custom_title || s.title),
+              title: (curId === s.session_id && curTitle && !/^(new conversation|new chat)$/i.test(curTitle.trim())) ? curTitle : (s.custom_title || s.title),
               has_unread: curId === s.session_id ? false : s.has_unread,
             });
           }

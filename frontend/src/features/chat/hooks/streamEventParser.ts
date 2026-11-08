@@ -166,7 +166,7 @@ export function syncSessionSwitchingState(params: {
         history.setHistoryLoadError(false);
         setChatMessages([...msgs]);
         history.updatePaginationState(s);
-        requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; });
+
       }
     }, () => {
       if (activeSessionIdRef.current === sessionId) {
@@ -176,6 +176,6 @@ export function syncSessionSwitchingState(params: {
     });
   } else {
     history.updatePaginationState(state);
-    requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; });
+
   }
 }

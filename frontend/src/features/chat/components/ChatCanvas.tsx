@@ -219,15 +219,16 @@ export default function ChatCanvas({
     virtuosoRef.current?.scrollToIndex({
       index: turns.length - 1,
       align: 'end',
-      behavior: 'smooth',
+      behavior: isStreaming ? 'auto' : 'smooth',
     });
-  }, [turns.length]);
+  }, [turns.length, isStreaming]);
 
   // Immediate wheel & touch intent detection (inspired by assistant-ui useThreadViewportAutoScroll)
   // When the user scrolls upwards, immediately disconnect auto-follow to prevent
   // Virtuoso from snapping back down on streaming token flushes or tool renders.
   const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    if (e.deltaY < 0) {
+    // Deadband filter: ignore micro-drift (< 2px) to prevent precision trackpad false-disconnects
+    if (e.deltaY < -2) {
       setHitBottom(false);
     }
   }, []);
@@ -363,6 +364,7 @@ export default function ChatCanvas({
           atBottomStateChange={setHitBottom}
           atBottomThreshold={40}
           increaseViewportBy={{ top: 1200, bottom: 1200 }}
+          minOverscanItemCount={{ top: 1, bottom: 1 }}
           scrollerRef={(el) => {
             if (el instanceof HTMLElement) {
               el.style.overflowAnchor = 'none';
