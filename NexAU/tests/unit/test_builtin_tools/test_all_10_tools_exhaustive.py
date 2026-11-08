@@ -88,6 +88,19 @@ def test_03_replace_file_content_canonical_and_aliases(tmp_path: Path):
     )
     assert "Error:" in res3["content"]
 
+    # CRLF line ending preservation without CR-CR-LF doubling
+    crlf_target = tmp_path / "crlf_sample.txt"
+    crlf_target.write_bytes(b"USD 1,225,450.00\r\nSecond line\r\n")
+    res_crlf = replace_file_content(
+        TargetFile=str(crlf_target),
+        TargetContent="USD 1,225,450.00",
+        ReplacementContent="USD 1,221,450.00",
+    )
+    assert not res_crlf.get("isError")
+    crlf_bytes = crlf_target.read_bytes()
+    assert b"\r\r\n" not in crlf_bytes, "Must never double CRLF into CR-CR-LF on Windows"
+    assert crlf_bytes == b"USD 1,221,450.00\r\nSecond line\r\n"
+
 
 def test_04_search_file_content_canonical_and_aliases(tmp_path: Path):
     (tmp_path / "sample.py").write_text("SPECIAL_SEARCH_TOKEN_123 = True\n", encoding="utf-8")

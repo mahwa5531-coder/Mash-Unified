@@ -1143,7 +1143,7 @@ class LocalSandbox(BaseSandbox):
                         f.flush()
                         os.fsync(f.fileno())
                 else:
-                    with open(temp_path, "w", encoding=encoding) as f:
+                    with open(temp_path, "w", encoding=encoding, newline="") as f:
                         f.write(content if isinstance(content, str) else content.decode(encoding))
                         f.flush()
                         os.fsync(f.fileno())
