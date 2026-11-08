@@ -48,8 +48,8 @@ const CodeBlock = memo(function CodeBlock({
   }, [code, language, isDark, isStreaming, isNearViewport]);
 
   return (
-    <div className="my-3 rounded-lg overflow-hidden border border-[var(--border-subtle)] shadow-xs bg-[var(--bg-surface)]">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] text-xs font-mono text-[var(--text-secondary)]">
+    <div className="my-3 rounded-lg overflow-hidden border border-[var(--border-subtle)] shadow-xs bg-[var(--bg-app)]">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-100 dark:bg-white/[0.04] border-b border-[var(--border-subtle)] text-xs font-mono text-[var(--text-secondary)]">
         <div className="flex items-center gap-2">
           <span className="font-mono text-[11px] font-medium text-zinc-600 dark:text-zinc-400">{language || 'code'}</span>
           <span className="text-[10px] text-[var(--text-muted)] font-sans">({lineCount} lines)</span>
@@ -69,15 +69,15 @@ const CodeBlock = memo(function CodeBlock({
       <div>
         {isStreaming ? (
           <pre
-            className="font-mono text-[13px] leading-[1.5] p-3 text-zinc-800 dark:text-zinc-200 overflow-x-auto whitespace-pre select-text m-0"
-            style={{ background: 'var(--bg-surface)' }}
+            className="font-mono text-[13px] leading-[1.5] p-3 text-zinc-800 dark:text-zinc-200 overflow-x-auto whitespace-pre select-text m-0 bg-[var(--bg-app)]"
+            style={{ background: 'var(--bg-app)' }}
           >
             <code>{code}</code>
           </pre>
         ) : (
           <pre
-            className="font-mono text-[13px] leading-[1.5] p-3 text-zinc-800 dark:text-zinc-200 overflow-x-auto whitespace-pre select-text m-0"
-            style={{ background: 'var(--bg-surface)' }}
+            className="font-mono text-[13px] leading-[1.5] p-3 text-zinc-800 dark:text-zinc-200 overflow-x-auto whitespace-pre select-text m-0 bg-[var(--bg-app)]"
+            style={{ background: 'var(--bg-app)' }}
           >
             <code dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
           </pre>

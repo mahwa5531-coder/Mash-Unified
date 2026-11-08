@@ -65,7 +65,7 @@ export function FileTabStrip({
   return (
     <div
       className={cn(
-        "h-9 bg-zinc-100/90 dark:bg-[#121214] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center justify-between px-2 shrink-0 w-full overflow-hidden select-none",
+        "h-9 bg-zinc-100/90 dark:bg-[var(--bg-app)] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center justify-between px-2 shrink-0 w-full overflow-hidden select-none",
         className
       )}
     >

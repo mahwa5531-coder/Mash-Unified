@@ -244,7 +244,7 @@ export default function SafeFileViewer({
           <ErrorBoundary
             scope="markdown-viewer"
             fallback={
-              <pre className="p-5 font-mono text-[12.5px] leading-relaxed whitespace-pre overflow-auto select-text">
+              <pre className="p-5 font-mono text-[12.5px] leading-relaxed whitespace-pre overflow-auto select-text bg-[var(--bg-app)]">
                 {displayedContent}
               </pre>
             }

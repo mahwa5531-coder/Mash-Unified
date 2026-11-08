@@ -2,9 +2,7 @@
 
 import React from 'react';
 import { 
-  FileCode, 
-  FileText, 
-  Settings 
+  FileText 
 } from 'lucide-react';
 import {
   FluentExcelLogo,
@@ -26,6 +24,42 @@ import {
   ZipArchiveLogo,
   ImageEvidenceLogo,
   MediaEvidenceLogo,
+  TypeScriptLogo,
+  JavaScriptLogo,
+  ReactLogo,
+  RustLogo,
+  GoLogo,
+  CLogo,
+  CppLogo,
+  CSharpLogo,
+  JavaLogo,
+  KotlinLogo,
+  SwiftLogo,
+  RubyLogo,
+  PhpLogo,
+  VueLogo,
+  SvelteLogo,
+  AstroLogo,
+  HtmlLogo,
+  CssLogo,
+  SassLogo,
+  TailwindLogo,
+  GraphqlLogo,
+  PrismaLogo,
+  ProtobufLogo,
+  DartLogo,
+  LuaLogo,
+  ZigLogo,
+  ElixirLogo,
+  ScalaLogo,
+  HaskellLogo,
+  DockerLogo,
+  GitLogo,
+  EnvConfigLogo,
+  ConfigSettingsLogo,
+  KubernetesLogo,
+  TerraformLogo,
+  MakefileLogo,
 } from './FileLogos';
 
 export interface FileIconProps {
@@ -36,19 +70,208 @@ export interface FileIconProps {
   isOpen?: boolean;
 }
 
-/** Authentic React Atom SVG Logo */
-function ReactIconSvg({ size = 14, className = "" }: { size?: number; className?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="-11.5 -10.23 23 20.46" fill="none" className={`shrink-0 ${className}`}>
-      <circle cx="0" cy="0" r="2.05" fill="#61dafb" />
-      <g stroke="#61dafb" strokeWidth="1" fill="none">
-        <ellipse rx="11" ry="4.2" />
-        <ellipse rx="11" ry="4.2" transform="rotate(60)" />
-        <ellipse rx="11" ry="4.2" transform="rotate(120)" />
-      </g>
-    </svg>
-  );
-}
+type LogoComponent = React.ComponentType<{ size?: number; className?: string }>;
+
+/** Exact filename lookup for common development & configuration files */
+const EXACT_FILE_MAP: Record<string, LogoComponent> = {
+  'dockerfile': DockerLogo,
+  '.dockerignore': DockerLogo,
+  'docker-compose.yml': DockerLogo,
+  'docker-compose.yaml': DockerLogo,
+  '.gitignore': GitLogo,
+  '.gitattributes': GitLogo,
+  '.gitmodules': GitLogo,
+  'package.json': JsonObjectLogo,
+  'package-lock.json': JsonObjectLogo,
+  'tsconfig.json': TypeScriptLogo,
+  'cargo.toml': RustLogo,
+  'cargo.lock': RustLogo,
+  'go.mod': GoLogo,
+  'go.sum': GoLogo,
+  'requirements.txt': AuthenticPythonLogo,
+  'pyproject.toml': AuthenticPythonLogo,
+  'makefile': MakefileLogo,
+  'gnumakefile': MakefileLogo,
+  'cmakelists.txt': CLogo,
+  '.editorconfig': ConfigSettingsLogo,
+};
+
+/** Extension lookup dictionary covering languages, formats, and tools */
+const EXTENSION_MAP: Record<string, LogoComponent> = {
+  // Spreadsheets & Financial Workpapers
+  'xlsx': FluentExcelLogo,
+  'xls': FluentExcelLogo,
+  'xlsm': FluentExcelLogo,
+  'xlsb': FluentExcelLogo,
+  'ods': FluentExcelLogo,
+
+  // Presentations & Executive Decks
+  'pptx': FluentPowerPointLogo,
+  'ppt': FluentPowerPointLogo,
+  'odp': FluentPowerPointLogo,
+  'key': FluentPowerPointLogo,
+
+  // Delimited Data & Analytics
+  'csv': CsvDelimitedLogo,
+  'tsv': CsvDelimitedLogo,
+  'tab': CsvDelimitedLogo,
+  'parquet': CsvDelimitedLogo,
+  'feather': CsvDelimitedLogo,
+  'arrow': CsvDelimitedLogo,
+
+  // Statutory Documents & Memos
+  'pdf': AdobePdfLogo,
+
+  // Word Documents & Letters
+  'docx': FluentWordLogo,
+  'doc': FluentWordLogo,
+  'odt': FluentWordLogo,
+  'rtf': FluentWordLogo,
+
+  // Python & Data Science
+  'py': AuthenticPythonLogo,
+  'pyw': AuthenticPythonLogo,
+  'pyi': AuthenticPythonLogo,
+  'ipynb': JupyterNotebookLogo,
+
+  // TypeScript & JavaScript Ecosystem
+  'ts': TypeScriptLogo,
+  'mts': TypeScriptLogo,
+  'cts': TypeScriptLogo,
+  'tsx': ReactLogo,
+  'jsx': ReactLogo,
+  'js': JavaScriptLogo,
+  'mjs': JavaScriptLogo,
+  'cjs': JavaScriptLogo,
+
+  // Web Frameworks & Frontend
+  'vue': VueLogo,
+  'svelte': SvelteLogo,
+  'astro': AstroLogo,
+  'html': HtmlLogo,
+  'htm': HtmlLogo,
+  'xhtml': HtmlLogo,
+  'css': CssLogo,
+  'scss': SassLogo,
+  'sass': SassLogo,
+  'less': SassLogo,
+
+  // Systems & Compiled Languages
+  'rs': RustLogo,
+  'go': GoLogo,
+  'c': CLogo,
+  'h': CLogo,
+  'cpp': CppLogo,
+  'hpp': CppLogo,
+  'cc': CppLogo,
+  'cxx': CppLogo,
+  'c++': CppLogo,
+  'cs': CSharpLogo,
+  'csx': CSharpLogo,
+  'java': JavaLogo,
+  'class': JavaLogo,
+  'jar': JavaLogo,
+  'kt': KotlinLogo,
+  'kts': KotlinLogo,
+  'swift': SwiftLogo,
+  'rb': RubyLogo,
+  'erb': RubyLogo,
+  'gemspec': RubyLogo,
+  'php': PhpLogo,
+  'phtml': PhpLogo,
+  'dart': DartLogo,
+  'lua': LuaLogo,
+  'zig': ZigLogo,
+  'ex': ElixirLogo,
+  'exs': ElixirLogo,
+  'scala': ScalaLogo,
+  'sc': ScalaLogo,
+  'hs': HaskellLogo,
+  'lhs': HaskellLogo,
+
+  // API, Database & Schemas
+  'graphql': GraphqlLogo,
+  'gql': GraphqlLogo,
+  'prisma': PrismaLogo,
+  'proto': ProtobufLogo,
+  'protobuf': ProtobufLogo,
+  'sql': SqlDatabaseLogo,
+  'db': SqlDatabaseLogo,
+  'sqlite': SqlDatabaseLogo,
+  'sqlite3': SqlDatabaseLogo,
+  'duckdb': SqlDatabaseLogo,
+
+  // DevOps & Cloud Configuration
+  'tf': TerraformLogo,
+  'tfvars': TerraformLogo,
+  'k8s': KubernetesLogo,
+
+  // Data Formats & Configs
+  'json': JsonObjectLogo,
+  'json5': JsonObjectLogo,
+  'jsonc': JsonObjectLogo,
+  'yaml': YamlConfigLogo,
+  'yml': YamlConfigLogo,
+  'xml': XmlXbrlLogo,
+  'xbrl': XmlXbrlLogo,
+  'xaml': XmlXbrlLogo,
+  'toml': ConfigSettingsLogo,
+  'ini': ConfigSettingsLogo,
+  'conf': ConfigSettingsLogo,
+  'cfg': ConfigSettingsLogo,
+  'properties': ConfigSettingsLogo,
+
+  // Documentation & Templates
+  'md': OfficialMarkdownLogo,
+  'markdown': OfficialMarkdownLogo,
+  'mdx': OfficialMarkdownLogo,
+  'rmd': OfficialMarkdownLogo,
+
+  // Shell Scripts & Terminal
+  'sh': ConsoleTerminalLogo,
+  'bash': ConsoleTerminalLogo,
+  'zsh': ConsoleTerminalLogo,
+  'ps1': ConsoleTerminalLogo,
+  'psm1': ConsoleTerminalLogo,
+  'psd1': ConsoleTerminalLogo,
+  'bat': ConsoleTerminalLogo,
+  'cmd': ConsoleTerminalLogo,
+
+  // Media & Scanned Evidence Vouchers
+  'png': ImageEvidenceLogo,
+  'jpg': ImageEvidenceLogo,
+  'jpeg': ImageEvidenceLogo,
+  'gif': ImageEvidenceLogo,
+  'svg': ImageEvidenceLogo,
+  'webp': ImageEvidenceLogo,
+  'ico': ImageEvidenceLogo,
+  'bmp': ImageEvidenceLogo,
+  'tiff': ImageEvidenceLogo,
+  'tif': ImageEvidenceLogo,
+  'avif': ImageEvidenceLogo,
+
+  // Statutory Audio/Video Recordings
+  'mp4': MediaEvidenceLogo,
+  'mov': MediaEvidenceLogo,
+  'avi': MediaEvidenceLogo,
+  'mkv': MediaEvidenceLogo,
+  'webm': MediaEvidenceLogo,
+  'mp3': MediaEvidenceLogo,
+  'wav': MediaEvidenceLogo,
+  'm4a': MediaEvidenceLogo,
+  'ogg': MediaEvidenceLogo,
+  'flac': MediaEvidenceLogo,
+
+  // Evidence Archives & Backups
+  'zip': ZipArchiveLogo,
+  'tar': ZipArchiveLogo,
+  'gz': ZipArchiveLogo,
+  'rar': ZipArchiveLogo,
+  '7z': ZipArchiveLogo,
+  'bz2': ZipArchiveLogo,
+  'xz': ZipArchiveLogo,
+  'tgz': ZipArchiveLogo,
+};
 
 export function FileIcon({ 
   filename, 
@@ -67,27 +290,18 @@ export function FileIcon({
   const basename = clean.split(/[/\\]/).pop() || clean;
   const ext = basename.split('.').pop() || '';
 
-  // 1. Special full filenames & config patterns
-  if (basename === 'dockerfile' || basename.startsWith('dockerfile.') || basename.startsWith('docker-compose')) {
-    return <FileCode size={size} style={iconStyle} className={`${className} text-[#2496ED]`} />;
+  // 1. Exact Filename Match
+  const ExactMatch = EXACT_FILE_MAP[basename];
+  if (ExactMatch) {
+    return <ExactMatch size={size} className={className} />;
   }
-  if (basename === '.gitignore' || basename === '.gitattributes' || basename === '.gitmodules') {
-    return <FileText size={size} style={iconStyle} className={`${className} text-[#F05032]`} />;
-  }
+
+  // 2. Prefix / Pattern Matches
   if (basename.startsWith('.env')) {
-    return <Settings size={size} style={iconStyle} className={`${className} text-[#E5C07B]`} />;
+    return <EnvConfigLogo size={size} className={className} />;
   }
-  if (basename === 'package.json' || basename === 'package-lock.json' || basename === 'tsconfig.json') {
-    return <JsonObjectLogo size={size} className={className} />;
-  }
-  if (basename === 'cargo.toml' || basename === 'cargo.lock') {
-    return <Settings size={size} style={iconStyle} className={`${className} text-[#DEA584]`} />;
-  }
-  if (basename === 'go.mod' || basename === 'go.sum') {
-    return <FileCode size={size} style={iconStyle} className={`${className} text-[#00ADD8]`} />;
-  }
-  if (basename === 'requirements.txt' || basename === 'pyproject.toml') {
-    return <AuthenticPythonLogo size={size} className={className} />;
+  if (basename.startsWith('dockerfile') || basename.startsWith('docker-compose')) {
+    return <DockerLogo size={size} className={className} />;
   }
   if (basename.includes('plan') && (ext === 'md' || ext === 'markdown' || ext === 'txt' || !ext)) {
     return <ImplementationPlanLogo size={size} className={className} />;
@@ -96,174 +310,14 @@ export function FileIcon({
     return <AuditWalkthroughLogo size={size} className={className} />;
   }
 
-  // 2. Extensions matching
-  switch (ext) {
-    // Spreadsheets & Financial Workpapers (Microsoft Fluent 365)
-    case 'xlsx':
-    case 'xls':
-    case 'xlsm':
-    case 'xlsb':
-    case 'ods':
-      return <FluentExcelLogo size={size} className={className} />;
-
-    // Presentations & Executive Decks (Microsoft Fluent 365)
-    case 'pptx':
-    case 'ppt':
-    case 'odp':
-    case 'key':
-      return <FluentPowerPointLogo size={size} className={className} />;
-
-    // Delimited Data & Analytics (Teal CSV Matrix)
-    case 'csv':
-    case 'tsv':
-    case 'tab':
-    case 'parquet':
-    case 'feather':
-    case 'arrow':
-      return <CsvDelimitedLogo size={size} className={className} />;
-
-    // Statutory Documents & Memos (Adobe Acrobat Official)
-    case 'pdf':
-      return <AdobePdfLogo size={size} className={className} />;
-
-    // Word Documents & Letters (Microsoft Fluent 365)
-    case 'docx':
-    case 'doc':
-    case 'odt':
-    case 'rtf':
-      return <FluentWordLogo size={size} className={className} />;
-
-    // Python & Data Science (Official Language Dual-Snake)
-    case 'py':
-    case 'pyw':
-    case 'pyi':
-      return <AuthenticPythonLogo size={size} className={className} />;
-    case 'ipynb':
-      return <JupyterNotebookLogo size={size} className={className} />;
-
-    // JavaScript & TypeScript Ecosystem
-    case 'ts':
-    case 'mts':
-    case 'cts':
-      return <FileCode size={size} style={iconStyle} className={`${className} text-[#3178C6]`} />;
-    case 'tsx':
-    case 'jsx':
-      return <ReactIconSvg size={size} className={className} />;
-    case 'js':
-    case 'mjs':
-    case 'cjs':
-      return <FileCode size={size} style={iconStyle} className={`${className} text-[#F7DF1E]`} />;
-
-    // Templates & Documentations
-    case 'md':
-    case 'markdown':
-    case 'mdx':
-      return <OfficialMarkdownLogo size={size} className={className} />;
-    case 'txt':
-    case 'log':
-      return <FileText size={size} style={iconStyle} className={`${className} text-zinc-400`} />;
-
-    // Web Frontend
-    case 'html':
-    case 'htm':
-      return <FileCode size={size} style={iconStyle} className={`${className} text-[#E34F26]`} />;
-    case 'css':
-    case 'scss':
-    case 'sass':
-    case 'less':
-      return <FileCode size={size} style={iconStyle} className={`${className} text-[#1572B6]`} />;
-
-    // Data Formats & Configs
-    case 'json':
-    case 'json5':
-    case 'jsonc':
-      return <JsonObjectLogo size={size} className={className} />;
-    case 'yaml':
-    case 'yml':
-      return <YamlConfigLogo size={size} className={className} />;
-    case 'xml':
-    case 'xbrl':
-      return <XmlXbrlLogo size={size} className={className} />;
-    case 'toml':
-    case 'ini':
-    case 'conf':
-    case 'cfg':
-      return <Settings size={size} style={iconStyle} className={`${className} text-[#E5C07B]`} />;
-
-    // Database & SQL
-    case 'sql':
-    case 'db':
-    case 'sqlite':
-    case 'sqlite3':
-    case 'duckdb':
-      return <SqlDatabaseLogo size={size} className={className} />;
-
-    // Shell Scripts & Terminal
-    case 'sh':
-    case 'bash':
-    case 'zsh':
-    case 'ps1':
-    case 'psm1':
-    case 'bat':
-    case 'cmd':
-      return <ConsoleTerminalLogo size={size} className={className} />;
-
-    // Systems & Compiled Languages
-    case 'rs':
-      return <FileCode size={size} style={iconStyle} className={`${className} text-[#DEA584]`} />;
-    case 'go':
-      return <FileCode size={size} style={iconStyle} className={`${className} text-[#00ADD8]`} />;
-    case 'c':
-    case 'h':
-    case 'cpp':
-    case 'hpp':
-    case 'cc':
-    case 'cxx':
-      return <FileCode size={size} style={iconStyle} className={`${className} text-[#00599C]`} />;
-    case 'java':
-    case 'class':
-    case 'jar':
-      return <FileCode size={size} style={iconStyle} className={`${className} text-[#ED8B00]`} />;
-
-    // Media & Scanned Evidence Vouchers
-    case 'png':
-    case 'jpg':
-    case 'jpeg':
-    case 'gif':
-    case 'svg':
-    case 'webp':
-    case 'ico':
-    case 'bmp':
-    case 'tiff':
-    case 'tif':
-      return <ImageEvidenceLogo size={size} className={className} />;
-
-    // Statutory Interview & Audio/Video Recordings
-    case 'mp4':
-    case 'mov':
-    case 'avi':
-    case 'mkv':
-    case 'webm':
-    case 'mp3':
-    case 'wav':
-    case 'm4a':
-    case 'ogg':
-      return <MediaEvidenceLogo size={size} className={className} />;
-
-    // Evidence Archives & Backups
-    case 'zip':
-    case 'tar':
-    case 'gz':
-    case 'rar':
-    case '7z':
-    case 'bz2':
-    case 'xz':
-      return <ZipArchiveLogo size={size} className={className} />;
-
-    // Fallback default
-    default:
-      return <FileText size={size} style={iconStyle} className={`${className} text-zinc-400`} />;
+  // 3. Extension Map Match
+  const ExtMatch = EXTENSION_MAP[ext];
+  if (ExtMatch) {
+    return <ExtMatch size={size} className={className} />;
   }
+
+  // 4. Fallback Default
+  return <FileText size={size} style={iconStyle} className={`${className} text-zinc-400`} />;
 }
 
 export default FileIcon;
