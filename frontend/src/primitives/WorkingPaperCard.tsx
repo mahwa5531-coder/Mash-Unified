@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Check } from 'lucide-react';
+import FileIcon from '@/primitives/FileIcon';
 import { cn } from '@/lib/utils';
 import { normalizePath } from '@/utils/normalizePath';
 
@@ -56,9 +57,9 @@ export function WorkingPaperCard({
       )}
     >
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        {/* The distinctive <> indicator */}
-        <span className="font-mono text-xs font-semibold text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors select-none shrink-0 tracking-tight">
-          &lt;&gt;
+        {/* Deliverable Logo */}
+        <span className="flex items-center justify-center shrink-0 w-4 h-4">
+          <FileIcon filename={cleanPath} size={15} className="shrink-0" />
         </span>
 
         {/* Clean Title */}

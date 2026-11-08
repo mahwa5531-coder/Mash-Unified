@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { BookOpen, FileSpreadsheet, Image as ImageIcon, Download } from 'lucide-react';
+import FileIcon from '@/primitives/FileIcon';
 import { ArtifactItem } from '@/types/artifacts';
 import { BASE_URL } from '@/services/client';
 import { WorkingPaperCard } from '@/primitives/WorkingPaperCard';
@@ -75,7 +76,7 @@ export default function ArtifactCard({
     }
     return (
       <div className="w-8 h-8 rounded-lg bg-zinc-500/10 border border-zinc-500/20 flex items-center justify-center text-zinc-500 dark:text-zinc-400 font-mono text-xs font-semibold shrink-0">
-        &lt;&gt;
+        <FileIcon filename={artifact.filePath} size={16} />
       </div>
     );
   };

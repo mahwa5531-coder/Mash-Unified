@@ -36,6 +36,11 @@ export function FilePill({
   const halfPath = parent && parent !== '.' && !/^[a-zA-Z]:$/.test(parent) ? `${parent}/${basename}` : basename;
   const rawDisplay = label || halfPath;
 
+  const slashIdx = rawDisplay.lastIndexOf('/');
+  const hasDir = slashIdx >= 0;
+  const dirPrefix = hasDir ? rawDisplay.slice(0, slashIdx + 1) : '';
+  const filePart = hasDir ? rawDisplay.slice(slashIdx + 1) : rawDisplay;
+
   let lineSuffix = '';
   // Only append lineSuffix if rawDisplay does not already contain a line indicator (:12 or :L12 or :12-30)
   const hasLineInDisplay = /:(?:L)?\d+(?:-\d+)?$/i.test(rawDisplay);
@@ -70,11 +75,10 @@ export function FilePill({
       onClick={handleClick}
       title={isClickable ? `Open ${cleanPath}${lineSuffix}` : rawDisplay}
       className={cn(
-        "group inline-flex items-center gap-1.5 h-[21px] px-1.5 py-0 mx-0.5 rounded-[4px] font-mono text-[11px] leading-none select-none align-baseline my-0 outline-none transition-all duration-150",
+        "group inline-flex items-center gap-1.5 h-[22px] px-2 py-0 mx-0.5 rounded-[5px] font-sans text-[12px] leading-none select-none align-middle relative -top-[0.5px] outline-none transition-all duration-150",
         isClickable ? "cursor-pointer active:scale-[0.98]" : "cursor-default",
         // Calm ghost styling: clean neutral surface, authentic file logo, subtle hover highlight
         "bg-zinc-100/90 hover:bg-zinc-200/90 dark:bg-white/[0.06] dark:hover:bg-white/[0.12]",
-        "text-zinc-700 hover:text-zinc-950 dark:text-zinc-200 dark:hover:text-white",
         "border border-zinc-200/90 hover:border-zinc-300 dark:border-white/[0.08] dark:hover:border-white/[0.20]",
         "shadow-2xs",
         className
@@ -83,13 +87,13 @@ export function FilePill({
     >
       {/* File logo and/or close button in the left slot */}
       {(showIcon || onClose) && (
-        <span className="relative flex items-center justify-center shrink-0 w-3 h-3">
+        <span className="relative flex items-center justify-center shrink-0 w-3.5 h-3.5">
           {showIcon && (
             <span className={cn(
               "flex items-center justify-center shrink-0 transition-opacity duration-100",
               onClose ? "group-hover:opacity-0 group-hover:pointer-events-none" : ""
             )}>
-              <FileIcon filename={filePathOnly} size={12} className="shrink-0 group-hover:scale-105 transition-transform" />
+              <FileIcon filename={filePathOnly} size={13} className="shrink-0 group-hover:scale-105 transition-transform" />
             </span>
           )}
 
@@ -101,7 +105,7 @@ export function FilePill({
                 e.stopPropagation();
                 onClose(e);
               }}
-              className="absolute inset-0 m-auto w-3 h-3 p-0 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-200/80 dark:hover:bg-white/[0.15] opacity-0 group-hover:opacity-100 transition-all cursor-pointer outline-none shrink-0"
+              className="absolute inset-0 m-auto w-3.5 h-3.5 p-0 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-200/80 dark:hover:bg-white/[0.15] opacity-0 group-hover:opacity-100 transition-all cursor-pointer outline-none shrink-0"
               title={`Remove ${rawDisplay}`}
               aria-label={`Remove ${rawDisplay}`}
             >
@@ -111,11 +115,18 @@ export function FilePill({
         </span>
       )}
 
-      <span className="truncate max-w-[240px] font-medium leading-none">
-        {rawDisplay}
+      <span className="truncate max-w-[260px] leading-none">
+        {dirPrefix && (
+          <span className="text-zinc-400 dark:text-zinc-500 font-normal">
+            {dirPrefix}
+          </span>
+        )}
+        <span className="font-medium text-zinc-700 group-hover:text-zinc-950 dark:text-zinc-200 dark:group-hover:text-white">
+          {filePart}
+        </span>
       </span>
       {lineSuffix && (
-        <span className="font-mono text-[9.5px] text-zinc-400 dark:text-zinc-500 font-normal leading-none shrink-0">
+        <span className="font-mono text-[10.5px] text-zinc-400 dark:text-zinc-400 font-normal leading-none shrink-0">
           {lineSuffix}
         </span>
       )}

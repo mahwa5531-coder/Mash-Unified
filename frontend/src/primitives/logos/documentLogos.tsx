@@ -46,14 +46,15 @@ export function FluentWordLogo({ size = 16, className = "" }: { size?: number; c
   );
 }
 
-/** LOGO-MD-1: Slate Markdown Note Sheet (Notion / Executive Document Style) */
+/** LOGO-MD-1: Official Universal Markdown Mark (M ↓ standard) */
 export function OfficialMarkdownLogo({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={`shrink-0 ${className}`}>
-      <rect x="3" y="2.5" width="18" height="19" rx="3" fill="#64748B" fillOpacity="0.14" stroke="#64748B" strokeWidth="1.5" />
-      <path d="M7 7.5H17" stroke="#64748B" strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M7 11.5H15" stroke="#64748B" strokeWidth="1.4" strokeLinecap="round" opacity="0.85" />
-      <path d="M7 15.5H11.5" stroke="#64748B" strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />
+      <rect x="2" y="3.5" width="20" height="17" rx="3" fill="#0284C7" fillOpacity="0.14" stroke="#0284C7" strokeWidth="1.6" />
+      {/* Authentic Markdown 'M' */}
+      <path d="M5.5 16V8H7.5L10 11.2L12.5 8H14.5V16H12.8V11.2L10.6 14H9.4L7.2 11.2V16H5.5Z" fill="#0284C7" />
+      {/* Authentic Markdown Down Arrow */}
+      <path d="M17.5 8V12.5H19.5L17 16L14.5 12.5H16.5V8H17.5Z" fill="#0284C7" />
     </svg>
   );
 }
