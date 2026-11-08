@@ -154,7 +154,7 @@ export default function Sidebar({
           normUri.endsWith('/' + p.name.toLowerCase())
         );
       });
-      repo = (session.project_name && session.project_name !== 'No Repo') ? session.project_name : (matchedProject ? matchedProject.name : (
+      repo = (session.project_name && session.project_name !== 'No Repo') ? session.project_name : (matchedProject ? matchedProject.name :
         uri.includes('/') || uri.includes('\\')
           ? uri.split(/[/\\]/).filter(Boolean).pop() || uri
           : uri

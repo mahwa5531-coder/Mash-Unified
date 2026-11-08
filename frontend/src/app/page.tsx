@@ -363,6 +363,7 @@ export default function Home() {
                 archivedSessionIds={archivedSessionIds}
                 onToggleArchive={handleToggleArchive}
                 onDeleteSession={handleDeleteSession}
+
                 onRenameSession={handleRenameSession}
                 authUser={authUser}
               />
@@ -389,7 +390,7 @@ export default function Home() {
                     sessions={allSessions}
                     onSelectSession={handleSelectSession}
                     onDeleteSession={handleDeleteSession}
-                onRenameSession={handleRenameSession}
+
                     archivedSessionIds={archivedSessionIds}
                     onToggleArchive={handleToggleArchive}
                   />
