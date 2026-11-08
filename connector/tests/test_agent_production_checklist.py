@@ -25,9 +25,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "NexAU"))
 
 from app.main import app, lifespan
+from app.paths import resolve_deliverables_dir
 from app.routers.chat import (
     _ensure_project_and_context,
-    resolve_deliverables_dir,
 )
 from app.workspace import is_path_in_base_roots
 from nexau.archs.main_sub.execution.hooks import AfterToolHookInput
