@@ -37,6 +37,7 @@ interface SidebarProps {
   archivedSessionIds?: Set<string>;
   onToggleArchive?: (sessionId: string) => void;
   onDeleteSession?: (sessionId: string, showToast?: boolean) => Promise<any> | void;
+  onRenameSession?: (sessionId: string, newTitle: string) => void;
   authUser?: AuthUser | null;
 }
 
@@ -70,6 +71,7 @@ export default function Sidebar({
   archivedSessionIds: externalArchivedSessionIds,
   onToggleArchive: externalOnToggleArchive,
   onDeleteSession,
+  onRenameSession,
   authUser,
 }: SidebarProps) {
   // Atomised Resizing
@@ -152,7 +154,7 @@ export default function Sidebar({
           normUri.endsWith('/' + p.name.toLowerCase())
         );
       });
-      repo = matchedProject ? matchedProject.name : (
+      repo = (session.project_name && session.project_name !== 'No Repo') ? session.project_name : (matchedProject ? matchedProject.name : (
         uri.includes('/') || uri.includes('\\')
           ? uri.split(/[/\\]/).filter(Boolean).pop() || uri
           : uri
@@ -206,11 +208,13 @@ export default function Sidebar({
         setSessions(prev =>
           prev.map(s => s.session_id === sessionId ? { ...s, custom_title: trimmed, title: trimmed } : s)
         );
+        onRenameSession?.(sessionId, trimmed);
         const ok = await renameSession(sessionId, trimmed);
         if (!ok) {
           setSessions(prev =>
             prev.map(s => s.session_id === sessionId ? { ...s, custom_title: original, title: original } : s)
           );
+          onRenameSession?.(sessionId, original);
           setDeleteError({
             title: "Failed to rename",
             message: `Could not rename conversation to "${trimmed}". Changes were reverted.`,

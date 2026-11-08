@@ -109,9 +109,14 @@ export default function Home() {
               if (match.custom_title || match.title) {
                 setSelectedSessionTitle(match.custom_title || match.title);
               }
-              if (match.workspace_uri && match.workspace_uri !== 'No Repo') {
-                setSelectedSessionRepo(match.workspace_uri);
-              }
+              const repoDisplayName = match.project_name || (
+                match.workspace_uri && match.workspace_uri !== 'No Repo'
+                  ? (match.workspace_uri.includes('/') || match.workspace_uri.includes('\\')
+                      ? match.workspace_uri.split(/[/\\]/).filter(Boolean).pop() || match.workspace_uri
+                      : match.workspace_uri)
+                  : 'No Repo'
+              );
+              setSelectedSessionRepo(repoDisplayName);
             }
           }
         }).catch(() => {});
@@ -161,6 +166,12 @@ export default function Home() {
     setPendingWorkspacePath(null);
     setIsHistoryActive(false);
   }, []);
+
+  const handleRenameSession = useCallback((sessionId: string, newTitle: string) => {
+    if (sessionId === selectedSessionId) {
+      setSelectedSessionTitle(newTitle);
+    }
+  }, [selectedSessionId]);
 
   const handleNewSession = useCallback((repoName: string = 'No Repo', folderPath?: string) => {
     setSelectedSessionId(null);
@@ -352,6 +363,7 @@ export default function Home() {
                 archivedSessionIds={archivedSessionIds}
                 onToggleArchive={handleToggleArchive}
                 onDeleteSession={handleDeleteSession}
+                onRenameSession={handleRenameSession}
                 authUser={authUser}
               />
             )}
@@ -377,6 +389,7 @@ export default function Home() {
                     sessions={allSessions}
                     onSelectSession={handleSelectSession}
                     onDeleteSession={handleDeleteSession}
+                onRenameSession={handleRenameSession}
                     archivedSessionIds={archivedSessionIds}
                     onToggleArchive={handleToggleArchive}
                   />

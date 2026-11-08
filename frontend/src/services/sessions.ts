@@ -5,6 +5,7 @@ import { BASE_URL, safeFetch } from './client';
 export interface SessionItem {
   session_id: string;
   project_id?: string | null;
+  project_name?: string | null;
   title: string;
   custom_title: string;
   workspace_uri: string;

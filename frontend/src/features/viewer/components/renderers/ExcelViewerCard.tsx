@@ -68,12 +68,7 @@ export function ExcelViewerCard({
 
       const data = await res.json().catch(() => ({}));
 
-      if (data.status === 'success') {
-        setStatusFeedback({
-          type: 'success',
-          message: 'Workbook launched in Microsoft Excel',
-        });
-      } else {
+      if (data.status !== 'success') {
         const rawMsg = data.message || '';
         const isNoApp = rawMsg.includes('1155') || rawMsg.toLowerCase().includes('no application');
         setStatusFeedback({

@@ -60,6 +60,20 @@ async def list_all_sessions(engine: Any, include_benchmarks: bool = False) -> di
         raise HTTPException(status_code=503, detail="Database engine is unavailable")
     try:
         db_sessions = await eng.find_many(SessionModel)
+        project_map: dict[str, str] = {}
+        folder_map: dict[str, str] = {}
+        try:
+            db_projects = await eng.find_many(ProjectModel)
+            for p in db_projects:
+                if p.id and p.name:
+                    project_map[str(p.id).lower()] = p.name
+                    project_map[p.name.lower()] = p.name
+                if getattr(p, "local_folder_path", None):
+                    norm = p.local_folder_path.replace("\\", "/").rstrip("/").lower()
+                    folder_map[norm] = p.name
+        except Exception:
+            pass
+
         session_stats: dict[str, dict[str, Any]] = {}
         try:
             async_eng = getattr(getattr(eng, "_inner", None), "_engine", None)
@@ -87,8 +101,20 @@ async def list_all_sessions(engine: Any, include_benchmarks: bool = False) -> di
             ws = ctx.get("workspace_uri", "No Repo")
             sec = ctx.get("section") or ("workspace" if ws not in ("No Repo", "", None) else "conversation")
 
+            pid = str(ctx.get("project_id") or "").lower()
+            norm_ws = ws.replace("\\", "/").rstrip("/").lower() if ws and ws != "No Repo" else ""
+            p_name = project_map.get(pid) or folder_map.get(norm_ws)
+            if not p_name and norm_ws:
+                for k, v in folder_map.items():
+                    if k and (norm_ws.endswith("/" + k) or k.endswith("/" + norm_ws)):
+                        p_name = v
+                        break
+            if not p_name and ws and ws != "No Repo":
+                p_name = ws.split("/")[-1].split("\\")[-1] or ws
+
             result.append({
                 "session_id": sid, "project_id": ctx.get("project_id"),
+                "project_name": p_name or "No Repo",
                 "title": generate_clean_session_title(ctx.get("title") or ctx.get("custom_title") or "New Conversation", sid),
                 "custom_title": ctx.get("custom_title"), "workspace_uri": ws, "working_directory": ctx.get("working_directory", ws),
                 "section": sec, "message_count": msg_count, "total_tokens": ctx.get("total_tokens") or 0,

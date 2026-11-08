@@ -361,15 +361,16 @@ export default function ChatCanvas({
           startReached={isStreaming ? undefined : handleLoadEarlier}
           computeItemKey={(_, turn) => turn.id || String(turn.flatIdx)}
           atBottomStateChange={setHitBottom}
-          atBottomThreshold={8}
+          atBottomThreshold={40}
           increaseViewportBy={{ top: 1200, bottom: 1200 }}
           scrollerRef={(el) => {
             if (el instanceof HTMLElement) {
+              el.style.overflowAnchor = 'none';
               (chatScrollContainerRef as any).current = el;
             }
           }}
-          style={{ overflowX: 'hidden' }}
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar relative"
+          style={{ overflowX: 'hidden', overflowAnchor: 'none' }}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden [overflow-anchor:none] custom-scrollbar relative"
           components={virtuosoComponents}
           itemContent={(index, turn) => {
             const isLastTurn = index === turns.length - 1;
