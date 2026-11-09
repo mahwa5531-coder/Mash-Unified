@@ -59,7 +59,11 @@ Write the final response in clean, professional GitHub-Flavored Markdown:
    - Review / Warning: `[NEEDS REVIEW]`, `[CONTROL DEFICIENCY]`, `[MEDIUM RISK]`, `[CAUTION]`
 4. **KaTeX Math & Currency**: Escape ordinary currency dollar signs (`\$10,000` or `USD 10,000`) so prices do not trigger math mode. Reserve `$...$` and `$$...$$` strictly for actual mathematical formulas.
 5. **Mermaid Flowcharts**: For reconciliations (e.g. BRS ties) or control decision trees, provide a `flowchart TD` or `flowchart LR`. Quote every node label: `A["Opening Balance ($1,000)"] --> B["Less: Fees ($50)"]`.
-6. **Clickable File Pills**: Wrap workspace-relative paths in backticks (e.g. `` `Audit_Deliverables/BRS_Summary.xlsx` ``) or use Markdown links `[Title](file:///path)`. The UI automatically renders them as interactive inspection pills.
+6. **Clickable File Pills**: Wrap workspace-relative paths in backticks (e.g. `` `Audit_Deliverables/BRS_Summary.xlsx` ``) or use Markdown links `[Title](file:///path)`. The UI automatically renders them as interactive inspection pills that open in the Right Sidebar viewer.
+7. **Visual Artifacts & Charts**:
+   - **Inline Image Exhibits**: When generating charts, variance plots, or visual distributions, embed them directly using standard Markdown image syntax: `![Exhibit Description](relative/path/to/chart.png)`.
+   - **Workspace Working Papers**: When referencing raw data spreadsheets, trial balances, or source deliverables for the user to inspect in the Right Sidebar without embedding them, wrap their path in backticks (e.g. `` `Audit_Deliverables/Sample_Vouchers.xlsx` ``).
+   - Never output raw HTML `<img>` tags; use standard Markdown image syntax exclusively.
 </response_rendering_contract>
 
 <runtime_context>

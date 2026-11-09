@@ -640,6 +640,20 @@ class ContextCompactionMiddleware(Middleware):
             strategy_name=self.compaction_strategy.name,
         )
 
+        # R-1 Shrink guard: If compaction produced no savings (byte-identical messages or zero token delta),
+        # skip ReplaceEvent, skip compaction counter increment, and suppress event churn.
+        has_shrunk = len(compacted_messages) < original_count or (
+            after_tokens is not None and current_tokens is not None and after_tokens < current_tokens
+        )
+        if not has_shrunk:
+            logger.info(
+                "[ContextCompactionMiddleware] Pre-call compaction produced no shrinkable savings (%d messages, %s -> %s tokens), skipping ReplaceEvent",
+                original_count,
+                current_tokens,
+                after_tokens,
+            )
+            return HookResult.no_changes()
+
         # compaction strategy hard truncation fallback
         compaction_used_fallback = getattr(self.compaction_strategy, "last_compact_used_fallback", False)
 
@@ -965,6 +979,20 @@ class ContextCompactionMiddleware(Middleware):
             strategy_name=self.compaction_strategy.name,
         )
         compacted_message_count = len(compacted_messages)
+
+        # R-1 Shrink guard: If compaction produced no savings (byte-identical messages or zero token delta),
+        # skip ReplaceEvent, skip compaction counter increment, and suppress event churn.
+        has_shrunk = compacted_message_count < original_message_count or (
+            compacted_tokens is not None and current_tokens is not None and compacted_tokens < current_tokens
+        )
+        if not has_shrunk:
+            logger.info(
+                "[ContextCompactionMiddleware] Post-call compaction produced no shrinkable savings (%d messages, %s -> %s tokens), skipping ReplaceEvent",
+                original_message_count,
+                current_tokens,
+                compacted_tokens,
+            )
+            return HookResult.no_changes()
 
         # compaction strategy hard truncation fallback
         compaction_used_fallback = getattr(self.compaction_strategy, "last_compact_used_fallback", False)

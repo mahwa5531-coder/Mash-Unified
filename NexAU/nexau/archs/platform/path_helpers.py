@@ -178,13 +178,13 @@ def safe_rmtree_session_brain(session_id: str, brain_dir: str | Path | None = No
     Never deletes mash/nexau home, brain roots, database, or anything outside allowed roots.
     """
     safe_sid = validate_safe_id(session_id, "session_id")
-    mash_home = (Path.home() / ".mash").resolve()
+    mash_home = get_mash_home().resolve()
     mash_brain_root = (mash_home / "brain").resolve()
-    nexau_home = (Path.home() / ".nexau").resolve()
-    nexau_brain_root = (nexau_home / "brain").resolve()
+    legacy_nexau_home = (Path.home() / ".nexau").resolve()
+    legacy_nexau_brain_root = (legacy_nexau_home / "brain").resolve()
 
-    allowed_roots = [mash_brain_root, nexau_brain_root]
-    protected_dirs = {mash_home, mash_brain_root, nexau_home, nexau_brain_root}
+    allowed_roots = [mash_brain_root, legacy_nexau_brain_root]
+    protected_dirs = {mash_home, mash_brain_root, legacy_nexau_home, legacy_nexau_brain_root}
 
     targets: list[Path] = []
     if brain_dir:
