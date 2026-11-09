@@ -20,7 +20,11 @@ console.log('[Test 2] Virtuoso Chat Engine Contracts...');
 assert.ok(chatCanvasSrc.includes('data={turns}'), 'Virtuoso must receive data={turns}');
 assert.ok(chatCanvasSrc.includes('firstItemIndex={firstItemIndex}'), 'Virtuoso must receive firstItemIndex for reverse infinite scroll anchoring');
 assert.ok(chatCanvasSrc.includes('initialTopMostItemIndex={Math.max(0, turns.length - 1)}'), 'Virtuoso must start scrolled to bottom');
-assert.ok(chatCanvasSrc.includes("followOutput={hitBottom ? 'auto' : false}"), 'Virtuoso must bind followOutput to hitBottom state to eliminate SIZE_INCREASED auto-yanking when scrolled away');
+assert.ok(
+  chatCanvasSrc.includes("followOutput={(isAtBottom) => (isAtBottom && hitBottom ? 'auto' : false)}") ||
+  chatCanvasSrc.includes("followOutput={hitBottom ? 'auto' : false}"),
+  'Virtuoso must bind followOutput to hitBottom state to eliminate SIZE_INCREASED auto-yanking when scrolled away'
+);
 assert.ok(chatCanvasSrc.includes('startReached={isStreaming ? undefined : handleLoadEarlier}'), 'Virtuoso must guard startReached during streaming to prevent reverse-pagination index offset race');
 assert.ok(chatCanvasSrc.includes('atBottomStateChange={setHitBottom}'), 'Virtuoso must drive floating button via atBottomStateChange');
 assert.ok(chatCanvasSrc.includes('computeItemKey='), 'Virtuoso must provide computeItemKey for stable DOM keys');
