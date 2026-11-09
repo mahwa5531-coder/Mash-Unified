@@ -135,7 +135,7 @@ export function syncSessionSwitchingState(params: {
   setInputPrompt: (prompt: string) => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  const { sessionId, activeSessionIdRef, history, steering, setChatMessages, setIsStreaming, setInputPrompt, scrollRef } = params;
+  const { sessionId, activeSessionIdRef, history, steering, setChatMessages, setIsStreaming, setInputPrompt, scrollRef: _scrollRef } = params;
   if (!sessionId) {
     setChatMessages([]);
     setIsStreaming(false);

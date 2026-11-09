@@ -22,7 +22,7 @@ export function parseAttachmentRefs(rawContent?: string, sessionId?: string | nu
     return { cleanText: '', images: [], documents: [], all: [] };
   }
 
-  let text = rawContent;
+  const text = rawContent;
   const attachments: AttachmentRef[] = [];
   const seenPaths = new Set<string>();
 

@@ -61,7 +61,6 @@ function InlineMarkdownImage({
   src,
   alt,
   sessionId,
-  onOpenFile,
   onImageClick,
   ...props
 }: InlineMarkdownImageProps) {
@@ -378,7 +377,6 @@ export function useAgentMarkdownComponents({
       return (
         <InlineMarkdownImage
           sessionId={sessionId}
-          onOpenFile={onOpenFile}
           onImageClick={onImageClick}
           {...props}
         />

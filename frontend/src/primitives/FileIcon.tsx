@@ -43,7 +43,6 @@ import {
   HtmlLogo,
   CssLogo,
   SassLogo,
-  TailwindLogo,
   GraphqlLogo,
   PrismaLogo,
   ProtobufLogo,
