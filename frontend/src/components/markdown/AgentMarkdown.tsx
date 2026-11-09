@@ -128,19 +128,20 @@ const [sanitizeFn, defaultSanitizeSchema] = (Array.isArray(defaultRehypePlugins.
   ? defaultRehypePlugins.sanitize
   : [defaultRehypePlugins.sanitize, {}]) as [any, any];
 
+// Desktop Read Model: Omit web-forum protocol restrictions on href/src so local filesystem
+// paths (C:\..., D:\..., file:///...) and inline images (data:image/...) are never stripped.
+// Real security (blocking javascript:, vbscript:, untrusted data:) is strictly enforced by safeUrlTransform.
+const desktopSanitizeProtocols = { ...(defaultSanitizeSchema?.protocols || {}) };
+delete desktopSanitizeProtocols.href;
+delete desktopSanitizeProtocols.src;
+
 const DESKTOP_REHYPE_PLUGINS = [
   defaultRehypePlugins.raw,
   [
     sanitizeFn,
     {
       ...defaultSanitizeSchema,
-      protocols: {
-        ...(defaultSanitizeSchema?.protocols || {}),
-        href: [
-          ...((defaultSanitizeSchema?.protocols && defaultSanitizeSchema.protocols.href) || []),
-          'file', 'c', 'C', 'd', 'D', 'e', 'E', 'f', 'F', 'z', 'Z'
-        ]
-      }
+      protocols: desktopSanitizeProtocols,
     }
   ]
 ];

@@ -25,14 +25,16 @@ export function safeUrlTransform(url: string): string {
   if (/^file:\/\/\/?/i.test(trimmed)) {
     return trimmed;
   }
-  if (/^[a-zA-Z]:[/\\]/.test(trimmed)) {
-    return `file:///${trimmed.replace(/\\/g, '/')}`;
+  // Desktop Read Model: Support all Windows drive letters (A-Z) with raw backslashes or encoded %5C from remark
+  const normalizedPath = trimmed.replace(/%5c/gi, '/').replace(/\\/g, '/');
+  if (/^[a-zA-Z]:\//.test(normalizedPath)) {
+    return `file:///${normalizedPath}`;
   }
 
-  // Allow relative links and bare filenames/paths without an explicit foreign scheme (F-1)
+  // Allow relative links, anchors, and POSIX absolute paths without an explicit foreign scheme (F-1)
   // Bare filenames like 'notes.md', 'findings.csv', './doc.pdf', '../report.xlsx', '#anchor', '/path'
   const colonIdx = trimmed.indexOf(':');
-  const slashIdx = trimmed.search(/[\/\\]/);
+  const slashIdx = normalizedPath.indexOf('/');
   // If no colon, or colon appears after a path slash, it is a safe relative path
   if (colonIdx === -1 || (slashIdx !== -1 && colonIdx > slashIdx)) {
     return trimmed;

@@ -44,7 +44,17 @@ console.log("\n[Test 1] safeUrlTransform XSS and Data URI Policy Matrix...");
   assert.strictEqual(safeUrlTransform("http://localhost:8000/files/content"), "http://localhost:8000/files/content");
   assert.strictEqual(safeUrlTransform("/files/content?path=chart.png"), "/files/content?path=chart.png");
 
-  console.log("  -> PASSED: Dangerous schemes blocked, safe base64 images and HTTP links permitted!");
+  // Desktop Read Model: Local Windows paths across any drive letter (raw or encoded backslashes)
+  assert.strictEqual(safeUrlTransform("C:\\Users\\alice\\chart.png"), "file:///C:/Users/alice/chart.png");
+  assert.strictEqual(safeUrlTransform("C:%5CUsers%5Calice%5Cchart.png"), "file:///C:/Users/alice/chart.png");
+  assert.strictEqual(safeUrlTransform("D:\\work\\model.onnx"), "file:///D:/work/model.onnx");
+  assert.strictEqual(safeUrlTransform("Z:\\network\\share\\data.csv"), "file:///Z:/network/share/data.csv");
+  assert.strictEqual(safeUrlTransform("G:%5Cusb%5Cbackup.zip"), "file:///G:/usb/backup.zip");
+  assert.strictEqual(safeUrlTransform("file:///C:/Users/alice/chart.png"), "file:///C:/Users/alice/chart.png");
+  assert.strictEqual(safeUrlTransform("/home/alice/chart.png"), "/home/alice/chart.png");
+  assert.strictEqual(safeUrlTransform("./relative/chart.png"), "./relative/chart.png");
+
+  console.log("  -> PASSED: Dangerous schemes blocked, safe base64 images, desktop paths (A-Z), and HTTP links permitted!");
 }
 
 // -----------------------------------------------------------------------------
