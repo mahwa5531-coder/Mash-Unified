@@ -112,6 +112,7 @@ export function useSseBufferFlusher({
         content: tokenDelta ? next[targetIdx].content + tokenDelta : next[targetIdx].content,
         thoughts: updatedThoughts,
         steps: currentSteps,
+        retryAttempt: undefined,
         thinkingDurationSeconds: s.thinkingDuration ?? next[targetIdx].thinkingDurationSeconds,
       };
       s.chatMessages = next;

@@ -27,6 +27,26 @@ from .parse_structures import ParsedResponse, ToolCall
 
 logger = logging.getLogger(__name__)
 
+def _sanitize_tool_parameters(params: dict[str, Any]) -> dict[str, Any]:
+    """Strip hallucinated XML tokens (e.g. </arg_value><arg_key>) from parameter strings."""
+    sanitized: dict[str, Any] = {}
+    for k, v in params.items():
+        if isinstance(v, str):
+            # Truncate at leaked tag boundaries
+            cleaned = re.sub(r'</?(?:arg_key|arg_value|parameter|tool_call|tool_use)[^>]*>.*$', '', v).strip()
+            sanitized[k] = cleaned
+        elif isinstance(v, dict):
+            sanitized[k] = _sanitize_tool_parameters(v)
+        elif isinstance(v, list):
+            sanitized[k] = [
+                _sanitize_tool_parameters(item) if isinstance(item, dict)
+                else (re.sub(r'</?(?:arg_key|arg_value|parameter|tool_call|tool_use)[^>]*>.*$', '', item).strip() if isinstance(item, str) else item)
+                for item in v
+            ]
+        else:
+            sanitized[k] = v
+    return sanitized
+
 
 class ResponseParser:
     """Parses LLM responses to extract all executable calls."""
@@ -44,8 +64,10 @@ class ResponseParser:
         model_response = response if isinstance(response, ModelResponse) else None
         if model_response:
             response_text = model_response.content or ""
+            reasoning_text = model_response.reasoning or ""
         else:
             response_text = cast(str, response) or ""
+            reasoning_text = ""
 
         # Parse OpenAI tool calls first if present
         if model_response and model_response.tool_calls:
@@ -74,6 +96,16 @@ class ResponseParser:
         )
         if xml_report.get("is_parallel_tools"):
             is_parallel_tools = True
+
+        # ponytail: Recover tool calls emitted inside reasoning/thinking block by small models (e.g. 1.7B)
+        if not tool_calls and reasoning_text and ("<tool_use>" in reasoning_text or "<tool_call>" in reasoning_text):
+            logger.info("🔧 Recovering tool call leaked into model reasoning block")
+            self._parse_xml_constructs(reasoning_text, tool_calls)
+
+        # Sanitize parameters on all extracted tool calls
+        for tc in tool_calls:
+            if isinstance(tc.parameters, dict):
+                tc.parameters = _sanitize_tool_parameters(tc.parameters)
 
         parsed_response = ParsedResponse(
             original_response=response_text,
@@ -134,7 +166,41 @@ class ResponseParser:
             )
             tool_calls.append(tool_call)
 
+        # Alternate <tool_call> tags (e.g. Ollama/SparkLLM: <tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value></tool_call>)
+        tc_pattern = r"<tool_call>(.*?)</tool_call>"
+        tc_matches = re.findall(tc_pattern, response_text, re.DOTALL)
+        for tc_content in tc_matches:
+            tool_call = self._parse_alternate_tool_call(tc_content)
+            if tool_call is not None:
+                logger.info("🔍 Parsed alternate <tool_call>: %s", tool_call.tool_name)
+                tool_calls.append(tool_call)
+
         return report
+
+    def _parse_alternate_tool_call(self, content: str) -> ToolCall | None:
+        """Parse alternate <tool_call> syntax (e.g. name<arg_key>... or JSON)."""
+        content_clean = content.strip()
+        if not content_clean:
+            return None
+        if content_clean.startswith("{") and content_clean.endswith("}"):
+            try:
+                import json
+                data = json.loads(content_clean)
+                name = data.get("name") or data.get("tool_name")
+                args = data.get("arguments") or data.get("parameters") or {}
+                if name:
+                    return ToolCall(tool_name=name, parameters=args, raw_content=content, source="xml")
+            except Exception:
+                pass
+        m_name = re.match(r"^([a-zA-Z0-9_\-]+)", content_clean)
+        if m_name:
+            tool_name = m_name.group(1)
+            args: dict[str, Any] = {}
+            arg_pairs = re.findall(r"<arg_key>(.*?)</arg_key>\s*<arg_value>(.*?)</arg_value>", content, re.DOTALL)
+            for k, v in arg_pairs:
+                args[k.strip()] = v.strip()
+            return ToolCall(tool_name=tool_name, parameters=args, raw_content=content, source="xml")
+        return None
 
     def _parse_tool_call(self, xml_content: str) -> ToolCall | None:
         """Parse tool call XML content."""

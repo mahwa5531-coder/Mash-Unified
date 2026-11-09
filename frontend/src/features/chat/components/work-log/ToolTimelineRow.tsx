@@ -28,8 +28,10 @@ export function ToolTimelineRow({
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
     const isFailed = entry.data?.tool?.status === 'failed' || entry.data?.status === 'failed';
-    const filePath = entry.data?.filePath || entry.data?.filename || entry.data?.folderPath || entry.data?.foldername || 'file';
-    const baseName = (entry.data?.filename || entry.data?.foldername || filePath.split(/[/\\]/).pop() || '').trim();
+    const rawPath = entry.data?.filePath || entry.data?.filename || entry.data?.folderPath || entry.data?.foldername || '';
+    const filePath = rawPath && rawPath !== 'file' ? rawPath : '';
+    const baseName = (entry.data?.filename || entry.data?.foldername || (filePath ? filePath.split(/[/\\]/).pop() : '') || '').trim();
+    const hasValidFile = Boolean(baseName && baseName !== 'file');
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
 
@@ -75,9 +77,11 @@ export function ToolTimelineRow({
         >
           {label}
         </span>
-        <div className={cn(isDenied && "opacity-60")}>
-          <FilePill path={filePath} line={entry.data?.lineRange} onOpenFile={onOpenFile} />
-        </div>
+        {hasValidFile && (
+          <div className={cn(isDenied && "opacity-60")}>
+            <FilePill path={filePath || baseName} label={baseName} line={entry.data?.lineRange} onOpenFile={onOpenFile} />
+          </div>
+        )}
         {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
       </div>
     );
@@ -89,8 +93,10 @@ export function ToolTimelineRow({
     const isCancelled = entry.data?.tool?.status === 'cancelled';
     const isDenied = entry.data?.tool?.status === 'denied' || entry.data?.tool?.decision === 'deny';
     const isFailed = entry.data?.tool?.status === 'failed' || entry.data?.status === 'failed';
-    const filePath = entry.data?.filePath || entry.data?.filename || 'file';
-    const baseName = (entry.data?.filename || filePath.split(/[/\\]/).pop() || '').trim();
+    const rawPath = entry.data?.filePath || entry.data?.filename || '';
+    const filePath = rawPath && rawPath !== 'file' ? rawPath : '';
+    const baseName = (entry.data?.filename || (filePath ? filePath.split(/[/\\]/).pop() : '') || '').trim();
+    const hasValidFile = Boolean(baseName && baseName !== 'file');
     const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
     const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
 
@@ -136,9 +142,11 @@ export function ToolTimelineRow({
         >
           {label}
         </span>
-        <div className={cn(isDenied && "opacity-60")}>
-          <FilePill path={filePath} line={entry.data?.lineRange} onOpenFile={onOpenFile} />
-        </div>
+        {hasValidFile && (
+          <div className={cn(isDenied && "opacity-60")}>
+            <FilePill path={filePath || baseName} label={baseName} line={entry.data?.lineRange} onOpenFile={onOpenFile} />
+          </div>
+        )}
         {isRunning && <span className="font-sans text-[12px] text-zinc-400 dark:text-zinc-500 shrink-0">...</span>}
       </div>
     );

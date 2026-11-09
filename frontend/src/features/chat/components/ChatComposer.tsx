@@ -106,7 +106,8 @@ export default function ChatComposer({
       const fileRefs = attachedFiles
         .map((f) => {
           const relPath = relativizePath(f.path, sessionRepo);
-          return `  <file path="${relPath}" name="${f.name}" size="${f.size || 0}" />`;
+          const kind = f.previewUrl || /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(f.name) ? 'image' : 'document';
+          return `  <file path="${relPath}" name="${f.name}" kind="${kind}" size="${f.size || 0}" />`;
         })
         .join('\n');
       const attachmentBlock = `<attachments>\n${fileRefs}\n</attachments>`;

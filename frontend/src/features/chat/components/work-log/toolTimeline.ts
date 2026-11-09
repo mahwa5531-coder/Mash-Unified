@@ -106,7 +106,7 @@ export function resolveToolCategory(name: string): TimelineEntry['type'] {
 
 export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineEntry {
   const name = (t.name || '').toLowerCase();
-  let args = t.args || {};
+  let args = t.args || (t as any).input || (t as any).parameters || {};
   if (typeof args === 'string') {
     try { args = JSON.parse(args); } catch { args = {}; }
   }
@@ -160,8 +160,8 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
       };
     }
     case 'file_read': {
-      const p = (t as any).path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path || args.target_file || 'file';
-      const fname = String(p).split(/[/\\]/).pop() || p;
+      const p = (t as any).path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path || args.target_file || (t as any).input?.TargetFile || (t as any).input?.AbsolutePath || (t as any).input?.file_path || (t as any).input?.path || '';
+      const fname = p ? (String(p).split(/[/\\]/).pop() || p) : '';
       const isDir = !fname.includes('.') || name.includes('list');
       if (isDir) {
         return {
@@ -178,8 +178,8 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
       }
     }
     case 'edit': {
-      const p = (t as any).path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path || args.target_file || args.filepath || 'file';
-      const fname = String(p).split(/[/\\]/).pop() || p;
+      const p = (t as any).path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path || args.target_file || args.filepath || (t as any).input?.TargetFile || (t as any).input?.AbsolutePath || (t as any).input?.file_path || (t as any).input?.path || '';
+      const fname = p ? (String(p).split(/[/\\]/).pop() || p) : '';
       let added = 0;
       let deleted = 0;
 

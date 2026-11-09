@@ -226,7 +226,8 @@ def view_file(
         # Pure Vision-First Multimodal PDF Engine (Antigravity & Gemini CLI pattern):
         # Renders document pages directly into high-res visual images and converts to base64.
         # Zero brittle text extraction: preserves tables, columns, charts, and geometry natively.
-        MAX_SAFE_PAGES = 50  # Protect against exceeding HTTP request payload limits (>30MB)
+        # ponytail: 10 pages default window protects single-turn context from blowing up on large PDFs
+        MAX_SAFE_PAGES = 10
         if start is not None or end is not None:
             p_start = max(1, start if start is not None else 1)
             p_end = min(num_pages, end if end is not None else num_pages)

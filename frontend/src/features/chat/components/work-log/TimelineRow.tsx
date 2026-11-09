@@ -120,8 +120,7 @@ export function TimelineRow(props: TimelineRowProps) {
           isChild ? "pl-2 py-0.5" : "py-0.5"
         )}
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400/60 dark:bg-zinc-500/60 shrink-0" />
-        <span className="font-sans text-[12px] text-zinc-600 dark:text-zinc-300 leading-snug">
+        <span className="font-sans text-[12px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
           {text}
         </span>
       </div>

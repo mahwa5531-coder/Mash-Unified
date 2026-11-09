@@ -5,20 +5,22 @@ import { Check, Copy, Undo2 } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import { cleanUserSteeringEnvelope } from '@/features/chat/utils/sessionHistoryParser';
+import { parseAttachmentRefs } from '@/features/chat/utils/attachmentRefs';
 import { FilePill } from '@/primitives';
 import AgentMarkdown from '@/components/markdown/AgentMarkdown';
+import { ImageLightboxModal, type LightboxImageData } from './ImageLightboxModal';
 
 function formatUserTimestamp(ts?: string): string {
   if (!ts) return '';
   try {
-    if (/^\d{1,2}:\d{2}(\s?[APap][Mm])?$/.test(ts.trim())) {
-      return ts.trim();
-    }
     const d = new Date(ts);
     if (!isNaN(d.getTime())) {
-      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+      const isToday = new Date().toDateString() === d.toDateString();
+      return isToday
+        ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+        : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
     }
-    return ts;
+    return ts.trim();
   } catch {
     return ts;
   }
@@ -39,41 +41,24 @@ const UserMessage = memo(function UserMessage({
   const [isExpanded, setIsExpanded] = useState(false);
   const textRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<LightboxImageData | null>(null);
   const [latchedTime] = useState(() => 
     new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
   );
   const displayTime = (msg.timestamp && formatUserTimestamp(msg.timestamp)) || latchedTime;
 
-  // Check if content has an image markdown link or path
+  // Check if content has an inline image markdown link
   const imgMatch = msg.content ? msg.content.match(/!\[([^\]]*)\]\(([^)]+)\)/) : null;
-  let rawText = imgMatch ? msg.content.replace(imgMatch[0], '').trim() : (msg.content || '');
+  const contentWithoutMarkdownImg = imgMatch ? msg.content.replace(imgMatch[0], '') : (msg.content || '');
 
-  // Extract attached files: both bracket tags [Attached file: ...] and XML <attachments><file .../></attachments>
-  const attachedFilePaths: string[] = [];
-  const fileTagRegex = /\[Attached (?:file|files):\s*([^\]]+)\]/gi;
-  let fileMatch: RegExpExecArray | null;
-  while ((fileMatch = fileTagRegex.exec(rawText)) !== null) {
-    const p = fileMatch[1]?.trim().replace(/[\]"')]+$/, '');
-    if (p) {
-      attachedFilePaths.push(p);
-    }
-  }
-  rawText = rawText.replace(fileTagRegex, '').trim();
+  // Parse attachments once cleanly using the pure attachment refs utility
+  const { cleanText: parsedText, images: attachedImages, documents: attachedDocuments } = parseAttachmentRefs(contentWithoutMarkdownImg, msg.sessionId);
+  const cleanText = cleanUserSteeringEnvelope(parsedText);
 
-  const fileXmlRegex = /<file\s+[^>]*path=["']([^"']+)["'][^>]*\/?>/gi;
-  let xmlFileMatch: RegExpExecArray | null;
-  while ((xmlFileMatch = fileXmlRegex.exec(rawText)) !== null) {
-    const p = xmlFileMatch[1]?.trim();
-    if (p && !attachedFilePaths.includes(p)) {
-      attachedFilePaths.push(p);
-    }
-  }
-  rawText = rawText.replace(/<attachments>[\s\S]*?<\/attachments>/gi, '').trim();
-  rawText = rawText.replace(/<file\s+[^>]*\/?>/gi, '').trim();
-  rawText = rawText.replace(/^Please inspect and analyze the attached (?:audit )?documents?:?\s*/i, '').trim();
-
-  const cleanText = cleanUserSteeringEnvelope(rawText);
-  const imgSrc = imgMatch ? imgMatch[2] : null;
+  const allImages = [
+    ...(imgMatch ? [{ src: imgMatch[2], name: 'Attached image' }] : []),
+    ...attachedImages.map((img) => ({ src: img.previewUrl || img.path, name: img.name })),
+  ];
 
   useEffect(() => {
     if (textRef.current) {
@@ -101,7 +86,8 @@ const UserMessage = memo(function UserMessage({
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full flex flex-col items-end group/user-turn">
+      {/* 1. User Message Bubble (100% full width, zero buttons inside) */}
       <div 
         role={isOverflowing ? "button" : undefined}
         tabIndex={isOverflowing ? 0 : undefined}
@@ -114,24 +100,36 @@ const UserMessage = memo(function UserMessage({
         }}
         title={isOverflowing ? (isExpanded ? "Click to collapse" : "Click to expand") : undefined}
         className={cn(
-          "w-full bg-[#f4f4f6] dark:bg-[#18181b]/90 hover:bg-[#eaecee] dark:hover:bg-[#1f1f23] rounded-2xl px-4 py-2.5 text-[13.5px] text-zinc-900 dark:text-zinc-100 border border-zinc-200/70 dark:border-white/[0.06] shadow-xs relative group transition-colors flex items-start gap-3",
+          "w-full bg-[#f4f4f6] dark:bg-[#18181b]/90 hover:bg-[#eaecee] dark:hover:bg-[#1f1f23] rounded-2xl px-4 py-2.5 text-[13.5px] text-zinc-900 dark:text-zinc-100 border border-zinc-200/70 dark:border-white/[0.06] shadow-xs transition-colors flex items-start gap-3",
           isOverflowing && "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400"
         )}
       >
         {/* Optional Image Thumbnail Preview */}
-        {imgSrc && (
-          <div className="w-16 h-12 rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 shrink-0 select-none">
-            <img src={imgSrc} alt="Attached image" className="w-full h-full object-cover" />
+        {allImages.length > 0 && (
+          <div className="flex items-center gap-1.5 shrink-0 select-none">
+            {allImages.map((img, i) => (
+              <div
+                key={i}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxImage({ src: img.src, alt: img.name });
+                }}
+                className="w-16 h-12 rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 shrink-0 select-none cursor-pointer hover:opacity-90 transition-opacity"
+                title={`${img.name} (Click to expand)`}
+              >
+                <img src={img.src} alt={img.name} className="w-full h-full object-cover" />
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Content Body */}
-        <div className="flex-1 min-w-0 pr-28 pb-0.5">
+        {/* Content Body - Full Width */}
+        <div className="flex-1 min-w-0">
           {/* Attached Files Chips */}
-          {attachedFilePaths.length > 0 && (
+          {attachedDocuments.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 mb-1.5 select-none">
-              {attachedFilePaths.map((filePath, idx) => (
-                <FilePill key={`${filePath}_${idx}`} path={filePath} onOpenFile={onOpenFile} />
+              {attachedDocuments.map((doc, idx) => (
+                <FilePill key={`${doc.path}_${idx}`} path={doc.path} label={doc.name} onOpenFile={onOpenFile} />
               ))}
             </div>
           )}
@@ -141,58 +139,72 @@ const UserMessage = memo(function UserMessage({
               <div 
                 ref={textRef}
                 className={cn(
-                  "font-sans text-[13.5px] leading-[22px] text-zinc-900 dark:text-zinc-100 break-words select-text transition-all",
-                  !isExpanded && isOverflowing && "line-clamp-3 overflow-hidden"
+                  "font-sans text-[13.5px] leading-relaxed select-text transition-all",
+                  !isExpanded && isOverflowing && "line-clamp-2 max-h-[46px] overflow-hidden"
                 )}
               >
-                <AgentMarkdown content={cleanText} mode="chat" onOpenFile={onOpenFile} className="!mt-0 !text-[13.5px] [&_p]:mb-1.5 [&_blockquote]:my-2" />
+                <AgentMarkdown content={cleanText} isStreaming={false} mode="chat" />
               </div>
             ) : (
               <div 
                 ref={textRef}
                 className={cn(
-                  "whitespace-pre-wrap font-sans text-[13.5px] leading-[22px] text-zinc-900 dark:text-zinc-100 break-words select-text transition-all",
-                  !isExpanded && isOverflowing && "line-clamp-3 overflow-hidden"
+                  "font-sans text-[13.5px] leading-relaxed whitespace-pre-wrap break-words select-text transition-all",
+                  !isExpanded && isOverflowing && "line-clamp-2 max-h-[46px] overflow-hidden"
                 )}
               >
                 {cleanText}
               </div>
             )
-          ) : null}
-        </div>
-
-        {/* Bottom-Right Actions Bar (Timestamp, Copy, Undo) */}
-        <div className="absolute bottom-2 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 select-none pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto">
-          {displayTime && (
-            <span className="text-[11.5px] font-mono text-zinc-400 dark:text-zinc-500 select-none mr-0.5 tracking-tight font-medium">
-              {displayTime}
-            </span>
+          ) : (
+            <div className="font-sans text-[13px] text-zinc-400 italic">
+              Attached documents
+            </div>
           )}
+        </div>
+      </div>
+
+      {/* 2. Outside Actions Bar (Timestamp, Copy, Undo) - Tiny, simple, small, with clean hover highlight */}
+      <div className="flex items-center gap-1.5 mt-1 mr-1 px-1 h-5 text-zinc-400 dark:text-zinc-500 opacity-0 group-hover/user-turn:opacity-100 group-focus-within/user-turn:opacity-100 transition-opacity duration-150 select-none">
+        {displayTime && (
+          <span 
+            className="text-[11px] font-mono tracking-tight font-medium select-none mr-0.5"
+            title={msg.timestamp ? new Date(msg.timestamp).toLocaleString() : undefined}
+          >
+            {displayTime}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="p-1 rounded text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
+          title="Copy prompt"
+        >
+          {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+        </button>
+        <div className="relative group/undo">
           <button
             type="button"
-            onClick={handleCopy}
-            className="p-1 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-black/[0.06] dark:hover:bg-[#242424] transition-colors cursor-pointer"
-            title="Copy prompt"
+            onClick={(e) => { e.stopPropagation(); onUndo(); }}
+            className="p-1 rounded text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
+            title="Undo up to here"
           >
-            {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12.5} />}
+            <Undo2 size={12} />
           </button>
-          <div className="relative group/undo">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onUndo(); }}
-              className="p-1 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-black/[0.06] dark:hover:bg-[#242424] transition-colors cursor-pointer"
-              title="Undo up to here"
-            >
-              <Undo2 size={13} />
-            </button>
-            <div className="absolute bottom-full mb-1.5 right-0 hidden group-hover/undo:block bg-zinc-900 dark:bg-[#1a1a1a] text-zinc-100 dark:text-zinc-200 text-[11px] px-2 py-0.5 rounded border border-zinc-800 dark:border-[#333] shadow-lg pointer-events-none whitespace-nowrap z-30 font-sans">
-              Undo changes up to this point
-            </div>
+          <div className="absolute bottom-full mb-1.5 right-0 hidden group-hover/undo:block bg-zinc-900 dark:bg-[#1a1a1a] text-zinc-100 dark:text-zinc-200 text-[11px] px-2 py-0.5 rounded border border-zinc-800 dark:border-[#333] shadow-lg pointer-events-none whitespace-nowrap z-30 font-sans">
+            Undo changes up to this point
           </div>
         </div>
       </div>
+
+      {/* Image Lightbox Modal */}
+      <ImageLightboxModal
+        image={lightboxImage}
+        onClose={() => setLightboxImage(null)}
+        onOpenFile={onOpenFile}
+      />
     </div>
   );
-}, (prev, next) => prev.msg.content === next.msg.content && prev.msg.timestamp === next.msg.timestamp && prev.onUndo === next.onUndo);
+});
 
 export default UserMessage;

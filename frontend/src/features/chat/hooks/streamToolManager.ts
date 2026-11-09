@@ -154,7 +154,7 @@ export function updateAssistantToolsAndSteps(
       toolAction: toolCall.toolAction,
     });
   }
-  next[idx] = { ...next[idx], tools, steps, thinkingDurationSeconds: thinkingDuration ?? next[idx].thinkingDurationSeconds };
+  next[idx] = { ...next[idx], tools, steps, retryAttempt: undefined, thinkingDurationSeconds: thinkingDuration ?? next[idx].thinkingDurationSeconds };
   return next;
 }
 

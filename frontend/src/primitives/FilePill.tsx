@@ -33,7 +33,8 @@ export function FilePill({
   const parts = filePathOnly.split(/[/\\]/);
   const basename = parts.pop() || filePathOnly;
   const parent = parts.length > 0 ? parts[parts.length - 1] : '';
-  const halfPath = parent && parent !== '.' && !/^[a-zA-Z]:$/.test(parent) ? `${parent}/${basename}` : basename;
+  const isInternalStaging = parent.startsWith('.') || parent === 'tmp' || parent === 'cache';
+  const halfPath = parent && !isInternalStaging && !/^[a-zA-Z]:$/.test(parent) ? `${parent}/${basename}` : basename;
   const rawDisplay = label || halfPath;
 
   const slashIdx = rawDisplay.lastIndexOf('/');

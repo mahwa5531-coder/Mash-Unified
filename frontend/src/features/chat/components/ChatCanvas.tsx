@@ -358,11 +358,11 @@ export default function ChatCanvas({
           data={turns}
           firstItemIndex={firstItemIndex}
           initialTopMostItemIndex={Math.max(0, turns.length - 1)}
-          followOutput={hitBottom ? 'auto' : false}
+          followOutput={(isAtBottom) => (isAtBottom && hitBottom ? 'auto' : false)}
           startReached={isStreaming ? undefined : handleLoadEarlier}
           computeItemKey={(_, turn) => turn.id || String(turn.flatIdx)}
           atBottomStateChange={setHitBottom}
-          atBottomThreshold={40}
+          atBottomThreshold={15}
           increaseViewportBy={{ top: 1200, bottom: 1200 }}
           minOverscanItemCount={{ top: 1, bottom: 1 }}
           scrollerRef={(el) => {

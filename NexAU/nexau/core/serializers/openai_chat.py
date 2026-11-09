@@ -43,8 +43,19 @@ def serialize_ump_to_openai_chat_payload(
 
     output: list[dict[str, Any]] = []
     coalesced = coalesce_user_shaped_messages(messages or [])
-    for msg in coalesced:
+
+    # Identify active turn boundary: the active turn starts at the most recent USER message.
+    # Messages prior to the last USER message belong to completed past turns, where visual
+    # payloads (tool output images, PDF page renders, user image uploads) have already been analyzed.
+    last_user_idx = -1
+    for i in range(len(coalesced) - 1, -1, -1):
+        if coalesced[i].role == Role.USER:
+            last_user_idx = i
+            break
+
+    for idx, msg in enumerate(coalesced):
         role = msg.role.value
+        is_active_turn = (last_user_idx == -1) or (idx >= last_user_idx)
         if use_developer_role and role == Role.SYSTEM.value:
             role = "developer"
 
@@ -63,7 +74,7 @@ def serialize_ump_to_openai_chat_payload(
                     rendered: list[dict[str, Any]] = []
                     for i in range(max_p):
                         p = doc.load_page(i)
-                        pix = p.get_pixmap(dpi=300)
+                        pix = p.get_pixmap(dpi=150)
                         jpg_b64 = b64_mod.b64encode(pix.tobytes("jpeg")).decode("utf-8")
                         detail_val = img.detail if img.detail != "auto" else "auto"
                         rendered.append({
@@ -85,6 +96,7 @@ def serialize_ump_to_openai_chat_payload(
             *,
             tool_call_id: str,
             tool_content: str | list[TextBlock | ImageBlock],
+            is_active_turn: bool = True,
         ) -> list[dict[str, Any]]:
             if not isinstance(tool_content, list):
                 return [{"role": "tool", "tool_call_id": tool_call_id, "content": tool_content}]
@@ -98,9 +110,13 @@ def serialize_ump_to_openai_chat_payload(
                         tool_text_only_parts.append({"type": "text", "text": part.text})
                         text_parts.append(part.text)
                 else:
-                    parts = _image_part_to_image_parts(part)
-                    image_parts.extend(parts)
-                    text_parts.append("<image>" if len(parts) == 1 else f"<image x{len(parts)}>")
+                    if is_active_turn:
+                        parts = _image_part_to_image_parts(part)
+                        image_parts.extend(parts)
+                        text_parts.append("<image>" if len(parts) == 1 else f"<image x{len(parts)}>")
+                    else:
+                        # ponytail: prune completed turn image payloads to avoid re-sending heavy Base64
+                        text_parts.append(f"[Visual tool output from call {tool_call_id} analyzed in turn above]")
 
             if tool_image_policy == "embed_in_tool_message":
                 return [{"role": "tool", "tool_call_id": tool_call_id, "content": tool_text_only_parts + image_parts}]
@@ -121,7 +137,11 @@ def serialize_ump_to_openai_chat_payload(
             if tr is None:
                 output.append({"role": "tool", "content": msg.get_text_content()})
             else:
-                tool_msgs = _emit_tool_result_as_messages(tool_call_id=tr.tool_use_id, tool_content=tr.content)
+                tool_msgs = _emit_tool_result_as_messages(
+                    tool_call_id=tr.tool_use_id,
+                    tool_content=tr.content,
+                    is_active_turn=is_active_turn,
+                )
                 tool_name = msg.metadata.get("tool_name")
                 if tool_name:
                     for tm in tool_msgs:
@@ -178,9 +198,19 @@ def serialize_ump_to_openai_chat_payload(
                     },
                 )
             elif isinstance(block, ToolResultBlock):
-                output.extend(_emit_tool_result_as_messages(tool_call_id=block.tool_use_id, tool_content=block.content))
+                output.extend(
+                    _emit_tool_result_as_messages(
+                        tool_call_id=block.tool_use_id,
+                        tool_content=block.content,
+                        is_active_turn=is_active_turn,
+                    )
+                )
             elif isinstance(block, ImageBlock):  # pyright: ignore[reportUnnecessaryIsInstance]
-                content_parts.extend(_image_part_to_image_parts(block))
+                if is_active_turn or not block.base64:
+                    content_parts.extend(_image_part_to_image_parts(block))
+                else:
+                    # ponytail: prune past user-uploaded image base64 in completed turns
+                    content_parts.append({"type": "text", "text": "[User-uploaded image from previous turn analyzed above]"})
 
         entry["content"] = content_parts if has_images else "".join(text_parts)
         if reasoning_parts:
@@ -447,4 +477,4 @@ def messages_from_legacy_openai_chat(messages: list[dict[str, Any]]) -> list[Mes
                 content_blocks = [ToolResultBlock(tool_use_id=tool_call_id, content=tool_text)]
 
         result.append(Message(role=role, content=content_blocks, metadata=metadata))
-    return result
+    return result
