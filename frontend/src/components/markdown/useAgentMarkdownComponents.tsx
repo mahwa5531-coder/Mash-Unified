@@ -212,7 +212,7 @@ export function useAgentMarkdownComponents({
     th({ children, node: _node, className, ...props }: any) {
       const alignClass = props.align === 'right' ? 'text-right' : props.align === 'center' ? 'text-center' : 'text-left';
       return (
-        <th className={cn("px-3.5 py-2.5 font-semibold text-zinc-700 dark:text-zinc-300 text-[11.5px] uppercase tracking-wider bg-zinc-100 dark:bg-[#1c1c1f] border-r border-zinc-200 dark:border-white/[0.08] last:border-r-0", alignClass, className)} {...props}>
+        <th className={cn("px-3.5 py-2.5 font-semibold text-zinc-900 dark:text-zinc-100 text-[11.5px] uppercase tracking-wider bg-zinc-100/90 dark:bg-[#18181c] border-r border-zinc-300/80 dark:border-zinc-700/80 last:border-r-0", alignClass, className)} {...props}>
           {children}
         </th>
       );
@@ -225,7 +225,7 @@ export function useAgentMarkdownComponents({
       return (
         <td
           className={cn(
-            "px-3.5 py-2 text-[13px] border-r border-zinc-200/40 dark:border-white/[0.04] last:border-r-0 text-zinc-900 dark:text-zinc-100",
+            "px-3.5 py-2 text-[13px] border-r border-zinc-200 dark:border-zinc-800/60 last:border-r-0 text-zinc-900 dark:text-zinc-100",
             isRight && "font-mono tabular-nums whitespace-nowrap",
             alignClass,
             className
