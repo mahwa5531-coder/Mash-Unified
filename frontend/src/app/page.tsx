@@ -26,7 +26,18 @@ export default function Home() {
   const [selectedSessionRepo, setSelectedSessionRepo] = useState<string>('No Repo');
   const [pendingWorkspacePath, setPendingWorkspacePath] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(260);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('mash_sidebar_width');
+        if (saved) {
+          const parsed = parseInt(saved, 10);
+          if (!isNaN(parsed)) return Math.min(380, Math.max(260, parsed));
+        }
+      } catch {}
+    }
+    return 260;
+  });
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const [isRightSidebarMaximized, setIsRightSidebarMaximized] = useState(false);
   const [fileToOpen, setFileToOpen] = useState<string | null>(null);
@@ -283,6 +294,13 @@ export default function Home() {
     });
   }, []);
 
+  const handleSidebarWidthChange = useCallback((newWidth: number) => {
+    setSidebarWidth(newWidth);
+    try {
+      localStorage.setItem('mash_sidebar_width', String(newWidth));
+    } catch {}
+  }, []);
+
   const handleOpenFile = useCallback((path: string) => {
     setIsRightSidebarOpen(true);
     setFileToOpen(path);
@@ -359,7 +377,7 @@ export default function Home() {
                 onOpenHistory={handleOpenHistory}
                 onOpenSettings={(tab?: string) => { setSettingsTab(tab || 'appearance'); setIsSettingsOpen(true); }}
                 width={sidebarWidth}
-                onWidthChange={setSidebarWidth}
+                onWidthChange={handleSidebarWidthChange}
                 archivedSessionIds={archivedSessionIds}
                 onToggleArchive={handleToggleArchive}
                 onDeleteSession={handleDeleteSession}

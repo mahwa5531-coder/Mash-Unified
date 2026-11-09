@@ -2,9 +2,9 @@
 
 import { useState, useRef, useCallback, useEffect, MouseEvent as ReactMouseEvent } from 'react';
 
-const MIN_WIDTH = 320;
-const MAX_WIDTH = 1100;
-const DEFAULT_WIDTH = 420;
+const MIN_WIDTH = 380;
+const MAX_WIDTH = 760;
+const DEFAULT_WIDTH = 380;
 
 interface UseRightSidebarResizeProps {
   controlledIsMaximized?: boolean;
@@ -15,13 +15,24 @@ export function useRightSidebarResize({
   controlledIsMaximized,
   onToggleMaximize,
 }: UseRightSidebarResizeProps) {
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const [width, setWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('mash_right_sidebar_width');
+        if (saved) {
+          const parsed = parseInt(saved, 10);
+          if (!isNaN(parsed)) return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, parsed));
+        }
+      } catch {}
+    }
+    return DEFAULT_WIDTH;
+  });
   const [isResizing, setIsResizing] = useState(false);
   const [internalIsMaximized, setInternalIsMaximized] = useState(false);
   const isMaximized = controlledIsMaximized !== undefined ? controlledIsMaximized : internalIsMaximized;
-  const prevWidthRef = useRef<number>(DEFAULT_WIDTH);
+  const prevWidthRef = useRef<number>(width);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const widthRef = useRef(DEFAULT_WIDTH);
+  const widthRef = useRef(width);
 
   const startResizing = useCallback((e: ReactMouseEvent) => {
     if (e.button !== 0) return;
@@ -36,8 +47,10 @@ export function useRightSidebarResize({
       if (!isResizing || isMaximized) return;
       let newWidth = window.innerWidth - e.clientX;
       if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
-      const safeMax = Math.max(MIN_WIDTH, window.innerWidth - 420);
-      if (newWidth > Math.min(MAX_WIDTH, safeMax)) newWidth = Math.min(MAX_WIDTH, safeMax);
+      // Reserve at least 260px for left sidebar + 400px for center chat = 660px minimum non-right-sidebar space
+      const safeMax = Math.max(MIN_WIDTH, window.innerWidth - 660);
+      const effectiveMax = Math.min(MAX_WIDTH, safeMax);
+      if (newWidth > effectiveMax) newWidth = effectiveMax;
       widthRef.current = newWidth;
 
       if (resizeRaf === null) {
@@ -57,6 +70,9 @@ export function useRightSidebarResize({
       }
       if (isResizing) {
         setWidth(widthRef.current);
+        try {
+          localStorage.setItem('mash_right_sidebar_width', String(widthRef.current));
+        } catch {}
       }
       setIsResizing(false);
     };
