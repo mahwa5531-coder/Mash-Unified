@@ -85,10 +85,10 @@ console.log('[Suite 1: Happy Path] Full-Turn Multi-Phase State Transition...');
   assert.strictEqual(asstMsg.role, 'assistant');
   // Invariant: intermediate prose during tool call is folded; final verified prose is displayed
   assert.strictEqual(asstMsg.content, 'The function `add` is implemented cleanly and is ready for production.');
-  assert.strictEqual(asstMsg.tools.length, 1);
-  assert.strictEqual(asstMsg.tools[0].name, 'read_file');
-  assert.strictEqual(asstMsg.tools[0].status, 'completed');
-  assert.strictEqual(asstMsg.thoughts.length, 2);
+  assert.strictEqual(asstMsg.tools?.length, 1);
+  assert.strictEqual(asstMsg.tools?.[0]?.name, 'read_file');
+  assert.strictEqual(asstMsg.tools?.[0]?.status, 'completed');
+  assert.strictEqual(asstMsg.thoughts?.length, 2);
 
   console.log('  [PASS] 1. Happy path: multi-phase turn correctly parsed and consolidated.');
 }
@@ -185,8 +185,8 @@ console.log('\n[Suite 2: Unhappy Path B] Tool Non-Zero Exit Code / Tool Failure.
   const parsedFailed = parseSessionHistory(failedToolTranscript);
   assert.strictEqual(parsedFailed.length, 2);
   const asst = parsedFailed[1];
-  assert.strictEqual(asst.tools[0].status, 'failed', 'Tool status must be preserved as failed');
-  assert.ok(asst.tools[0].output.includes('Exit code: 4'), 'Error output must be retained for inspection');
+  assert.strictEqual(asst.tools?.[0]?.status, 'failed', 'Tool status must be preserved as failed');
+  assert.ok(asst.tools?.[0]?.output?.includes('Exit code: 4'), 'Error output must be retained for inspection');
   assert.strictEqual(asst.content, 'The test run failed because `test_missing.py` does not exist on disk.');
 
   console.log('  [PASS] 2B. Tool failure non-zero exit code preserved and rendered without crash.');
@@ -226,8 +226,9 @@ console.log('\n[Suite 2: Unhappy Path C] Tool Permission Denial & Preemptive Aut
 
   // User steers or rejects -> tool auto-dismissed with 'deny'
   const deniedMsgs = dismissPendingApprovals(pendingApprovalMsgs);
-  assert.strictEqual(deniedMsgs[1].tools[0].status, 'denied', 'Status must transition to denied');
-  assert.strictEqual(deniedMsgs[1].tools[0].decision, 'deny');
+  const deniedTool = deniedMsgs[1].tools?.[0];
+  assert.strictEqual(deniedTool?.status, 'denied', 'Status must transition to denied');
+  assert.strictEqual(deniedTool?.decision, 'deny');
 
   console.log('  [PASS] 2C. Tool denial correctly sets status to denied with zero side effects.');
 }
