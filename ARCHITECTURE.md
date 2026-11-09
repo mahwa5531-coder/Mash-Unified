@@ -6,7 +6,7 @@
 > The entity executing the backend and frontend **IS THE LOCAL HOST OS USER**.
 >
 > ❌ **DO NOT** apply cloud SaaS chroot jailing or artificial filesystem restrictions.  
-> ❌ **DO NOT** treat local absolute paths, external drives, or `..` traversals as "attacks".  
+> ❌ **DO NOT** treat local absolute paths, external drives, or host file reads as "attacks".  
 > ❌ **DO NOT** return `403 Forbidden` for non-existent local files. Missing files are **`404 Not Found`**.  
 > 
 > Security in Mash lives in **MUTATION AND EXECUTION APPROVAL** (human-in-the-loop consent before modifying files or executing shell commands), **NEVER** in hiding files from the user who owns the machine.
@@ -65,7 +65,7 @@ The primary failure mode of automated AI coding assistants when working on Mash 
    - Never artificially restrict reads to the project workspace root.
 2. **Missing Files Return 404, Not 403**:
    - Returning `403 Forbidden` for a file that does not exist on disk is an anti-pattern. If a path does not exist, return `404 Not Found`.
-   - Only return `403 Forbidden` when the operating system raises `PermissionError` (e.g. attempting to read a protected system file without admin rights), when attempting to read a directory as a file, or when attempting unauthorized access to another session's private brain storage.
+   - Only return `403 Forbidden` when the operating system raises `PermissionError` (e.g. attempting to read a protected system file without OS permissions), when attempting to read a directory as a file, or when attempting unauthorized access to another session's private brain storage.
 3. **Execution & Mutation Security (Human-in-the-Loop)**:
    - Security in Mash is enforced strictly at the **mutation boundary**:
      - Running shell commands (`run_shell_command`)
@@ -106,7 +106,7 @@ flowchart TD
     subgraph Tier4 ["Tier 4: Local Persistence Engine (SQLite / Event Ledger)"]
         DB_Actions["agent_run_actions<br/>(APPEND / UNDO / REPLACE)"]
         DB_Sessions["sessions & permission_rules"]
-        DB_Projects["projects & teams"]
+        DB_Projects["projects, teams & agents"]
         FS_Brain["~/.mash/brain/&lt;session_id&gt;/<br/>(Session Working Papers)"]
     end
 
@@ -165,33 +165,39 @@ sequenceDiagram
     Engine-->>Gateway: Yield internal events
     Gateway-->>Browser: SSE data: {"type": "TEXT_MESSAGE_CONTENT", "delta": "..."}
     Browser->>Flusher: Push delta to queue
-    Note over Flusher: Micro-batches deltas into 60 FPS chunks
+    Note over Flusher: Micro-batches deltas into 60 FPS chunks (16ms)
     Flusher->>Browser: Reconcile React state
     Browser->>User: Virtuoso smoothly renders active turn
 ```
 
-#### 2. Wire Protocol Event Catalogue
-Every event transmitted over `POST /stream` adheres strictly to the format `data: <JSON>\n\n`:
+#### 2. Complete Wire Protocol Event Catalogue
+Every event transmitted over `POST /stream` adheres strictly to the format `data: <JSON>\n\n`. Both the backend (`chat_streamer.py`) and frontend (`services/stream.ts`) normalize the following complete event set:
 
 | SSE Event `type` | Payload Keys | Purpose / Frontend Action |
 | :--- | :--- | :--- |
 | **`RUN_STARTED`** | `run_id`, `session_id` | Initializes new execution turn in UI; attaches abort controller. |
 | **`TEXT_MESSAGE_START`** | `run_id`, `message_id` | Signals assistant text generation is beginning. |
-| **`TEXT_MESSAGE_CONTENT`** | `run_id`, `delta` | Assistant token delta; batched by `useSseBufferFlusher`. |
+| **`TEXT_MESSAGE_CONTENT`** / **`TEXT_MESSAGE_CHUNK`** | `run_id`, `delta` | Assistant token delta; batched by `useSseBufferFlusher`. |
 | **`THINKING_START`** | `run_id` | Opens collapsible reasoning block in UI. |
-| **`THINKING_CONTENT`** | `run_id`, `delta` | Reasoning/Chain-of-Thought token delta. |
+| **`THINKING_CONTENT`** / **`THINKING_TEXT_MESSAGE_CONTENT`** / **`REASONING_MESSAGE_CONTENT`** | `run_id`, `delta` | Reasoning/Chain-of-Thought token delta. |
+| **`THINKING_TEXT_MESSAGE_END`** / **`REASONING_MESSAGE_END`** | `run_id` | Closes reasoning block and records duration. |
 | **`TOOL_CALL_START`** | `run_id`, `tool_call_id`, `tool_name`, `parameters` | Mounts active tool card in execution timeline. |
-| **`TOOL_CALL_RESULT`** | `run_id`, `tool_call_id`, `tool_name`, `result`, `is_error` | Closes tool card with stdout/stderr and exit badge. |
-| **`TOOL_CALL_PENDING_APPROVAL`**| `tool_call_id`, `tool_name`, `prompt`, `parameters` | Displays interactive modal card for user approval. |
+| **`TOOL_CALL_ARGS`** | `run_id`, `tool_call_id`, `delta` | Streams tool JSON argument chunks. |
+| **`TOOL_CALL_END`** | `run_id`, `tool_call_id` | Finalizes tool argument streaming before execution. |
+| **`TOOL_CALL_RESULT`** | `run_id`, `tool_call_id`, `tool_name`, `content`, `status`, `duration_seconds` | Closes tool card with stdout/stderr, duration, and status badge. |
+| **`TOOL_CALL_PENDING_APPROVAL`**| `tool_call_id`, `run_id`, `tool_name`, `prompt`, `parameters` | Displays interactive modal card for user approval. |
+| **`COMPACTION_STARTED`** | `trigger_reason` | Displays transient context compaction banner in chat. |
+| **`COMPACTION_FINISHED`** | `tokens_saved`, `summary` | Replaces compaction banner with token savings badge. |
+| **`RETRY`** | `attempt` | Signals upstream provider retry; resets uncommitted stream buffer. |
 | **`RUN_FINISHED`** | `run_id`, `session_id`, `result` | Finalizes turn; clears streaming spinners. |
-| **`RUN_ERROR`** | `run_id`, `message` | Displays error toast/banner; triggers retry button. |
+| **`RUN_ERROR`** / **`TRANSPORT_ERROR`** | `run_id`, `message` | Normalizes error into clean notice; triggers retry UI. |
 | **`: heartbeat`** | *(Comment line)* | Sent every 15.0s during idle periods to prevent proxy timeouts. |
 
 #### 3. Graceful Empty-Response Degradation
 Under heavy load, upstream proxy drops, or aggressive moderation filtering, an LLM may terminate without emitting tokens or tool calls. NexAU yields a `RUN_ERROR` with `"No response content or tool calls"`.
 [`connector/app/services/chat_streamer.py:169-193`](file:///c:/Users/rama/Downloads/Mash/connector/app/services/chat_streamer.py#L169-L193) intercepts this error, shields the user from raw stack traces, and converts it into a clean, recoverable message:
 ```python
-if "No response content or tool calls" in err_msg_s:
+if "No response content or tool calls" in err_msg_s or "never aggregated with any content" in err_msg_s:
     notice = "The model returned an empty response. Please rephrase your query or provide more context."
     yield f"data: {json.dumps({'type': 'RUN_STARTED', 'run_id': run_id, 'session_id': session_id})}\n\n"
     yield f"data: {json.dumps({'type': 'TEXT_MESSAGE_CONTENT', 'delta': notice, 'run_id': run_id})}\n\n"
@@ -236,36 +242,41 @@ When an agent proposes a dangerous tool call and pauses for user confirmation, t
 - [`connector/app/services/chat_permissions.py:79`](file:///c:/Users/rama/Downloads/Mash/connector/app/services/chat_permissions.py#L79) invokes `handle_preemptive_steer`:
   1. Auto-denies all pending tool calls with feedback: `"Superseded by user mid-flight steering"`.
   2. Calls `server.handle_stop_request(force=True)` to terminate the pending iteration.
-  3. Wraps the new user prompt inside `<USER_STEERING>` protocol envelopes.
-  4. Delivers the prompt to the active session inbox. The dangerous tool **never executes**.
+  3. Frontend (`streamRetryManager.ts:51`) immediately marks pending approval tools as `status: 'denied', decision: 'deny'`.
+  4. Wraps the new user prompt inside `<USER_STEERING>` protocol envelopes.
+  5. Delivers the prompt to the active session inbox. The dangerous tool **never executes**.
 
 ---
 
 ### Subsystem 3: Universal Artifact Viewer & Desktop Read Model
 
 #### 1. The 4-Tier Path Resolution Hierarchy
-When the frontend requests file content via `GET /files/content?path=<path>&session_id=<sid>`, [`connector/app/routers/artifacts.py`](file:///c:/Users/rama/Downloads/Mash/connector/app/routers/artifacts.py) resolves the target through four sequential rungs:
+When the frontend requests file content via `GET /files/content?path=<path>&session_id=<sid>`, [`connector/app/routers/artifacts.py`](file:///c:/Users/rama/Downloads/Mash/connector/app/routers/artifacts.py) resolves the target through sequential rungs:
 
 ```mermaid
 flowchart TD
-    Start["Incoming Request: path, session_id"] --> Step1{"1. Is path relative to Project Workspace?"}
-    Step1 -- Yes & Exists --> ServeLocal["Serve File Content"]
-    Step1 -- No --> Step2{"2. Is path relative to Session Brain?<br/>(~/.mash/brain/&lt;sid&gt;/)"}
-    Step2 -- Yes & Exists --> AuthCheck{"Session Authorization Valid?"}
-    AuthCheck -- Yes --> ServeLocal
-    AuthCheck -- No --> Ret403["Return 403 Forbidden<br/>(Unauthorized Brain Access)"]
-    Step2 -- No --> Step3{"3. Is path an Absolute Host Path?<br/>(C:\..., /home/..., /Volumes/...)"}
-    Step3 -- Yes & Exists --> CheckPerm{"OS Permission Denied?"}
+    Start["Incoming Request: path, session_id"] --> Step0{"Contains relative '..' segment?"}
+    Step0 -- Yes --> Ret403Rel["Return 403 Forbidden<br/>(Relative traversal defense)"]
+    Step0 -- No --> Step1{"1. Is path an existing Absolute Host File?<br/>(p.is_absolute() and p.is_file())"}
+    Step1 -- Yes --> BrainAuthCheck{"Is path inside ~/.mash/brain/?"}
+    Step1 -- No --> Step2{"2. Search Relative Candidates:<br/>1. s_dir (brain, working_papers, scratch)<br/>2. ws (workspace, Audit_Deliverables, working_papers)<br/>3. APP_WORKSPACE_ROOT"}
+    Step2 -- Found --> BrainAuthCheck
+    Step2 -- Not Found --> Step3{"3. Found in SQLite Action History?<br/>(_recover_from_sqlite_direct)"}
+    Step3 -- Yes --> ServeVirtual["Return Virtual Content (Text)"]
+    Step3 -- No --> Ret404["Return 404 Not Found<br/>(File does not exist on local disk)"]
+    BrainAuthCheck -- Yes & session_id missing --> Ret403Brain["Return 403 Forbidden<br/>(Brain authorization required)"]
+    BrainAuthCheck -- No or Authorized --> CheckPerm{"OS Permission Denied?"}
     CheckPerm -- Yes --> Ret403Perm["Return 403 Forbidden<br/>(OS PermissionError)"]
     CheckPerm -- No --> CheckDir{"Is Directory?"}
-    CheckDir -- Yes --> Ret403Dir["Return 403 Forbidden<br/>(Cannot read directory)"]
-    CheckDir -- No --> ServeLocal
-    Step3 -- No --> Step4{"4. Found in SQLite Action History?<br/>(_recover_from_sqlite_direct)"}
-    Step4 -- Yes --> ServeVirtual["Return Virtual Content (Text)"]
-    Step4 -- No --> Ret404["Return 404 Not Found<br/>(File does not exist on disk)"]
+    CheckDir -- Yes --> Ret403Dir["Return 403 Forbidden<br/>(Path is a directory)"]
+    CheckDir -- No --> ServeFile["Serve File Content (MIME Dispatched)"]
 ```
 
-#### 2. Content Dispatch & MIME Handling
+#### 2. Relative Traversal vs Absolute Host Access
+- **Relative Path Traversal Defense**: Passing relative paths containing `..` (e.g. `path="../../foo.txt"`) is rejected with `403 Invalid path traversal detected` to prevent ambiguous directory escaping.
+- **Absolute Host Paths**: Fully supported! The host OS user can open any absolute path (`C:\Users\rama\Desktop\notes.txt`, `D:\data\sample.csv`, `/home/user/paper.pdf`). Absolute paths bypass relative candidate searching and are directly served.
+
+#### 3. Content Dispatch & MIME Handling
 - **PDF Documents** (`.pdf`): Served via `FileResponse(media_type="application/pdf", content_disposition_type="inline")`.
 - **Images & Vector Graphics** (`.png`, `.jpg`, `.svg`, `.webp`, `.gif`): Served inline; frontend renders inside interactive PanZoom viewport.
 - **Spreadsheets** (`.xlsx`, `.xls`, `.ods`): Served as JSON descriptor (`{"type": "excel", "filename": ...}`); client-side SheetJS parses raw bytes into interactive data grid.
@@ -274,6 +285,7 @@ flowchart TD
   - Line ending normalization: Normalizes mixed CRLF (`\r\r\n` and `\r\n`) to clean `\n`.
   - Frontend renders in Monaco Editor with syntax highlighting and diff viewing.
 - **Binary & Archives** (`.zip`, `.tar.gz`, `.exe`, `.bin`): Served as attachment download.
+- **Virtual SQLite Fallback**: If an agent deliverable was deleted from disk or generated ephemerally, `_recover_from_sqlite_direct` scans `agent_run_actions` and reconstructs the content from tool call arguments.
 
 ---
 
@@ -400,139 +412,199 @@ Small reasoning models (e.g. DeepSeek-R1-Distill-1.7B, Qwen-2.5-Coder-7B) often 
 ### Subsystem 8: Workspaces, Projects & Multi-Agent Teams
 
 - **Projects**: Local folders registered in the `projects` table. Each session binds to a project workspace via `resolve_session_workspace`.
-- **Multi-Agent Teams**: Defined by `teams`, `team_members`, and `team_tasks` tables:
+- **Multi-Agent Teams**: Defined by `teams`, `team_members`, `team_messages`, `team_tasks`, and `team_task_locks` tables:
   - `TeamModel`: Scopes team leader and candidate agent configurations.
   - `TeamMemberModel`: Scopes individual agent roles (`idle`, `running`, `stopped`) with isolated sub-sessions (`member_session_id`).
+  - `TeamMessageModel`: Tracks inter-agent communications and deliveries.
   - `TeamTaskModel`: Work item queue with task dependencies, priorities, and assigned agents.
+  - `TeamTaskLockModel`: Nanosecond task claims preventing multiple agents from picking up the same item.
 
 ---
 
 ## 4. Complete SQLite Database Reference (`~/.mash/database/mash.db`)
 
-Mash uses SQLite in WAL mode. All tables are managed by SQLAlchemy and SQLModel:
+Mash uses SQLite in WAL mode. The database contains 11 core tables managed by SQLAlchemy, SQLModel, and Alembic:
 
 ### 1. Table: `sessions`
-*Stores core session state and active tool approval requests.*
 ```sql
 CREATE TABLE sessions (
-    user_id VARCHAR NOT NULL,
-    session_id VARCHAR NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
-    context JSON NOT NULL,            -- Runtime context: cwd, username, git branch
-    storage JSON NOT NULL,            -- GlobalStorage cross-agent data sharing
-    sandbox_state JSON NOT NULL,      -- Sandbox state for resumption
-    root_agent_id VARCHAR,            -- Main agent identifier
-    pending_tool_calls JSON,          -- Dict of tool calls awaiting user approval
+    user_id VARCHAR NOT NULL, 
+    session_id VARCHAR NOT NULL, 
+    created_at DATETIME NOT NULL, 
+    updated_at DATETIME NOT NULL, 
+    context JSON,                     -- Runtime context: cwd, username, git branch
+    storage JSON,                     -- GlobalStorage cross-agent data sharing
+    sandbox_state JSON,               -- Sandbox state for resumption
+    root_agent_id VARCHAR,             -- Main agent identifier
+    pending_tool_calls JSON,           -- Dict of tool calls awaiting user approval
     PRIMARY KEY (user_id, session_id)
 );
 ```
 
 ### 2. Table: `agent_run_actions`
-*Event-sourced chronological mutation ledger for all conversation messages.*
 ```sql
 CREATE TABLE agent_run_actions (
-    action_id VARCHAR NOT NULL PRIMARY KEY,
-    user_id VARCHAR NOT NULL,
-    session_id VARCHAR NOT NULL,
-    agent_id VARCHAR NOT NULL,
-    run_id VARCHAR NOT NULL,
-    created_at DATETIME NOT NULL,
-    created_at_ns BIGINT NOT NULL,    -- Nanosecond timestamp for strict chronological sorting
-    action_type VARCHAR NOT NULL,     -- 'append' | 'undo' | 'replace' | 'run_start' | 'run_end'
-    append_messages JSON,             -- Messages added in this step
-    replace_messages JSON,            -- Messages replacing state (used by compaction)
-    undo_before_run_id VARCHAR,       -- Target run_id reverted by undo
-    extra JSON                        -- Metadata (e.g. ReplaceExtra reason="compact_auto")
+    action_id VARCHAR NOT NULL PRIMARY KEY, 
+    user_id VARCHAR NOT NULL, 
+    session_id VARCHAR NOT NULL, 
+    agent_id VARCHAR NOT NULL, 
+    run_id VARCHAR NOT NULL, 
+    root_run_id VARCHAR NOT NULL, 
+    parent_run_id VARCHAR, 
+    agent_name VARCHAR NOT NULL, 
+    created_at DATETIME NOT NULL, 
+    created_at_ns INTEGER NOT NULL,   -- Nanosecond timestamp for strict chronological sorting
+    action_type VARCHAR NOT NULL,      -- 'append' | 'undo' | 'replace' | 'run_start' | 'run_end'
+    append_messages JSON,              -- Messages added in this step
+    replace_messages JSON,             -- Messages replacing state (used by compaction)
+    undo_before_run_id VARCHAR,        -- Target run_id reverted by undo
+    idempotency_key VARCHAR UNIQUE, 
+    extra JSON                         -- Metadata (e.g. ReplaceExtra reason="compact_auto")
 );
-CREATE INDEX ix_actions_session_ns ON agent_run_actions (session_id, created_at_ns);
+-- High-performance query indexes
+CREATE INDEX ix_agent_run_actions_session_id ON agent_run_actions (session_id);
+CREATE INDEX ix_agent_run_actions_created_at_ns ON agent_run_actions (created_at_ns);
+CREATE INDEX idx_agent_run_actions_created_at_ns ON agent_run_actions (user_id, session_id, agent_id, created_at_ns);
+CREATE INDEX idx_agent_run_actions_action_type_created_at_ns ON agent_run_actions (user_id, session_id, agent_id, action_type, created_at_ns);
+CREATE INDEX ix_agent_run_actions_action_type ON agent_run_actions (action_type);
+CREATE INDEX ix_agent_run_actions_run_id ON agent_run_actions (run_id);
 ```
 
 ### 3. Table: `permission_rules`
-*Permanent tool permission rules configured by the user.*
 ```sql
 CREATE TABLE permission_rules (
-    user_id VARCHAR NOT NULL,
-    session_id VARCHAR NOT NULL,
-    tool_name VARCHAR NOT NULL,
-    rule_content VARCHAR NOT NULL,    -- Wildcard pattern or command prefix (e.g. '**')
-    behavior VARCHAR NOT NULL,        -- 'allow' | 'deny'
-    source VARCHAR NOT NULL,          -- 'config' | 'user'
-    created_at DATETIME NOT NULL,
+    user_id VARCHAR NOT NULL, 
+    session_id VARCHAR NOT NULL, 
+    tool_name VARCHAR NOT NULL, 
+    rule_content VARCHAR NOT NULL,     -- Wildcard pattern or command prefix (e.g. '**')
+    behavior VARCHAR NOT NULL,         -- 'allow' | 'deny'
+    source VARCHAR NOT NULL,           -- 'config' | 'user'
+    created_at DATETIME NOT NULL, 
     PRIMARY KEY (user_id, session_id, tool_name, rule_content, behavior)
 );
 ```
 
 ### 4. Table: `projects`
-*Local directory workspace mappings.*
 ```sql
 CREATE TABLE projects (
-    id VARCHAR NOT NULL PRIMARY KEY,
-    user_id VARCHAR NOT NULL,
-    name VARCHAR NOT NULL,
-    local_folder_path VARCHAR NOT NULL,
-    created_at DATETIME NOT NULL,
+    id VARCHAR NOT NULL PRIMARY KEY, 
+    user_id VARCHAR NOT NULL, 
+    name VARCHAR NOT NULL, 
+    local_folder_path VARCHAR NOT NULL, 
+    created_at DATETIME NOT NULL, 
     updated_at DATETIME NOT NULL
 );
 ```
 
-### 5. Table: `agent_locks`
-*Nanosecond distributed session locks preventing concurrent mutation races.*
+### 5. Table: `agents`
+```sql
+CREATE TABLE agents (
+    user_id VARCHAR NOT NULL, 
+    session_id VARCHAR NOT NULL, 
+    agent_id VARCHAR NOT NULL, 
+    agent_name VARCHAR NOT NULL, 
+    created_at DATETIME NOT NULL, 
+    last_updated DATETIME NOT NULL, 
+    PRIMARY KEY (user_id, session_id, agent_id)
+);
+CREATE INDEX ix_agents_session_id ON agents (session_id);
+```
+
+### 6. Table: `agent_locks`
 ```sql
 CREATE TABLE agent_locks (
-    session_id VARCHAR NOT NULL,
-    agent_id VARCHAR NOT NULL,
-    holder_id VARCHAR NOT NULL,
-    acquired_at_ns BIGINT NOT NULL,
-    expires_at_ns BIGINT NOT NULL,
+    session_id VARCHAR NOT NULL, 
+    agent_id VARCHAR NOT NULL, 
+    user_id VARCHAR, 
+    run_id VARCHAR, 
+    holder_id VARCHAR NOT NULL, 
+    acquired_at_ns INTEGER NOT NULL, 
+    expires_at_ns INTEGER NOT NULL, 
     PRIMARY KEY (session_id, agent_id)
 );
 ```
 
-### 6. Tables: `teams`, `team_members`, `team_tasks`
-*Multi-agent team coordination, member roles, and task boards.*
+### 7. Table: `teams`
 ```sql
 CREATE TABLE teams (
-    user_id VARCHAR NOT NULL,
-    session_id VARCHAR NOT NULL,
-    team_id VARCHAR NOT NULL,
-    leader_agent_id VARCHAR NOT NULL,
-    candidates JSON,
-    max_teammates INTEGER,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
+    user_id VARCHAR NOT NULL, 
+    session_id VARCHAR NOT NULL, 
+    team_id VARCHAR NOT NULL, 
+    leader_agent_id VARCHAR NOT NULL, 
+    candidates JSON, 
+    max_teammates INTEGER NOT NULL, 
+    created_at DATETIME NOT NULL, 
+    updated_at DATETIME NOT NULL, 
     PRIMARY KEY (user_id, session_id, team_id)
 );
+```
 
+### 8. Table: `team_members`
+```sql
 CREATE TABLE team_members (
-    user_id VARCHAR NOT NULL,
-    session_id VARCHAR NOT NULL,
-    team_id VARCHAR NOT NULL,
-    agent_id VARCHAR NOT NULL,
-    member_session_id VARCHAR NOT NULL,
-    role_name VARCHAR NOT NULL,
-    status VARCHAR NOT NULL,          -- 'idle' | 'running' | 'stopped'
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
+    user_id VARCHAR NOT NULL, 
+    session_id VARCHAR NOT NULL, 
+    team_id VARCHAR NOT NULL, 
+    agent_id VARCHAR NOT NULL, 
+    member_session_id VARCHAR NOT NULL, 
+    role_name VARCHAR NOT NULL, 
+    status VARCHAR NOT NULL,           -- 'idle' | 'running' | 'stopped'
+    created_at DATETIME NOT NULL, 
+    updated_at DATETIME NOT NULL, 
     PRIMARY KEY (user_id, session_id, team_id, agent_id)
 );
+```
 
+### 9. Table: `team_messages`
+```sql
+CREATE TABLE team_messages (
+    user_id VARCHAR NOT NULL, 
+    session_id VARCHAR NOT NULL, 
+    team_id VARCHAR NOT NULL, 
+    message_id VARCHAR NOT NULL, 
+    from_agent_id VARCHAR NOT NULL, 
+    to_agent_id VARCHAR, 
+    content VARCHAR NOT NULL, 
+    message_type VARCHAR NOT NULL, 
+    delivered BOOLEAN NOT NULL, 
+    delivered_at DATETIME, 
+    created_at DATETIME NOT NULL, 
+    PRIMARY KEY (user_id, session_id, team_id, message_id)
+);
+```
+
+### 10. Table: `team_tasks`
+```sql
 CREATE TABLE team_tasks (
-    user_id VARCHAR NOT NULL,
-    session_id VARCHAR NOT NULL,
-    team_id VARCHAR NOT NULL,
-    task_id VARCHAR NOT NULL,         -- e.g. 'T-001'
-    title VARCHAR NOT NULL,
-    description VARCHAR,
-    priority INTEGER NOT NULL,        -- 0=normal, 1=high, 2=critical
-    status VARCHAR NOT NULL,          -- 'pending' | 'in_progress' | 'completed'
-    dependencies JSON,                -- List of prerequisite task_ids
-    assignee_agent_id VARCHAR,
-    result_summary VARCHAR,
-    deliverable_path VARCHAR,
-    created_by VARCHAR NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
+    user_id VARCHAR NOT NULL, 
+    session_id VARCHAR NOT NULL, 
+    team_id VARCHAR NOT NULL, 
+    task_id VARCHAR NOT NULL,          -- e.g. 'T-001'
+    title VARCHAR NOT NULL, 
+    description VARCHAR NOT NULL, 
+    priority INTEGER NOT NULL,         -- 0=normal, 1=high, 2=critical
+    status VARCHAR NOT NULL,           -- 'pending' | 'in_progress' | 'completed'
+    dependencies JSON,                 -- List of prerequisite task_ids
+    assignee_agent_id VARCHAR, 
+    result_summary VARCHAR, 
+    deliverable_path VARCHAR, 
+    created_by VARCHAR NOT NULL, 
+    created_at DATETIME NOT NULL, 
+    updated_at DATETIME NOT NULL, 
+    PRIMARY KEY (user_id, session_id, team_id, task_id)
+);
+```
+
+### 11. Table: `team_task_locks`
+```sql
+CREATE TABLE team_task_locks (
+    user_id VARCHAR NOT NULL, 
+    session_id VARCHAR NOT NULL, 
+    team_id VARCHAR NOT NULL, 
+    task_id VARCHAR NOT NULL, 
+    holder_id VARCHAR NOT NULL, 
+    acquired_at_ns INTEGER NOT NULL, 
+    expires_at_ns INTEGER NOT NULL, 
     PRIMARY KEY (user_id, session_id, team_id, task_id)
 );
 ```
