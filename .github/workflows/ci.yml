@@ -75,7 +75,7 @@ jobs:
         run: |
           python -m ruff check NexAU/ connector/ --select E9,F821
 
-      - name: Run Connector and NexAU Tests
+      - name: Run NexAU Agent Harness Evaluation Tests
         env:
           PYTHONPATH: "connector:NexAU"
           MASH_ENV: "test"
@@ -84,4 +84,4 @@ jobs:
           LLM_API_KEY: "ollama"
           LLM_API_TYPE: "openai_chat_completion"
         run: |
-          python -m pytest connector/tests/ NexAU/tests/unit/test_storage_scaffold.py -v
+          python -m pytest NexAU/tests/harness_eval/ -v
