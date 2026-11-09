@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
-import { ImageOff, ExternalLink, RefreshCw } from 'lucide-react';
+import { ImageOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   FilePill,
@@ -66,8 +66,6 @@ function InlineMarkdownImage({
   ...props
 }: InlineMarkdownImageProps) {
   const [hasError, setHasError] = useState(false);
-  const [retryKey, setRetryKey] = useState(0);
-  const [isRetrying, setIsRetrying] = useState(false);
 
   let cleanPath = src || '';
   const isRemote = cleanPath.startsWith('http://') || cleanPath.startsWith('https://') || cleanPath.startsWith('data:');
@@ -75,36 +73,19 @@ function InlineMarkdownImage({
   let resolvedSrc = cleanPath;
   if (cleanPath && !isRemote) {
     cleanPath = normalizePath(cleanPath);
-    resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}${retryKey ? `&_t=${retryKey}` : ''}`;
+    resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}`;
   }
 
   const caption = alt && alt.trim() ? alt.trim() : null;
   const parts = cleanPath.split(/[/\\]/);
   const filename = parts.pop() || cleanPath || 'Image';
 
-  const handleInspect = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (cleanPath && onOpenFile) {
-      onOpenFile(cleanPath);
-    } else if (cleanPath && onImageClick) {
-      onImageClick({ src: resolvedSrc, alt: caption || filename, path: cleanPath });
-    }
-  };
-
-  const handleRetry = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsRetrying(true);
-    setRetryKey(Date.now());
-    setHasError(false);
-    setTimeout(() => setIsRetrying(false), 600);
-  };
-
   if (hasError) {
     return (
       <div
         className="my-3.5 w-full max-w-xl rounded-xl border border-dashed border-zinc-300 dark:border-white/[0.14] bg-zinc-50/70 dark:bg-zinc-900/40 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] dark:bg-[radial-gradient(#27272a_1px,transparent_1px)] overflow-hidden transition-all duration-200 select-none shadow-xs"
       >
-        <div className="flex flex-col items-center justify-center p-6 text-center min-h-[220px]">
+        <div className="flex flex-col items-center justify-center p-6 text-center min-h-[190px]">
           {/* Authentic Icon Shield */}
           <div className="w-12 h-12 rounded-xl bg-zinc-200/80 dark:bg-white/[0.08] border border-zinc-300/70 dark:border-white/[0.12] flex items-center justify-center text-zinc-500 dark:text-zinc-400 mb-3 shadow-2xs">
             <ImageOff size={22} strokeWidth={1.8} />
@@ -124,27 +105,6 @@ function InlineMarkdownImage({
           <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed">
             Image file no longer exists at this path. It may have been moved, renamed, or deleted from disk.
           </p>
-
-          {/* Actions: Inspect in Sidebar & Live Retry */}
-          <div className="mt-4 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleInspect}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-200/90 hover:bg-zinc-300 dark:bg-white/[0.08] dark:hover:bg-white/[0.15] text-zinc-800 dark:text-zinc-200 border border-zinc-300/60 dark:border-white/[0.10] transition-colors cursor-pointer"
-            >
-              <ExternalLink size={12} />
-              Inspect in Sidebar
-            </button>
-            <button
-              type="button"
-              onClick={handleRetry}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-transparent hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 border border-transparent transition-colors cursor-pointer"
-              title="Re-check file on disk"
-            >
-              <RefreshCw size={12} className={isRetrying ? "animate-spin" : ""} />
-              Retry
-            </button>
-          </div>
         </div>
       </div>
     );
