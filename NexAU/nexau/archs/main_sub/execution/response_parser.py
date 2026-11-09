@@ -64,7 +64,7 @@ class ResponseParser:
         model_response = response if isinstance(response, ModelResponse) else None
         if model_response:
             response_text = model_response.content or ""
-            reasoning_text = model_response.reasoning or ""
+            reasoning_text = getattr(model_response, "reasoning_content", None) or getattr(model_response, "reasoning", "") or ""
         else:
             response_text = cast(str, response) or ""
             reasoning_text = ""

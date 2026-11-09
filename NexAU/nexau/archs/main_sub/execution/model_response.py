@@ -263,6 +263,14 @@ class ModelResponse:
         if usage is None:
             self.usage = TokenUsage()
 
+    @property
+    def reasoning(self) -> str | None:
+        return self.reasoning_content
+
+    @reasoning.setter
+    def reasoning(self, val: str | None) -> None:
+        self.reasoning_content = val
+
     @classmethod
     def from_openai_message(cls, message: Any, usage: dict[str, Any] | None = None) -> ModelResponse:
         """Create a ModelResponse from an OpenAI chat completion message.
