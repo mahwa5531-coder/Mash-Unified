@@ -442,12 +442,14 @@ export default function Sidebar({
       style={{ width: `${effectiveWidth}px` }}
       onClick={() => setActiveMenuSessionId(null)}
     >
-      {/* Resizer Handle */}
+      {/* Draggable Resizer Handle */}
       <div 
-        className="absolute -right-0.5 top-0 w-1.5 h-full cursor-col-resize z-50 hover:bg-zinc-400/40 dark:hover:bg-white/15 active:bg-zinc-500/60 dark:active:bg-white/25 transition-colors"
+        className="absolute -right-1.5 top-0 w-3 h-full cursor-col-resize z-50 group flex items-center justify-center select-none"
         onMouseDown={startResizing}
         title="Drag to resize sidebar"
-      />
+      >
+        <div className="w-[2px] h-12 rounded-full bg-zinc-300 dark:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
+      </div>
 
       {/* Top Header Bar & Quick Actions */}
       <SidebarHeader
