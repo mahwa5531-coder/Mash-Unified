@@ -167,10 +167,10 @@ export const AgentMarkdown = memo(function AgentMarkdown({
 
   return (
     <div className={cn(
-      "font-sans text-zinc-900 dark:text-zinc-100 text-[13.5px] leading-[1.68]",
+      "font-sans text-zinc-900 dark:text-[#e2e8f0] text-[14.5px] leading-[1.62]",
       isChat
         ? "mt-2"
-        : "p-5 md:p-6 leading-[1.75] text-[13.5px] bg-[var(--bg-app)]",
+        : "p-5 md:p-6 leading-[1.65] text-[14.5px] bg-[var(--bg-app)]",
       className
     )}>
       <Streamdown

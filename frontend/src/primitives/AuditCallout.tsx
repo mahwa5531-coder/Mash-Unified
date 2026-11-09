@@ -186,7 +186,7 @@ export function AuditCallout({
   return (
     <blockquote
       className={cn(
-        "my-2.5 px-3 py-2 sm:px-3.5 sm:py-2 rounded-lg border border-l-[3px] select-text font-sans text-[13px] leading-[1.58] transition-colors",
+        "my-3 px-3.5 py-2.5 rounded-lg border border-l-[3.5px] select-text font-sans text-[13.5px] leading-[1.6] transition-colors",
         config.border,
         config.bg,
         className
@@ -200,7 +200,7 @@ export function AuditCallout({
         </div>
       )}
 
-      <div className="text-zinc-800 dark:text-zinc-300 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>p]:my-0.5 leading-[1.58]">
+      <div className="text-zinc-800 dark:text-[#e2e8f0] [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>p]:my-1 leading-[1.6]">
         {children}
       </div>
 
