@@ -47,8 +47,8 @@ export function useRightSidebarResize({
       if (!isResizing || isMaximized) return;
       let newWidth = window.innerWidth - e.clientX;
       if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
-      // Reserve at least 260px for left sidebar + 400px for center chat = 660px minimum non-right-sidebar space
-      const safeMax = Math.max(MIN_WIDTH, window.innerWidth - 660);
+      // Reserve at least 280px for left sidebar + 400px for center chat = 680px minimum non-right-sidebar space
+      const safeMax = Math.max(MIN_WIDTH, window.innerWidth - 680);
       const effectiveMax = Math.min(MAX_WIDTH, safeMax);
       if (newWidth > effectiveMax) newWidth = effectiveMax;
       widthRef.current = newWidth;

@@ -122,7 +122,7 @@ const MountedTurnRow = memo(function MountedTurnRow({
 
 // Module-hoisted Virtuoso footer prevents component re-creation and DOM remounts on every render frame
 const VirtuosoFooter = memo(function VirtuosoFooter() {
-  return <div className="max-w-3xl mx-auto w-full pb-6 px-4 sm:px-6" aria-hidden="true" />;
+  return <div className="max-w-3xl mx-auto w-full pb-6 px-2.5 sm:px-3.5" aria-hidden="true" />;
 });
 
 export default function ChatCanvas({ 
@@ -378,7 +378,7 @@ export default function ChatCanvas({
             const isLastTurn = index === turns.length - 1;
             const turnKey = turn.id || `turn_${turn.flatIdx}_${index}`;
             return (
-              <div className="max-w-3xl mx-auto w-full py-1 px-4 sm:px-6">
+              <div className="max-w-3xl mx-auto w-full py-1 px-2.5 sm:px-3.5">
                 <MountedTurnRow
                   turn={turn}
                   turnKey={turnKey}
@@ -399,7 +399,7 @@ export default function ChatCanvas({
       )}
 
       {/* Bottom Composer Dock */}
-      <div className="shrink-0 w-full z-20 bg-transparent pb-3 px-4 sm:px-6 relative">
+      <div className="shrink-0 w-full z-20 bg-transparent pb-3 px-2.5 sm:px-3.5 relative">
         <div className="max-w-3xl mx-auto w-full relative">
 
           <SteeringQueueBanner

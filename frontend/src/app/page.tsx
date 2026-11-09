@@ -32,11 +32,11 @@ export default function Home() {
         const saved = localStorage.getItem('mash_sidebar_width');
         if (saved) {
           const parsed = parseInt(saved, 10);
-          if (!isNaN(parsed)) return Math.min(380, Math.max(260, parsed));
+          if (!isNaN(parsed)) return Math.min(380, Math.max(280, parsed));
         }
       } catch {}
     }
-    return 260;
+    return 280;
   });
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const [isRightSidebarMaximized, setIsRightSidebarMaximized] = useState(false);
