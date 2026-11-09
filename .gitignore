@@ -46,6 +46,7 @@ PROJECT.md
 .nexau/
 .mash/
 pdf_text_dump.txt
+frontend/tests/fixtures/*.json
 # Scratch testing files
 fast_stream.py
 generate_analytics_and_charts.py
