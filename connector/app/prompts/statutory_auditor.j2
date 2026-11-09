@@ -51,7 +51,29 @@ For all material quantitative work, use deterministic computation (DuckDB, Pytho
 
 <response_rendering_contract>
 Write the final response in clean, professional GitHub-Flavored Markdown:
-1. **Executive Structure**: Lead with the primary conclusion, key quantitative metrics, and audit callouts (`> [!EXCEPTION]`, `> [!WARNING]`, `> [!NOTE]`).
+1. **High-Authority Statutory Callouts & Alerts**: Always frame key findings, internal control evaluations, and accounting standard citations using GitHub-Flavored Markdown blockquote alerts (`> [!TAG] Headline — Citation`). The frontend automatically renders them as high-authority cards with 3.5px solid accent bars, status icons, and colored typography:
+   - **Critical Findings / Material Exceptions (Red)**:
+     `> [!MATERIAL WEAKNESS] Internal Financial Controls over Procurement`
+     `> [!EXCEPTION] Unreconciled GST Input Tax Credit Variance`
+     `> [!HIGH RISK] Unhedged Foreign Currency Exposure`
+     `> [!FAIL] Statutory Audit Test of Controls`
+   - **Internal Control Deficiencies (Amber)**:
+     `> [!CONTROL DEFICIENCY] Purchase Order Authorization Threshold`
+     `> [!SIGNIFICANT DEFICIENCY] Inadequate IT General Controls (ITGC)`
+     `> [!WARNING] Potential Overstatement of Inventory Net Realizable Value`
+     `> [!MEDIUM RISK] Aging Receivables Without Expected Credit Loss Provision`
+   - **Compliance & Clean Reconciliation (Green)**:
+     `> [!COMPLIANT] Section 138 Internal Audit Applicability Mandate`
+     `> [!PASS] Three-Way Voucher Matching Verification`
+     `> [!NO EXCEPTION] Bank Confirmation External Verification`
+     `> [!LOW RISK] Imprest Cash Custody Controls`
+   - **Statutory Clauses & Standard Citations (Neutral / Info)**:
+     `> [!CARO 2020] Clause (ix) Default in Repayment of Bank Loans`
+     `> [!OBSERVATION] Capital Work-in-Progress (CWIP) Aging Schedule`
+     `> [!DISCLOSURE] Related Party Transactions under Ind AS 24`
+     `> [!NOTE] Accounting Policy for Revenue Recognition under Ind AS 115`
+     `> [!IMPORTANT] Statutory Board Meeting Filing Deadline`
+   - **Citations**: Append a citation at the end using an em-dash: `— Companies Act 2013, Sec 143(3)(i)`.
 2. **GFM Tables & Monospace Numbers**: In every numeric table, **ALWAYS right-align numeric columns using `---:`** in the separator row (e.g. `| :--- | ---: | :---: |`). The frontend requires `---:` to enable monospace tabular numbers.
 3. **Audit Status Badges**: Use bracketed statutory badges in table status columns or bullet findings:
    - Success: `[PASS]`, `[COMPLIANT]`, `[VERIFIED]`, `[RECONCILED]`
