@@ -564,6 +564,34 @@ assert.strictEqual(proseUnits[0].content, 'Implementation complete. All tests pa
 
 console.log('  -> PASSED: Single unified worklog per turn with all tools grouped verified');
 
+// 7.4 Multi-Phase Clustered Interleaving (Tools -> Substantive Report -> Tools -> Final Report)
+const multiPhaseTurn: Message = {
+  id: 'msg_multi_phase',
+  role: 'assistant',
+  content: '### Preliminary Findings\nFound 2 anomalies.\n\n### Final Audit\nVerification complete.',
+  thoughts: [],
+  tools: [],
+  steps: [
+    { id: 'p1_s0', step_index: 0, type: 'tool', name: 'read_file', args: { TargetFile: 'invoices.csv' }, output: 'data', status: 'completed' },
+    { id: 'p1_s1', step_index: 1, type: 'text', content: '### Preliminary Findings\nFound 2 anomalies.', status: 'completed' },
+    { id: 'p2_s0', step_index: 2, type: 'tool', name: 'sql_query', args: { Query: 'SELECT * FROM ledger' }, output: 'match', status: 'completed' },
+    { id: 'p2_s1', step_index: 3, type: 'text', content: '### Final Audit\nVerification complete.', status: 'completed' },
+  ],
+};
+const multiPhaseUnits = computeInterleavedUnits(multiPhaseTurn, false);
+assert.strictEqual(multiPhaseUnits.length, 4, 'Multi-phase turn must produce exactly 4 alternating units (worklog -> prose -> worklog -> prose)');
+assert.strictEqual(multiPhaseUnits[0].type, 'worklog');
+assert.strictEqual(multiPhaseUnits[1].type, 'prose');
+assert.strictEqual(multiPhaseUnits[2].type, 'worklog');
+assert.strictEqual(multiPhaseUnits[3].type, 'prose');
+if (multiPhaseUnits[1].type === 'prose') {
+  assert.strictEqual(multiPhaseUnits[1].content, '### Preliminary Findings\nFound 2 anomalies.');
+}
+if (multiPhaseUnits[3].type === 'prose') {
+  assert.strictEqual(multiPhaseUnits[3].content, '### Final Audit\nVerification complete.');
+}
+console.log('  -> PASSED: Multi-Phase Clustered Interleaving verified (worklog -> prose -> worklog -> prose)');
+
 // -----------------------------------------------------------------------------
 // [Test 8] SQLite Reload Parity & Metadata Preservation (R3)
 // -----------------------------------------------------------------------------
