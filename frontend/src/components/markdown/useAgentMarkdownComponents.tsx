@@ -162,7 +162,7 @@ function InlineMarkdownImage({
         src={resolvedSrc}
         alt={caption || 'Chart'}
         onError={() => setHasError(true)}
-        className="max-w-full rounded-lg object-contain max-h-[480px] border border-zinc-200/60 dark:border-white/[0.08] transition-transform duration-200 group-hover/img:scale-[1.01]"
+        className="max-w-full w-auto h-auto rounded-lg object-contain max-h-[480px] border border-zinc-200/60 dark:border-white/[0.08] transition-transform duration-200 group-hover/img:scale-[1.01]"
         loading="lazy"
         {...props}
       />
