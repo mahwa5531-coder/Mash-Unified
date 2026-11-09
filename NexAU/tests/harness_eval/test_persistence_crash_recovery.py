@@ -37,7 +37,7 @@ from nexau.core.messages import Message
 class TestWriteReadRoundtrip:
     """Basic CRUD operations must be correct."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_session_and_actions_roundtrip(self):
         """PERSISTENCE-001: Write session + 5 actions, read them back exactly."""
         engine = InMemoryDatabaseEngine()
@@ -84,7 +84,7 @@ class TestWriteReadRoundtrip:
 class TestSQLRestartPersistence:
     """Data must survive engine disposal and recreation (simulating restart)."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_data_survives_engine_restart(self):
         """PERSISTENCE-002: Write to SQLite, dispose, reopen, verify data."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -144,7 +144,7 @@ class TestSQLRestartPersistence:
 class TestPartialFailureSafety:
     """A failed write must not corrupt existing valid data."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_failed_action_does_not_corrupt_session(self):
         """PERSISTENCE-003: Invalid action write must not corrupt existing session."""
         engine = InMemoryDatabaseEngine()
@@ -183,7 +183,7 @@ class TestPartialFailureSafety:
 class TestConcurrentWrites:
     """Concurrent writes to the same session must all succeed."""
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_concurrent_action_writes(self):
         """PERSISTENCE-004: 10 concurrent action writes all persist."""
         engine = InMemoryDatabaseEngine()

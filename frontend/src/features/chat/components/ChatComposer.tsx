@@ -185,7 +185,7 @@ export default function ChatComposer({
       <div aria-live="polite" className="sr-only">
         {isUploading ? "Uploading files..." : uploadError ? uploadError : ""}
       </div>
-      {uploadError && (
+      {!onInvalidMedia && uploadError && (
         <div className="flex items-center justify-between text-xs text-rose-500 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-lg px-2.5 py-1.5 my-1">
           <span className="truncate">{uploadError}</span>
           <button 

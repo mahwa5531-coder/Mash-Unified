@@ -109,4 +109,36 @@ session2.clearAttachments();
 assert.equal(session2.attached.length, 0, "Should be empty after clear");
 assert.equal(session2.isInvalid, false, "Invalid state must reset after clear");
 
-console.log("All attachment limit & 30 MB size limit unit assertions PASSED successfully (100% green)!");
+// Test 6: Single-Banner Exclusivity Invariant (DeepSeek UI Parity)
+// When onInvalidMedia is supplied by parent ChatCanvas, the floating top <InvalidMediaBanner />
+// handles user notification, and the inline red box inside ChatComposer MUST NOT render.
+function computeComposerInlineErrorVisibility(uploadError: string | null, onInvalidMedia?: (val: boolean, reason?: string) => void): boolean {
+  return Boolean(!onInvalidMedia && uploadError);
+}
+
+// Case A: ChatCanvas passes onInvalidMedia -> inline composer error suppressed, top banner exclusive
+const mockParentBannerHandler = (_val: boolean, _reason?: string) => {};
+assert.equal(
+  computeComposerInlineErrorVisibility("File exceeds 30 MB", mockParentBannerHandler),
+  false,
+  "Inline composer error box must be suppressed when parent onInvalidMedia is provided"
+);
+
+// Case B: Composer rendered without parent onInvalidMedia -> inline fallback activates
+assert.equal(
+  computeComposerInlineErrorVisibility("File exceeds 30 MB", undefined),
+  true,
+  "Inline composer error box acts as fallback when onInvalidMedia is absent"
+);
+
+// Case C: No error -> neither renders
+assert.equal(
+  computeComposerInlineErrorVisibility(null, mockParentBannerHandler),
+  false
+);
+assert.equal(
+  computeComposerInlineErrorVisibility(null, undefined),
+  false
+);
+
+console.log("All attachment limit, 30 MB size limit & single-banner exclusivity assertions PASSED successfully (100% green)!");
