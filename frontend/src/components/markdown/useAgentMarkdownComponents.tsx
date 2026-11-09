@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { ImageOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   FilePill,
@@ -45,6 +46,99 @@ export interface UseAgentMarkdownComponentsOptions {
   sessionId?: string;
   onOpenFile?: (path: string) => void;
   onImageClick?: (img: LightboxImageData) => void;
+}
+
+interface InlineMarkdownImageProps {
+  src?: string;
+  alt?: string;
+  sessionId?: string;
+  onOpenFile?: (path: string) => void;
+  onImageClick?: (data: LightboxImageData) => void;
+  [key: string]: any;
+}
+
+function InlineMarkdownImage({
+  src,
+  alt,
+  sessionId,
+  onOpenFile,
+  onImageClick,
+  ...props
+}: InlineMarkdownImageProps) {
+  const [hasError, setHasError] = useState(false);
+
+  let resolvedSrc = src;
+  let cleanPath = src;
+  const isRemote = resolvedSrc && (resolvedSrc.startsWith('http://') || resolvedSrc.startsWith('https://') || resolvedSrc.startsWith('data:'));
+
+  if (resolvedSrc && !isRemote) {
+    cleanPath = normalizePath(resolvedSrc);
+    resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}`;
+  }
+
+  const caption = alt && alt.trim() ? alt.trim() : null;
+  const parts = cleanPath ? cleanPath.split(/[/\\]/) : [];
+  const displayName = parts.length > 0 ? parts[parts.length - 1] : 'Image';
+
+  if (hasError) {
+    const handleGhostClick = () => {
+      if (cleanPath && onOpenFile) {
+        onOpenFile(cleanPath);
+      } else if (cleanPath && onImageClick) {
+        onImageClick({ src: resolvedSrc || '', alt: caption || displayName, path: cleanPath });
+      }
+    };
+
+    return (
+      <span
+        onClick={handleGhostClick}
+        className="group/ghost my-2.5 inline-flex items-center gap-3 px-3.5 py-2.5 rounded-lg bg-zinc-100/90 hover:bg-zinc-200/80 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] border border-zinc-200/90 hover:border-zinc-300 dark:border-white/[0.08] dark:hover:border-white/[0.15] text-xs transition-all duration-150 cursor-pointer select-none max-w-lg shadow-2xs"
+        title={cleanPath ? `File no longer on disk: ${cleanPath}. Click to inspect.` : 'Image unavailable'}
+      >
+        <span className="w-8 h-8 rounded-md bg-zinc-200/70 dark:bg-white/[0.06] flex items-center justify-center text-zinc-400 dark:text-zinc-500 shrink-0 group-hover/ghost:text-zinc-600 dark:group-hover/ghost:text-zinc-300 transition-colors">
+          <ImageOff size={16} strokeWidth={2} />
+        </span>
+        <span className="flex flex-col min-w-0 pr-1 text-left">
+          <span className="font-medium text-xs text-zinc-800 dark:text-zinc-200 truncate leading-tight">
+            {caption || displayName}
+          </span>
+          <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500 truncate mt-0.5 leading-tight flex items-center gap-1.5">
+            {caption && caption !== displayName && (
+              <>
+                <span className="text-zinc-500 dark:text-zinc-400">{displayName}</span>
+                <span className="text-zinc-300 dark:text-zinc-600">•</span>
+              </>
+            )}
+            <span>File no longer on disk</span>
+          </span>
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      onClick={() => {
+        onImageClick?.({ src: resolvedSrc || '', alt: caption || '', path: cleanPath });
+      }}
+      className="group/img my-3 block max-w-full cursor-pointer select-none"
+      title={caption ? `Click to inspect: ${caption}` : 'Click to inspect image'}
+    >
+      <img
+        src={resolvedSrc}
+        alt={caption || 'Chart'}
+        onError={() => setHasError(true)}
+        className="max-w-full rounded-lg object-contain max-h-[480px] border border-zinc-200/60 dark:border-white/[0.08] transition-transform duration-200 group-hover/img:scale-[1.01]"
+        loading="lazy"
+        {...props}
+      />
+      {caption && (
+        <span className="block text-center text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 font-medium truncate px-1">
+          {caption}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export function useAgentMarkdownComponents({
@@ -285,40 +379,15 @@ export function useAgentMarkdownComponents({
       );
     },
 
-    /** Images: resolve local paths via connector, single-frame lightbox on click (eliminated 3 nested frames) */
-    img({ src, alt, node: _node, ...props }: any) {
-      let resolvedSrc = src;
-      let cleanPath = src;
-      const isRemote = resolvedSrc && (resolvedSrc.startsWith('http://') || resolvedSrc.startsWith('https://') || resolvedSrc.startsWith('data:'));
-
-      if (resolvedSrc && !isRemote) {
-        cleanPath = normalizePath(resolvedSrc);
-        resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}`;
-      }
-
-      const caption = alt && alt.trim() ? alt.trim() : null;
-
+    /** Images: resolve local paths via connector, single-frame lightbox on click, clean ghost on missing */
+    img(props: any) {
       return (
-        <span
-          onClick={() => {
-            onImageClick?.({ src: resolvedSrc, alt: caption || '', path: cleanPath });
-          }}
-          className="group/img my-3 block max-w-full cursor-pointer select-none"
-          title={caption ? `Click to inspect: ${caption}` : 'Click to inspect image'}
-        >
-          <img
-            src={resolvedSrc}
-            alt={caption || 'Chart'}
-            className="max-w-full rounded-lg object-contain max-h-[480px] border border-zinc-200/60 dark:border-white/[0.08] transition-transform duration-200 group-hover/img:scale-[1.01]"
-            loading="lazy"
-            {...props}
-          />
-          {caption && (
-            <span className="block text-center text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 font-medium truncate px-1">
-              {caption}
-            </span>
-          )}
-        </span>
+        <InlineMarkdownImage
+          sessionId={sessionId}
+          onOpenFile={onOpenFile}
+          onImageClick={onImageClick}
+          {...props}
+        />
       );
     },
   }), [isChat, sessionId, onOpenFile, onImageClick]);
