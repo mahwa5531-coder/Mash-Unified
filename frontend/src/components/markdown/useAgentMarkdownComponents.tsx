@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
-import { ImageOff } from 'lucide-react';
+import { ImageOff, ExternalLink, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   FilePill,
@@ -66,53 +66,87 @@ function InlineMarkdownImage({
   ...props
 }: InlineMarkdownImageProps) {
   const [hasError, setHasError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
 
-  let resolvedSrc = src;
-  let cleanPath = src;
-  const isRemote = resolvedSrc && (resolvedSrc.startsWith('http://') || resolvedSrc.startsWith('https://') || resolvedSrc.startsWith('data:'));
+  let cleanPath = src || '';
+  const isRemote = cleanPath.startsWith('http://') || cleanPath.startsWith('https://') || cleanPath.startsWith('data:');
 
-  if (resolvedSrc && !isRemote) {
-    cleanPath = normalizePath(resolvedSrc);
-    resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}`;
+  let resolvedSrc = cleanPath;
+  if (cleanPath && !isRemote) {
+    cleanPath = normalizePath(cleanPath);
+    resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}${retryKey ? `&_t=${retryKey}` : ''}`;
   }
 
   const caption = alt && alt.trim() ? alt.trim() : null;
-  const parts = cleanPath ? cleanPath.split(/[/\\]/) : [];
-  const displayName = parts.length > 0 ? parts[parts.length - 1] : 'Image';
+  const parts = cleanPath.split(/[/\\]/);
+  const filename = parts.pop() || cleanPath || 'Image';
+
+  const handleInspect = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (cleanPath && onOpenFile) {
+      onOpenFile(cleanPath);
+    } else if (cleanPath && onImageClick) {
+      onImageClick({ src: resolvedSrc, alt: caption || filename, path: cleanPath });
+    }
+  };
+
+  const handleRetry = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsRetrying(true);
+    setRetryKey(Date.now());
+    setHasError(false);
+    setTimeout(() => setIsRetrying(false), 600);
+  };
 
   if (hasError) {
-    const handleGhostClick = () => {
-      if (cleanPath && onOpenFile) {
-        onOpenFile(cleanPath);
-      } else if (cleanPath && onImageClick) {
-        onImageClick({ src: resolvedSrc || '', alt: caption || displayName, path: cleanPath });
-      }
-    };
-
     return (
-      <span
-        onClick={handleGhostClick}
-        className="group/ghost my-2.5 inline-flex items-center gap-3 px-3.5 py-2.5 rounded-lg bg-zinc-100/90 hover:bg-zinc-200/80 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] border border-zinc-200/90 hover:border-zinc-300 dark:border-white/[0.08] dark:hover:border-white/[0.15] text-xs transition-all duration-150 cursor-pointer select-none max-w-lg shadow-2xs"
-        title={cleanPath ? `File no longer on disk: ${cleanPath}. Click to inspect.` : 'Image unavailable'}
+      <div
+        className="my-3.5 w-full max-w-xl rounded-xl border border-dashed border-zinc-300 dark:border-white/[0.14] bg-zinc-50/70 dark:bg-zinc-900/40 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] dark:bg-[radial-gradient(#27272a_1px,transparent_1px)] overflow-hidden transition-all duration-200 select-none shadow-xs"
       >
-        <span className="w-8 h-8 rounded-md bg-zinc-200/70 dark:bg-white/[0.06] flex items-center justify-center text-zinc-400 dark:text-zinc-500 shrink-0 group-hover/ghost:text-zinc-600 dark:group-hover/ghost:text-zinc-300 transition-colors">
-          <ImageOff size={16} strokeWidth={2} />
-        </span>
-        <span className="flex flex-col min-w-0 pr-1 text-left">
-          <span className="font-medium text-xs text-zinc-800 dark:text-zinc-200 truncate leading-tight">
-            {caption || displayName}
-          </span>
-          <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500 truncate mt-0.5 leading-tight flex items-center gap-1.5">
-            {caption && caption !== displayName && (
-              <>
-                <span className="text-zinc-500 dark:text-zinc-400">{displayName}</span>
-                <span className="text-zinc-300 dark:text-zinc-600">•</span>
-              </>
-            )}
-            <span>File no longer on disk</span>
-          </span>
-        </span>
-      </span>
+        <div className="flex flex-col items-center justify-center p-6 text-center min-h-[220px]">
+          {/* Authentic Icon Shield */}
+          <div className="w-12 h-12 rounded-xl bg-zinc-200/80 dark:bg-white/[0.08] border border-zinc-300/70 dark:border-white/[0.12] flex items-center justify-center text-zinc-500 dark:text-zinc-400 mb-3 shadow-2xs">
+            <ImageOff size={22} strokeWidth={1.8} />
+          </div>
+
+          {/* Headline: Caption or Filename */}
+          <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate max-w-md">
+            {caption || filename}
+          </div>
+
+          {/* Dynamic Path Pill */}
+          <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md font-mono text-[11px] bg-zinc-200/70 dark:bg-white/[0.06] text-zinc-600 dark:text-zinc-400 border border-zinc-300/50 dark:border-white/[0.08] max-w-md truncate">
+            {cleanPath}
+          </div>
+
+          {/* Dynamic Explanatory Message */}
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed">
+            Image file no longer exists at this path. It may have been moved, renamed, or deleted from disk.
+          </p>
+
+          {/* Actions: Inspect in Sidebar & Live Retry */}
+          <div className="mt-4 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleInspect}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-200/90 hover:bg-zinc-300 dark:bg-white/[0.08] dark:hover:bg-white/[0.15] text-zinc-800 dark:text-zinc-200 border border-zinc-300/60 dark:border-white/[0.10] transition-colors cursor-pointer"
+            >
+              <ExternalLink size={12} />
+              Inspect in Sidebar
+            </button>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-transparent hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 border border-transparent transition-colors cursor-pointer"
+              title="Re-check file on disk"
+            >
+              <RefreshCw size={12} className={isRetrying ? "animate-spin" : ""} />
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
