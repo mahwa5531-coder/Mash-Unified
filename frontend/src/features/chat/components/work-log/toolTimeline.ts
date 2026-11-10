@@ -24,19 +24,7 @@ export function extractLineRange(args?: Record<string, any>): string | null {
   return null;
 }
 
-export function formatDurationDisplay(secs: number): string {
-  if (secs <= 0) return '0s';
-  const rounded = Math.round(secs);
-  if (rounded < 60) return `${rounded}s`;
-  const mins = Math.floor(secs / 60);
-  const remSecs = rounded % 60;
-  if (mins < 60) {
-    return remSecs > 0 ? `${mins}m ${remSecs}s` : `${mins}m`;
-  }
-  const hours = Math.floor(mins / 60);
-  const remMins = mins % 60;
-  return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
-}
+export { formatDurationDisplay } from '@/utils/formatting';
 
 // Keyed Slot Registry for O(1) canonical tool category dispatch (replaces 160-line substring regex ladder)
 const EXACT_TOOL_CATEGORY_MAP: Record<string, TimelineEntry['type']> = {

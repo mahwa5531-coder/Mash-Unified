@@ -33,3 +33,24 @@ export function formatRelativeTime(timestamp: number | string | null | undefined
   const months = Math.floor(days / 30);
   return `${months}mo`;
 }
+
+/**
+ * Canonical duration formatter for tool executions, reasoning disclosures, and turn metrics.
+ * Formats seconds into human-readable strings: '0s', '14s', '1m 14s', '1h 15m'.
+ */
+export function formatDurationDisplay(secs: number): string {
+  if (!secs || secs <= 0) return '0s';
+  const rounded = Math.round(secs);
+  if (rounded < 60) return `${rounded}s`;
+  const mins = Math.floor(rounded / 60);
+  const remSecs = rounded % 60;
+  if (mins < 60) {
+    return remSecs > 0 ? `${mins}m ${remSecs}s` : `${mins}m`;
+  }
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
+}
+
+export const formatReasoningDuration = formatDurationDisplay;
+

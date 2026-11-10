@@ -3,19 +3,11 @@
 import type { Message } from '@/types/chat';
 import { BASE_URL, safeFetch } from '@/services/client';
 import { markSessionViewed } from '@/services/sessions';
-import { streamQuery, formatErrorMessage } from '@/services/stream';
+import { streamQuery } from '@/services/stream';
 export { formatErrorMessage } from '@/services/stream';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
 import { findTargetAssistantIdx, sessionStore, notifyStoreListeners, persistSessionQueue } from '../state/sessionStore';
 import { createStreamCallbacks } from './streamToolManager';
-
-export function classifyDisconnectError(err: any): string {
-  const isOffline = typeof window !== 'undefined' && typeof navigator !== 'undefined' && !navigator.onLine;
-  const isFetch = err?.name === 'TypeError' || String(err?.message || '').toLowerCase().includes('failed to fetch') || String(err?.message || '').toLowerCase().includes('networkerror');
-  if (isOffline) return 'Network connection lost (WiFi disconnected). Reconnection timed out. Agent execution terminated.';
-  if (isFetch) return 'Network connection interrupted or backend server unreachable. Could not reconnect within time. Agent execution terminated.';
-  return formatErrorMessage(err?.message || String(err));
-}
 
 export function prepareRetryMessages(
   messages: Message[], activeTurnId?: string | null, activeSid?: string

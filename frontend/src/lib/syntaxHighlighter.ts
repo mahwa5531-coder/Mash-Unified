@@ -22,7 +22,7 @@ import java from 'shiki/langs/java.mjs';
 import docker from 'shiki/langs/dockerfile.mjs';
 import diff from 'shiki/langs/diff.mjs';
 
-function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

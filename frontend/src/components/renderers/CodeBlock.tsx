@@ -4,18 +4,9 @@ import { useState, useMemo, memo } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { useIsDarkMode } from '@/hooks/useIsDarkMode';
 import { useTurnViewport } from '@/features/chat/context/TurnViewportContext';
-import { highlightCodeSnippet } from '@/lib/syntaxHighlighter';
+import { highlightCodeSnippet, escapeHtml } from '@/lib/syntaxHighlighter';
 
-export { highlightCodeSnippet };
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+export { highlightCodeSnippet, escapeHtml };
 
 const CodeBlock = memo(function CodeBlock({ 
   language, 

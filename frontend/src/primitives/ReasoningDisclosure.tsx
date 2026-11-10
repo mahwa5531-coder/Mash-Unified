@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatReasoningDuration } from '@/utils/formatting';
+
+export { formatReasoningDuration };
 
 export interface ReasoningDisclosureProps {
   /** The raw reasoning/chain-of-thought text */
@@ -23,20 +26,6 @@ export interface ReasoningDisclosureProps {
   className?: string;
   /** Optional external ref to the scrollable text viewport */
   scrollRef?: React.RefObject<HTMLDivElement | null>;
-}
-
-export function formatReasoningDuration(secs: number): string {
-  if (!secs || secs <= 0) return '0s';
-  const rounded = Math.round(secs);
-  if (rounded < 60) return `${rounded}s`;
-  const mins = Math.floor(rounded / 60);
-  const remSecs = rounded % 60;
-  if (mins < 60) {
-    return remSecs > 0 ? `${mins}m ${remSecs}s` : `${mins}m`;
-  }
-  const hours = Math.floor(mins / 60);
-  const remMins = mins % 60;
-  return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
 }
 
 /**
