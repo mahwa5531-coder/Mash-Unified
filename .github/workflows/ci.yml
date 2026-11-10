@@ -85,3 +85,21 @@ jobs:
           LLM_API_TYPE: "openai_chat_completion"
         run: |
           python -m pytest NexAU/tests/harness_eval/ -v
+
+      - name: Run Connector Backend Unit & Contract Tests
+        env:
+          PYTHONPATH: "connector:NexAU"
+          MASH_ENV: "test"
+          LLM_API_KEY: "mock-test-key"
+        run: |
+          python -m pytest \
+            connector/tests/test_backend_sanity.py \
+            connector/tests/test_tasks_api.py \
+            connector/tests/test_file_access_boundaries.py \
+            connector/tests/test_desktop_attached_file_authorization.py \
+            connector/tests/test_ui_backend_endpoints.py \
+            connector/tests/test_clean_title_and_tags.py \
+            connector/tests/test_atomic_session_deletion.py \
+            connector/tests/test_stream_idempotency.py \
+            connector/tests/test_heartbeat_shield.py \
+            -v --timeout=45

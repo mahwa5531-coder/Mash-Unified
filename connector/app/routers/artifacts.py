@@ -172,7 +172,6 @@ async def get_file_content(
     if any(p in clean_path.split("/") or p in clean_path.split("\\") for p in ("..", ".%2e", "%2e.")):
         raise HTTPException(status_code=403, detail="Invalid path traversal detected.")
 
-    eng = _get_engine(engine)
     p = Path(clean_path).expanduser()
     if not (p.is_absolute() and p.is_file()):
         rel_path = clean_path.lstrip("/\\")
@@ -190,6 +189,8 @@ async def get_file_content(
                     s_dir / "scratch" / rel_path,
                 ])
             try:
+                # Lazy DB engine resolution: only query database when relative workspace resolution is needed
+                eng = _get_engine(engine)
                 ws = await resolve_session_workspace(eng, session_id)
                 if ws and ws.is_dir():
                     candidates.extend([

@@ -43,9 +43,10 @@ async def test_file_content_missing_file_inside_workspace_returns_404() -> None:
 
 
 @pytest.mark.anyio
-async def test_file_content_missing_file_outside_workspace_returns_403() -> None:
-    """N-04: Authorization runs BEFORE existence check to prevent existence oracle leak."""
+async def test_file_content_missing_file_outside_workspace_returns_404() -> None:
+    """Under Desktop Read Model doctrine, missing local files return 404 (not 403)."""
     outside_missing = Path("C:/DefinitelyNonExistentFolder123/non_existent.txt") if os.name == "nt" else Path("/DefinitelyNonExistentFolder123/non_existent.txt")
     with pytest.raises(HTTPException) as exc_info:
         await get_file_content(path=str(outside_missing), engine=None)
-    assert exc_info.value.status_code == 403
+    assert exc_info.value.status_code == 404
+    assert "not found on local disk" in exc_info.value.detail
