@@ -74,6 +74,12 @@ middlewares:
       keep_iterations: ${env.COMPACTION_KEEP_ITERATIONS:-3}
       threshold: ${env.COMPACTION_THRESHOLD:-0.75}
       emergency_compact_enabled: true
+      compactable_tools:
+        - audit_skill_tool
+        - search_file_content
+        - run_shell_command
+        - view_file
+        - web_search
   - import: nexau.archs.main_sub.execution.middleware.long_tool_output:LongToolOutputMiddleware
     params:
       max_output_chars: 2500

@@ -165,6 +165,12 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
 
   // Mount inline static diagram (strictly no zoom gestures to prevent chat scroll traps)
   useEffect(() => {
+    // While the diagram is still streaming from the LLM, defer mounting incomplete syntax
+    if (isStreaming) {
+      setLoading(true);
+      return;
+    }
+
     // Defer diagram rendering until within viewport (unless already loaded)
     if (!isNearViewport && !isRendered) return;
 
@@ -241,7 +247,7 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
       inlineMountedRef.current?.destroy();
       inlineMountedRef.current = null;
     };
-  }, [chart, isNearViewport, isRendered, retryKey]);
+  }, [chart, isStreaming, isNearViewport, retryKey]);
 
   // Mount modal lightbox diagram powered by @panzoom/panzoom (infinite canvas, wheel zoom, pinch, 2D fit)
   useEffect(() => {
@@ -442,7 +448,7 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
             {isNearViewport ? (
               <>
                 <span className="w-3.5 h-3.5 rounded-full border-2 border-sky-500 border-t-transparent animate-spin" />
-                <span>Rendering diagram...</span>
+                <span>{isStreaming ? "Generating diagram..." : "Rendering diagram..."}</span>
               </>
             ) : (
               <>
@@ -456,8 +462,8 @@ export default function MermaidRenderer({ chart, isStreaming = false }: MermaidR
         <div
           ref={inlineContainerRef}
           className={cn(
-            "mash-mermaid w-full flex justify-center items-center select-none overflow-hidden",
-            loading ? "hidden" : "block"
+            "mash-mermaid w-full flex justify-center items-center select-none overflow-hidden transition-opacity duration-150",
+            loading ? "h-0 opacity-0 overflow-hidden pointer-events-none" : "h-auto opacity-100"
           )}
         />
       </div>

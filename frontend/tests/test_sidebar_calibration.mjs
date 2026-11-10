@@ -24,9 +24,9 @@ async function run() {
   // 2. Measure Left Sidebar default width
   const leftSidebar = page.locator('[data-testid="left-sidebar"]');
   const initialLeftBox = await leftSidebar.boundingBox();
-  console.log(`Left sidebar default width: ${Math.round(initialLeftBox?.width || 0)}px (Expected: 260px)`);
-  if (Math.round(initialLeftBox?.width || 0) !== 260) {
-    throw new Error(`Left sidebar expected 260px, got ${initialLeftBox?.width}px`);
+  console.log(`Left sidebar default width: ${Math.round(initialLeftBox?.width || 0)}px (Expected: 280px)`);
+  if (Math.round(initialLeftBox?.width || 0) !== 280) {
+    throw new Error(`Left sidebar expected 280px, got ${initialLeftBox?.width}px`);
   }
 
   // 3. Open Right Sidebar via mash:open-file event
@@ -40,9 +40,9 @@ async function run() {
   const rightResizer = page.locator('[title="Drag to resize sidebar"]').nth(1);
   const rightSidebar = rightResizer.locator('..');
   const initialRightBox = await rightSidebar.boundingBox();
-  console.log(`Right sidebar default open width: ${Math.round(initialRightBox?.width || 0)}px (Expected: 380px)`);
-  if (Math.round(initialRightBox?.width || 0) !== 380) {
-    throw new Error(`Right sidebar expected 380px, got ${initialRightBox?.width}px`);
+  console.log(`Right sidebar default open width: ${Math.round(initialRightBox?.width || 0)}px (Expected: 360px)`);
+  if (Math.round(initialRightBox?.width || 0) !== 360) {
+    throw new Error(`Right sidebar expected 360px, got ${initialRightBox?.width}px`);
   }
 
   // 5. Test Left Sidebar floor clamp: drag handle leftwards into negative space
@@ -56,9 +56,9 @@ async function run() {
     await page.waitForTimeout(300);
   }
   const clampLeftBox = await leftSidebar.boundingBox();
-  console.log(`Left sidebar after drag-left clamp: ${Math.round(clampLeftBox?.width || 0)}px (Expected clamped at: 260px)`);
-  if (Math.round(clampLeftBox?.width || 0) !== 260) {
-    throw new Error(`Left sidebar failed to clamp at 260px floor! Got ${clampLeftBox?.width}px`);
+  console.log(`Left sidebar after drag-left clamp: ${Math.round(clampLeftBox?.width || 0)}px (Expected clamped at: 280px)`);
+  if (Math.round(clampLeftBox?.width || 0) !== 280) {
+    throw new Error(`Left sidebar failed to clamp at 280px floor! Got ${clampLeftBox?.width}px`);
   }
 
   // 6. Test Right Sidebar floor clamp: drag handle rightwards into sidebar space
@@ -71,9 +71,9 @@ async function run() {
     await page.waitForTimeout(300);
   }
   const clampRightBox = await rightSidebar.boundingBox();
-  console.log(`Right sidebar after drag-right clamp: ${Math.round(clampRightBox?.width || 0)}px (Expected clamped at: 380px)`);
-  if (Math.round(clampRightBox?.width || 0) !== 380) {
-    throw new Error(`Right sidebar failed to clamp at 380px floor! Got ${clampRightBox?.width}px`);
+  console.log(`Right sidebar after drag-right clamp: ${Math.round(clampRightBox?.width || 0)}px (Expected clamped at: 340px)`);
+  if (Math.round(clampRightBox?.width || 0) !== 340) {
+    throw new Error(`Right sidebar failed to clamp at 340px floor! Got ${clampRightBox?.width}px`);
   }
 
   // 7. Drag Left Sidebar to 320px

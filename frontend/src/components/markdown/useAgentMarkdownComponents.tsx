@@ -66,7 +66,10 @@ function InlineMarkdownImage({
 }: InlineMarkdownImageProps) {
   const [hasError, setHasError] = useState(false);
 
-  let cleanPath = src || '';
+  let cleanPath = (src || '').trim();
+  if (!cleanPath) {
+    return null;
+  }
   const isRemote = cleanPath.startsWith('http://') || cleanPath.startsWith('https://') || cleanPath.startsWith('data:');
 
   let resolvedSrc = cleanPath;
@@ -81,31 +84,31 @@ function InlineMarkdownImage({
 
   if (hasError) {
     return (
-      <div
-        className="my-3.5 w-full max-w-xl rounded-xl border border-dashed border-zinc-300 dark:border-white/[0.14] bg-zinc-50/70 dark:bg-zinc-900/40 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] dark:bg-[radial-gradient(#27272a_1px,transparent_1px)] overflow-hidden transition-all duration-200 select-none shadow-xs"
+      <span
+        className="my-3.5 block w-full max-w-xl rounded-xl border border-dashed border-zinc-300 dark:border-white/[0.14] bg-zinc-50/70 dark:bg-zinc-900/40 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] dark:bg-[radial-gradient(#27272a_1px,transparent_1px)] overflow-hidden transition-all duration-200 select-none shadow-xs"
       >
-        <div className="flex flex-col items-center justify-center p-6 text-center min-h-[190px]">
+        <span className="flex flex-col items-center justify-center p-6 text-center min-h-[190px]">
           {/* Authentic Icon Shield */}
-          <div className="w-12 h-12 rounded-xl bg-zinc-200/80 dark:bg-white/[0.08] border border-zinc-300/70 dark:border-white/[0.12] flex items-center justify-center text-zinc-500 dark:text-zinc-400 mb-3 shadow-2xs">
+          <span className="w-12 h-12 rounded-xl bg-zinc-200/80 dark:bg-white/[0.08] border border-zinc-300/70 dark:border-white/[0.12] flex items-center justify-center text-zinc-500 dark:text-zinc-400 mb-3 shadow-2xs">
             <ImageOff size={22} strokeWidth={1.8} />
-          </div>
+          </span>
 
           {/* Headline: Caption or Filename */}
-          <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate max-w-md">
+          <span className="block text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate max-w-md">
             {caption || filename}
-          </div>
+          </span>
 
           {/* Dynamic Path Pill */}
-          <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md font-mono text-[11px] bg-zinc-200/70 dark:bg-white/[0.06] text-zinc-600 dark:text-zinc-400 border border-zinc-300/50 dark:border-white/[0.08] max-w-md truncate">
+          <span className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md font-mono text-[11px] bg-zinc-200/70 dark:bg-white/[0.06] text-zinc-600 dark:text-zinc-400 border border-zinc-300/50 dark:border-white/[0.08] max-w-md truncate">
             {cleanPath}
-          </div>
+          </span>
 
           {/* Dynamic Explanatory Message */}
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed">
+          <span className="block mt-2 text-xs text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed">
             Image file no longer exists at this path. It may have been moved, renamed, or deleted from disk.
-          </p>
-        </div>
-      </div>
+          </span>
+        </span>
+      </span>
     );
   }
 
@@ -189,8 +192,8 @@ export function useAgentMarkdownComponents({
     p({ children, node: _node, ...props }: any) {
       return (
         <p className={isChat
-          ? "mb-2.5 text-[14.5px] leading-[1.62] text-zinc-800 dark:text-[#e2e8f0] last:mb-0 [li>&]:my-0 [li>&+p]:mt-1.5 [&+ul]:mt-1.5 [&+ol]:mt-1.5"
-          : "mb-2.5 text-[14.5px] leading-[1.62] text-zinc-800 dark:text-[#e2e8f0] last:mb-0 [li>&]:my-0 [li>&+p]:mt-1.5 [&+ul]:mt-1.5 [&+ol]:mt-1.5"
+          ? "mb-2.5 text-[14.5px] leading-[1.62] text-zinc-800 dark:text-[#f4f4f6] last:mb-0 [li>&]:my-0 [li>&+p]:mt-1.5 [&+ul]:mt-1.5 [&+ol]:mt-1.5"
+          : "mb-2.5 text-[14.5px] leading-[1.62] text-zinc-800 dark:text-[#f4f4f6] last:mb-0 [li>&]:my-0 [li>&+p]:mt-1.5 [&+ul]:mt-1.5 [&+ol]:mt-1.5"
         } {...props}>
           {processTextNodes(children, onOpenFile)}
         </p>
@@ -199,7 +202,7 @@ export function useAgentMarkdownComponents({
 
     ul({ children, node: _node, ...props }: any) {
       return (
-        <ul className="my-2.5 pl-4.5 list-disc text-zinc-800 dark:text-[#e2e8f0] marker:text-zinc-400 dark:marker:text-zinc-500 [&_ul]:my-1 [&_ul]:pl-4 [&_ol]:my-1 [&_ol]:pl-4" {...props}>
+        <ul className="my-2.5 pl-7 list-disc text-zinc-800 dark:text-[#f4f4f6] marker:text-zinc-400 dark:marker:text-zinc-300 space-y-1.5 [&_ul]:my-1.5 [&_ul]:pl-7 [&_ol]:my-1.5 [&_ol]:pl-7" {...props}>
           {children}
         </ul>
       );
@@ -207,7 +210,7 @@ export function useAgentMarkdownComponents({
 
     ol({ children, node: _node, ...props }: any) {
       return (
-        <ol className="my-2.5 pl-4.5 list-decimal text-zinc-800 dark:text-[#e2e8f0] marker:font-mono marker:text-xs marker:text-zinc-400 dark:marker:text-zinc-500 [&_ul]:my-1 [&_ul]:pl-4 [&_ol]:my-1 [&_ol]:pl-4 [&>li]:font-medium [&>li>p]:font-normal [&>li>ul]:font-normal [&>li>ul>li]:font-normal" {...props}>
+        <ol className="my-2.5 pl-7 list-decimal text-zinc-800 dark:text-[#f4f4f6] marker:font-mono marker:text-xs marker:text-zinc-400 dark:marker:text-zinc-300 space-y-2 [&_ul]:my-1.5 [&_ul]:pl-7 [&_ol]:my-1.5 [&_ol]:pl-7 [&>li]:font-semibold [&>li]:text-white [&>li>p]:font-normal [&>li>p]:text-[#f4f4f6] [&>li>ul]:font-normal [&>li>ul]:text-[#f4f4f6] [&>li>ul>li]:font-normal" {...props}>
           {children}
         </ol>
       );
@@ -221,7 +224,7 @@ export function useAgentMarkdownComponents({
 
     li({ children, node: _node, ...props }: any) {
       return (
-        <li className="py-0.5 text-[14.5px] leading-[1.62] text-zinc-800 dark:text-[#e2e8f0]" {...props}>
+        <li className="py-0.5 text-[14.5px] leading-[1.62] text-zinc-800 dark:text-[#f4f4f6]" {...props}>
           {processTextNodes(children, onOpenFile)}
         </li>
       );
@@ -231,8 +234,8 @@ export function useAgentMarkdownComponents({
       const headingId = propId || slugifyHeading(extractChildText(children));
       return (
         <h1 id={headingId || undefined} className={isChat
-          ? "mt-5 mb-2.5 text-[21px] font-semibold text-zinc-900 dark:text-[#f1f5f9] tracking-tight first:mt-0 [&+h2]:mt-2.5 [&+h3]:mt-2"
-          : "mt-5.5 mb-2.5 text-[22px] font-semibold text-zinc-900 dark:text-[#f1f5f9] tracking-tight first:mt-0 [&+h2]:mt-2.5"
+          ? "mt-6 mb-3 text-[21px] font-semibold text-zinc-900 dark:text-white tracking-tight first:mt-0"
+          : "mt-6 mb-3 text-[22px] font-semibold text-zinc-900 dark:text-white tracking-tight first:mt-0"
         } {...props}>
           {processTextNodes(children, onOpenFile)}
         </h1>
@@ -243,8 +246,8 @@ export function useAgentMarkdownComponents({
       const headingId = propId || slugifyHeading(extractChildText(children));
       return (
         <h2 id={headingId || undefined} className={isChat
-          ? "mt-4.5 mb-2 text-[18px] font-semibold text-zinc-900 dark:text-[#f1f5f9] tracking-tight first:mt-0 [&+h3]:mt-2 [&+h4]:mt-1.5"
-          : "mt-5 mb-2 text-[19px] font-semibold text-zinc-900 dark:text-[#f1f5f9] tracking-tight first:mt-0 border-b border-zinc-200/60 dark:border-white/[0.08] pb-1 [&+h3]:mt-2"
+          ? "mt-5.5 mb-2.5 text-[18px] font-semibold text-zinc-900 dark:text-white tracking-tight first:mt-0"
+          : "mt-5.5 mb-2.5 text-[19px] font-semibold text-zinc-900 dark:text-white tracking-tight first:mt-0 border-b border-zinc-200/60 dark:border-white/[0.08] pb-1"
         } {...props}>
           {processTextNodes(children, onOpenFile)}
         </h2>
@@ -254,7 +257,7 @@ export function useAgentMarkdownComponents({
     h3({ children, node: _node, id: propId, ...props }: any) {
       const headingId = propId || slugifyHeading(extractChildText(children));
       return (
-        <h3 id={headingId || undefined} className="mt-3.5 mb-1.5 text-[15.5px] font-semibold text-zinc-900 dark:text-[#e2e8f0] tracking-tight first:mt-0 [&+h4]:mt-1" {...props}>
+        <h3 id={headingId || undefined} className="mt-4.5 mb-2 text-[16px] font-semibold text-zinc-900 dark:text-white tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h3>
       );
@@ -263,7 +266,7 @@ export function useAgentMarkdownComponents({
     h4({ children, node: _node, id: propId, ...props }: any) {
       const headingId = propId || slugifyHeading(extractChildText(children));
       return (
-        <h4 id={headingId || undefined} className="mt-3 mb-1 text-[14.5px] font-semibold text-zinc-800 dark:text-[#e2e8f0] tracking-tight first:mt-0 [&+h5]:mt-1" {...props}>
+        <h4 id={headingId || undefined} className="mt-3.5 mb-1.5 text-[14.5px] font-semibold text-zinc-800 dark:text-zinc-100 tracking-tight first:mt-0" {...props}>
           {processTextNodes(children, onOpenFile)}
         </h4>
       );

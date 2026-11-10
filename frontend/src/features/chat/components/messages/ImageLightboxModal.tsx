@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUpRight, ExternalLink, X } from 'lucide-react';
+import { ArrowUpRight, X } from 'lucide-react';
 
 export interface LightboxImageData {
   src: string;
@@ -56,15 +56,7 @@ export function ImageLightboxModal({
             <ArrowUpRight size={13} />
           </button>
         )}
-        <a
-          href={image.src}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer shadow-sm"
-          title="Open full resolution in new tab"
-        >
-          <ExternalLink size={15} />
-        </a>
+
         <button
           type="button"
           onClick={onClose}

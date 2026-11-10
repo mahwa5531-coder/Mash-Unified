@@ -2,9 +2,9 @@
 
 import { useState, useRef, useCallback, useEffect, MouseEvent as ReactMouseEvent } from 'react';
 
-const MIN_WIDTH = 380;
+const MIN_WIDTH = 340;
 const MAX_WIDTH = 760;
-const DEFAULT_WIDTH = 380;
+const DEFAULT_WIDTH = 360;
 
 interface UseRightSidebarResizeProps {
   controlledIsMaximized?: boolean;

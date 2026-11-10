@@ -285,7 +285,7 @@ export default function TaskWorkLogAccordion({
             {groupedTimeline.map((entry) => renderTimelineRow(entry, false))}
           </div>
         )}
-        {!isAnyItemRunning && !hasAssistantContent && (
+        {!isAnyItemRunning && !hasAssistantContent && !hasPendingApproval && (
           <div className="flex items-center text-xs text-zinc-400 dark:text-zinc-500 font-sans py-0.5 select-none">
             <span>Working</span>
             <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">

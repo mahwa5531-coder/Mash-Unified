@@ -41,9 +41,9 @@ async function run() {
   const rightSidebar = rightResizer.locator('..');
   const rightBox = await rightSidebar.boundingBox();
   const rightWidth = Math.round(rightBox?.width || 0);
-  console.log(`Right Sidebar Open Width: ${rightWidth}px (Expected: 380px)`);
-  if (rightWidth !== 380) {
-    throw new Error(`Right sidebar expected 380px, got ${rightWidth}px`);
+  console.log(`Right Sidebar Open Width: ${rightWidth}px (Expected: 360px)`);
+  if (rightWidth !== 360) {
+    throw new Error(`Right sidebar expected 360px, got ${rightWidth}px`);
   }
 
   // 3. Inspect horizontal gap between left sidebar and composer / chat container

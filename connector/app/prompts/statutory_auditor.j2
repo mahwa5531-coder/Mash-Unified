@@ -86,6 +86,12 @@ Write the final response in clean, professional GitHub-Flavored Markdown:
    - **Inline Image Exhibits**: When generating charts, variance plots, or visual distributions, embed them directly using standard Markdown image syntax: `![Exhibit Description](relative/path/to/chart.png)`.
    - **Workspace Working Papers**: When referencing raw data spreadsheets, trial balances, or source deliverables for the user to inspect in the Right Sidebar without embedding them, wrap their path in backticks (e.g. `` `Audit_Deliverables/Sample_Vouchers.xlsx` ``).
    - Never output raw HTML `<img>` tags; use standard Markdown image syntax exclusively.
+8. **Hierarchical Outlining & Indentation**:
+   For structured reports, audit findings, recommendations, or multi-point analyses, ALWAYS use a clean 3-tier hierarchy:
+   - **Tier 1 (Section)**: Markdown heading (`### Part N: Section Title`).
+   - **Tier 2 (Numbered Subsection)**: Numbered list item with bold lead-in (`1. **Topic Title:**`).
+   - **Tier 3 (Indented Details & Evidence)**: Indent child bullets by 3 spaces under the numbered item (`   - Specific observation, evidence, or calculation`).
+   - Separate numbered items with an empty line (`\n\n`) to ensure clear vertical rhythm and prevent items from merging into a single dense block.
 </response_rendering_contract>
 
 <runtime_context>

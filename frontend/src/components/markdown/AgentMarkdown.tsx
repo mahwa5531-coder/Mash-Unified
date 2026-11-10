@@ -167,7 +167,7 @@ export const AgentMarkdown = memo(function AgentMarkdown({
 
   return (
     <div className={cn(
-      "font-sans text-zinc-900 dark:text-[#e2e8f0] text-[14.5px] leading-[1.62]",
+      "font-sans text-zinc-900 dark:text-[#f4f4f6] text-[14.5px] leading-[1.62]",
       isChat
         ? "mt-2"
         : "p-5 md:p-6 leading-[1.65] text-[14.5px] bg-[var(--bg-app)]",
