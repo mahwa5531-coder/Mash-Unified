@@ -14,6 +14,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
+  isMaximized: () => {
+    try {
+      return Boolean(ipcRenderer.sendSync('window-is-maximized'));
+    } catch (_) {
+      return false;
+    }
+  },
+  onMaximizeChange: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (_event, isMax) => callback(Boolean(isMax));
+    ipcRenderer.on('window-maximize-change', handler);
+    return () => {
+      try {
+        ipcRenderer.removeListener('window-maximize-change', handler);
+      } catch (_) {}
+    };
+  },
   openPath: (targetPath) => ipcRenderer.invoke('mash-open-path', targetPath),
   getPathForFile: (file) => {
     try {

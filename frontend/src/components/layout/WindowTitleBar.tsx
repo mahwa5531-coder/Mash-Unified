@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Minus, Square, Copy, X } from 'lucide-react';
 import { MashBrandIcon } from '@/primitives/MashBrandIcon';
 
@@ -24,6 +24,22 @@ export function WindowTitleBar({
   title: _title = "Mash — Autonomous Financial Forensic Auditor",
 }: WindowTitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const w = window as any;
+    if (typeof w.electronAPI?.isMaximized === 'function') {
+      try {
+        setIsMaximized(Boolean(w.electronAPI.isMaximized()));
+      } catch (_) {}
+    }
+    if (typeof w.electronAPI?.onMaximizeChange === 'function') {
+      const unsubscribe = w.electronAPI.onMaximizeChange((max: boolean) => {
+        setIsMaximized(max);
+      });
+      return unsubscribe;
+    }
+  }, []);
 
   const handleMinimize = () => {
     if (typeof window !== 'undefined') {
@@ -61,7 +77,7 @@ export function WindowTitleBar({
       // 2. Electron Native IPC
       if (w.electronAPI?.maximize) {
         w.electronAPI.maximize();
-        setIsMaximized((v) => !v);
+        // State updates reactively via native window-maximize-change event subscription
         return;
       }
       // 3. PyWebView Native API
@@ -118,7 +134,11 @@ export function WindowTitleBar({
       </div>
 
       {/* Center Draggable Spacer */}
-      <div className="flex-1 h-full cursor-default" data-tauri-drag-region />
+      <div
+        className="flex-1 h-full cursor-default"
+        data-tauri-drag-region
+        onDoubleClick={handleMaximize}
+      />
 
       {/* Right: VS Code Standard Sized Titlebar Controls (46px x 30px click target) */}
       <div

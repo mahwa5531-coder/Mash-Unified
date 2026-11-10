@@ -41,6 +41,8 @@ console.log('[*] Launching real Electron desktop application...');
         hasMinimize: typeof api?.minimize === 'function',
         hasMaximize: typeof api?.maximize === 'function',
         hasClose: typeof api?.close === 'function',
+        hasIsMaximized: typeof api?.isMaximized === 'function',
+        hasOnMaximizeChange: typeof api?.onMaximizeChange === 'function',
       };
     });
 
@@ -50,7 +52,9 @@ console.log('[*] Launching real Electron desktop application...');
     assert.ok(apis.hasMinimize, 'window.electronAPI.minimize must be a function');
     assert.ok(apis.hasMaximize, 'window.electronAPI.maximize must be a function');
     assert.ok(apis.hasClose, 'window.electronAPI.close must be a function');
-    console.log('  [PASS] 4. window.electronAPI verified with all native bridges (getPathForFile, openPath, window controls).');
+    assert.ok(apis.hasIsMaximized, 'window.electronAPI.isMaximized must be a function');
+    assert.ok(apis.hasOnMaximizeChange, 'window.electronAPI.onMaximizeChange must be a function');
+    console.log('  [PASS] 4. window.electronAPI verified with all native bridges (getPathForFile, openPath, window controls, state persistence & sync).');
 
     console.log('\n[SUCCESS] Real Electron Desktop Mode E2E Test PASSED!');
   } catch (err) {
