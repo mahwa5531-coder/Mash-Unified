@@ -17,22 +17,29 @@ const rootDir = path.resolve(__dirname, '../..');
 
 console.log('[*] Testing Electron Desktop PDF & Native File Opening Wiring...');
 
-// 1. Check electron/main.js
+// 1. Check electron main / windowManager / ipcHandlers
 const mainJsPath = path.join(rootDir, 'electron', 'main.js');
+const windowManagerPath = path.join(rootDir, 'electron', 'windowManager.js');
+const ipcHandlersPath = path.join(rootDir, 'electron', 'ipcHandlers.js');
 assert.ok(fs.existsSync(mainJsPath), 'electron/main.js must exist');
-const mainJs = fs.readFileSync(mainJsPath, 'utf8');
+
+const electronCode = [
+  fs.existsSync(mainJsPath) ? fs.readFileSync(mainJsPath, 'utf8') : '',
+  fs.existsSync(windowManagerPath) ? fs.readFileSync(windowManagerPath, 'utf8') : '',
+  fs.existsSync(ipcHandlersPath) ? fs.readFileSync(ipcHandlersPath, 'utf8') : '',
+].join('\n');
 
 assert.ok(
-  /plugins:\s*true/.test(mainJs),
-  'electron/main.js must set plugins: true in webPreferences to enable Chromium native PDF viewer'
+  /plugins:\s*true/.test(electronCode),
+  'electron/windowManager.js must set plugins: true in webPreferences to enable Chromium native PDF viewer'
 );
-console.log('  [PASS] 1. electron/main.js has plugins: true enabled in webPreferences.');
+console.log('  [PASS] 1. electron has plugins: true enabled in webPreferences.');
 
 assert.ok(
-  /mash-open-path/.test(mainJs) && /shell\.openPath/.test(mainJs),
-  'electron/main.js must register mash-open-path IPC handler invoking shell.openPath'
+  /mash-open-path/.test(electronCode) && /shell\.openPath/.test(electronCode),
+  'electron/ipcHandlers.js must register mash-open-path IPC handler invoking shell.openPath'
 );
-console.log('  [PASS] 2. electron/main.js registers mash-open-path IPC handler.');
+console.log('  [PASS] 2. electron registers mash-open-path IPC handler.');
 
 // 2. Check electron/preload.js
 const preloadJsPath = path.join(rootDir, 'electron', 'preload.js');
