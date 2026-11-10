@@ -76,7 +76,7 @@ export function FilePill({
       onClick={handleClick}
       title={isClickable ? `Open ${cleanPath}${lineSuffix}` : rawDisplay}
       className={cn(
-        "group inline-flex items-center gap-1.5 h-[22px] px-2 py-0 mx-0.5 rounded-[5px] font-sans text-[12px] leading-none select-none align-middle relative -top-[0.5px] outline-none transition-all duration-150",
+        "group inline-flex items-center gap-1.5 h-[25px] px-2.5 py-0.5 mx-0.5 rounded-[6px] font-sans text-[12px] leading-tight select-none align-middle relative -top-[0.5px] outline-none transition-all duration-150",
         isClickable ? "cursor-pointer active:scale-[0.98]" : "cursor-default",
         // Calm ghost styling: clean neutral surface, authentic file logo, subtle hover highlight
         "bg-zinc-100/90 hover:bg-zinc-200/90 dark:bg-white/[0.06] dark:hover:bg-white/[0.12]",
@@ -88,13 +88,13 @@ export function FilePill({
     >
       {/* File logo and/or close button in the left slot */}
       {(showIcon || onClose) && (
-        <span className="relative flex items-center justify-center shrink-0 w-3.5 h-3.5">
+        <span className="relative flex items-center justify-center shrink-0 w-4 h-4">
           {showIcon && (
             <span className={cn(
               "flex items-center justify-center shrink-0 transition-opacity duration-100",
               onClose ? "group-hover:opacity-0 group-hover:pointer-events-none" : ""
             )}>
-              <FileIcon filename={filePathOnly} size={13} className="shrink-0 group-hover:scale-105 transition-transform" />
+              <FileIcon filename={filePathOnly} size={13.5} className="shrink-0 group-hover:scale-105 transition-transform" />
             </span>
           )}
 
@@ -116,7 +116,7 @@ export function FilePill({
         </span>
       )}
 
-      <span className="truncate max-w-[260px] leading-none">
+      <span className="truncate max-w-[340px] sm:max-w-[380px] leading-tight">
         {dirPrefix && (
           <span className="text-zinc-400 dark:text-zinc-500 font-normal">
             {dirPrefix}
@@ -127,7 +127,7 @@ export function FilePill({
         </span>
       </span>
       {lineSuffix && (
-        <span className="font-mono text-[10.5px] text-zinc-400 dark:text-zinc-400 font-normal leading-none shrink-0">
+        <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-400 font-normal leading-tight shrink-0">
           {lineSuffix}
         </span>
       )}

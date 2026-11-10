@@ -210,7 +210,7 @@ export function useAgentMarkdownComponents({
 
     ol({ children, node: _node, ...props }: any) {
       return (
-        <ol className="my-2.5 pl-7 list-decimal text-zinc-800 dark:text-[#f4f4f6] marker:font-mono marker:text-xs marker:text-zinc-400 dark:marker:text-zinc-300 space-y-2 [&_ul]:my-1.5 [&_ul]:pl-7 [&_ol]:my-1.5 [&_ol]:pl-7 [&>li]:font-semibold [&>li]:text-white [&>li>p]:font-normal [&>li>p]:text-[#f4f4f6] [&>li>ul]:font-normal [&>li>ul]:text-[#f4f4f6] [&>li>ul>li]:font-normal" {...props}>
+        <ol className="my-2.5 pl-7 list-decimal text-zinc-800 dark:text-[#f4f4f6] marker:font-mono marker:text-xs marker:text-zinc-400 dark:marker:text-zinc-300 space-y-2 [&_ul]:my-1.5 [&_ul]:pl-7 [&_ol]:my-1.5 [&_ol]:pl-7 [&>li]:font-semibold [&>li]:text-zinc-900 dark:[&>li]:text-white [&>li>p]:font-normal [&>li>p]:text-zinc-800 dark:[&>li>p]:text-[#f4f4f6] [&>li>ul]:font-normal [&>li>ul]:text-zinc-800 dark:[&>li>ul]:text-[#f4f4f6] [&>li>ul>li]:font-normal" {...props}>
           {children}
         </ol>
       );

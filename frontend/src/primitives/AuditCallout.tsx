@@ -177,11 +177,7 @@ export function AuditCallout({
     (normalizedStatus ? STATUS_VARIANT_MAP[normalizedStatus] || 'info' : 'neutral');
 
   const config = VARIANT_CONFIG[variant] || VARIANT_CONFIG.info;
-  const label = status && title && status !== title
-    ? `${status} — ${title}`
-    : (status || title);
-
-  const displayIcon = icon || (label ? getDefaultCalloutIcon(normalizedStatus, variant) : null);
+  const displayIcon = icon || ((status || title) ? getDefaultCalloutIcon(normalizedStatus, variant) : null);
 
   return (
     <blockquote
@@ -193,20 +189,38 @@ export function AuditCallout({
       )}
       {...props}
     >
-      {label && (
-        <div className={cn("flex items-center gap-1.5 text-[11px] font-bold tracking-wide uppercase mb-1 select-none", config.titleColor)}>
-          {displayIcon}
-          <span>{label}</span>
+      {status ? (
+        <div className="flex items-center gap-2 mb-2 select-none min-h-[20px] pb-0.5">
+          <span className={cn("inline-flex items-center gap-1.5 text-[11.5px] font-bold tracking-wider uppercase", config.titleColor)}>
+            {displayIcon}
+            <span>{status}</span>
+          </span>
+          {title && status !== title && (
+            <>
+              <span className="text-zinc-300 dark:text-zinc-600 text-xs select-none">|</span>
+              <span className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight leading-normal">
+                {title}
+              </span>
+            </>
+          )}
         </div>
-      )}
+      ) : title ? (
+        <div className="flex items-center gap-1.5 mb-2 select-none min-h-[20px] pb-0.5">
+          {displayIcon}
+          <span className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight leading-normal">
+            {title}
+          </span>
+        </div>
+      ) : null}
 
-      <div className="text-zinc-800 dark:text-[#e2e8f0] [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>p]:my-1 leading-[1.6]">
+      <div className="text-zinc-800 dark:text-[#e2e8f0] [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>p]:my-1.5 leading-[1.62] [&>h1]:text-[16px] [&>h1]:font-semibold [&>h1]:mt-2 [&>h1]:mb-1 [&>h2]:text-[15px] [&>h2]:font-semibold [&>h2]:mt-2 [&>h2]:mb-1 [&>h3]:text-[14px] [&>h3]:font-semibold [&>h3]:mt-1.5 [&>h3]:mb-1 [&>h4]:text-[13px] [&>h4]:font-semibold [&>h4]:mt-1.5 [&>h4]:mb-1 [&>ul]:my-1.5 [&>ol]:my-1.5">
         {children}
       </div>
 
       {cite && (
-        <footer className="mt-2 text-[11px] font-mono text-zinc-500 dark:text-zinc-400 not-italic select-text">
-          — § {cite}
+        <footer className="mt-2.5 pt-1.5 border-t border-zinc-200/50 dark:border-white/[0.06] text-[11px] font-mono text-zinc-500 dark:text-zinc-400 not-italic select-text flex items-center gap-1.5">
+          <span className="text-zinc-400 dark:text-zinc-500 font-sans">Source:</span>
+          <span>§ {cite}</span>
         </footer>
       )}
     </blockquote>
