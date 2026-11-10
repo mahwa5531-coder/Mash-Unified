@@ -283,13 +283,8 @@ export default function TaskWorkLogAccordion({
     if (!hasAssistantContent && !hasPendingApproval) {
       return (
         <div className="w-full min-w-0 text-[13px] font-sans my-1 select-none">
-          <div className="flex items-center text-xs text-zinc-400 dark:text-zinc-500 font-sans py-0.5 select-none">
-            <span>Working</span>
-            <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
-              <span>.</span>
-              <span>.</span>
-              <span>.</span>
-            </span>
+          <div className="flex items-center text-xs font-sans py-0.5 select-none">
+            <span className="animate-silver-shine font-medium">Working...</span>
           </div>
         </div>
       );
