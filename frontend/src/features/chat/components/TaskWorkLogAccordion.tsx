@@ -7,7 +7,6 @@ import { TimelineRow } from './work-log/TimelineRow';
 import {
   formatDurationDisplay,
   parseToolItem,
-  isToolRunning,
   groupTimelineEntries,
 } from './work-log/toolTimeline';
 import type { ToolCallItem, ExecutionStep, TimelineEntry } from './work-log/types';
@@ -267,25 +266,23 @@ export default function TaskWorkLogAccordion({
     />
   );
 
-  // 1. While actively streaming: render timeline steps + dynamic "Working..." at end when no tool is running
+  // 1. While actively streaming:
+  // - If tools or thinking blocks are rendered, show them directly (they replace "Working...")
+  // - If no tool/thought is visible yet and no prose has started, show "Working..."
   if (isStreaming) {
-    const isAnyItemRunning = isActivelyThinking || groupedTimeline.some(entry => {
-      if (entry.type === 'thought' && entry.data?.status === 'running') return true;
-      if (entry.type === 'command_group' || entry.type === 'edit_group' || entry.type === 'exploration_group') {
-        return Boolean(entry.data?.isRunning);
-      }
-      if (entry.data?.tool && isToolRunning(entry.data.tool, isStreaming)) return true;
-      return false;
-    });
-
-    return (
-      <div className="w-full min-w-0 text-[13px] font-sans my-1 select-none">
-        {groupedTimeline.length > 0 && (
+    if (groupedTimeline.length > 0) {
+      return (
+        <div className="w-full min-w-0 text-[13px] font-sans my-1 select-none">
           <div className="flex flex-col gap-1 py-1 text-xs mb-1">
             {groupedTimeline.map((entry) => renderTimelineRow(entry, false))}
           </div>
-        )}
-        {!isAnyItemRunning && !hasAssistantContent && !hasPendingApproval && (
+        </div>
+      );
+    }
+
+    if (!hasAssistantContent && !hasPendingApproval) {
+      return (
+        <div className="w-full min-w-0 text-[13px] font-sans my-1 select-none">
           <div className="flex items-center text-xs text-zinc-400 dark:text-zinc-500 font-sans py-0.5 select-none">
             <span>Working</span>
             <span className="inline-flex items-center ml-0.5 space-x-0.5 animate-loading-dots">
@@ -294,9 +291,11 @@ export default function TaskWorkLogAccordion({
               <span>.</span>
             </span>
           </div>
-        )}
-      </div>
-    );
+        </div>
+      );
+    }
+
+    return null;
   }
 
   // 2. Completed turn: render summary button once turn is finished
