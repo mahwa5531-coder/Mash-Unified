@@ -5,7 +5,7 @@ description: |
   Results include file sizes, item types, and are sorted directories-first.
 
   CRITICAL:
-  - `dir_path` MUST be a directory or folder path (e.g. '.', 'src', 'C:/Users/rama/Downloads').
+  - `dir_path` MUST be a directory or folder path (e.g. '.', 'src', 'workpapers', or an absolute directory path).
   - Do NOT pass a file path to this tool.
   - If you already have a specific file path, call `read_file` directly to view its contents.
 

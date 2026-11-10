@@ -104,7 +104,7 @@ export function Unit14AllToolMatrix() {
                   type: 'edit',
                   data: {
                     filename: 'TaskWorkLogAccordion.tsx',
-                    filePath: 'C:/Users/rama/Downloads/Mash/frontend/src/features/chat/components/TaskWorkLogAccordion.tsx',
+                    filePath: 'frontend/src/features/chat/components/TaskWorkLogAccordion.tsx',
                     tool: { id: 't-e1', name: 'replace_file_content', status: 'running' }
                   }
                 }}
@@ -121,7 +121,7 @@ export function Unit14AllToolMatrix() {
                   type: 'edit',
                   data: {
                     filename: 'ToolTimelineRow.tsx',
-                    filePath: 'C:/Users/rama/Downloads/Mash/frontend/src/features/chat/components/work-log/ToolTimelineRow.tsx',
+                    filePath: 'frontend/src/features/chat/components/work-log/ToolTimelineRow.tsx',
                     tool: { id: 't-e2', name: 'replace_file_content', status: 'completed' }
                   }
                 }}
@@ -201,7 +201,7 @@ export function Unit14AllToolMatrix() {
                   type: 'file_read',
                   data: {
                     filename: 'audit_engagement_2026.xlsx',
-                    filePath: 'C:/Users/rama/Downloads/Mash/workpapers/audit_engagement_2026.xlsx',
+                    filePath: 'workpapers/audit_engagement_2026.xlsx',
                     tool: { id: 't-r1', name: 'read_file', status: 'running' }
                   }
                 }}
@@ -218,7 +218,7 @@ export function Unit14AllToolMatrix() {
                   type: 'file_read',
                   data: {
                     filename: 'general_ledger_q3.csv',
-                    filePath: 'C:/Users/rama/Downloads/Mash/data/general_ledger_q3.csv',
+                    filePath: 'data/general_ledger_q3.csv',
                     tool: { id: 't-r2', name: 'read_file', status: 'completed' }
                   }
                 }}

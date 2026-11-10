@@ -55,7 +55,7 @@ export function Unit19Typography() {
           <span className="text-[10px] font-mono text-[var(--m-text-muted)] uppercase tracking-wider block mb-1">Paragraphs with Bold Lead-Ins &amp; Inline Pills:</span>
           
           <p>
-            During our field audit in <PathPill path="C:/Users/rama/Downloads/Mash/workpapers" />, we cross-referenced the general ledger voucher export in <FilePill path="C:/Users/rama/Downloads/Mash/data/general_ledger_q3.csv" /> against the statutory filing in <ExtensionBadge extension=".xlsx" />.
+            During our field audit in <PathPill path="workpapers" />, we cross-referenced the general ledger voucher export in <FilePill path="data/general_ledger_q3.csv" /> against the statutory filing in <ExtensionBadge extension=".xlsx" />.
           </p>
 
           <ul className="my-2 pl-5 list-disc space-y-1.5 marker:text-zinc-400 dark:marker:text-zinc-500">
