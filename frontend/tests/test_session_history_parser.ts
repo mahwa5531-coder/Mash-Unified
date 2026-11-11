@@ -14,7 +14,8 @@ assert.strictEqual(cleanAssistantContent('[empty]'), '');
 assert.strictEqual(cleanAssistantContent('[DONE]'), '');
 assert.strictEqual(cleanAssistantContent('[END]'), '');
 assert.strictEqual(cleanAssistantContent('Here is the plan [DONE]'), 'Here is the plan');
-assert.strictEqual(cleanAssistantContent('[VERIFIED] Here is the plan'), 'Here is the plan');
+// Audit markers like [VERIFIED] must be preserved so AuditBadge renders them on reload
+assert.strictEqual(cleanAssistantContent('[VERIFIED] Here is the plan'), '[VERIFIED] Here is the plan');
 assert.strictEqual(cleanAssistantContent('<user_message>Here is the plan</user_message>'), 'Here is the plan');
 console.log('  [PASS] 1. cleanAssistantContent strips sentinels and protocol tags.');
 

@@ -72,6 +72,12 @@ export function computeInterleavedUnits(msg: Message, isActivelyStreaming: boole
     const result: MessageInterleavedUnit[] = [];
     let currentWorkSteps: ExecutionStep[] = [];
     let unitIdx = 0;
+    const hasToolStepsInMsg = msg.steps.some(
+      (s) => s.type === 'tool' || (!s.type && (s.name || s.tool_call_id)) || Boolean(s.tools && s.tools.length > 0)
+    );
+    const hasThoughtStepsInMsg = msg.steps.some(
+      (s) => s.type === 'thinking' || s.type === 'reasoning' || Boolean(s.thoughts && s.thoughts.length > 0)
+    );
 
     const flushWorklog = () => {
       if (currentWorkSteps.length === 0) return;
@@ -80,8 +86,8 @@ export function computeInterleavedUnits(msg: Message, isActivelyStreaming: boole
         type: 'worklog',
         id: `work_${msg.id || 'w'}_${unitIdx++}`,
         steps: currentWorkSteps,
-        thoughts: thoughts.length > 0 ? thoughts : (result.length === 0 ? (msg.thoughts || []) : []),
-        tools: tools.length > 0 ? tools : (result.length === 0 ? (msg.tools || []) : []),
+        thoughts: thoughts.length > 0 ? thoughts : (!hasThoughtStepsInMsg && result.length === 0 ? (msg.thoughts || []) : []),
+        tools: tools.length > 0 ? tools : (!hasToolStepsInMsg && result.length === 0 ? (msg.tools || []) : []),
       });
       currentWorkSteps = [];
     };

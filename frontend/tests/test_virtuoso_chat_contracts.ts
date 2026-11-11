@@ -30,6 +30,33 @@ assert.ok(chatCanvasSrc.includes('atBottomStateChange={setHitBottom}'), 'Virtuos
 assert.ok(chatCanvasSrc.includes('computeItemKey='), 'Virtuoso must provide computeItemKey for stable DOM keys');
 console.log('  ✓ PASSED: All 6 Virtuoso chat contracts verified.\n');
 
+// Test 2b: Virtuoso firstItemIndex offset subtraction for isLastTurn & globalTurnIdx
+console.log('[Test 2b] Virtuoso firstItemIndex Offset Math...');
+assert.ok(chatCanvasSrc.includes('const turnIndex = index - firstItemIndex;'), 'ChatCanvas must subtract firstItemIndex from Virtuoso itemContent index');
+assert.ok(chatCanvasSrc.includes('const isLastTurn = turnIndex === turns.length - 1;'), 'ChatCanvas must compute isLastTurn using 0-based turnIndex');
+assert.ok(chatCanvasSrc.includes('globalTurnIdx={turnIndex}'), 'ChatCanvas must pass 0-based turnIndex as globalTurnIdx');
+assert.ok(!chatCanvasSrc.includes('const isLastTurn = index === turns.length - 1;'), 'ChatCanvas must NOT compare offsetted Virtuoso index directly against turns.length - 1');
+assert.ok(!chatCanvasSrc.includes('globalTurnIdx={index}'), 'ChatCanvas must NOT leak firstItemIndex-offsetted index into globalTurnIdx');
+
+// Verify index mapping invariants at initial load (100_000) and after prepending 40 earlier turns (99_960)
+for (const [firstIdx, turnCount] of [[100_000, 1], [100_000, 3], [99_960, 43]]) {
+  for (let arrayIdx = 0; arrayIdx < turnCount; arrayIdx++) {
+    const virtuosoIndex = firstIdx + arrayIdx;
+    const turnIndex = virtuosoIndex - firstIdx;
+    const isLastTurn = turnIndex === turnCount - 1;
+    assert.strictEqual(turnIndex, arrayIdx);
+  assert.strictEqual(isLastTurn, arrayIdx === turnCount - 1);
+  }
+}
+console.log('  ✓ PASSED: Virtuoso firstItemIndex offset subtraction verified.\n');
+
+// Test 2c: Scroll-to-Bottom Button & VirtuosoFooter Clearance (Bug 6b)
+console.log('[Test 2c] Scroll-to-Bottom Button Positioning & Bottom Clearance...');
+assert.ok(chatCanvasSrc.includes('pb-14'), 'VirtuosoFooter must include pb-14 bottom clearance above composer dock');
+assert.ok(chatCanvasSrc.includes('-top-12 right-2'), 'ScrollToBottomButton must dock on trailing right edge (-top-12 right-2)');
+assert.ok(!chatCanvasSrc.includes('-top-11 left-1/2 -translate-x-1/2'), 'ScrollToBottomButton must NOT sit dead-center over message text');
+console.log('  ✓ PASSED: Scroll-to-bottom button avoids covering bottom center prose.\n');
+
 // Test 3: Dead spacer replacement <div data-turn-culled> is completely gone
 console.log('[Test 3] Dead Spacer Div Removal...');
 assert.ok(!chatCanvasSrc.includes('data-turn-culled="true"'), 'ChatCanvas must NOT swap turns with culled placeholder divs');

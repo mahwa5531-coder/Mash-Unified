@@ -3,6 +3,9 @@ import {
   formatErrorMessage,
   prepareRetryMessages,
   computeUndoMessages,
+  applyStreamError,
+  applyStreamAbort,
+  applyStreamCompletion,
 } from '../src/features/chat/hooks/streamRetryManager';
 import {
   isSameToolId,
@@ -223,6 +226,46 @@ console.log("\n[Test 5] HTTP 401 Stream Auth Expiry, Window Event & Prompt Resto
   assert.strictEqual(cleanedMessages[cleanedMessages.length - 1].content, "Step 1 complete.");
 
   console.log("  -> PASSED: 401 auth expiration triggers event, reverts zombie turn, and restores composer prompt");
+}
+
+// -----------------------------------------------------------------------------
+// Test 6: Transient Compaction Pill Pruning on Stream Completion / Abort / Error
+// -----------------------------------------------------------------------------
+console.log("\n[Test 6] Transient Compaction Indicator Pruned on Terminal Lifecycle...");
+{
+  const makeMsgWithCompaction = (turnId: string): Message => ({
+    id: `asst_${turnId}`,
+    turnId,
+    role: 'assistant',
+    content: 'Result',
+    status: 'running',
+    thoughts: [],
+    tools: [
+      { id: 'compaction_sess_1', name: 'compaction', args: {}, status: 'running', toolSummary: 'Compacting context' },
+      { id: 'tc_real', name: 'view_file', args: {}, status: 'completed', toolSummary: 'Analysed report.pdf' },
+    ],
+    steps: [
+      { id: 'compaction_sess_1', step_index: 0, type: 'tool', name: 'compaction', args: {}, status: 'running' },
+      { id: 'tc_real', step_index: 1, type: 'tool', name: 'view_file', args: {}, status: 'completed' },
+    ],
+  });
+
+  const completed = applyStreamCompletion([makeMsgWithCompaction('t_done')], 't_done', false, Date.now() - 1000);
+  assert.strictEqual(completed[0].tools?.length, 1);
+  assert.strictEqual(completed[0].tools?.[0].id, 'tc_real');
+  assert.strictEqual(completed[0].steps?.length, 1);
+
+  const aborted = applyStreamAbort([makeMsgWithCompaction('t_abort')], 't_abort', Date.now() - 1000);
+  assert.strictEqual(aborted[0].status, 'aborted');
+  assert.strictEqual(aborted[0].tools?.length, 1);
+  assert.strictEqual(aborted[0].steps?.length, 1);
+
+  const errored = applyStreamError([makeMsgWithCompaction('t_err')], 't_err', 'Network error', undefined, Date.now() - 1000);
+  assert.strictEqual(errored[0].status, 'error');
+  assert.strictEqual(errored[0].tools?.length, 1);
+  assert.strictEqual(errored[0].steps?.length, 1);
+
+  console.log("  -> PASSED: Transient compaction pills cleanly pruned on completion, abort, and error");
 }
 
 console.log("\n======================================================================");

@@ -48,6 +48,9 @@ import {
   formatDurationDisplay,
 } from '../src/features/chat/components/work-log/toolTimeline';
 import { ToolTimelineRow } from '../src/features/chat/components/work-log/ToolTimelineRow';
+import { CommandTimelineRow } from '../src/features/chat/components/work-log/CommandTimelineRow';
+import TaskWorkLogAccordion from '../src/features/chat/components/TaskWorkLogAccordion';
+import { ReasoningDisclosure } from '../src/primitives/ReasoningDisclosure';
 import {
   ApprovalCard,
   getToolHeaderInfo,
@@ -81,6 +84,7 @@ import {
   isFileExtension,
   isDirectoryPath,
   processTextNodes,
+  escapeCurrencyInMarkdown,
 } from '../src/features/chat/components/messages/proseHelpers';
 import { AuditBadge } from '../src/primitives/AuditBadge';
 import type { Message, ToolCall } from '../src/types/chat';
@@ -663,7 +667,7 @@ test('Sanitizer: Strips NexAU protocol sentinels and internal XML tags', () => {
   const clean = cleanAssistantContent(dirtyAssistant);
   assert(!clean.includes('<thought>'), 'Must strip <thought>');
   assert(!clean.includes('<task_result>'), 'Must strip <task_result>');
-  assert(!clean.includes('[VERIFIED]'), 'Must strip [VERIFIED]');
+  assert(clean.includes('[VERIFIED]'), 'Must preserve [VERIFIED] for AuditBadge rendering');
   assert(!clean.includes('[DONE]'), 'Must strip [DONE]');
   assert(clean.includes('The total GST liability is ₹12,45,000.'), 'Prose text preserved');
 });
@@ -764,6 +768,73 @@ test('Case-Insensitive Tag Detection: processTextNodes parses [Verified] into Au
   assert(rendered.includes('rounded-full'), 'Must convert [Verified] into soft capsule AuditBadge');
   assert(rendered.includes('VERIFIED'), 'Must normalize to uppercase');
   assert(rendered.includes('text-emerald-'), 'Must map to emerald');
+});
+
+test('Tool Timeline Rendering: Never renders red Failed badge on failed tools or commands', () => {
+  const failedReadHtml = renderToStaticMarkup(
+    React.createElement(ToolTimelineRow, {
+      entry: parseToolItem(
+        { id: 'tc_fail_read', name: 'view_file', args: { file_path: 'ledger.sqlite' }, status: 'failed', output: 'Unsupported binary format' },
+        0,
+      ),
+      isStreaming: false,
+    }),
+  );
+  assert(!failedReadHtml.includes('>Failed<'), 'ToolTimelineRow must never render Failed badge');
+  assert(!failedReadHtml.includes('text-red-'), 'ToolTimelineRow must never use red error badge text');
+  assert(failedReadHtml.includes('Analysed'), 'ToolTimelineRow must render calm Analysed label');
+
+  const failedCmdHtml = renderToStaticMarkup(
+    React.createElement(CommandTimelineRow, {
+      entry: parseToolItem(
+        { id: 'tc_fail_cmd', name: 'run_command', args: { CommandLine: 'pytest -q' }, status: 'failed', output: '1 failed' },
+        1,
+      ),
+      isStreaming: false,
+    }),
+  );
+  assert(!failedCmdHtml.includes('>Failed<'), 'CommandTimelineRow must never render Failed badge');
+  assert(!failedCmdHtml.includes('text-red-'), 'CommandTimelineRow must never use red error badge text');
+  assert(failedCmdHtml.includes('Ran'), 'CommandTimelineRow must render calm Ran label');
+});
+
+test('Thought Disclosure: Expanding thinking-only worklog reveals thought prose without nested toggle', () => {
+  const accordionHtml = renderToStaticMarkup(
+    React.createElement(TaskWorkLogAccordion, {
+      id: 'work_thought_only',
+      steps: [{ id: 's0', step_index: 0, type: 'thinking', content: 'Evaluating cash flow classifications.', status: 'completed' }],
+      thoughts: ['Evaluating cash flow classifications.'],
+      tools: [],
+      isStreaming: false,
+      hasAssistantContent: false,
+    }),
+  );
+  assert(accordionHtml.includes('Thought'), 'Must render Thought outer header');
+  assert(accordionHtml.includes('Evaluating cash flow classifications.'), 'Thinking-only accordion must expose thought text');
+  const buttonMatches = accordionHtml.match(/<button\b/g) || [];
+  assert.equal(buttonMatches.length, 1, 'Must render single outer Thought toggle without nested duplicate Thought button');
+
+  const hideHeaderHtml = renderToStaticMarkup(
+    React.createElement(ReasoningDisclosure, { text: 'Inner thought trace', isOpen: true, hideHeader: true }),
+  );
+  assert(!hideHeaderHtml.includes('<button'), 'hideHeader must omit button toggle');
+  assert(hideHeaderHtml.includes('Inner thought trace'), 'hideHeader must render thought text directly');
+});
+
+test('Mermaid Currency Guard: Preserves $digits inside fenced mermaid/code blocks & inline backticks', () => {
+  const raw = [
+    'Outside revenue is $300 and expense is $150.',
+    '```mermaid',
+    'flowchart TD',
+    '  A["Budget $100M"] --> B["CapEx $200M"]',
+    '```',
+    'Inline `$50` and streaming ```mermaid\nX["Pending $400"]',
+  ].join('\n');
+  const escaped = escapeCurrencyInMarkdown(raw);
+  assert(escaped.includes('Outside revenue is \\$300 and expense is \\$150.'), 'Prose currency must escape');
+  assert(escaped.includes('A["Budget $100M"] --> B["CapEx $200M"]'), 'Closed mermaid fence must NOT escape $digits');
+  assert(escaped.includes('Inline `$50`'), 'Inline backtick code must NOT escape $digits');
+  assert(escaped.includes('X["Pending $400"]'), 'Unclosed streaming mermaid fence must NOT escape $digits');
 });
 
 console.log(`✓ ALL ${passedTests} CHAT RENDERING & STREAMING TESTS PASSED!`);

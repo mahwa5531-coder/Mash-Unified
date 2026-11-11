@@ -99,6 +99,7 @@ const AssistantMessage = memo(function AssistantMessage({
   const isCompleted = msg.status === 'completed' || msg.status === 'error' || msg.status === 'aborted';
   const hasContent = Boolean(allProseText || artifacts.length > 0 || editedFilesData.files.length > 0);
   const showFooter = isCompleted && !isStreaming && hasContent;
+  const lastWorklogIdx = units.reduce((acc, u, i) => (u.type === 'worklog' ? i : acc), -1);
 
   return (
     <div className="text-[13.5px] text-[var(--text-primary)] w-full mb-1.5">
@@ -114,9 +115,9 @@ const AssistantMessage = memo(function AssistantMessage({
               tools={unit.tools}
               isStreaming={isLast && isStreaming && !units.some((u, i) => i > uIdx && u.type === 'worklog')}
               isLast={isLast}
-              thinkingDurationSeconds={msg.thinkingDurationSeconds}
+              thinkingDurationSeconds={uIdx === 0 ? msg.thinkingDurationSeconds : undefined}
               hasAssistantContent={units.some((u, i) => i > uIdx && u.type === 'prose')}
-              totalDurationSeconds={msg.totalDurationSeconds}
+              totalDurationSeconds={uIdx === lastWorklogIdx ? msg.totalDurationSeconds : undefined}
               turnStartTime={msg.turnStartTime}
               onOpenFile={onOpenFile}
               onApproveTool={onApproveTool}

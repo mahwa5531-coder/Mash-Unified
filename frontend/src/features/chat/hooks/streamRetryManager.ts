@@ -88,13 +88,22 @@ export function computeUndoMessages(messages: Message[], flatIdx?: number): Mess
   return messages.slice(0, messages.length - removeCount);
 }
 
+const isTransientCompaction = (item: any): boolean =>
+  String(item?.id || '').startsWith('compaction_') || item?.name === 'compaction';
+
+function pruneTransientCompaction(msg: Message): Message {
+  const tools = msg.tools?.some(isTransientCompaction) ? msg.tools.filter((t) => !isTransientCompaction(t)) : msg.tools;
+  const steps = msg.steps?.some(isTransientCompaction) ? msg.steps.filter((s) => !isTransientCompaction(s)) : msg.steps;
+  return tools === msg.tools && steps === msg.steps ? msg : { ...msg, tools, steps };
+}
+
 export function applyStreamError(messages: Message[], activeTurnId: string | null, errorText: string, errorId?: string, turnStartTime?: number): Message[] {
   const elapsed = turnStartTime && turnStartTime > 0 ? Math.max(1, Math.round((Date.now() - turnStartTime) / 1000)) : undefined;
   const next = [...messages];
   const idx = findTargetAssistantIdx(next, activeTurnId);
   if (idx >= 0 && next[idx].status !== 'aborted') {
     next[idx] = {
-      ...next[idx],
+      ...pruneTransientCompaction(next[idx]),
       status: 'error',
       error: errorText,
       retryAttempt: undefined,
@@ -110,7 +119,7 @@ export function applyStreamAbort(messages: Message[], activeTurnId: string | nul
   const next = [...messages];
   const targetIdx = findTargetAssistantIdx(next, activeTurnId);
   if (targetIdx >= 0) {
-    next[targetIdx] = { ...next[targetIdx], status: 'aborted', retryAttempt: undefined, totalDurationSeconds: elapsed ?? next[targetIdx].totalDurationSeconds };
+    next[targetIdx] = { ...pruneTransientCompaction(next[targetIdx]), status: 'aborted', retryAttempt: undefined, totalDurationSeconds: elapsed ?? next[targetIdx].totalDurationSeconds };
   }
   return next;
 }
@@ -120,9 +129,10 @@ export function applyStreamCompletion(messages: Message[], activeTurnId: string 
   const next = [...messages];
   const idx = findTargetAssistantIdx(next, activeTurnId);
   if (idx >= 0 && next[idx].status !== 'aborted' && next[idx].status !== 'error') {
-    next[idx] = { ...next[idx], status: wasUserAborted ? 'aborted' : 'completed', retryAttempt: undefined, totalDurationSeconds: totalElapsed ?? next[idx].totalDurationSeconds };
-  } else if (idx >= 0 && next[idx].totalDurationSeconds === undefined && totalElapsed) {
-    next[idx] = { ...next[idx], totalDurationSeconds: totalElapsed };
+    next[idx] = { ...pruneTransientCompaction(next[idx]), status: wasUserAborted ? 'aborted' : 'completed', retryAttempt: undefined, totalDurationSeconds: totalElapsed ?? next[idx].totalDurationSeconds };
+  } else if (idx >= 0) {
+    const cleaned = pruneTransientCompaction(next[idx]);
+    next[idx] = cleaned.totalDurationSeconds === undefined && totalElapsed ? { ...cleaned, totalDurationSeconds: totalElapsed } : cleaned;
   }
   return next;
 }

@@ -57,7 +57,7 @@ console.log('\n[Test 2] Assistant Content Tag Sanitization...');
 assert.strictEqual(cleanAssistantContent('[empty]'), '');
 assert.strictEqual(cleanAssistantContent('[DONE]'), '');
 assert.strictEqual(cleanAssistantContent('[END]'), '');
-assert.strictEqual(cleanAssistantContent('Here is the plan [VERIFIED] ready to proceed'), 'Here is the plan ready to proceed');
+assert.strictEqual(cleanAssistantContent('Here is the plan [VERIFIED] ready to proceed'), 'Here is the plan [VERIFIED] ready to proceed');
 assert.strictEqual(cleanAssistantContent('<user_message>hello</user_message>'), 'hello');
 assert.strictEqual(cleanAssistantContent('<assistant_message>response</assistant_message>'), 'response');
 assert.strictEqual(cleanAssistantContent('<session_mode>audit</session_mode>Report prepared.'), 'auditReport prepared.');

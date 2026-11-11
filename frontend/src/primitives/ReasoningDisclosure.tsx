@@ -26,6 +26,8 @@ export interface ReasoningDisclosureProps {
   className?: string;
   /** Optional external ref to the scrollable text viewport */
   scrollRef?: React.RefObject<HTMLDivElement | null>;
+  /** Hide clickable header button when nested inside an already-labeled outer disclosure */
+  hideHeader?: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export function ReasoningDisclosure({
   onToggle,
   className,
   scrollRef: externalScrollRef,
+  hideHeader = false,
 }: ReasoningDisclosureProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(defaultOpen);
   const wasStreamingRef = useRef(isStreaming);
@@ -97,26 +100,28 @@ export function ReasoningDisclosure({
 
   return (
     <div className={cn("my-1 select-none font-sans", className)}>
-      <button
-        type="button"
-        onClick={handleToggle}
-        className={cn(
-          "flex items-center gap-1.5 text-xs font-normal py-0.5 cursor-pointer select-none transition-colors group text-left w-fit",
-          "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-        )}
-      >
-        {isStreaming && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
-        <span className="font-sans text-[12px]">
-          {displayLabel}
-        </span>
-        <ChevronRight
-          size={11}
+      {!hideHeader && (
+        <button
+          type="button"
+          onClick={handleToggle}
           className={cn(
-            "text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 transition-transform duration-200 shrink-0",
-            isExpanded && "rotate-90"
+            "flex items-center gap-1.5 text-xs font-normal py-0.5 cursor-pointer select-none transition-colors group text-left w-fit",
+            "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           )}
-        />
-      </button>
+        >
+          {isStreaming && <Loader2 size={10} className="animate-spin text-sky-500 shrink-0" />}
+          <span className="font-sans text-[12px]">
+            {displayLabel}
+          </span>
+          <ChevronRight
+            size={11}
+            className={cn(
+              "text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 transition-transform duration-200 shrink-0",
+              isExpanded && "rotate-90"
+            )}
+          />
+        </button>
+      )}
 
       {isExpanded && (
         <div className="mt-1.5 mb-2 pl-2">

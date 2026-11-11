@@ -30,7 +30,6 @@ export function stripSentinels(rawToken: string): string {
   // QA-BUG-1 Fix: Require brackets so ordinary words ("done", "end", "empty") are never dropped from chat
   if (/^\[(DONE|END|done|end|empty)\]$/i.test(rawToken.trim())) return '';
   return rawToken
-    .replace(/\[VERIFIED\]\s*/gi, '')
     .replace(/(\s*\[(DONE|END|done|end)\]\s*)+$/gi, '');
 }
 

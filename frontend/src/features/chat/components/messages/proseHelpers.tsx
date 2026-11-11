@@ -183,12 +183,15 @@ export function processTextNodes(children: any, onOpenFile?: (path: string) => v
   return children;
 }
 
-// Guard unescaped currency dollar signs (e.g. $100) outside math formulas,
+// Guard unescaped currency dollar signs (e.g. $100) outside math formulas and code blocks,
 // and normalize Windows CRLF / corrupted \r\r\n to prevent table & blockquote layout breaks
 export function escapeCurrencyInMarkdown(content: string): string {
   if (!content) return '';
   const normalized = content.replace(/\r\r\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   if (!normalized.includes('$')) return normalized;
-  return normalized.replace(/(?<![\$\\])\$(?=\d)/g, '\\$');
+  return normalized.replace(
+    /(`{3,}|~{3,})[\s\S]*?(?:\1|$)|(`+)[^\n]*?\2|(?<![\$\\])\$(?=\d)/g,
+    (match) => (match === '$' ? '\\$' : match),
+  );
 }
 

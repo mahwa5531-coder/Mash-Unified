@@ -9,7 +9,6 @@ export function cleanAssistantContent(raw?: string): string {
   const trimmed = raw.trim();
   if (trimmed === '[empty]' || /^\[?(DONE|END|done|end)\]?$/i.test(trimmed)) return '';
   return trimmed
-    .replace(/\[VERIFIED\]\s*/gi, '')
     .replace(PROTOCOL_BRACKETS_REGEX, '')
     .replace(PROTOCOL_TAGS_REGEX, '')
     .replace(/^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*$/gim, '')

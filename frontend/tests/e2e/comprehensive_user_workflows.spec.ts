@@ -180,14 +180,10 @@ test.describe('MASH Desktop E2E Workflow Matrix', () => {
     await setupMockBackend(page, true);
     await page.goto('/');
 
-    // Expand the "Mash" workspace folder if collapsed (QA-03 Fix)
-    const mashFolder = page.locator('[class*="group/folder"]').filter({ hasText: /^Mash$/i }).first();
-    try {
-      await mashFolder.waitFor({ state: 'visible', timeout: 3000 });
-      await mashFolder.click();
-    } catch {
-      // Folder already expanded or not present
-    }
+    // Expand the "Mash" workspace folder if collapsed (matches label span without session count badge)
+    const mashFolder = page.locator('[class*="group/folder"]').filter({ has: page.getByText('Mash', { exact: true }) }).first();
+    await mashFolder.waitFor({ state: 'visible', timeout: 5000 });
+    await mashFolder.click();
 
     // Verify sessions appear in the sidebar list (matching with regex for ellipsis truncation)
     await expect(page.getByText(/Compiler Toolchain/i)).toBeVisible({ timeout: 10000 });
@@ -294,14 +290,10 @@ test.describe('MASH Desktop E2E Workflow Matrix', () => {
     await setupMockBackend(page, true);
     await page.goto('/');
 
-    // Expand the "Mash" workspace folder if collapsed (QA-03 Fix)
-    const mashFolder = page.locator('[class*="group/folder"]').filter({ hasText: /^Mash$/i }).first();
-    try {
-      await mashFolder.waitFor({ state: 'visible', timeout: 3000 });
-      await mashFolder.click();
-    } catch {
-      // Folder already expanded or not present
-    }
+    // Expand the "Mash" workspace folder before selecting session A
+    const mashFolder = page.locator('[class*="group/folder"]').filter({ has: page.getByText('Mash', { exact: true }) }).first();
+    await mashFolder.waitFor({ state: 'visible', timeout: 5000 });
+    await mashFolder.click();
 
     // 1. Select Session A (Compiler Toolchain Diagnostic)
     const sessionA = page.getByText(/Compiler Toolchain/i);
@@ -353,5 +345,135 @@ test.describe('MASH Desktop E2E Workflow Matrix', () => {
     // Verify app remains completely stable and responsive
     const composer = page.locator('textarea');
     await expect(composer).toBeVisible();
+  });
+
+  test('Workflow 11: Calibrated Chat UI Rendering (AuditBadge, Single-Toggle Thought, Calm Failed Tool, Currency & Scroll Button)', async ({ page }) => {
+    await setupMockBackend(page, true);
+
+    const longFiller = Array.from({ length: 24 }, (_, idx) => `Audit section line ${idx + 1}: ledger balance check passed.`).join('\n\n');
+    await page.route('**/sessions/sess_direct_03/transcript*', async (route: any) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          total: 5,
+          lines: [
+            {
+              id: 'm_u1',
+              session_id: 'sess_direct_03',
+              turn_id: 'turn_w11_1',
+              role: 'user',
+              content: 'Run verification check 1',
+            },
+            {
+              id: 'm_a1',
+              session_id: 'sess_direct_03',
+              turn_id: 'turn_w11_1',
+              role: 'assistant',
+              thoughts: ['Isolated single reasoning trace for ledger verification.'],
+              tools: [],
+              steps: [{ id: 'st_t1', type: 'thinking', content: 'Isolated single reasoning trace for ledger verification.' }],
+              content: 'Initial scope checked.',
+            },
+            {
+              id: 'm_u2',
+              session_id: 'sess_direct_03',
+              turn_id: 'turn_w11_2',
+              role: 'user',
+              content: 'Run verification check 2',
+            },
+            {
+              id: 'm_a2a',
+              session_id: 'sess_direct_03',
+              turn_id: 'turn_w11_2',
+              role: 'assistant',
+              thoughts: ['Checking unsupported workbook fallback and currency escaping.'],
+              tools: [
+                {
+                  id: 'tc_view_err',
+                  name: 'view_file',
+                  args: { TargetFile: 'notes.xlsx' },
+                  status: 'error',
+                  output: 'Unsupported binary format .xlsx',
+                },
+                {
+                  id: 'tc_cmd_err',
+                  name: 'run_shell_command',
+                  args: { CommandLine: 'grep -q tax ledger.csv' },
+                  status: 'error',
+                  output: 'Exit code 1\nNo matches',
+                },
+              ],
+              steps: [
+                { id: 'st_t2', type: 'thinking', content: 'Checking unsupported workbook fallback and currency escaping.' },
+                {
+                  id: 'st_v2',
+                  type: 'tool',
+                  id_ref: 'tc_view_err',
+                  name: 'view_file',
+                  args: { TargetFile: 'notes.xlsx' },
+                  status: 'error',
+                  output: 'Unsupported binary format .xlsx',
+                },
+                {
+                  id: 'st_c2',
+                  type: 'tool',
+                  id_ref: 'tc_cmd_err',
+                  name: 'run_shell_command',
+                  args: { CommandLine: 'grep -q tax ledger.csv' },
+                  status: 'error',
+                  output: 'Exit code 1\nNo matches',
+                },
+              ],
+              content: 'Intermediate tool step.',
+            },
+            {
+              id: 'm_a2b',
+              session_id: 'sess_direct_03',
+              turn_id: 'turn_w11_2',
+              role: 'assistant',
+              thoughts: [],
+              tools: [],
+              steps: [{ id: 'st_final2', type: 'text', content: `[VERIFIED] Cash reconciliation matched $1000 vs $2500.\n\n\`\`\`mermaid\nflowchart TD\n  A["Cash $1000"] --> B["Payable $2500"]\n\`\`\`\n\n${longFiller}` }],
+              content: `[VERIFIED] Cash reconciliation matched $1000 vs $2500.\n\n\`\`\`mermaid\nflowchart TD\n  A["Cash $1000"] --> B["Payable $2500"]\n\`\`\`\n\n${longFiller}`,
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto('/');
+    await page.getByText(/Direct Architectural/i).click();
+
+    // 1. AuditBadge renders [VERIFIED] as pill capsule without raw brackets
+    await expect(page.getByText('VERIFIED', { exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('[VERIFIED]')).toHaveCount(0);
+
+    // 2. Currency $1000 / $2500 stays literal in both prose and diagram SVG (no false KaTeX math)
+    await expect(page.locator('.katex')).toHaveCount(0);
+    await expect(page.getByText(/Cash reconciliation matched \$1000 vs \$2500/)).toBeVisible();
+    await expect(page.locator('svg text', { hasText: 'Cash $1000' })).toBeVisible();
+
+    // 3. Thinking-only turn opens straight into thought body with single toggle (no nested "Thought" button)
+    const thoughtToggle = page.getByRole('button', { name: /^Thought/i }).first();
+    await expect(thoughtToggle).toBeVisible();
+    await thoughtToggle.click();
+    await expect(page.getByText('Isolated single reasoning trace for ledger verification.')).toBeVisible();
+
+    // 4. Failed tools render calm status row with zero red "Failed" label
+    const workedToggle = page.getByRole('button', { name: /^Worked/i }).first();
+    await expect(workedToggle).toBeVisible();
+    await workedToggle.click();
+    await expect(page.getByText('notes.xlsx').first()).toBeVisible();
+    await expect(page.getByText(/grep -q tax ledger\.csv/)).toBeVisible();
+    await expect(page.getByText(/^Failed$/i)).toHaveCount(0);
+
+    // 5. Scrolling up inside Virtuoso reveals right-docked ScrollToBottomButton
+    const scroller = page.locator('[data-virtuoso-scroller="true"]').first();
+    await scroller.evaluate((el) => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll')); });
+    const scrollBtn = page.getByRole('button', { name: 'Scroll to bottom' });
+    await expect(scrollBtn).toBeVisible({ timeout: 5000 });
+    const [box, vp] = await Promise.all([scrollBtn.boundingBox(), scroller.boundingBox()]);
+    expect(box && vp && box.x > vp.x + vp.width * 0.5).toBeTruthy();
   });
 });

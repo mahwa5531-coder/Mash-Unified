@@ -344,9 +344,12 @@ export function createStreamCallbacks(
         const target = { ...next[idx] };
         target.retryAttempt = attempt > 0 ? attempt : undefined;
         if (attempt > 1) {
-          // Provider retry initiated: strip partial uncommitted running text step and clear in-flight content
+          // Provider retry initiated: strip partial uncommitted text step + any transient compaction pill and clear in-flight content
           if (Array.isArray(target.steps)) {
-            target.steps = target.steps.filter((st: any) => !(st.type === "text" && st.status === "running"));
+            target.steps = target.steps.filter((st: any) => !(st.type === "text" && st.status === "running") && !String(st?.id || '').startsWith('compaction_') && st?.name !== 'compaction');
+          }
+          if (Array.isArray(target.tools)) {
+            target.tools = target.tools.filter((t: any) => !String(t?.id || '').startsWith('compaction_') && t?.name !== 'compaction');
           }
           target.content = "";
         }

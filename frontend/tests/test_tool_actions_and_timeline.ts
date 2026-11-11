@@ -747,6 +747,28 @@ if (reasoningUnits[0].type === 'worklog') {
   assert.strictEqual(reasoningUnits[0].thoughts[0], 'Deliberating architecture');
 }
 
+// 8.7 Thinking-only first worklog must NOT inherit msg.tools from subsequent worklog units
+const turnWithThoughtThenProseThenTool: Message = {
+  id: 'msg_split_thought_tool',
+  role: 'assistant',
+  content: 'Initial findings look promising.\n\nAll files verified cleanly.',
+  thoughts: ['Weighing approach A vs B'],
+  tools: [{ id: 'tc_late', name: 'view_file', args: { file_path: 'ledger.csv' }, status: 'completed', output: 'ok' }],
+  steps: [
+    { id: 'st_think', step_index: 0, type: 'thinking', content: 'Weighing approach A vs B', status: 'completed' },
+    { id: 'st_prose_1', step_index: 1, type: 'text', content: '### Initial Findings\nWeighing approach A before reading ledger.', status: 'completed' },
+    { id: 'st_tool', step_index: 2, type: 'tool', tool_call_id: 'tc_late', name: 'view_file', args: { file_path: 'ledger.csv' }, output: 'ok', status: 'completed' },
+    { id: 'st_prose_2', step_index: 3, type: 'text', content: '### Final Verification\nAll files verified cleanly.', status: 'completed' },
+  ],
+};
+const splitUnits = computeInterleavedUnits(turnWithThoughtThenProseThenTool, false);
+assert.strictEqual(splitUnits.length, 4, 'Expected worklog -> prose -> worklog -> prose');
+if (splitUnits[0].type === 'worklog' && splitUnits[2].type === 'worklog') {
+  assert.strictEqual(splitUnits[0].thoughts.length, 1);
+  assert.strictEqual(splitUnits[0].tools.length, 0, 'First thinking-only worklog MUST NOT absorb tools from later worklog');
+  assert.strictEqual(splitUnits[2].tools.length, 1);
+}
+
 console.log('  -> PASSED: 100% Reload Parity from SQLite transcript verified');
 
 console.log('\n======================================================================');

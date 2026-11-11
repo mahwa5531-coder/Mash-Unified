@@ -122,7 +122,7 @@ const MountedTurnRow = memo(function MountedTurnRow({
 
 // Module-hoisted Virtuoso footer prevents component re-creation and DOM remounts on every render frame
 const VirtuosoFooter = memo(function VirtuosoFooter() {
-  return <div className="max-w-3xl mx-auto w-full pb-6 px-2.5 sm:px-3.5" aria-hidden="true" />;
+  return <div className="max-w-3xl mx-auto w-full pb-14 px-2.5 sm:px-3.5" aria-hidden="true" />;
 });
 
 export default function ChatCanvas({ 
@@ -375,14 +375,16 @@ export default function ChatCanvas({
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden [overflow-anchor:none] custom-scrollbar relative"
           components={virtuosoComponents}
           itemContent={(index, turn) => {
-            const isLastTurn = index === turns.length - 1;
+            // Virtuoso passes `firstItemIndex + arrayIndex`; subtract `firstItemIndex` for 0-based turn checks.
+            const turnIndex = index - firstItemIndex;
+            const isLastTurn = turnIndex === turns.length - 1;
             const turnKey = turn.id || `turn_${turn.flatIdx}_${index}`;
             return (
               <div className="max-w-3xl mx-auto w-full py-1 px-2.5 sm:px-3.5">
                 <MountedTurnRow
                   turn={turn}
                   turnKey={turnKey}
-                  globalTurnIdx={index}
+                  globalTurnIdx={turnIndex}
                   isLastTurn={isLastTurn}
                   isStreaming={isLastTurn && isStreaming}
                   artifactsByTurnMsg={artifactsByTurnMsg}
@@ -416,7 +418,7 @@ export default function ChatCanvas({
 
           {/* Floating Scroll-to-Bottom Button */}
           {!hitBottom && (
-            <div className="absolute -top-11 left-1/2 -translate-x-1/2 pointer-events-auto z-30">
+            <div className="absolute -top-12 right-2 pointer-events-auto z-30">
               <ScrollToBottomButton onClick={scrollDomToBottom} />
             </div>
           )}

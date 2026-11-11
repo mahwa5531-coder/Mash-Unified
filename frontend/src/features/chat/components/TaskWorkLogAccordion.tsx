@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ReasoningDisclosure } from '@/primitives';
 import { TimelineRow } from './work-log/TimelineRow';
 import {
   formatDurationDisplay,
@@ -151,7 +152,7 @@ export default function TaskWorkLogAccordion({
     if (steps && steps.length > 0) {
       steps.forEach((step: any, sIdx) => {
         if (step.type === 'thinking' || step.type === 'reasoning' || (step.thoughts && step.thoughts.length > 0)) {
-          const thText = (step.content || (step.thoughts ? step.thoughts.join('\n\n') : '')).replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
+          const thText = (step.content || (step.thoughts ? step.thoughts.join('\n\n') : '')).replace(/<\/?(?:thought|thinking)>/gi, '').trim();
           if (thText) {
             const computedSecs = step.thinkingDurationSeconds || undefined;
             const lastEntry = fullTimeline[fullTimeline.length - 1];
@@ -178,7 +179,7 @@ export default function TaskWorkLogAccordion({
           const stepToolEntries = step.tools.map((t: any, tIdx: number) => parseToolItem(t, `${sIdx}_${tIdx}`));
           fullTimeline.push(...stepToolEntries);
         } else if (step.type === 'text' && step.content) {
-          const noteText = step.content.replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
+          const noteText = step.content.replace(/<\/?(?:thought|thinking)>/gi, '').trim();
           if (noteText) {
             fullTimeline.push({
               id: step.id ? `note-${step.id}-${sIdx}` : `note-step-${sIdx}`,
@@ -198,7 +199,7 @@ export default function TaskWorkLogAccordion({
     const groupedTools = groupTimelineEntries(rawToolEntries);
 
     if (thoughts.length > 0) {
-      const combinedThoughtText = thoughts.join('\n\n').replace(/\[VERIFIED\]\s*/gi, '').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
+      const combinedThoughtText = thoughts.join('\n\n').replace(/<\/?(?:thought|thinking)>/gi, '').trim();
       if (combinedThoughtText) {
         const computedSecs = thinkingDurationSeconds || undefined;
         fullTimeline.push({
@@ -331,7 +332,15 @@ export default function TaskWorkLogAccordion({
       {clusterOpen && (
         <div className="min-w-0 overflow-hidden mt-0.5 transition-all duration-200 ease-out animate-in fade-in-50 slide-in-from-top-1">
           <div className="flex flex-col gap-1 py-1 text-xs">
-            {groupedTimeline.length > 0 ? (
+            {!hasTools && groupedTimeline.length === 1 && groupedTimeline[0].type === 'thought' ? (
+              <ReasoningDisclosure
+                text={groupedTimeline[0].data?.text || ''}
+                isStreaming={false}
+                hideHeader
+                isOpen
+                scrollRef={thoughtScrollRef}
+              />
+            ) : groupedTimeline.length > 0 ? (
               groupedTimeline.map((entry) => renderTimelineRow(entry, false))
             ) : (
               <div className="text-xs text-muted-foreground/80 py-1 px-1 font-sans">
