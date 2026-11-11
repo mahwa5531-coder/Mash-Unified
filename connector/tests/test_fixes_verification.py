@@ -74,6 +74,26 @@ def test_accordion_sanitization():
     assert 'Thought for' in content, "TaskWorkLogAccordion must support Thought for label"
     print("PASS: test_accordion_sanitization")
 
+def test_folder_picker_cancel_does_not_cascade(monkeypatch):
+    import subprocess
+    import sys
+    from types import SimpleNamespace
+    from app.routers import system as system_router
+
+    if sys.platform != "win32":
+        return
+
+    calls = []
+
+    def fake_run(*args, **kwargs):
+        calls.append(args[0])
+        return SimpleNamespace(stdout="__CANCELLED__\n", returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert system_router._open_folder_dialog() is None
+    assert len(calls) == 1, f"Cancelled native dialog must not cascade to fallback pickers: {calls}"
+
+
 if __name__ == '__main__':
     test_single_env_and_no_max_iterations_option()
     test_universal_scrollbar_removal()

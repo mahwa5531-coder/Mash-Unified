@@ -116,6 +116,8 @@ def _open_folder_dialog() -> str | None:
                     timeout=60,
                 )
                 out = res.stdout.strip()
+                if out == "__CANCELLED__":
+                    return None
                 if out and Path(out).is_dir():
                     return out
             except Exception as e:
@@ -132,7 +134,7 @@ def _open_folder_dialog() -> str | None:
             "$f.Title = 'Select Workspace Folder'; "
             "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { "
             "  [System.IO.Path]::GetDirectoryName($f.FileName) "
-            "}"
+            "} else { '__CANCELLED__' }"
         )
         try:
             res = subprocess.run(
@@ -142,6 +144,8 @@ def _open_folder_dialog() -> str | None:
                 timeout=60,
             )
             out = res.stdout.strip()
+            if out == "__CANCELLED__":
+                return None
             if out and Path(out).is_dir():
                 return out
         except Exception:

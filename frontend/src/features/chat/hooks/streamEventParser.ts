@@ -139,6 +139,7 @@ export function syncSessionSwitchingState(params: {
     setChatMessages([]);
     setIsStreaming(false);
     setInputPrompt('');
+    steering.setQueuedMessages([]);
     history.setHasEarlierTurns(false);
     history.setRemainingEarlierCount(0);
     history.setIsHistoryLoaded(true);

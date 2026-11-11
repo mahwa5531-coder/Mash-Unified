@@ -314,35 +314,47 @@ export default function Home() {
     return () => window.removeEventListener('mash:open-file', handleGlobalOpenFile);
   }, [handleOpenFile]);
 
+  const titleBar = (
+    <WindowTitleBar
+      onToggleFullscreen={() => {
+        if (typeof document !== 'undefined') {
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          } else {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        }
+      }}
+    />
+  );
+
   if (isAuthLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#09090b] text-zinc-400">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 rounded-full border-2 border-zinc-500 border-t-transparent animate-spin" />
-          <span className="text-xs font-mono tracking-wider text-zinc-500 uppercase">MASH</span>
+      <div className="flex flex-col h-screen w-full bg-[#09090b] text-zinc-400 overflow-hidden">
+        {titleBar}
+        <div className="flex flex-1 min-h-0 items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-6 h-6 rounded-full border-2 border-zinc-500 border-t-transparent animate-spin" />
+            <span className="text-xs font-mono tracking-wider text-zinc-500 uppercase">MASH</span>
+          </div>
         </div>
       </div>
     );
   }
 
   if (!authUser || !authUser.authenticated) {
-    return <DesktopSignInView onAuthSuccess={(user) => setAuthUser(user)} />;
+    return (
+      <div className="flex flex-col h-screen w-full bg-[#0e0e11] overflow-hidden">
+        {titleBar}
+        <DesktopSignInView onAuthSuccess={(user) => setAuthUser(user)} className="min-h-0 flex-1 overflow-y-auto" />
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col h-screen w-full bg-[var(--bg-app)] overflow-hidden text-[var(--text-primary)] font-sans transition-colors">
       {/* Row 1: Window Frame Title Bar (Matches Desktop Window in Images 1 & 2) */}
-      <WindowTitleBar
-        onToggleFullscreen={() => {
-          if (typeof document !== 'undefined') {
-            if (document.fullscreenElement) {
-              document.exitFullscreen().catch(() => {});
-            } else {
-              document.documentElement.requestFullscreen().catch(() => {});
-            }
-          }
-        }}
-      />
+      {titleBar}
 
       <ErrorBoundary
         scope="workbench-root"

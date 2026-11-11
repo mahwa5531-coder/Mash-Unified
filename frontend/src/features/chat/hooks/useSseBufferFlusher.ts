@@ -18,16 +18,19 @@ export function useSseBufferFlusher({
   const rafIdRef = useRef<number | null>(null);
   const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
 
-  const flushActiveStreamBuffer = useCallback(() => {
-    if (rafIdRef.current !== null) {
-      cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = null;
+  const flushActiveStreamBuffer = useCallback((targetSid?: string) => {
+    const isTargetOverride = typeof targetSid === 'string' && targetSid.length > 0 && targetSid !== activeSessionIdRef.current;
+    if (!isTargetOverride) {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      if (timeoutIdRef.current !== null) {
+        clearTimeout(timeoutIdRef.current);
+        timeoutIdRef.current = null;
+      }
     }
-    if (timeoutIdRef.current !== null) {
-      clearTimeout(timeoutIdRef.current);
-      timeoutIdRef.current = null;
-    }
-    const curSid = activeSessionIdRef.current;
+    const curSid = typeof targetSid === 'string' && targetSid.length > 0 ? targetSid : activeSessionIdRef.current;
     if (!curSid) return;
     const s = sessionStore.get(curSid);
     if (!s) return;
@@ -116,7 +119,7 @@ export function useSseBufferFlusher({
         thinkingDurationSeconds: s.thinkingDuration ?? next[targetIdx].thinkingDurationSeconds,
       };
       s.chatMessages = next;
-      setChatMessages(next);
+      if (curSid === activeSessionIdRef.current) setChatMessages(next);
     }
     // Delegated scroll retention entirely to Virtuoso followOutput.
     // Zero manual scrollTop mutations prevent yanking the user away from history during streaming.

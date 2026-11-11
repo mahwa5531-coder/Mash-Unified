@@ -6,13 +6,16 @@ import {
   applyStreamError,
   applyStreamAbort,
   applyStreamCompletion,
+  stopSessionStream,
+  runChatStream,
 } from '../src/features/chat/hooks/streamRetryManager';
+import { syncSessionSwitchingState } from '../src/features/chat/hooks/streamEventParser';
 import {
   isSameToolId,
   dismissPendingApprovals,
 } from '../src/features/chat/hooks/streamToolManager';
 import { parseSseChunkBuffer } from '../src/services/stream';
-import { findTargetAssistantIdx } from '../src/features/chat/state/sessionStore';
+import { findTargetAssistantIdx, getOrCreateSessionState, clearSessionStore } from '../src/features/chat/state/sessionStore';
 import type { Message } from '../src/types/chat';
 
 console.log("======================================================================");
@@ -268,6 +271,84 @@ console.log("\n[Test 6] Transient Compaction Indicator Pruned on Terminal Lifecy
   console.log("  -> PASSED: Transient compaction pills cleanly pruned on completion, abort, and error");
 }
 
-console.log("\n======================================================================");
-console.log("ALL FRONTEND STREAM RETRY & RECOVERY TESTS PASSED (5/5) FROM REAL MODULES!");
-console.log("======================================================================");
+// -----------------------------------------------------------------------------
+// Test 7: Concurrency & Abort Guards (stopSessionStream, queue clear, turn isolation)
+// -----------------------------------------------------------------------------
+console.log("\n[Test 7] Session/Turn Isolation & AbortController Recovery");
+{
+  clearSessionStore();
+  const s = getOrCreateSessionState('sess_stop_ctrl');
+  const ctrl = new AbortController();
+  s.isStreaming = false;
+  s.abortController = ctrl;
+  s.activeTurnId = 'turn_stop';
+  s.turnStartTime = Date.now() - 1000;
+  s.chatMessages = [
+    { id: 'u1', turnId: 'turn_stop', role: 'user', content: 'Stop', thoughts: [], tools: [] },
+    { id: 'a1', turnId: 'turn_stop', role: 'assistant', content: '', status: 'running', thoughts: [], tools: [] },
+  ];
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response('{}', { status: 200 })) as any;
+  try {
+    const out = stopSessionStream('sess_stop_ctrl');
+    assert.strictEqual(ctrl.signal.aborted, true, 'AbortController must abort even if isStreaming drifted false');
+    assert.strictEqual(s.abortController, null);
+    assert.strictEqual(out[1].status, 'aborted');
+  } finally {
+    globalThis.fetch = origFetch;
+    clearSessionStore();
+  }
+
+  let syncedQueue: string[] = ['stale'];
+  syncSessionSwitchingState({
+    sessionId: null,
+    activeSessionIdRef: { current: null },
+    history: {
+      setHasEarlierTurns: () => {},
+      setRemainingEarlierCount: () => {},
+      setIsHistoryLoaded: () => {},
+      setHistoryLoadError: () => {},
+      updatePaginationState: () => {},
+    },
+    steering: { setQueuedMessages: (q: string[]) => { syncedQueue = q; } },
+    setChatMessages: () => {},
+    setIsStreaming: () => {},
+    setInputPrompt: () => {},
+    scrollRef: { current: null },
+  });
+  assert.deepStrictEqual(syncedQueue, [], 'Switching to null session clears stale queue');
+
+  (async () => {
+    clearSessionStore();
+    const sIso = getOrCreateSessionState('sess_turn_iso');
+    const ctrl1 = new AbortController();
+    const ctrl2 = new AbortController();
+    sIso.isStreaming = true;
+    sIso.activeTurnId = 'turn_2';
+    sIso.abortController = ctrl2;
+    sIso.chatMessages = [
+      { id: 'u1', turnId: 'turn_1', role: 'user', content: 'First', thoughts: [], tools: [] },
+      { id: 'a1', turnId: 'turn_1', role: 'assistant', content: 'Stopped', status: 'aborted', thoughts: [], tools: [] },
+      { id: 'u2', turnId: 'turn_2', role: 'user', content: 'Second', thoughts: [], tools: [] },
+      { id: 'a2', turnId: 'turn_2', role: 'assistant', content: '', status: 'running', thoughts: [], tools: [] },
+    ];
+    let endCalled = 0;
+    ctrl1.abort();
+    await runChatStream('sess_turn_iso', 'First', {
+      turnId: 'turn_1', isResume: false, signal: ctrl1.signal, context: {},
+      scheduleFlush: () => {}, flushBuffer: () => {}, onUpdateMessages: () => {},
+      onStreamEnd: () => { endCalled++; }, scrollToBottom: () => {}, onAutoDispatchQueue: () => {},
+    });
+    assert.strictEqual(sIso.isStreaming, true, 'Late Turn 1 exit must not clear Turn 2 isStreaming');
+    assert.strictEqual(sIso.abortController, ctrl2, 'Late Turn 1 exit must not clear Turn 2 abortController');
+    assert.strictEqual(endCalled, 0, 'Late Turn 1 exit must not call onStreamEnd for Turn 2');
+    clearSessionStore();
+    console.log("  -> PASSED: AbortController recovery, queue clear, and Turn 1/2 isolation verified");
+    console.log("\n======================================================================");
+    console.log("ALL FRONTEND STREAM RETRY & RECOVERY TESTS PASSED (7/7) FROM REAL MODULES!");
+    console.log("======================================================================");
+  })().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

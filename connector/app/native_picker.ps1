@@ -68,6 +68,9 @@ public class NativeFolderPicker {
                 item.GetDisplayName(0x80058000, out path); // SIGDN_FILESYSPATH
                 return path;
             }
+            if (hr == -2147023673) { // ERROR_CANCELLED (0x800704C7)
+                return "__CANCELLED__";
+            }
         } catch {
         }
         return null;

@@ -238,6 +238,7 @@ export async function executeToolApproval(curSid: string, toolCallId: string, ac
 export function createStreamCallbacks(
   activeSid: string,
   handlers: {
+    turnId?: string;
     scheduleFlush: () => void;
     flushBuffer: () => void;
     onUpdateMessages: (msgs: Message[]) => void;
@@ -246,6 +247,7 @@ export function createStreamCallbacks(
     onRetryAttempt?: (attempt: number) => void;
   }
 ) {
+  const resolveTurnId = (s: { activeTurnId: string | null }) => handlers.turnId ?? s.activeTurnId;
   return {
     onToken: (token: string) => {
       const s = sessionStore.get(activeSid);
@@ -263,7 +265,7 @@ export function createStreamCallbacks(
       const s = sessionStore.get(activeSid);
       if (!s) return;
       handlers.flushBuffer();
-      const res = completeAssistantThinking(s.chatMessages, s.activeTurnId, s.thinkingDuration);
+      const res = completeAssistantThinking(s.chatMessages, resolveTurnId(s), s.thinkingDuration);
       s.chatMessages = res.updatedMessages;
       if (s.thinkingDuration === null) s.thinkingDuration = res.thinkingDuration;
       handlers.onUpdateMessages(s.chatMessages);
@@ -272,7 +274,7 @@ export function createStreamCallbacks(
       const s = sessionStore.get(activeSid);
       if (!s) return;
       handlers.flushBuffer();
-      s.chatMessages = updateAssistantToolsAndSteps(s.chatMessages, s.activeTurnId, toolCall, s.thinkingDuration);
+      s.chatMessages = updateAssistantToolsAndSteps(s.chatMessages, resolveTurnId(s), toolCall, s.thinkingDuration);
       handlers.onUpdateMessages(s.chatMessages);
       handlers.onToolCallRender();
     },
@@ -280,7 +282,7 @@ export function createStreamCallbacks(
     onCompaction: (cData: { type: string; trigger_reason?: string; summary?: string }) => {
       const s = sessionStore.get(activeSid);
       if (!s) return;
-      const idx = findTargetAssistantIdx(s.chatMessages, s.activeTurnId);
+      const idx = findTargetAssistantIdx(s.chatMessages, resolveTurnId(s));
       if (idx < 0) return;
 
       const next = [...s.chatMessages];
@@ -338,7 +340,7 @@ export function createStreamCallbacks(
       // Discard uncommitted partial stream buffers from the aborted attempt
       s.tokenBuffer = "";
       s.thoughtBuffer = "";
-      const idx = findTargetAssistantIdx(s.chatMessages, s.activeTurnId);
+      const idx = findTargetAssistantIdx(s.chatMessages, resolveTurnId(s));
       if (idx >= 0) {
         const next = [...s.chatMessages];
         const target = { ...next[idx] };

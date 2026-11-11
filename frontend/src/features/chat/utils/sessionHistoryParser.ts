@@ -128,6 +128,9 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
         const isAborted = step.status === 'aborted' || step.status === 'cancelled' || step.stop_reason === 'user_stopped' || step.stop_reason === 'cancelled';
         const isError = step.status === 'error' || step.status === 'failed';
         const status = isAborted ? 'aborted' : (isError ? 'error' : (step.status || 'completed'));
+        const stepErrorRaw = step.error ?? step.error_message ?? step.reason;
+        const stepError = typeof stepErrorRaw === 'string' && stepErrorRaw ? stepErrorRaw : undefined;
+        const stepErrorId = step.error_id || step.errorId;
 
         const thinkingDurationSeconds = step.thinking_duration_seconds || step.thinkingDurationSeconds;
         const totalDurationSeconds = step.total_duration_seconds || step.totalDurationSeconds;
@@ -156,6 +159,8 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
           }
           if (isAborted) prevMsg.status = 'aborted';
           else if (isError) prevMsg.status = 'error';
+          if (stepError) prevMsg.error = stepError;
+          if (stepErrorId) prevMsg.errorId = stepErrorId;
           if (step.created_at || step.timestamp) prevMsg.timestamp = step.created_at || step.timestamp;
           if (thinkingDurationSeconds) prevMsg.thinkingDurationSeconds = thinkingDurationSeconds;
           if (totalDurationSeconds) prevMsg.totalDurationSeconds = totalDurationSeconds;
@@ -167,6 +172,8 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
             role: 'assistant',
             content: rawTools.length === 0 ? content.trim() : '',
             status,
+            ...(stepError ? { error: stepError } : {}),
+            ...(stepErrorId ? { errorId: stepErrorId } : {}),
             thoughts,
             tools,
             tasks: [],

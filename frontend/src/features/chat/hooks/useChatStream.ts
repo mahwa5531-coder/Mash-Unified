@@ -95,7 +95,9 @@ export function useChatStream({
       targetSessionId, activeSessionIdRef.current, sessionId, userText, isRetry || isResume, onSessionCreated, sessionRepo
     );
     if (!activeSid) return;
-    activeSessionIdRef.current = activeSid;
+    if (!targetSessionId || targetSessionId === activeSessionIdRef.current || !activeSessionIdRef.current) {
+      activeSessionIdRef.current = activeSid;
+    }
     const targetSession = getOrCreateSessionState(activeSid);
 
     if (targetSession.isStreaming && !isRetry && !isImmediate && !isResume) {
@@ -142,10 +144,11 @@ export function useChatStream({
     notifyStoreListeners();
 
     await runChatStream(activeSid, userText, {
+      turnId: targetTurnId,
       isResume,
       signal: targetSession.abortController.signal,
       scheduleFlush,
-      flushBuffer: flushActiveStreamBuffer,
+      flushBuffer: () => flushActiveStreamBuffer(activeSid),
       onUpdateMessages: (msgs) => { if (activeSid === activeSessionIdRef.current) setChatMessages(msgs); },
       onStreamEnd: () => { if (activeSid === activeSessionIdRef.current) setIsStreaming(false); },
       scrollToBottom: () => {}, // Virtuoso followOutput manages stream following natively; no manual scrollTop yanking

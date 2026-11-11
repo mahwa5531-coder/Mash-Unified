@@ -258,6 +258,8 @@ def messages_to_transcript_lines(
         if isinstance(meta, dict):
             if meta.get("status"):
                 line_item["status"] = meta["status"]
+            if meta.get("error") or meta.get("reason"):
+                line_item["error"] = meta.get("error") or meta.get("reason")
             if meta.get("thinking_duration_seconds") is not None:
                 line_item["thinking_duration_seconds"] = meta["thinking_duration_seconds"]
             if meta.get("total_duration_seconds") is not None:

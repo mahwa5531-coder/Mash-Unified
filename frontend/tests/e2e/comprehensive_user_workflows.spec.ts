@@ -147,6 +147,11 @@ test.describe('MASH Desktop E2E Workflow Matrix', () => {
     await setupMockBackend(page, false);
     await page.goto('/');
 
+    // Verify WindowTitleBar remains mounted on Sign-In screen for frameless desktop controls
+    await expect(page.getByRole('button', { name: 'Minimize' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: 'Maximize' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Close' })).toBeVisible();
+
     // Verify Welcome to MASH headline is displayed
     const welcomeHeadline = page.getByRole('heading', { name: /welcome to mash/i });
     await expect(welcomeHeadline).toBeVisible({ timeout: 10000 });

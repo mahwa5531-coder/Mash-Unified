@@ -106,4 +106,16 @@ assert.strictEqual(asstMsg.compactionBoundary, true);
 assert.strictEqual(asstMsg.compactionSummary, 'Previous 5 turns compacted to conserve tokens');
 console.log('  [PASS] 5. parseSessionHistory merges turns cleanly, honors compactions, and avoids fabricating tool output.');
 
+// Error & errorId preserved on reloaded assistant turns
+{
+  const parsedErr = parseSessionHistory([
+    { id: 'u_e', role: 'user', turn_id: 't_e', content: 'Run check' },
+    { id: 'a_e', role: 'assistant', turn_id: 't_e', status: 'error', error: 'TypeError: Failed to fetch', error_id: 'err_42', content: 'Partial' },
+  ]);
+  assert.strictEqual(parsedErr[1].status, 'error');
+  assert.strictEqual(parsedErr[1].error, 'TypeError: Failed to fetch');
+  assert.strictEqual(parsedErr[1].errorId, 'err_42');
+  console.log('  [PASS] 6. Error and errorId preserved across transcript parsing.');
+}
+
 console.log('[SUCCESS] All SessionHistoryParser & ProseHelpers tests passed cleanly!');

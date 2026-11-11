@@ -361,6 +361,7 @@ export default function Sidebar({
     // 1. Native desktop folder selection (primary in Electron desktop)
     try {
       const selected = await selectFolder();
+      if (selected?.status === 'cancelled') return;
       if (selected && selected.folder_path) {
         const folderPath = selected.folder_path;
         const folderName = selected.folder_name || folderPath.split(/[/\\]/).filter(Boolean).pop() || folderPath;

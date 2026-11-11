@@ -183,7 +183,7 @@ export function resolveActiveSession(
 
 export function stopSessionStream(curSid: string): Message[] {
   const s = sessionStore.get(curSid);
-  if (!s || !s.isStreaming) return [];
+  if (!s || (!s.isStreaming && !s.abortController)) return [];
   s.wasUserAborted = true;
   s.isStreaming = false;
   s.chatMessages = applyStreamAbort(s.chatMessages, s.activeTurnId, s.turnStartTime);
@@ -213,26 +213,34 @@ export function executeSessionUndo(activeSid: string, flatIdx?: number, turnIdx?
 export async function runChatStream(
   activeSid: string, userText: string,
   options: {
+    turnId?: string;
     isResume: boolean; signal?: AbortSignal; context: Record<string, any>; scheduleFlush: () => void; flushBuffer: () => void;
     onUpdateMessages: (msgs: Message[]) => void; onStreamEnd: () => void; scrollToBottom: () => void;
     onAutoDispatchQueue: (msg: string) => void; onSyncSteeringQueue?: (queue: string[]) => void;
     onRestorePrompt?: (prompt: string) => void;
   }
 ) {
+  const ownsActiveTurn = (s?: { activeTurnId: string | null; abortController: AbortController | null }) =>
+    !s || ((!options.turnId || s.activeTurnId === options.turnId) && (!options.signal || !s.abortController || s.abortController.signal === options.signal));
+
   try {
     await streamQuery(
       activeSid, options.isResume ? '' : userText,
       createStreamCallbacks(activeSid, {
+        turnId: options.turnId,
         scheduleFlush: options.scheduleFlush, flushBuffer: options.flushBuffer, onUpdateMessages: options.onUpdateMessages,
         onStreamError: (errText, errId) => {
           const s = sessionStore.get(activeSid);
           if (!s) return;
-          options.flushBuffer();
-          s.chatMessages = applyStreamError(s.chatMessages, s.activeTurnId, errText, errId, s.turnStartTime);
-          s.isStreaming = false;
-          s.abortController = null;
+          const isCurrent = ownsActiveTurn(s);
+          if (isCurrent) options.flushBuffer();
+          s.chatMessages = applyStreamError(s.chatMessages, options.turnId ?? s.activeTurnId, errText, errId, s.turnStartTime);
+          if (isCurrent) {
+            s.isStreaming = false;
+            s.abortController = null;
+          }
           options.onUpdateMessages(s.chatMessages);
-          options.onStreamEnd();
+          if (isCurrent) options.onStreamEnd();
           notifyStoreListeners();
         },
         onToolCallRender: options.scrollToBottom,
@@ -258,17 +266,25 @@ export async function runChatStream(
           options.onRestorePrompt(userText);
         }
       } else {
-        s.chatMessages = applyStreamError(s.chatMessages, s.activeTurnId, err?.message || 'Agent execution encountered an error.', undefined, s.turnStartTime);
+        s.chatMessages = applyStreamError(s.chatMessages, options.turnId ?? s.activeTurnId, err?.message || 'Agent execution encountered an error.', undefined, s.turnStartTime);
       }
       options.onUpdateMessages(s.chatMessages);
     }
   } finally {
+    const s = sessionStore.get(activeSid);
+    if (!ownsActiveTurn(s)) {
+      if (s && options.turnId) {
+        s.chatMessages = applyStreamCompletion(s.chatMessages, options.turnId, true, s.turnStartTime);
+        options.onUpdateMessages(s.chatMessages);
+      }
+      return;
+    }
+    options.flushBuffer();
     const { updatedMessages, nextQueuedMsg } = finalizeStreamSession(activeSid);
     options.onUpdateMessages(updatedMessages);
     options.onStreamEnd();
-    options.flushBuffer();
-    const s = sessionStore.get(activeSid);
-    if (s?.queuedMessages && options.onSyncSteeringQueue) options.onSyncSteeringQueue([...s.queuedMessages]);
+    const cur = sessionStore.get(activeSid);
+    if (cur?.queuedMessages && options.onSyncSteeringQueue) options.onSyncSteeringQueue([...cur.queuedMessages]);
     if (nextQueuedMsg) {
       // shifting next-turn queue must NOT delete from backend steering mailbox
       setTimeout(() => options.onAutoDispatchQueue(nextQueuedMsg), 80);
