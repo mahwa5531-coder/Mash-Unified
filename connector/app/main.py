@@ -195,7 +195,26 @@ async def lifespan(app: FastAPI):
         )
         app.include_router(team_router)
 
-    yield
+    try:
+        yield
+    finally:
+        if getattr(app.state, "engine", None) is engine:
+            app.state.engine = None
+            app.state.sse_server = None
+            app.state.session_manager = None
+        if getattr(_deps, "_engine", None) is engine:
+            _deps._engine = None
+            _deps._session_manager = None
+        try:
+            from app.routers import chat as chat_router
+            if getattr(chat_router, "_sse_server", None) is sse_server:
+                chat_router._sse_server = None
+        except Exception:
+            pass
+        try:
+            await engine.dispose()
+        except Exception as e:
+            logger.debug("Engine dispose on shutdown failed: %s", e)
 
 
 

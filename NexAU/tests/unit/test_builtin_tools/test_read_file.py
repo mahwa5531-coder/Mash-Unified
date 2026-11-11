@@ -105,25 +105,25 @@ class TestDetectEncoding:
         assert result.endswith("hello")
 
     def test_utf16_le_bom_returns_replacement(self):
-        """UTF-16 LE bytes are not valid UTF-8 — invalid bytes become U+FFFD."""
+        """UTF-16 LE BOM bytes are decoded cleanly without replacement corruption."""
         raw = b"\xff\xfe" + "hello".encode("utf-16-le")
         sandbox = _make_sandbox_for_encoding(raw)
         result = _read_text_lossy("test.txt", sandbox)
-        assert "\ufffd" in result
+        assert result == "hello"
 
     def test_utf16_be_bom_returns_replacement(self):
-        """UTF-16 BE bytes are not valid UTF-8 — invalid bytes become U+FFFD."""
+        """UTF-16 BE BOM bytes are decoded cleanly without replacement corruption."""
         raw = b"\xfe\xff" + "hello".encode("utf-16-be")
         sandbox = _make_sandbox_for_encoding(raw)
         result = _read_text_lossy("test.txt", sandbox)
-        assert "\ufffd" in result
+        assert result == "hello"
 
     def test_utf32_le_bom_returns_replacement(self):
-        """UTF-32 LE bytes are not valid UTF-8 — invalid bytes become U+FFFD."""
+        """UTF-32 LE BOM bytes are decoded cleanly without replacement corruption."""
         raw = b"\xff\xfe\x00\x00" + "hi".encode("utf-32-le")
         sandbox = _make_sandbox_for_encoding(raw)
         result = _read_text_lossy("test.txt", sandbox)
-        assert "\ufffd" in result
+        assert result == "hi"
 
     def test_empty_content_returns_utf8(self):
         """Empty file content should return empty string."""
@@ -941,11 +941,14 @@ class TestReadTextLossy:
         assert "\ufffd" in result
 
     def test_raw_invalid_bytes(self):
-        """Completely invalid byte sequences → all become U+FFFD."""
-        raw = b"\xff\xfe\x80\x81\x90\x91"
+        """Completely invalid non-BOM UTF-8 byte sequences -> all become U+FFFD."""
+        raw = b"\x80\x81\x90\x91\xfe\xff"
         sandbox = _make_sandbox_with_bytes(raw)
         result = _read_text_lossy("/f", sandbox)
         assert all(ch == "\ufffd" for ch in result)
+        # Unpaired UTF-16 surrogate with UTF-16 LE BOM also yields replacement character
+        bad_utf16 = _read_text_lossy("/f2", _make_sandbox_with_bytes(b"\xff\xfe\x00\xd8"))
+        assert "\ufffd" in bad_utf16
 
     def test_mixed_valid_and_invalid_bytes(self):
         """Valid ASCII mixed with invalid bytes — valid parts preserved."""

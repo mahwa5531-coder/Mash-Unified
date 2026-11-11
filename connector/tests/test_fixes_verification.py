@@ -53,21 +53,24 @@ def test_tasks_router_kill_fallback():
 def test_turns_sanitization_and_stable_ids():
     turns_path = REPO_ROOT / 'frontend' / 'src' / 'features' / 'chat' / 'utils' / 'turns.ts'
     parser_path = REPO_ROOT / 'frontend' / 'src' / 'features' / 'chat' / 'utils' / 'sessionHistoryParser.ts'
+    prose_path = REPO_ROOT / 'frontend' / 'src' / 'features' / 'chat' / 'components' / 'messages' / 'proseHelpers.tsx'
     with open(turns_path, encoding='utf-8') as f:
         t_content = f.read()
     with open(parser_path, encoding='utf-8') as f:
         p_content = f.read()
-    content = t_content + "\n" + p_content
+    with open(prose_path, encoding='utf-8') as f:
+        prose_content = f.read()
     assert 'Date.now()' not in t_content, "turns.ts should NOT use Date.now() for step IDs to prevent accordion reset"
-    assert 'VERIFIED' in content, "turns.ts / sessionHistoryParser must sanitize VERIFIED"
-    assert 'last.type === \'thinking\' && rStep.type === \'thinking\'' in content or 'type === \'thinking\'' in content, "must merge consecutive thinking steps"
+    assert '[DONE]' in p_content or 'DONE|END' in p_content, "sessionHistoryParser must sanitize stream sentinels"
+    assert 'VERIFIED' in prose_content and 'AuditBadge' in prose_content, "proseHelpers must render [VERIFIED] via AuditBadge"
+    assert "type === 'thinking'" in t_content, "turns.ts must handle and merge thinking steps"
     print("PASS: test_turns_sanitization_and_stable_ids")
 
 def test_accordion_sanitization():
     acc_path = REPO_ROOT / 'frontend' / 'src' / 'features' / 'chat' / 'components' / 'TaskWorkLogAccordion.tsx'
     with open(acc_path, encoding='utf-8') as f:
         content = f.read()
-    assert 'VERIFIED' in content, "TaskWorkLogAccordion must sanitize VERIFIED"
+    assert 'ReasoningDisclosure' in content and 'hideHeader' in content, "TaskWorkLogAccordion must render thinking-only via single-toggle ReasoningDisclosure"
     assert 'Thought for' in content, "TaskWorkLogAccordion must support Thought for label"
     print("PASS: test_accordion_sanitization")
 

@@ -49,6 +49,7 @@ from nexau.archs.main_sub.config.schema import ToolConfigEntry
 from nexau.archs.session.models import SessionModel
 from nexau.archs.session.models.permission_rule import PermissionRuleModel
 from nexau.archs.session.orm import AndFilter, ComparisonFilter
+from nexau.archs.session.session_manager import SessionManager
 
 
 # ==============================================================================
@@ -319,6 +320,8 @@ async def test_init_session_permissions_real_sqlite_persistence():
 async def test_handle_preemptive_steer_auto_denies_undecided_calls():
     """Verify handle_preemptive_steer marks undecided calls as deny with prompt feedback."""
     class FakeSM:
+        cancel_pending_tool_calls_on_steer = SessionManager.cancel_pending_tool_calls_on_steer
+
         def __init__(self, pending: dict[str, Any]):
             self._pending = pending
             self.updated = False
@@ -379,6 +382,8 @@ async def test_handle_preemptive_steer_auto_denies_undecided_calls():
 async def test_handle_preemptive_steer_no_op_when_all_decided():
     """Verify handle_preemptive_steer returns False when no calls are undecided."""
     class FakeSM:
+        cancel_pending_tool_calls_on_steer = SessionManager.cancel_pending_tool_calls_on_steer
+
         def __init__(self, pending: dict[str, Any]):
             self._pending = pending
             self.updated = False
@@ -411,6 +416,8 @@ async def test_handle_preemptive_steer_no_op_when_all_decided():
 async def test_handle_preemptive_steer_blank_prompt_is_no_op(invalid_prompt: str | None):
     """Verify whitespace or empty steer prompts do not trigger auto-denial."""
     class FakeSM:
+        cancel_pending_tool_calls_on_steer = SessionManager.cancel_pending_tool_calls_on_steer
+
         async def get_pending_tool_calls(self, *, user_id: str, session_id: str):
             return {"call_1": {"decision": None}}
 
@@ -431,6 +438,8 @@ async def test_handle_preemptive_steer_blank_prompt_is_no_op(invalid_prompt: str
 async def test_handle_preemptive_steer_exception_resilience():
     """Verify handle_preemptive_steer logs error and returns False if SM raises an exception."""
     class BrokenSM:
+        cancel_pending_tool_calls_on_steer = SessionManager.cancel_pending_tool_calls_on_steer
+
         async def get_pending_tool_calls(self, **kwargs):
             raise RuntimeError("Database disconnected")
 

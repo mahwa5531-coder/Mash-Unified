@@ -641,7 +641,7 @@ class ContextCompactionMiddleware(Middleware):
         )
 
         # R-1 Shrink guard: If compaction produced no savings (byte-identical messages or zero token delta),
-        # skip ReplaceEvent, skip compaction counter increment, and suppress event churn.
+        # skip ReplaceEvent and counter increment, but ALWAYS emit CompactionFinishedEvent so the UI clears its started pill.
         has_shrunk = len(compacted_messages) < original_count or (
             after_tokens is not None and current_tokens is not None and after_tokens < current_tokens
         )
@@ -651,6 +651,18 @@ class ContextCompactionMiddleware(Middleware):
                 original_count,
                 current_tokens,
                 after_tokens,
+            )
+            self._emit_compaction_finished(
+                agent_state=hook_input.agent_state,
+                phase="before_model",
+                mode="regular",
+                success=True,
+                trigger_reason=trigger_reason,
+                original_message_count=original_count,
+                compacted_message_count=original_count,
+                original_token_count=current_tokens,
+                compacted_token_count=current_tokens,
+                fallback=False,
             )
             return HookResult.no_changes()
 
@@ -981,7 +993,7 @@ class ContextCompactionMiddleware(Middleware):
         compacted_message_count = len(compacted_messages)
 
         # R-1 Shrink guard: If compaction produced no savings (byte-identical messages or zero token delta),
-        # skip ReplaceEvent, skip compaction counter increment, and suppress event churn.
+        # skip ReplaceEvent and counter increment, but ALWAYS emit CompactionFinishedEvent so the UI clears its started pill.
         has_shrunk = compacted_message_count < original_message_count or (
             compacted_tokens is not None and current_tokens is not None and compacted_tokens < current_tokens
         )
@@ -991,6 +1003,18 @@ class ContextCompactionMiddleware(Middleware):
                 original_message_count,
                 current_tokens,
                 compacted_tokens,
+            )
+            self._emit_compaction_finished(
+                agent_state=hook_input.agent_state,
+                phase="after_model",
+                mode="regular",
+                success=True,
+                trigger_reason=trigger_reason,
+                original_message_count=original_message_count,
+                compacted_message_count=original_message_count,
+                original_token_count=current_tokens,
+                compacted_token_count=current_tokens,
+                fallback=False,
             )
             return HookResult.no_changes()
 

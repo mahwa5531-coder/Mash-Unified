@@ -58,3 +58,5 @@ def test_clean_protocol_sentinels():
     raw_notice = "[SYSTEM NOTICE: Tool error] Fallback text."
     assert clean_protocol_sentinels(raw_notice) == "Fallback text."
 
+    assert clean_protocol_sentinels("Ledger balance [VERIFIED].") == "Ledger balance [VERIFIED]."
+

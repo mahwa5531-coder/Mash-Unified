@@ -72,10 +72,24 @@ def pytest_sessionfinish(session, exitstatus):
     import asyncio
     try:
         import app.dependencies as deps
+        import app.main as app_main
+
+        engines = []
         if deps._engine is not None:
-            inner = deps._engine._inner
-            if hasattr(inner, "_engine"):
-                asyncio.run(inner._engine.dispose())
+            engines.append(deps._engine)
+        app_engine = getattr(getattr(app_main.app, "state", None), "engine", None)
+        if app_engine is not None and app_engine not in engines:
+            engines.append(app_engine)
+
+        async def _dispose_all():
+            for eng in engines:
+                if hasattr(eng, "dispose"):
+                    await eng.dispose()
+                elif hasattr(eng, "_inner") and hasattr(eng._inner, "_engine"):
+                    await eng._inner._engine.dispose()
+
+        if engines:
+            asyncio.run(_dispose_all())
     except Exception:
         pass
 

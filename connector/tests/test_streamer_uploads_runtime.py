@@ -292,7 +292,7 @@ async def test_empty_llm_response_degrades_gracefully_in_streamer():
 
 @pytest.mark.anyio
 async def test_transports_base_empty_llm_response():
-    """B-04/B-05: In transports/base.py, empty completion errors are intercepted into clean terminal turn."""
+    """B-04/B-05: TransportBase forwards RunErrorEvent; chat_streamer converts empty completion errors cleanly."""
     from nexau.archs.transports.base import TransportBase
 
     class DummyTransport(TransportBase):
@@ -313,20 +313,34 @@ async def test_transports_base_empty_llm_response():
     agent.agent_id = "agent_1"
     agent.run_id = "run_dummy_1"
 
-    # Verify TransportBase.handle_streaming_request intercepts RuntimeError("No response content or tool calls")
+    # Per 0d793ee, TransportBase stays aligned with upstream NexAU (emits RunErrorEvent)
+    # while connector chat_streamer handles user-facing empty-response conversion.
     with patch.object(transport, "_recursively_apply_middlewares", return_value=MagicMock()):
         with patch("nexau.archs.transports.base.Agent.create", return_value=agent):
-            events = []
-            async for ev in transport.handle_streaming_request(
-                user_id="u1",
-                session_id="s1",
-                message="hello",
-            ):
-                events.append(ev)
+            raw_events = [
+                ev
+                async for ev in transport.handle_streaming_request(
+                    user_id="u1",
+                    session_id="s1",
+                    message="hello",
+                )
+            ]
+            raw_types = [str(getattr(e, "type", "")) for e in raw_events]
+            assert any("RUN_ERROR" in t for t in raw_types)
 
-            types = [str(getattr(e, "type", "")) for e in events]
-            assert not any("RUN_ERROR" in t for t in types)
-            assert any("TEXT_MESSAGE_CONTENT" in t for t in types)
-            assert any("RUN_FINISHED" in t for t in types)
-            content_ev = next(e for e in events if "TEXT_MESSAGE_CONTENT" in str(getattr(e, "type", "")))
-            assert "empty response" in content_ev.delta.lower()
+            sse_events = []
+            async for chunk in generate_chat_sse_stream(
+                agent=transport,
+                run_kwargs={"user_id": "u1", "session_id": "s1", "message": "hello"},
+                session_id="s1",
+                user_id="u1",
+            ):
+                if chunk.startswith("data: "):
+                    sse_events.append(json.loads(chunk[6:].strip()))
+
+            sse_types = [e.get("type") for e in sse_events]
+            assert "RUN_ERROR" not in sse_types
+            assert "TEXT_MESSAGE_CONTENT" in sse_types
+            assert "RUN_FINISHED" in sse_types
+            content_ev = next(e for e in sse_events if e.get("type") == "TEXT_MESSAGE_CONTENT")
+            assert "empty response" in content_ev.get("delta", "").lower()

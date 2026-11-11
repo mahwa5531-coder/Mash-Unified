@@ -305,19 +305,43 @@ class TransportBase[TTransportConfig](ABC):
                 raise
 
         agent_task = asyncio.create_task(run_agent())
+        deferred_terminal_events: list[Event] = []
+
+        def _is_terminal_event(ev: Event) -> bool:
+            ev_type = getattr(ev, "type", None)
+            return getattr(ev_type, "value", ev_type) in ("RUN_FINISHED", "RUN_ERROR")
 
         try:
-            # Stream events from queue
+            # Stream events from queue, holding back RUN_FINISHED / RUN_ERROR until
+            # agent_task (and agent_lock.__aexit__) has completely released the session lock.
             while not agent_task.done():
                 try:
                     event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
-                    yield event
+                    if _is_terminal_event(event):
+                        deferred_terminal_events.append(event)
+                    else:
+                        yield event
                 except TimeoutError:
                     continue
 
-            # Drain remaining events
+            try:
+                await agent_task
+            except Exception:
+                pass
+
+            # Drain remaining events before emitting any deferred terminal event
             while not event_queue.empty():
-                yield event_queue.get_nowait()
+                rem_event = event_queue.get_nowait()
+                if _is_terminal_event(rem_event):
+                    deferred_terminal_events.append(rem_event)
+                else:
+                    yield rem_event
+
+            async with self._running_agents_lock:
+                self._running_agents.pop(agent_key, None)
+
+            for term_event in deferred_terminal_events:
+                yield term_event
 
         finally:
             # Prevent background token leak if client disconnected or stream cancelled

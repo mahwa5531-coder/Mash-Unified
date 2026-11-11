@@ -76,7 +76,7 @@ def sample_messages():
 
 def _make_mock_token_counter(factor: int):
     counter = Mock()
-    counter.count_tokens.side_effect = lambda msgs: len(msgs) * factor
+    counter.count_tokens.side_effect = lambda msgs, tools=None: len(msgs) * factor
     return counter
 
 
@@ -2306,15 +2306,17 @@ class TestCompactionTracerSpan:
         )
         return state, tracer
 
-    def test_before_model_creates_tracer_span(self):
+    @patch("nexau.archs.main_sub.execution.middleware.context_compaction.compact_stratigies.sliding_window.OpenAI")
+    def test_before_model_creates_tracer_span(self, mock_openai_class, mock_openai_client, temp_compact_prompt):
         """Compaction in before_model should create a tracer span with compaction metadata."""
         from nexau.archs.main_sub.execution.hooks import BeforeModelHookInput
 
+        mock_openai_class.return_value = mock_openai_client
         agent_state, tracer = self._make_agent_state_with_tracer()
 
-        # Token counter returns high token count to trigger compaction
+        # Token counter returns high token count before compaction, then reduced count after
         mock_counter = Mock()
-        mock_counter.count_tokens = Mock(return_value=9000)
+        mock_counter.count_tokens = Mock(side_effect=[9000, 3000])
 
         with pytest.warns(FutureWarning, match="sliding_window"):
             middleware = ContextCompactionMiddleware(
@@ -2322,6 +2324,11 @@ class TestCompactionTracerSpan:
                 max_context_tokens=10000,
                 auto_compact=True,
                 compaction_strategy="sliding_window",
+                keep_iterations=1,
+                summary_model="gpt-4o-mini",
+                summary_base_url="https://api.openai.com/v1",
+                summary_api_key="test-key",
+                compact_prompt_path=temp_compact_prompt,
             )
 
         messages = [
@@ -2366,12 +2373,14 @@ class TestCompactionTracerSpan:
         assert span.attributes["compaction.mode"] == "regular"
         assert span.attributes["compaction.success"] is True
 
-    def test_after_model_creates_tracer_span(self):
+    @patch("nexau.archs.main_sub.execution.middleware.context_compaction.compact_stratigies.sliding_window.OpenAI")
+    def test_after_model_creates_tracer_span(self, mock_openai_class, mock_openai_client, temp_compact_prompt):
         """Compaction in after_model should create a tracer span."""
+        mock_openai_class.return_value = mock_openai_client
         agent_state, tracer = self._make_agent_state_with_tracer()
 
         mock_counter = Mock()
-        mock_counter.count_tokens = Mock(return_value=900)
+        mock_counter.count_tokens = Mock(side_effect=[300])
 
         with pytest.warns(FutureWarning, match="sliding_window"):
             middleware = ContextCompactionMiddleware(
@@ -2379,6 +2388,11 @@ class TestCompactionTracerSpan:
                 max_context_tokens=1000,
                 auto_compact=True,
                 compaction_strategy="sliding_window",
+                keep_iterations=1,
+                summary_model="gpt-4o-mini",
+                summary_base_url="https://api.openai.com/v1",
+                summary_api_key="test-key",
+                compact_prompt_path=temp_compact_prompt,
             )
 
         # Last assistant message must have tool calls for after_model compaction
@@ -2424,11 +2438,13 @@ class TestCompactionTracerSpan:
         assert span.error is None
         assert span.outputs["success"] is True
 
-    def test_no_tracer_does_not_break(self):
+    @patch("nexau.archs.main_sub.execution.middleware.context_compaction.compact_stratigies.sliding_window.OpenAI")
+    def test_no_tracer_does_not_break(self, mock_openai_class, mock_openai_client, temp_compact_prompt):
         """Compaction without a tracer in global_storage should still work fine."""
         from nexau.archs.main_sub.execution.hooks import BeforeModelHookInput
         from nexau.archs.tool.tool_registry import ToolRegistry
 
+        mock_openai_class.return_value = mock_openai_client
         context = AgentContext()
         global_storage = GlobalStorage()
         # No tracer set in global_storage
@@ -2443,7 +2459,7 @@ class TestCompactionTracerSpan:
         )
 
         mock_counter = Mock()
-        mock_counter.count_tokens = Mock(return_value=9000)
+        mock_counter.count_tokens = Mock(side_effect=[9000, 3000])
 
         with pytest.warns(FutureWarning, match="sliding_window"):
             middleware = ContextCompactionMiddleware(
@@ -2451,6 +2467,11 @@ class TestCompactionTracerSpan:
                 max_context_tokens=10000,
                 auto_compact=True,
                 compaction_strategy="sliding_window",
+                keep_iterations=1,
+                summary_model="gpt-4o-mini",
+                summary_base_url="https://api.openai.com/v1",
+                summary_api_key="test-key",
+                compact_prompt_path=temp_compact_prompt,
             )
 
         messages = [
@@ -3012,3 +3033,71 @@ class TestToolCallResultPairPreservation:
 
         for call_msgs in captured_calls:
             _assert_no_orphan_tool_results(call_msgs)
+
+
+
+class TestCompactionShrinkGuardEvents:
+    """Verify CompactionFinishedEvent always closes CompactionStartedEvent when shrink guard skips ReplaceEvent."""
+
+    def test_shrink_guard_emits_compaction_finished_on_noop(
+        self, mock_model_response, agent_state, sample_messages
+    ):
+        from nexau.archs.llm.llm_aggregators.events import CompactionFinishedEvent, CompactionStartedEvent
+        from nexau.archs.main_sub.execution.hooks import BeforeModelHookInput
+
+        token_counter = Mock()
+        token_counter.count_tokens = Mock(return_value=900)
+        captured_events: list[object] = []
+        middleware = ContextCompactionMiddleware(
+            token_counter=token_counter,
+            compaction_strategy="tool_result_compaction",
+            max_context_tokens=1000,
+        )
+        middleware._event_emitter = captured_events.append
+        middleware.trigger_strategy = Mock()
+        middleware.trigger_strategy.should_compact.return_value = (True, "token threshold reached")
+        middleware.compaction_strategy = Mock(name="noop_strategy")
+        middleware.compaction_strategy.name = "noop_strategy"
+        middleware.compaction_strategy.compact.return_value = list(sample_messages)
+
+        before_res = middleware.before_model(
+            BeforeModelHookInput(
+                agent_state=agent_state,
+                messages=sample_messages,
+                max_iterations=5,
+                current_iteration=1,
+            )
+        )
+        assert before_res.messages is None
+        assert len(captured_events) == 2
+        assert isinstance(captured_events[0], CompactionStartedEvent)
+        assert isinstance(captured_events[1], CompactionFinishedEvent)
+        assert captured_events[1].success is True
+        assert captured_events[1].phase == "before_model"
+
+        captured_events.clear()
+        after_messages = [
+            *sample_messages,
+            Message(
+                role=Role.ASSISTANT,
+                content=[TextBlock(text="Calling tool"), ToolUseBlock(id="call_sg_1", name="search", input={})],
+            ),
+        ]
+        middleware.compaction_strategy.compact.return_value = list(after_messages)
+        after_res = middleware.after_model(
+            AfterModelHookInput(
+                agent_state=agent_state,
+                messages=after_messages,
+                max_iterations=5,
+                current_iteration=1,
+                model_response=mock_model_response,
+                original_response="Test",
+                parsed_response=ParsedResponse(original_response="Test", tool_calls=[]),
+            )
+        )
+        assert after_res.messages is None
+        assert len(captured_events) == 2
+        assert isinstance(captured_events[0], CompactionStartedEvent)
+        assert isinstance(captured_events[1], CompactionFinishedEvent)
+        assert captured_events[1].success is True
+        assert captured_events[1].phase == "after_model"

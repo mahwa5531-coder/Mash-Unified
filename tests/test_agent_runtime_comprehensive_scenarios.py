@@ -402,53 +402,56 @@ def test_scenario_6_error_recovery_and_anti_hallucination():
     print("  -> PASSED: Hallucinated tools, tool errors, and OpenAI payload hygiene rules verified 100%!")
 
 
-async def test_scenario_7_sse_chat_streamer_and_approval_flush():
+def test_scenario_7_sse_chat_streamer_and_approval_flush():
     print("\n--- [Scenario 7] Shielded SSE Chat Streamer & Tool Approval Flushing ---")
-    from app.services.chat_streamer import generate_chat_sse_stream
 
-    # Mock agent that yields streaming events
-    class MockStreamAgent:
-        async def handle_streaming_request(self, **kwargs):
-            yield {"type": "RUN_STARTED", "run_id": "run_test_001", "session_id": "sess_stream_001"}
-            yield {"type": "THINKING_START", "run_id": "run_test_001"}
-            yield {"type": "THINKING_CONTENT", "delta": "Thinking about the transaction...", "run_id": "run_test_001"}
-            yield {"type": "TOOL_CALL_START", "tool_call_id": "call_123", "tool_name": "run_shell_command", "run_id": "run_test_001"}
-            yield {"type": "RUN_FINISHED", "run_id": "run_test_001", "result": "Done"}
+    async def _run():
+        from app.services.chat_streamer import generate_chat_sse_stream
 
-    # Mock session manager with a pending tool call awaiting CA/CPA approval
-    class MockSessionManager:
-        async def get_pending_tool_calls(self, user_id: str, session_id: str):
-            return {
-                "call_pending_01": {
-                    "tool_name": "run_shell_command",
-                    "prompt": "Execute destructive format?",
-                    "permission_key": "shell.exec",
-                    "decision": None,  # Not decided yet
-                    "parameters": {"command": "rm -rf /"},
+        # Mock agent that yields streaming events
+        class MockStreamAgent:
+            async def handle_streaming_request(self, **kwargs):
+                yield {"type": "RUN_STARTED", "run_id": "run_test_001", "session_id": "sess_stream_001"}
+                yield {"type": "THINKING_START", "run_id": "run_test_001"}
+                yield {"type": "THINKING_CONTENT", "delta": "Thinking about the transaction...", "run_id": "run_test_001"}
+                yield {"type": "TOOL_CALL_START", "tool_call_id": "call_123", "tool_name": "run_shell_command", "run_id": "run_test_001"}
+                yield {"type": "RUN_FINISHED", "run_id": "run_test_001", "result": "Done"}
+
+        # Mock session manager with a pending tool call awaiting CA/CPA approval
+        class MockSessionManager:
+            async def get_pending_tool_calls(self, user_id: str, session_id: str):
+                return {
+                    "call_pending_01": {
+                        "tool_name": "run_shell_command",
+                        "prompt": "Execute destructive format?",
+                        "permission_key": "shell.exec",
+                        "decision": None,  # Not decided yet
+                        "parameters": {"command": "rm -rf /"},
+                    }
                 }
-            }
 
-    stream = generate_chat_sse_stream(
-        agent=MockStreamAgent(),
-        run_kwargs={"context": {"session_id": "sess_stream_001"}},
-        user_id="default_user",
-        session_id="sess_stream_001",
-        sm=MockSessionManager(),
-    )
+        stream = generate_chat_sse_stream(
+            agent=MockStreamAgent(),
+            run_kwargs={"context": {"session_id": "sess_stream_001"}},
+            user_id="default_user",
+            session_id="sess_stream_001",
+            sm=MockSessionManager(),
+        )
 
-    collected_sse_frames: list[str] = []
-    async for frame in stream:
-        collected_sse_frames.append(frame)
+        collected_sse_frames: list[str] = []
+        async for frame in stream:
+            collected_sse_frames.append(frame)
 
-    combined_output = "".join(collected_sse_frames)
+        combined_output = "".join(collected_sse_frames)
 
-    # Invariants
-    assert "data: {\"type\": \"RUN_STARTED\"" in combined_output
-    assert "data: {\"type\": \"THINKING_CONTENT\"" in combined_output
-    assert "data: {\"type\": \"TOOL_CALL_PENDING_APPROVAL\"" in combined_output
-    assert "call_pending_01" in combined_output
-    assert "data: {\"type\": \"RUN_FINISHED\"" in combined_output
+        # Invariants
+        assert "data: {\"type\": \"RUN_STARTED\"" in combined_output
+        assert "data: {\"type\": \"THINKING_CONTENT\"" in combined_output
+        assert "data: {\"type\": \"TOOL_CALL_PENDING_APPROVAL\"" in combined_output
+        assert "call_pending_01" in combined_output
+        assert "data: {\"type\": \"RUN_FINISHED\"" in combined_output
 
+    asyncio.run(_run())
     print("  -> PASSED: Shielded SSE streaming, event sequencing & pending approval flushing verified 100%!")
 
 
@@ -464,7 +467,7 @@ def run_all_scenarios():
     test_scenario_4_streaming_chunk_aggregation()
     test_scenario_5_multi_step_execution_loop()
     test_scenario_6_error_recovery_and_anti_hallucination()
-    asyncio.run(test_scenario_7_sse_chat_streamer_and_approval_flush())
+    test_scenario_7_sse_chat_streamer_and_approval_flush()
 
     print("\n" + "=" * 70)
     print("ALL 7 SCENARIOS 100% PASSED! AGENT RUNTIME IS PRODUCTION-READY.")

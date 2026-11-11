@@ -252,3 +252,53 @@ class TestTransportBase:
         assert agent.agent_id
         assert agent.global_storage is not None
         assert agent._session_id == "session_1"
+
+    def test_handle_streaming_request_defers_terminal_event_until_agent_exit(self, transport):
+        """RUN_FINISHED must only yield after agent.run_async finishes teardown and lock release."""
+        from nexau.archs.llm.llm_aggregators.events import RunFinishedEvent, TextMessageContentEvent
+        from nexau.archs.main_sub.execution.middleware.agent_events_middleware import AgentEventsMiddleware
+
+        captured_on_event = None
+        lock_released = False
+        yielded: list[tuple[str, bool, int]] = []
+
+        async def fake_create(*, config, **_kwargs):
+            nonlocal captured_on_event
+            for mw in config.middlewares:
+                if isinstance(mw, AgentEventsMiddleware):
+                    captured_on_event = mw.on_event
+            mock_agent = Mock()
+            mock_agent.agent_id = "agent_deferred_test"
+
+            async def fake_run_async(**_run_kwargs):
+                try:
+                    captured_on_event(TextMessageContentEvent(message_id="m1", delta="hello"))
+                    captured_on_event(RunFinishedEvent(thread_id="s_defer", run_id="r_defer"))
+                    # Hold lock/teardown briefly after emitting RunFinishedEvent
+                    await asyncio.sleep(0.05)
+                    return "done"
+                finally:
+                    nonlocal lock_released
+                    lock_released = True
+
+            mock_agent.run_async = AsyncMock(side_effect=fake_run_async)
+            return mock_agent
+
+        with patch("nexau.archs.transports.base.Agent") as mock_agent_cls:
+            mock_agent_cls.create = fake_create
+
+            async def run_test():
+                async for ev in transport.handle_streaming_request(
+                    message="Hello",
+                    user_id="user_1",
+                    session_id="s_defer",
+                ):
+                    ev_type = getattr(getattr(ev, "type", None), "value", getattr(ev, "type", None))
+                    yielded.append((str(ev_type), lock_released, len(transport._running_agents)))
+
+            asyncio.run(run_test())
+
+        assert len(yielded) == 2
+        assert yielded[0][0] == "TEXT_MESSAGE_CONTENT"
+        assert yielded[0][1] is False  # Content streams immediately before teardown completes
+        assert yielded[1] == ("RUN_FINISHED", True, 0)

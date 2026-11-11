@@ -28,10 +28,30 @@ action_type value:
 
 from __future__ import annotations
 
+import threading
 import time
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal, cast
+
+_ACTION_NS_LOCK = threading.Lock()
+_LAST_ACTION_NS = 0
+
+
+def _monotonic_time_ns() -> int:
+    """Return strictly increasing wall-clock nanoseconds across rapid bursts.
+
+    Windows ``time.time_ns()`` ticks in coarse (~0.5-1ms) quanta, so consecutive
+    actions get equal ``created_at_ns`` and cause UNDO's ``ns >= cutoff_ns`` filter
+    to discard earlier runs.
+    """
+    global _LAST_ACTION_NS
+    with _ACTION_NS_LOCK:
+        now = time.time_ns()
+        if now <= _LAST_ACTION_NS:
+            now = _LAST_ACTION_NS + 1
+        _LAST_ACTION_NS = now
+        return now
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Tag, TypeAdapter
 from sqlalchemy import Column, Index
@@ -375,7 +395,7 @@ class AgentRunActionModel(SQLModel, table=True):
 
     # === Timestamp ===
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    created_at_ns: int = Field(default_factory=time.time_ns, index=True)
+    created_at_ns: int = Field(default_factory=_monotonic_time_ns, index=True)
 
     # === Action type (string column, NOT enum-typed at SQL layer) ===
     # CRITICAL forward-compat: column type is plain string (not SQL ENUM)

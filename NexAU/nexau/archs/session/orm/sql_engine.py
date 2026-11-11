@@ -304,3 +304,7 @@ class SQLDatabaseEngine(DatabaseEngine):
         async with AsyncSession(self._engine) as session:
             result = await session.execute(stmt)
             return result.scalar() or 0
+
+    async def dispose(self) -> None:
+        """Dispose the underlying async SQLAlchemy engine and close pooled connections."""
+        await self._engine.dispose()

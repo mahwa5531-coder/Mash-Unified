@@ -382,8 +382,8 @@ class TestToolExecutorExtraKwargs:
                 extra_kwargs={"agent_state": "x"},
             )
 
-    def test_unknown_field_rejected_by_schema_when_additional_properties_false(self, agent_state):
-        """Unknown fields are rejected up front when the schema forbids them."""
+    def test_unknown_field_stripped_before_schema_validation(self, agent_state):
+        """MASh (a806bda) strips extra keys before schema validation so unknown fields don't break tool calls."""
 
         def impl(a, agent_state=None):
             return {"a": a}
@@ -405,8 +405,7 @@ class TestToolExecutorExtraKwargs:
             tool_call_id="call_unknown",
         )
 
-        assert result["error_type"] == "ValueError"
-        assert "Additional properties are not allowed" in result["error"]
+        assert result["a"] == 5
 
     def test_extra_kwargs_satisfy_required_fields(self, agent_state):
         """extra_kwargs alone can satisfy required schema fields."""
@@ -810,13 +809,13 @@ class TestToolExecutorStopTools:
         result = executor.execute_tool(
             agent_state=agent_state,
             tool_name="complete_task",
-            parameters={"result": "done", "unexpected": "value"},
+            parameters={"result": 123},
             tool_call_id="call_123",
         )
 
         assert result["_is_stop_tool"] is False
         assert result["error_type"] == "ValueError"
-        assert "Additional properties are not allowed" in result["error"]
+        assert "Invalid parameters for tool 'complete_task'" in result["error"]
 
     def test_non_stop_tool(self, agent_state):
         """Test normal tool (not a stop tool)."""

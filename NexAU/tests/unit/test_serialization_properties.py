@@ -24,7 +24,9 @@ should produce an equivalent object.
 **Validates: Requirements 2.7, 3.4, 5.3, 5.4**
 """
 
-from hypothesis import given, settings
+from datetime import datetime
+
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from nexau.archs.session.models import (
@@ -127,7 +129,7 @@ class TestSerializationRoundTrip:
     **Validates: Requirements 2.7, 3.4, 5.3, 5.4**
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     @given(session=session_model_strategy)
     def test_session_model_serialization_round_trip(self, session: SessionModel):
         """Test SessionModel serialization round-trip.
@@ -154,10 +156,10 @@ class TestSerializationRoundTrip:
 
         # Verify timestamps are preserved (comparing ISO format strings)
         # After JSON round-trip, datetime may be string or datetime
-        restored_created = restored.created_at if isinstance(restored.created_at, str) else restored.created_at.isoformat()
-        restored_updated = restored.updated_at if isinstance(restored.updated_at, str) else restored.updated_at.isoformat()
-        assert restored_created == session.created_at.isoformat()
-        assert restored_updated == session.updated_at.isoformat()
+        restored_created = restored.created_at if isinstance(restored.created_at, datetime) else datetime.fromisoformat(restored.created_at)
+        restored_updated = restored.updated_at if isinstance(restored.updated_at, datetime) else datetime.fromisoformat(restored.updated_at)
+        assert restored_created == session.created_at
+        assert restored_updated == session.updated_at
 
     @settings(max_examples=100)
     @given(agent=agent_model_strategy)
@@ -185,10 +187,10 @@ class TestSerializationRoundTrip:
 
         # Verify timestamps are preserved
         # After JSON round-trip, datetime may be string or datetime
-        restored_created = restored.created_at if isinstance(restored.created_at, str) else restored.created_at.isoformat()
-        restored_updated = restored.last_updated if isinstance(restored.last_updated, str) else restored.last_updated.isoformat()
-        assert restored_created == agent.created_at.isoformat()
-        assert restored_updated == agent.last_updated.isoformat()
+        restored_created = restored.created_at if isinstance(restored.created_at, datetime) else datetime.fromisoformat(restored.created_at)
+        restored_updated = restored.last_updated if isinstance(restored.last_updated, datetime) else datetime.fromisoformat(restored.last_updated)
+        assert restored_created == agent.created_at
+        assert restored_updated == agent.last_updated
 
     @settings(max_examples=100)
     @given(record=run_action_model_strategy)

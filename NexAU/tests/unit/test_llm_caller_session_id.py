@@ -150,6 +150,7 @@ class TestOpenAIChatCompletionSessionId:
         assert kwargs_passed["user"] == "explicit-user"
 
 
+@pytest.mark.skip(reason="MASh pruned OpenAI Responses, Anthropic, and Gemini REST providers in favor of OpenAI-compatible gateway (3eea5f8)")
 class TestOpenAIResponsesSessionId:
     """Test session_id injection for openai_responses api_type.
 
@@ -293,6 +294,7 @@ class TestOpenAIResponsesSessionId:
         assert "safety_identifier" not in kwargs_passed
 
 
+@pytest.mark.skip(reason="MASh pruned OpenAI Responses, Anthropic, and Gemini REST providers in favor of OpenAI-compatible gateway (3eea5f8)")
 class TestAnthropicSessionId:
     """Test session_id injection for anthropic_chat_completion api_type."""
 
@@ -371,6 +373,7 @@ class TestAnthropicSessionId:
         assert kwargs_passed["metadata"]["custom_key"] == "value"
 
 
+@pytest.mark.skip(reason="MASh pruned OpenAI Responses, Anthropic, and Gemini REST providers in favor of OpenAI-compatible gateway (3eea5f8)")
 class TestGeminiRestSessionId:
     """Test that session_id is NOT injected for gemini_rest api_type."""
 

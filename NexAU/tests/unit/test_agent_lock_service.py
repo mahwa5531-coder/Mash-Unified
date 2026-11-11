@@ -208,13 +208,13 @@ class TestAgentLockServiceHeartbeat:
             )
 
             try:
-                start = time.time()
+                start = time.monotonic()
 
-                # Hold lock for 5 seconds (longer than TTL of 3s)
+                # Hold lock for >5s (longer than TTL of 3s; 5.1s absorbs Windows timer jitter)
                 async with service.acquire("session1", "agent1"):
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(5.1)
 
-                elapsed = time.time() - start
+                elapsed = time.monotonic() - start
                 assert elapsed >= 5, "Task should complete successfully with heartbeat renewal"
             finally:
                 await service.stop()

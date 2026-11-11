@@ -92,6 +92,10 @@ class DatabaseEngine(ABC):
     ) -> int:
         """Count records matching filters."""
 
+    async def dispose(self) -> None:
+        """Release any underlying database connections/pools held by this engine."""
+        return None
+
     async def upsert(self, model: T) -> tuple[T, bool]:
         """Create or update a record. Returns (model, created)."""
         model_class = type(model)
@@ -324,3 +328,16 @@ class LoopSafeDatabaseEngine(DatabaseEngine):
             )
             return future.result(timeout=_BRIDGE_TIMEOUT_SECONDS)
         return await self._inner.get_or_create(model)
+
+    async def dispose(self) -> None:
+        """Dispose the wrapped engine on the owner event loop when active."""
+        bridge_loop = self._get_bridge_loop()
+        if bridge_loop is not None:
+            future = asyncio.run_coroutine_threadsafe(
+                self._inner.dispose(),
+                bridge_loop,
+            )
+            future.result(timeout=_BRIDGE_TIMEOUT_SECONDS)
+        else:
+            await self._inner.dispose()
+        self._owner_loop = None

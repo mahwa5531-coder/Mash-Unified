@@ -27,6 +27,21 @@ def temp_dir():
 def sandbox(temp_dir):
     sb = LocalSandbox(sandbox_id="test_sandbox", work_dir=temp_dir)
     yield sb
+    # Cleanup any remaining background processes so subsequent tests (e.g. TestSandboxDict)
+    # don't inherit unpicklable Thread/Popen handles across shared sandbox_id state.
+    for pid in list(sb._background_tasks.keys()):
+        sb.kill_background_task(pid)
+    LocalSandbox.clear_session_tasks("test_sandbox")
+
+
+def _wait_for_bg_task(sandbox: LocalSandbox, pid: int, timeout: float = 15.0):
+    """Poll a background task until it exits RUNNING status (needed for Windows PowerShell startup latency)."""
+    deadline = time.time() + timeout
+    while True:
+        status = sandbox.get_background_task_status(pid)
+        if status.status != SandboxStatus.RUNNING or time.time() >= deadline:
+            return status
+        time.sleep(0.05)
 
 
 def _python_inline(sandbox: LocalSandbox, code: str) -> str:
@@ -134,12 +149,7 @@ def test_execute_shell_background_detaches_child_stdin(sandbox, monkeypatch):
     result = sandbox.execute_shell("echo stdin-detached", background=True)
     assert result.background_pid is not None
 
-    deadline = time.time() + 5
-    while True:
-        status = sandbox.get_background_task_status(result.background_pid)
-        if status.status != SandboxStatus.RUNNING or time.time() >= deadline:
-            break
-        time.sleep(0.05)
+    status = _wait_for_bg_task(sandbox, result.background_pid)
 
     assert status.status == SandboxStatus.SUCCESS
     assert popen_calls
@@ -662,11 +672,7 @@ class TestBackgroundExecution:
         pid = result.background_pid
         assert pid is not None
 
-        import time
-
-        time.sleep(0.5)  # Wait for the short command to finish
-
-        status = sandbox.get_background_task_status(pid)
+        status = _wait_for_bg_task(sandbox, pid)
         assert status.status == SandboxStatus.SUCCESS
         assert status.exit_code == 0
         assert "done" in status.stdout
@@ -705,13 +711,7 @@ class TestBackgroundExecution:
         pid = result.background_pid
         assert pid is not None
 
-        import time
-
-        for _ in range(25):
-            status = sandbox.get_background_task_status(pid)
-            if status.status != SandboxStatus.RUNNING:
-                break
-            time.sleep(0.1)
+        status = _wait_for_bg_task(sandbox, pid)
 
         assert status.status == SandboxStatus.ERROR
         assert status.exit_code != 0
@@ -737,11 +737,17 @@ class TestBackgroundExecution:
 
 
 class TestAlwaysOnOutputDir:
-    """Tests that output is always saved to temp files and smart truncation works."""
+    """Tests that output spilling and smart truncation work across default and always-on modes."""
 
-    def test_foreground_always_creates_output_dir(self, sandbox):
-        """Every foreground command creates output_dir with stdout.txt and stderr.txt."""
-        result = sandbox.execute_bash("echo 'hello'")
+    def test_foreground_always_creates_output_dir(self, temp_dir):
+        """Foreground commands keep small output in memory by default, and create output_dir when always_create_output_dir=True."""
+        default_sb = LocalSandbox(sandbox_id="default_mem_test", work_dir=temp_dir)
+        small_res = default_sb.execute_bash("echo 'hello'")
+        assert small_res.status == SandboxStatus.SUCCESS
+        assert small_res.output_dir is None
+
+        always_sb = LocalSandbox(sandbox_id="always_dir_test", work_dir=temp_dir, always_create_output_dir=True)
+        result = always_sb.execute_bash("echo 'hello'")
         assert result.status == SandboxStatus.SUCCESS
         assert result.output_dir is not None
         assert Path(f"{result.output_dir}/command.txt").exists()
@@ -760,62 +766,65 @@ class TestAlwaysOnOutputDir:
             shutil.rmtree(result.output_dir, ignore_errors=True)
 
     def test_foreground_large_output_truncated_with_hint(self, sandbox):
-        """Output above threshold is truncated with first/last 5k chars and file hint."""
+        """Output above threshold spills to output_dir and is truncated with first/last 5k chars."""
         # Generate > 10k chars of stdout output
         python_cmd = sandbox.get_python_command()
         result = sandbox.execute_bash(f"{python_cmd} -c \"print('x' * 15000)\"")
         assert result.truncated is True
         assert result.original_stdout_length is not None
         assert result.original_stdout_length >= 15000
-        assert "characters omitted" in result.stdout
-        assert "stdout.txt" in result.stdout
+        assert "characters omitted due to output size limit" in result.stdout
+        assert result.output_dir is not None
+        assert result.stdout_file is not None and result.stdout_file.endswith("stdout.txt")
         # Full output is in the file
         full = Path(f"{result.output_dir}/stdout.txt").read_text()
         assert len(full) >= 15000
         shutil.rmtree(result.output_dir, ignore_errors=True)
 
-    def test_foreground_save_output_with_stderr(self, sandbox):
-        """Both stdout and stderr are saved to output_dir."""
-        result = sandbox.execute_bash(_python_inline(sandbox, "import sys; print('out'); print('err', file=sys.stderr)"))
+    def test_foreground_save_output_with_stderr(self, temp_dir):
+        """Both stdout and stderr are saved to output_dir when always_create_output_dir=True."""
+        always_sb = LocalSandbox(sandbox_id="always_dir_stderr", work_dir=temp_dir, always_create_output_dir=True)
+        result = always_sb.execute_bash(_python_inline(always_sb, "import sys; print('out'); print('err', file=sys.stderr)"))
         assert result.output_dir is not None
         assert "out" in Path(f"{result.output_dir}/stdout.txt").read_text()
         assert "err" in Path(f"{result.output_dir}/stderr.txt").read_text()
         shutil.rmtree(result.output_dir, ignore_errors=True)
 
-    def test_foreground_failed_command_has_output_dir(self, sandbox):
-        """Failed commands also get output_dir populated."""
-        result = sandbox.execute_bash(_python_inline(sandbox, "import sys; print('before fail'); sys.exit(1)"))
+    def test_foreground_failed_command_has_output_dir(self, temp_dir):
+        """Failed commands get output_dir populated when always_create_output_dir=True."""
+        always_sb = LocalSandbox(sandbox_id="always_dir_fail", work_dir=temp_dir, always_create_output_dir=True)
+        result = always_sb.execute_bash(_python_inline(always_sb, "import sys; print('before fail'); sys.exit(1)"))
         assert result.status == SandboxStatus.ERROR
         assert result.output_dir is not None
         assert Path(f"{result.output_dir}/stdout.txt").exists()
         assert "before fail" in Path(f"{result.output_dir}/stdout.txt").read_text()
         shutil.rmtree(result.output_dir, ignore_errors=True)
 
-    def test_foreground_timeout_has_output_dir(self, sandbox):
-        """Timed-out commands also get output_dir populated."""
-        result = sandbox.execute_bash(_python_inline(sandbox, "import time; print('timeout_test'); time.sleep(60)"), timeout=200)
+    def test_foreground_timeout_has_output_dir(self, temp_dir):
+        """Timed-out commands get output_dir populated when always_create_output_dir=True."""
+        always_sb = LocalSandbox(sandbox_id="always_dir_timeout", work_dir=temp_dir, always_create_output_dir=True)
+        result = always_sb.execute_bash(_python_inline(always_sb, "import time; print('timeout_test'); time.sleep(60)"), timeout=200)
         assert result.status == SandboxStatus.TIMEOUT
         assert result.output_dir is not None
         shutil.rmtree(result.output_dir, ignore_errors=True)
 
-    def test_output_dir_under_expected_base_path(self, sandbox):
+    def test_output_dir_under_expected_base_path(self, temp_dir):
         """Output dir is created under the local bash tool results directory."""
-        result = sandbox.execute_bash("echo 'path test'")
+        always_sb = LocalSandbox(sandbox_id="always_dir_base", work_dir=temp_dir, always_create_output_dir=True)
+        result = always_sb.execute_bash("echo 'path test'")
         assert result.output_dir is not None
         assert "nexau_bash_tool_results" in result.output_dir
         shutil.rmtree(result.output_dir, ignore_errors=True)
 
     def test_background_always_creates_output_dir(self, sandbox):
-        """Background tasks always create output_dir."""
-        import time
-
+        """Background tasks always create output_dir and write stdout.txt."""
         result = sandbox.execute_bash("echo 'bg output'", background=True)
         assert result.output_dir is not None
         assert result.background_pid is not None
-        assert "Output will be saved to" in result.stdout
+        assert "Task logs available at:" in result.stdout
 
-        time.sleep(1)
-        status = sandbox.get_background_task_status(result.background_pid)
+        status = _wait_for_bg_task(sandbox, result.background_pid)
+        assert status.status == SandboxStatus.SUCCESS
         assert status.output_dir is not None
         assert Path(f"{status.output_dir}/stdout.txt").exists()
         assert "bg output" in Path(f"{status.output_dir}/stdout.txt").read_text()
@@ -823,12 +832,11 @@ class TestAlwaysOnOutputDir:
 
     def test_background_large_output_truncated(self, sandbox):
         """Background tasks with large output are smart-truncated."""
-        import time
-
         python_cmd = sandbox.get_python_command()
         result = sandbox.execute_bash(f"{python_cmd} -c \"print('y' * 15000)\"", background=True)
-        time.sleep(2)
-        status = sandbox.get_background_task_status(result.background_pid)
+        assert result.background_pid is not None
+        status = _wait_for_bg_task(sandbox, result.background_pid)
+        assert status.status == SandboxStatus.SUCCESS
         assert status.truncated is True
         assert "characters omitted" in status.stdout
         if status.output_dir:
@@ -862,8 +870,7 @@ class TestSmartTruncateOutput:
         stdout, stderr, truncated, o_out, o_err = smart_truncate_output(big_stdout, "", "/tmp/test_dir")
         assert truncated is True
         assert o_out == 12000
-        assert "characters omitted" in stdout
-        assert "/tmp/test_dir/stdout.txt" in stdout
+        assert "characters omitted due to output size limit" in stdout
         # First 5k chars should be present
         assert stdout.startswith("A" * 5000)
         # Last 5k chars should be present
@@ -886,8 +893,8 @@ class TestSmartTruncateOutput:
         big_stderr = "D" * 11000
         stdout, stderr, truncated, _, _ = smart_truncate_output(big_stdout, big_stderr, "/tmp/test_dir")
         assert truncated is True
-        assert "stdout.txt" in stdout
-        assert "stderr.txt" in stderr
+        assert "characters omitted due to output size limit" in stdout
+        assert "characters omitted due to output size limit" in stderr
 
     def test_exact_threshold_not_truncated(self):
         from nexau.archs.sandbox.base_sandbox import smart_truncate_output

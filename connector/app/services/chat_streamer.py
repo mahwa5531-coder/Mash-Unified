@@ -374,10 +374,19 @@ async def stream_chat_query(
         if server and hasattr(server, "has_running_agent"):
             if await server.has_running_agent(user_id=user_id, session_id=sid):
                 with contextlib.suppress(Exception):
-                    await server.handle_stop_request(user_id=user_id, session_id=sid, force=True, timeout=1.0)
+                    await server.handle_stop_request(user_id=user_id, session_id=sid, force=True, timeout=5.0)
         else:
             with contextlib.suppress(Exception):
-                await server.handle_stop_request(user_id=user_id, session_id=sid, force=True, timeout=1.0)
+                await server.handle_stop_request(user_id=user_id, session_id=sid, force=True, timeout=5.0)
+
+        # Wait briefly if a finishing run / disconnect cleanup is still releasing the session lock
+        if eng is not None and sid:
+            with contextlib.suppress(Exception):
+                from nexau.archs.session.models.agent_lock import AgentLockModel
+                for _ in range(40):
+                    if not await eng.find_first(AgentLockModel, filters=ComparisonFilter.eq("session_id", sid)):
+                        break
+                    await asyncio.sleep(0.05)
 
         run_kwargs = {"message": user_prompt or [], "user_id": user_id, "agent_config": cfg, "session_id": sid, "context": resolved_context}
         if payload.variables:

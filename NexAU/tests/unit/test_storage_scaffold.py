@@ -133,13 +133,16 @@ async def test_storage_scaffold_lifecycle_live():
 
                 # 5. Create Artifacts and Query
                 (proj_brain / "task.md").write_text("# Task List\n- [x] Step 1\n", encoding="utf-8")
-                res_art = await client.get(f"/api/artifacts/{user_id}/{sess_proj_id}")
+                res_art = await client.get(f"/api/artifacts/session/{sess_proj_id}")
                 assert res_art.status_code == 200
-                assert "task.md" in res_art.json()["files"]
+                assert any(f.endswith("task.md") for f in res_art.json()["files"])
 
-                res_art_content = await client.get(f"/api/artifacts/{user_id}/{sess_proj_id}/task.md")
+                res_art_content = await client.get(
+                    "/api/files/content",
+                    params={"path": str(proj_brain / "task.md"), "session_id": sess_proj_id},
+                )
                 assert res_art_content.status_code == 200
-                assert "Task List" in res_art_content.text
+                assert "Task List" in res_art_content.json()["content"]
 
                 # 6. Delete Standalone Session -> Wipes directory
                 res_del_s = await client.delete(f"/sessions/{sess_standalone_id}")

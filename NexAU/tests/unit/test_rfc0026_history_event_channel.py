@@ -195,7 +195,8 @@ def test_replace_all_with_replace_extra_writes_typed_replace_row(tmp_path):
     async def go():
         history.replace_all(new_msgs, replace_extra=variant)
         # Drain any background tasks scheduled by the persist write.
-        await asyncio.sleep(0.05)
+        if history._background_tasks:
+            await asyncio.gather(*list(history._background_tasks))
 
     asyncio.run(go())
 
@@ -259,7 +260,8 @@ def test_framework_context_history_replace_writes_typed_replace_row(tmp_path):
 
     async def go():
         ctx.history.replace([_sys(), Message.user("via ctx.history.replace")], extra=variant)
-        await asyncio.sleep(0.05)
+        if history._background_tasks:
+            await asyncio.gather(*list(history._background_tasks))
 
     asyncio.run(go())
 

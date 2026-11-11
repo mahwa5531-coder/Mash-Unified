@@ -97,6 +97,8 @@ def mock_mash_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     mash_dir = home_dir / ".mash"
     nexau_dir = home_dir / ".nexau"
 
+    monkeypatch.delenv("MASH_HOME", raising=False)
+    monkeypatch.delenv("NEXAU_HOME", raising=False)
     monkeypatch.setenv("USERPROFILE", str(home_dir))
     monkeypatch.setenv("HOME", str(home_dir))
     monkeypatch.setattr(Path, "home", lambda: home_dir)
@@ -104,6 +106,8 @@ def mock_mash_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import nexau.archs.platform.path_helpers as ph
     monkeypatch.setattr(ph, "get_mash_home", lambda: mash_dir)
     monkeypatch.setattr(ph, "get_nexau_home", lambda: mash_dir)
+    monkeypatch.setattr(sys.modules[__name__], "get_mash_home", lambda: mash_dir)
+    monkeypatch.setattr(sys.modules[__name__], "get_nexau_home", lambda: mash_dir)
 
     import nexau.archs.platform.crypto_vault as cv
     monkeypatch.setattr(cv, "VAULT_FILE", mash_dir / "auth.vault")

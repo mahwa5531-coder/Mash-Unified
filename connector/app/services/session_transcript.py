@@ -50,7 +50,7 @@ def clean_protocol_sentinels(text: str) -> str:
     cleaned = re.sub(tag_pat, "", text, flags=re.IGNORECASE)
     cleaned = re.sub(r"\[(?:sub_agent_id|SYSTEM NOTICE):[^\]]*\]\s*", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"^(?:#+\s*)?(?:User|Assistant)\s+Message\s*:\s*$", "", cleaned, flags=re.IGNORECASE | re.MULTILINE)
-    cleaned = re.sub(r"\[(?:VERIFIED|empty)\]\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\[empty\]\s*", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"(?:^|\n)\s*\[(?:DONE|END|done|end)\]\s*(?=\n|$)", "", cleaned, flags=re.IGNORECASE)
     return re.sub(r"(\s*\[(?:DONE|END|done|end)\]\s*)+$", "", cleaned, flags=re.IGNORECASE).strip()
 
@@ -61,6 +61,7 @@ def generate_clean_session_title(raw_text: str, sid: str = "") -> str:
     if not raw_text or not isinstance(raw_text, str) or not raw_text.strip():
         return fallback
     t = clean_protocol_sentinels(clean_user_steering_envelope(raw_text.strip().strip("\"'` \t\n\r")))
+    t = re.sub(r"\[VERIFIED\]\s*", "", t, flags=re.I).strip()
     att_m = re.search(r"\[Attached (?:file|files):\s*([^\]]+)\]", t, re.I)
     att_base = [p for p in re.split(r"[\\/]", att_m.group(1).strip()) if p][-1].strip("\"'` \t\n\r,:;-\\]") if att_m else ""
     t = re.sub(r"\[Attached (?:file|files)[^\]]*\]", "", t, flags=re.I).strip()
