@@ -293,7 +293,9 @@ def detect_powershell_backend() -> WindowsShellInstallation | None:
                     executable_path=candidate,
                     kind=kind,
                     source="path",
-                    version=_version_for_windows_shell(candidate, kind),
+                    # Skip spawning pwsh/powershell for $PSVersionTable on the discovery hot path
+                    # (matches git_bash.py; no caller reads .version and each spawn costs ~2s on Windows).
+                    version=None,
                 )
     return None
 

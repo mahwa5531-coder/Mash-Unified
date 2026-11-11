@@ -1,11 +1,26 @@
 import asyncio
 import json
+import os
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 router = APIRouter(tags=["tasks"])
+
+
+def _find_sandbox_for_pid(pid: int | None) -> tuple[Any | None, Any | None]:
+    """Locate the session LocalSandbox owning ``pid`` without constructing idle sandboxes."""
+    if pid is None:
+        return None, None
+    from nexau.archs.sandbox.local_sandbox import LocalSandbox
+
+    for sid, tasks in list(LocalSandbox._registry_by_session.items()):
+        if pid in tasks:
+            sb = LocalSandbox(sandbox_id=sid)
+            return sb, sb.list_background_tasks().get(pid)
+    return None, None
 
 
 @router.get("/tasks")
@@ -16,10 +31,21 @@ async def list_active_tasks(session_id: str | None = None):
 
     try:
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
+        from nexau.archs.sandbox.local_sandbox import LocalSandbox
         from nexau.archs.session.models import SessionModel
         from nexau.archs.session.orm import ComparisonFilter
 
         from app.dependencies import get_engine
+
+        target_sids = (
+            [session_id]
+            if session_id
+            else [sid for sid, tasks in list(LocalSandbox._registry_by_session.items()) if tasks]
+        )
+        # Skip idle/missing sessions so querying /tasks never allocates or pollutes _registry_by_session.
+        active_sids = [sid for sid in target_sids if LocalSandbox._registry_by_session.get(sid)]
+        if not active_sids:
+            return {"tasks": tasks_list}
 
         session_work_dir = None
         if session_id:
@@ -32,11 +58,11 @@ async def list_active_tasks(session_id: str | None = None):
             except Exception:
                 pass
 
-        from nexau.archs.sandbox.local_sandbox import LocalSandbox
-        target_sids = [session_id] if session_id else (list(LocalSandbox._registry_by_session.keys()) or ["default"])
-        all_sandboxes = [LocalSandbox(sandbox_id=sid, work_dir=Path(session_work_dir) if session_work_dir else Path.cwd()) for sid in target_sids]
-
-        for sandbox in all_sandboxes:
+        for sid in active_sids:
+            sandbox = LocalSandbox(
+                sandbox_id=sid,
+                work_dir=Path(session_work_dir) if session_work_dir else Path.cwd(),
+            )
             bg_tasks = sandbox.list_background_tasks()
             for pid, info in bg_tasks.items():
                 task_sid = info.get("sandbox_id", "")
@@ -83,22 +109,15 @@ async def kill_task(pid: int):
         import sys
 
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
-        from nexau.archs.sandbox.local_sandbox import LocalSandbox
-        from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
 
-        sandbox = None
-        for sid in list(LocalSandbox._registry_by_session.keys()):
-            sb = LocalSandbox(sandbox_id=sid)
-            if pid in sb.list_background_tasks():
-                sandbox = sb
-                break
-        if sandbox is None:
-            sandbox = get_sandbox(None)
-        res = sandbox.kill_background_task(pid)
-        is_success = (res.status == SandboxStatus.SUCCESS)
+        sandbox, _ = _find_sandbox_for_pid(pid)
+        is_known = sandbox is not None
+        is_success = False
+        if sandbox is not None:
+            res = sandbox.kill_background_task(pid)
+            is_success = (res.status == SandboxStatus.SUCCESS)
 
         # Fallback taskkill direct OS tree kill only if pid belongs to sandbox
-        is_known = (sandbox is not None and pid in sandbox.list_background_tasks())
         if not is_success and is_known and sys.platform == "win32":
             import subprocess
 
@@ -128,19 +147,39 @@ def _normalize_task_id(raw_id: str) -> tuple[int | None, str]:
 
 
 def _find_task_log_candidates(clean_id: str) -> list[Path]:
+    from app.paths import get_mash_home, get_nexau_home
+
     task_root = (Path.cwd() / ".system_generated" / "tasks").resolve()
     candidate_paths = [
         task_root / f"task-{clean_id}.log",
         task_root / f"{clean_id}.log",
     ]
-    import glob
-    for brain_base in [Path.home() / ".mash" / "brain", Path.home() / ".nexau" / "brain"]:
-        b_resolved = brain_base.resolve()
-        if b_resolved.is_dir():
-            for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"task-{clean_id}.log")):
-                candidate_paths.append(Path(p_str))
-            for p_str in glob.glob(str(b_resolved / "*" / ".system_generated" / "tasks" / f"{clean_id}.log")):
-                candidate_paths.append(Path(p_str))
+    # Search configured MASH_HOME/NEXAU_HOME first, then default Path.home() layouts
+    # so custom homes work and patched Path.home() / legacy layouts resolve in .mash -> .nexau order.
+    raw_bases = [
+        get_mash_home() / "brain",
+        get_nexau_home() / "brain",
+        Path.home() / ".mash" / "brain",
+        Path.home() / ".nexau" / "brain",
+    ]
+    seen_bases: set[Path] = set()
+    for brain_base in raw_bases:
+        try:
+            b_resolved = brain_base.resolve()
+        except Exception:
+            continue
+        if b_resolved in seen_bases or not b_resolved.is_dir():
+            continue
+        seen_bases.add(b_resolved)
+        try:
+            with os.scandir(b_resolved) as entries:
+                for entry in entries:
+                    if entry.is_dir():
+                        tasks_dir = Path(entry.path) / ".system_generated" / "tasks"
+                        candidate_paths.append(tasks_dir / f"task-{clean_id}.log")
+                        candidate_paths.append(tasks_dir / f"{clean_id}.log")
+        except OSError:
+            continue
     return candidate_paths
 
 
@@ -152,24 +191,19 @@ async def get_task_log(task_id: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Check active sandboxes across all sessions directly first if task_id is an active PID
+    # Check active session sandboxes first if task_id is an active PID
     try:
-        from nexau.archs.sandbox.local_sandbox import LocalSandbox
-        from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
         if pid is not None:
-            active_sb = None
-            for sid in list(LocalSandbox._registry_by_session.keys()):
-                sb = LocalSandbox(sandbox_id=sid)
-                if pid in sb.list_background_tasks():
-                    active_sb = sb
-                    break
-            if active_sb is None:
-                active_sb = get_sandbox(None)
-            if pid in active_sb.list_background_tasks():
+            active_sb, active_info = _find_sandbox_for_pid(pid)
+            if active_sb is not None:
                 status_res = active_sb.get_background_task_status(pid)
                 combined = (status_res.stdout or "") + ("\n" + status_res.stderr if status_res.stderr else "")
                 if combined.strip():
                     return {"content": combined}
+                if active_info and active_info.get("task_log_path"):
+                    log_path = Path(active_info["task_log_path"])
+                    if log_path.exists() and log_path.is_file():
+                        return {"content": log_path.read_text(encoding="utf-8", errors="replace")}
     except Exception:
         pass
 
@@ -187,21 +221,16 @@ async def get_task_log(task_id: str):
 @router.get("/tasks/{task_id:path}/stream")
 async def stream_task_log(task_id: str, request: Request):
     """Stream live task terminal logs as SSE (OpenHands pattern)."""
+    try:
+        pid, clean = _normalize_task_id(task_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     # tail active sandbox stdout/stderr or task log file asynchronously with chunk deltas
     async def generate():
         from nexau.archs.sandbox.base_sandbox import SandboxStatus
-        from nexau.archs.tool.builtin._sandbox_utils import get_sandbox
 
-        pid, clean = _normalize_task_id(task_id)
-        sandbox = None
-        try:
-            sandbox = get_sandbox(None)
-        except Exception:
-            pass
-
-        active_info = None
-        if sandbox and pid is not None:
-            active_info = sandbox.list_background_tasks().get(pid)
+        sandbox, active_info = _find_sandbox_for_pid(pid)
 
         # 1. If active sandbox process:
         if active_info:

@@ -314,3 +314,30 @@ def test_create_shell_backend_uses_unix_backend(monkeypatch: pytest.MonkeyPatch)
 
     assert isinstance(backend, UnixShellBackend)
     assert backend.build_launch_config("pwd").argv[0] == str(bash_path)
+
+
+def test_detect_powershell_backend_does_not_probe_version_on_hot_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Discovery must not spawn powershell/pwsh just to probe $PSVersionTable."""
+    pwsh_path = tmp_path / "pwsh.exe"
+    pwsh_path.write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(shell_backend.sys, "platform", "win32")
+    monkeypatch.setattr(
+        shell_backend,
+        "_windows_shell_path_candidates",
+        lambda kind: [pwsh_path] if kind == "pwsh" else [],
+    )
+
+    def _fail_probe(*_args: object, **_kwargs: object) -> str | None:
+        raise AssertionError("_version_for_windows_shell must not run during hot-path discovery")
+
+    monkeypatch.setattr(shell_backend, "_version_for_windows_shell", _fail_probe)
+
+    installation = shell_backend.detect_powershell_backend()
+
+    assert installation is not None
+    assert installation.executable_path == pwsh_path
+    assert installation.kind == "pwsh"
+    assert installation.version is None

@@ -235,6 +235,19 @@ async def delete_existing_session(engine: Any, session_id: str) -> dict[str, str
     session_mgr = sm if (sm and hasattr(sm, "delete_session")) else SessionManager(engine=eng)
     await session_mgr.delete_session(user_id=user_id, session_id=session_id)
 
+    # 2. Stop & clear tracked background tasks before brain directory unlink (avoids Windows file locks)
+    try:
+        from nexau.archs.sandbox.local_sandbox import LocalSandbox
+
+        if LocalSandbox._registry_by_session.get(session_id):
+            sb = LocalSandbox(sandbox_id=session_id)
+            for pid, info in list(sb.list_background_tasks().items()):
+                if not info.get("finished"):
+                    sb.kill_background_task(pid)
+        LocalSandbox.clear_session_tasks(session_id)
+    except Exception as e:
+        logger.warning(f"Background task cleanup warning for {session_id}: {e}")
+
     # 4. Safely unlink brain directories
     try:
         safe_rmtree_session_brain(session_id, (s.context or {}).get("brain_directory"))
