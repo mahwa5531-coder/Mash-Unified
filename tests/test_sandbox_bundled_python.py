@@ -19,8 +19,15 @@ envs = sandbox._build_local_envs()
 first_path = envs['PATH'].split(';')[0]
 print('PREPENDED PATH:', first_path)
 
-# Live execution in sandbox
-code = "import duckdb, polars; con = duckdb.connect(); print('DUCKDB_VER:', duckdb.__version__); print('POLARS_ROWS:', len(polars.DataFrame({'x': [10, 20]})))"
+# Live execution in sandbox (bundled libs + full frozen agent config/middleware imports)
+code = (
+    "import duckdb, polars; "
+    "from app.main import _build_agent_config; "
+    "cfg = _build_agent_config(); "
+    "print('DUCKDB_VER:', duckdb.__version__); "
+    "print('POLARS_ROWS:', len(polars.DataFrame({'x': [10, 20]}))); "
+    "print('AGENT_MIDDLEWARES:', len(cfg.middlewares or []))"
+)
 res = sandbox.execute_shell(f'{cmd} -c "{code}"')
 print('EXIT CODE:', res.exit_code)
 print('STDOUT:\n' + res.stdout)
@@ -30,4 +37,5 @@ if res.stderr:
 assert res.exit_code == 0
 assert 'DUCKDB_VER: 1.5.4' in res.stdout
 assert 'POLARS_ROWS: 2' in res.stdout
+assert 'AGENT_MIDDLEWARES: 3' in res.stdout
 print('>>> ALL SANDBOX CHECKS PASSED 100%! <<<')

@@ -10,10 +10,11 @@ block_cipher = None
 root_dir = Path(SPECPATH).parent.resolve()
 connector_dir = root_dir / 'connector'
 nexau_dir = root_dir / 'NexAU'
+nexau_pkg_dir = nexau_dir / 'nexau'
 
 from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
-nexau_archs_dir = nexau_dir / 'nexau' / 'archs'
+nexau_archs_dir = nexau_pkg_dir / 'archs'
 # Bundle only non-Python assets from nexau/archs (.j2, .yaml, .sql, .md); Python modules live in PYZ.
 nexau_archs_datas = [
     (
@@ -25,6 +26,15 @@ nexau_archs_datas = [
     for p in nexau_archs_dir.rglob('*')
     if p.is_file() and p.suffix not in {'.py', '.pyc'} and '__pycache__' not in p.parts
 ]
+
+# Enumerate all nexau modules (including YAML-imported PEP 420 middlewares & lazy submodules) for PYZ.
+nexau_hiddenimports = sorted(
+    'nexau'
+    if (parts := p.relative_to(nexau_pkg_dir).with_suffix('').parts) == ('__init__',)
+    else 'nexau.' + '.'.join(parts[:-1] if parts[-1] == '__init__' else parts)
+    for p in nexau_pkg_dir.rglob('*.py')
+    if '__pycache__' not in p.parts and 'migrations' not in p.parts
+)
 
 datas = [
     (str(connector_dir / 'app' / 'resources'), 'app/resources'),
@@ -68,6 +78,8 @@ hiddenimports = [
     'sqlmodel',
     'bs4',
     'multipart',
+    'app.tools',
+    *nexau_hiddenimports,
 ]
 
 a = Analysis(

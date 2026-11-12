@@ -2,7 +2,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -12,8 +12,11 @@ router = APIRouter(prefix="/api", tags=["system"])
 
 @router.get("/system/health")
 @router.get("/health")
-async def get_system_health():
+async def get_system_health(request: Request):
     """Lightweight backend liveness and health probe."""
+    warmup_error = getattr(request.app.state, "warmup_error", None)
+    if warmup_error:
+        raise HTTPException(status_code=503, detail=f"Agent runtime warmup failed: {warmup_error}")
     return {"status": "ok", "service": "mash-backend"}
 
 

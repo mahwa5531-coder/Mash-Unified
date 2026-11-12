@@ -34,7 +34,7 @@ _rg_bin_dir = (
 if _rg_bin_dir.exists() and str(_rg_bin_dir) not in os.environ.get("PATH", ""):
     os.environ["PATH"] = str(_rg_bin_dir) + os.pathsep + os.environ.get("PATH", "")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import dependencies as _deps
@@ -126,8 +126,10 @@ async def _warmup_runtime(app: FastAPI, engine: Any) -> None:
     """Initialize agent transport and token state without blocking /health."""
     try:
         _ensure_sse_server(app, engine)
+        app.state.warmup_error = None
     except Exception as e:
-        logger.warning("Background runtime warmup failed: %s", e)
+        app.state.warmup_error = str(e)
+        logger.exception("Background runtime warmup failed: %s", e)
     try:
         await auth.ensure_valid_token()
     except Exception as e:
@@ -143,6 +145,7 @@ async def lifespan(app: FastAPI):
     app.state.engine = engine
     app.state.sse_server = None
     app.state.session_manager = None
+    app.state.warmup_error = None
     chat._sse_server_factory = lambda: _ensure_sse_server(app, engine)
     warmup_task = asyncio.create_task(_warmup_runtime(app, engine))
 
@@ -199,6 +202,6 @@ app.include_router(settings.router)
 
 
 @app.get("/health", tags=["system"])
-async def root_health():
+async def root_health(request: Request):
     """Root /health probe used by Electron's backend supervisor."""
-    return await system.get_system_health()
+    return await system.get_system_health(request)
