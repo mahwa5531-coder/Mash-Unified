@@ -24,10 +24,11 @@ from pathlib import Path
 
 def test_distribution_package_e2e():
     root_dir = Path(__file__).resolve().parent.parent
+    pkg_version = json.loads((root_dir / 'package.json').read_text(encoding='utf-8'))['version']
     release_dir = root_dir / 'dist' / 'release'
-    installer_exe = release_dir / 'Mash-Setup-1.0.0.exe'
+    installer_exe = release_dir / f'Mash-Setup-{pkg_version}.exe'
     if not installer_exe.exists():
-        installer_exe = release_dir / 'Mash Setup 1.0.0.exe'
+        installer_exe = release_dir / f'Mash Setup {pkg_version}.exe'
     
     blockmap_file = release_dir / f"{installer_exe.name}.blockmap"
     latest_yml = release_dir / 'latest.yml'
@@ -50,8 +51,8 @@ def test_distribution_package_e2e():
     
     assert latest_yml.exists(), f"Updater metadata missing: {latest_yml}"
     yml_content = latest_yml.read_text(encoding='utf-8')
-    assert "version: 1.0.0" in yml_content, "latest.yml missing correct version"
-    print(f"[OK] Auto-Updater Manifest (latest.yml): Verified version 1.0.0")
+    assert f"version: {pkg_version}" in yml_content, "latest.yml missing correct version"
+    print(f"[OK] Auto-Updater Manifest (latest.yml): Verified version {pkg_version}")
 
     print("\n" + "="*70)
     print(">>> 2. VERIFYING UNPACKED PRODUCTION BUNDLE <<<")

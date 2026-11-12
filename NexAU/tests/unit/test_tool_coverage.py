@@ -14,7 +14,7 @@
 
 """Coverage improvement tests for nexau/archs/tool/tool.py.
 
-Targets uncovered paths: execute_async, to_openai, to_anthropic,
+Targets uncovered paths: execute_async, to_openai,
 get_structured_description, get_info, __repr__, __str__,
 validate_params, _validate_schema, execute result coercion.
 """
@@ -31,7 +31,6 @@ from nexau.archs.tool.tool import (
     Tool,
     normalize_input_schema,
     normalize_structured_tool_definition,
-    structured_tool_definition_to_anthropic,
     structured_tool_definition_to_openai,
 )
 
@@ -103,7 +102,7 @@ class TestNormalizeStructuredToolDefinition:
 
 
 # ---------------------------------------------------------------------------
-# structured_tool_definition_to_openai / to_anthropic
+# structured_tool_definition_to_openai
 # ---------------------------------------------------------------------------
 
 
@@ -118,29 +117,6 @@ class TestStructuredToolDefinitionConverters:
         result = structured_tool_definition_to_openai(defn)
         assert result["type"] == "function"
         assert result["function"]["name"] == "my_tool"
-
-    def test_to_anthropic(self):
-        defn = {
-            "name": "my_tool",
-            "description": "desc",
-            "input_schema": {"type": "object", "properties": {}},
-            "kind": "tool",
-        }
-        result = structured_tool_definition_to_anthropic(defn)
-        assert result["name"] == "my_tool"
-        assert "eager_input_streaming" in result
-
-    def test_to_anthropic_tool_streaming_disabled(self):
-        """eager_input_streaming is omitted when tool_streaming=False."""
-        defn = {
-            "name": "my_tool",
-            "description": "desc",
-            "input_schema": {"type": "object", "properties": {}},
-            "kind": "tool",
-        }
-        result = structured_tool_definition_to_anthropic(defn, tool_streaming=False)
-        assert result["name"] == "my_tool"
-        assert "eager_input_streaming" not in result
 
 
 # ---------------------------------------------------------------------------
@@ -396,7 +372,7 @@ class TestToolInfo:
 
 
 # ---------------------------------------------------------------------------
-# Tool.to_openai / to_anthropic
+# Tool.to_openai
 # ---------------------------------------------------------------------------
 
 
@@ -411,28 +387,6 @@ class TestToolProviderConversion:
         result = tool.to_openai()
         assert result["type"] == "function"
         assert result["function"]["name"] == "t"
-
-    def test_to_anthropic(self):
-        tool = Tool(
-            name="t",
-            description="desc",
-            input_schema={"type": "object", "properties": {}},
-            implementation=lambda: None,
-        )
-        result = tool.to_anthropic()
-        assert result["name"] == "t"
-
-    def test_to_anthropic_tool_streaming_disabled(self):
-        """Tool.to_anthropic(tool_streaming=False) omits eager_input_streaming."""
-        tool = Tool(
-            name="t",
-            description="desc",
-            input_schema={"type": "object", "properties": {}},
-            implementation=lambda: None,
-        )
-        result = tool.to_anthropic(tool_streaming=False)
-        assert result["name"] == "t"
-        assert "eager_input_streaming" not in result
 
 
 # ---------------------------------------------------------------------------

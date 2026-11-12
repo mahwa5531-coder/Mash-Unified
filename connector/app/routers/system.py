@@ -31,7 +31,7 @@ async def get_system_info():
 
     return {
         "installation_id": get_installation_id(),
-        "version": "1.0.0",
+        "version": "0.1.0",
         "platform": platform.platform(),
         "os": sys.platform,
         "python_version": sys.version.split()[0],

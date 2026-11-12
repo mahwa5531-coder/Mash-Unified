@@ -85,12 +85,6 @@ class TestExecutionConfig:
         assert config.timeout == 180
         assert config.tool_call_mode == "structured"
 
-    def test_execution_config_supports_anthropic_mode(self):
-        """ExecutionConfig should normalize legacy structured aliases."""
-        config = ExecutionConfig(tool_call_mode="anthropic")
-
-        assert config.tool_call_mode == "structured"
-
     def test_normalize_tool_call_mode_logs_legacy_alias_warning_once(self, caplog):
         """Legacy structured aliases should emit a one-time compatibility warning."""
 
@@ -115,7 +109,6 @@ class TestExecutionConfig:
         [
             ("openai_chat_completion", "openai"),
             ("openai_responses", "openai"),
-            ("anthropic_chat_completion", "anthropic"),
             ("gemini_rest", "gemini"),
         ],
     )

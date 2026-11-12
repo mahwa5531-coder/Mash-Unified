@@ -26,15 +26,14 @@ from typing import Literal
 logger = logging.getLogger(__name__)
 
 ToolCallMode = Literal["xml", "structured"]
-StructuredProviderTarget = Literal["openai", "anthropic", "gemini"]
+StructuredProviderTarget = Literal["openai", "gemini"]
 
-VALID_TOOL_CALL_MODES: set[str] = {"xml", "structured", "openai", "anthropic"}
+VALID_TOOL_CALL_MODES: set[str] = {"xml", "structured", "openai"}
 STRUCTURED_TOOL_CALL_MODES: set[str] = {"structured"}
-LEGACY_STRUCTURED_TOOL_CALL_MODE_ALIASES: set[str] = {"openai", "anthropic"}
+LEGACY_STRUCTURED_TOOL_CALL_MODE_ALIASES: set[str] = {"openai"}
 DEFAULT_TOOL_CALL_MODE = "structured"
 
 _OPENAI_FAMILY_API_TYPES = {"openai_chat_completion", "openai_responses", "generate_with_token"}
-_ANTHROPIC_API_TYPES = {"anthropic_chat_completion"}
 _GEMINI_API_TYPES = {"gemini_rest"}
 
 _legacy_tool_call_mode_alias_lock = threading.Lock()
@@ -78,7 +77,7 @@ def normalize_tool_call_mode(mode: str | None) -> str:
     # 2. RFC-0006 value, provider .
     if normalized not in VALID_TOOL_CALL_MODES:
         raise ValueError(
-            "tool_call_mode must be one of 'xml', 'structured', 'openai', or 'anthropic'",
+            "tool_call_mode must be one of 'xml', 'structured', or 'openai'",
         )
 
     # 3. legacy alias, neutral structured .
@@ -101,8 +100,6 @@ def resolve_structured_provider_target(api_type: str | None) -> StructuredProvid
     normalized_api_type = (api_type or "").strip()
     if normalized_api_type in _OPENAI_FAMILY_API_TYPES:
         return "openai"
-    if normalized_api_type in _ANTHROPIC_API_TYPES:
-        return "anthropic"
     if normalized_api_type in _GEMINI_API_TYPES:
         return "gemini"
 
@@ -110,5 +107,5 @@ def resolve_structured_provider_target(api_type: str | None) -> StructuredProvid
     raise ValueError(
         "Structured tool calling is not supported for "
         f"api_type='{normalized_api_type or 'unknown'}'. Supported api_type values are: "
-        "openai_chat_completion, openai_responses, anthropic_chat_completion, gemini_rest.",
+        "openai_chat_completion, openai_responses, gemini_rest.",
     )

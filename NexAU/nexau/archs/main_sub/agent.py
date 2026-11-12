@@ -34,7 +34,6 @@ if TYPE_CHECKING:
     from nexau.archs.main_sub.framework_context import FrameworkContext
     from nexau.archs.main_sub.team.state import AgentTeamState
 
-import anthropic
 import dotenv
 import openai
 import yaml
@@ -601,9 +600,6 @@ class Agent:
         try:
             if llm_config.api_type in {"gemini_rest", "generate_with_token"}:
                 return None
-            if llm_config.api_type == "anthropic_chat_completion":
-                client_kwargs = llm_config.to_client_kwargs()
-                return anthropic.Anthropic(**client_kwargs)
             if llm_config.api_type in ["openai_responses", "openai_chat_completion"]:
                 client_kwargs = llm_config.to_client_kwargs()
                 return openai.OpenAI(**client_kwargs)
@@ -623,9 +619,6 @@ class Agent:
         try:
             if llm_config.api_type in {"gemini_rest", "generate_with_token"}:
                 return None
-            if llm_config.api_type == "anthropic_chat_completion":
-                client_kwargs = llm_config.to_client_kwargs()
-                return anthropic.AsyncAnthropic(**client_kwargs)
             if llm_config.api_type in ["openai_responses", "openai_chat_completion"]:
                 client_kwargs = llm_config.to_client_kwargs()
                 return openai.AsyncOpenAI(**client_kwargs)

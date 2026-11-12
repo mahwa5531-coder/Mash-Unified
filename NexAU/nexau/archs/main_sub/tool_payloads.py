@@ -20,7 +20,6 @@ eager tools - no special sub-agent handling required.
 from collections.abc import Sequence
 from typing import Any, cast
 
-from anthropic.types import ToolParam
 from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 
 from nexau.archs.tool.tool import Tool
@@ -40,32 +39,6 @@ def build_openai_tool_payload(
             if isinstance(function_block, dict):
                 function_block["description"] = structured_tool_description(tool)
         except (AttributeError, KeyError, TypeError):
-            pass
-        tools_payload.append(tool_spec)
-
-    return tools_payload
-
-
-def build_anthropic_tool_payload(
-    *,
-    eager_tools: Sequence[Tool],
-    tool_streaming: bool = True,
-) -> list[ToolParam]:
-    """Build Anthropic-compatible structured tool payload.
-
-    Parameters
-    ----------
-    tool_streaming:
-        Forwarded to :meth:`Tool.to_anthropic`.  When *False*,
-        ``eager_input_streaming`` is omitted from the tool schema.
-    """
-    tools_payload: list[ToolParam] = []
-
-    for tool in eager_tools:
-        tool_spec = tool.to_anthropic(tool_streaming=tool_streaming)
-        try:
-            tool_spec["description"] = structured_tool_description(tool)
-        except (KeyError, TypeError):
             pass
         tools_payload.append(tool_spec)
 

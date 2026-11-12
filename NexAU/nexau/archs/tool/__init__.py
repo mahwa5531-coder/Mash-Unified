@@ -17,7 +17,6 @@ if TYPE_CHECKING:
         Tool,
         build_structured_tool_definition,
         normalize_structured_tool_definition,
-        structured_tool_definition_to_anthropic,
         structured_tool_definition_to_openai,
     )
     from .tool_registry import ToolRegistry
@@ -28,7 +27,6 @@ __all__ = [
     "StructuredToolDefinition",
     "build_structured_tool_definition",
     "normalize_structured_tool_definition",
-    "structured_tool_definition_to_anthropic",
     "structured_tool_definition_to_openai",
 ]
 
@@ -61,10 +59,6 @@ def __getattr__(name: str) -> object:
         from .tool import normalize_structured_tool_definition
 
         return _cache_export(name, normalize_structured_tool_definition)
-    if name == "structured_tool_definition_to_anthropic":
-        from .tool import structured_tool_definition_to_anthropic
-
-        return _cache_export(name, structured_tool_definition_to_anthropic)
     if name == "structured_tool_definition_to_openai":
         from .tool import structured_tool_definition_to_openai
 

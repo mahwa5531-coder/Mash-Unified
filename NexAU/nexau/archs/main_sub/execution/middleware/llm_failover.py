@@ -25,7 +25,6 @@ import logging
 import time
 from dataclasses import dataclass, field
 
-import anthropic
 import openai
 
 from nexau.archs.llm.llm_config import LLMConfig
@@ -136,23 +135,15 @@ def _extract_status_code(exc: Exception) -> int | None:
 
      openai.APIStatusError.status_code  anthropic.APIStatusError.status_code.
     """
-    # openai >= 1.x anthropic >= 0.18 status_code property
+    # openai >= 1.x status_code property
     if isinstance(exc, openai.APIStatusError):
-        return exc.status_code
-    if isinstance(exc, anthropic.APIStatusError):
         return exc.status_code
     return None
 
 
-def _build_client_for_config(config: LLMConfig) -> openai.OpenAI | anthropic.Anthropic:
-    """Build an SDK client from LLMConfig.
-
-    RFC-0003:  api_type  SDK client
-    """
-    client_kwargs = config.to_client_kwargs()
-    if config.api_type == "anthropic_chat_completion":
-        return anthropic.Anthropic(**client_kwargs)
-    return openai.OpenAI(**client_kwargs)
+def _build_client_for_config(config: LLMConfig) -> openai.OpenAI:
+    """Build an OpenAI-compatible SDK client from LLMConfig."""
+    return openai.OpenAI(**config.to_client_kwargs())
 
 
 # ---------------------------------------------------------------------------

@@ -253,29 +253,6 @@ class OpenAIResponsesUsageConverter:
         )
 
 
-class AnthropicUsageConverter:
-    def convert(self, raw_usage: dict[str, object]) -> TokenUsage:
-        input_tokens = _int(raw_usage.get("input_tokens", 0))
-        cache_creation_tokens = _first_int_field(raw_usage, _CACHE_WRITE_FIELDS)
-        cache_read_tokens = _sum_int_fields(raw_usage, _CACHE_READ_FIELDS)
-        completion_tokens = _int(raw_usage.get("output_tokens", 0))
-        total_tokens = _resolve_total_tokens(
-            raw_usage,
-            input_tokens=input_tokens,
-            completion_tokens=completion_tokens,
-            cache_read_tokens=cache_read_tokens,
-            cache_write_tokens=cache_creation_tokens,
-        )
-        return _build_usage(
-            input_tokens=input_tokens,
-            completion_tokens=completion_tokens,
-            reasoning_tokens=0,
-            total_tokens=total_tokens,
-            cache_creation_tokens=cache_creation_tokens,
-            cache_read_tokens=cache_read_tokens,
-        )
-
-
 class GeminiUsageConverter:
     def convert(self, raw_usage: dict[str, object]) -> TokenUsage:
         input_tokens = _int(raw_usage.get("promptTokenCount", 0))
@@ -304,7 +281,6 @@ class UsageConverterRegistry:
     _converters: ClassVar[dict[str, UsageConverter]] = {
         "openai_chat_completion": OpenAIChatUsageConverter(),
         "openai_responses": OpenAIResponsesUsageConverter(),
-        "anthropic_chat_completion": AnthropicUsageConverter(),
         "gemini_rest": GeminiUsageConverter(),
     }
 

@@ -51,7 +51,7 @@ function allocateEphemeralPort() {
 }
 
 // 2. Health Probe Poller
-function waitForBackendReady(port, timeoutMs = 25000) {
+function waitForBackendReady(port, timeoutMs = 45000) {
   const startTime = Date.now();
   return new Promise((resolve, reject) => {
     const probe = () => {

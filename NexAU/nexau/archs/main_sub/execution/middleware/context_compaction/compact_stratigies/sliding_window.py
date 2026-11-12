@@ -18,7 +18,6 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
-import anthropic
 import openai
 
 from nexau.archs.llm.llm_config import LLMConfig
@@ -35,7 +34,6 @@ logger = logging.getLogger(__name__)
 
 # Backward-compatibility: older tests patch `sliding_window.OpenAI`.
 OpenAI = openai.OpenAI
-Anthropic = anthropic.Anthropic
 
 _HANDOFF_SUMMARY_PREFIX = (
     "Another language model started to solve this problem and produced a summary of the conversation so far. "
@@ -245,8 +243,6 @@ class SlidingWindowCompaction:
         if llm_config.api_type == "gemini_rest":
             return None
         client_kwargs = llm_config.to_client_kwargs()
-        if llm_config.api_type == "anthropic_chat_completion":
-            return Anthropic(**client_kwargs)
         if llm_config.api_type in ["openai_responses", "openai_chat_completion"]:
             return OpenAI(**client_kwargs)
         raise ValueError(f"Invalid API type: {llm_config.api_type}")

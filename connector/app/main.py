@@ -1,10 +1,18 @@
+from __future__ import annotations
+
+import asyncio
+import contextlib
 import logging
 import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from dotenv import load_dotenv
+
+if TYPE_CHECKING:
+    from nexau import AgentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +34,8 @@ _rg_bin_dir = (
 if _rg_bin_dir.exists() and str(_rg_bin_dir) not in os.environ.get("PATH", ""):
     os.environ["PATH"] = str(_rg_bin_dir) + os.pathsep + os.environ.get("PATH", "")
 
-import nexau
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from nexau import AgentConfig, LLMConfig
-from nexau.archs.platform.crypto_vault import _IN_MEMORY_AUTH_META, load_secure_vault
-from nexau.archs.transports.http import HTTPConfig, SSETransportServer
 
 from app import dependencies as _deps
 from app.client import resolve_cloud_gateway_url
@@ -53,6 +57,10 @@ from app.routers import (
 
 def _build_agent_config() -> AgentConfig:
     """Build runtime AgentConfig from manifest, encrypted local vault, and cloud gateway config."""
+    import nexau
+    from nexau import AgentConfig, LLMConfig
+    from nexau.archs.platform.crypto_vault import _IN_MEMORY_AUTH_META, load_secure_vault
+
     local_manifest = Path(__file__).resolve().parent / "resources" / "main_agent.yaml"
     fallback_manifest = Path(nexau.__file__).parent / "agents" / "main_agent.yaml"
     agent_config = AgentConfig.from_yaml(local_manifest if local_manifest.exists() else fallback_manifest)
@@ -99,28 +107,53 @@ def _build_agent_config() -> AgentConfig:
     return agent_config
 
 
+def _ensure_sse_server(app: FastAPI, engine: Any) -> Any:
+    """Lazily construct and wire the shared SSETransportServer once per app lifespan."""
+    sse_server = getattr(app.state, "sse_server", None) or getattr(chat, "_sse_server", None)
+    if sse_server is None:
+        from nexau.archs.transports.http import HTTPConfig, SSETransportServer
+
+        sse_server = SSETransportServer(engine=engine, config=HTTPConfig(), default_agent_config=_build_agent_config())
+
+    app.state.sse_server = sse_server
+    app.state.session_manager = sse_server._session_manager
+    _deps._session_manager = sse_server._session_manager
+    chat._sse_server = sse_server
+    return sse_server
+
+
+async def _warmup_runtime(app: FastAPI, engine: Any) -> None:
+    """Initialize agent transport and token state without blocking /health."""
+    try:
+        _ensure_sse_server(app, engine)
+    except Exception as e:
+        logger.warning("Background runtime warmup failed: %s", e)
+    try:
+        await auth.ensure_valid_token()
+    except Exception as e:
+        logger.warning("Cold boot token refresh skipped or offline: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scaffold_nexau_system_storage()
     engine = init_engine(f"sqlite+aiosqlite:///{get_database_path()}")
     await engine.setup_models([ProjectModel])
 
-    try:
-        await auth.ensure_valid_token()
-    except Exception as e:
-        logger.warning("Cold boot token refresh skipped or offline: %s", e)
-
-    sse_server = SSETransportServer(engine=engine, config=HTTPConfig(), default_agent_config=_build_agent_config())
-
     app.state.engine = engine
-    app.state.sse_server = sse_server
-    app.state.session_manager = sse_server._session_manager
-    _deps._session_manager = sse_server._session_manager
-    chat._sse_server = sse_server
+    app.state.sse_server = None
+    app.state.session_manager = None
+    chat._sse_server_factory = lambda: _ensure_sse_server(app, engine)
+    warmup_task = asyncio.create_task(_warmup_runtime(app, engine))
 
     try:
         yield
     finally:
+        warmup_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await warmup_task
+        sse_server = getattr(app.state, "sse_server", None)
+        chat._sse_server_factory = None
         if getattr(app.state, "engine", None) is engine:
             app.state.engine = None
             app.state.sse_server = None
@@ -128,7 +161,7 @@ async def lifespan(app: FastAPI):
         if getattr(_deps, "_engine", None) is engine:
             _deps._engine = None
             _deps._session_manager = None
-        if getattr(chat, "_sse_server", None) is sse_server:
+        if sse_server is not None and getattr(chat, "_sse_server", None) is sse_server:
             chat._sse_server = None
         try:
             await engine.dispose()
@@ -139,7 +172,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Mash Desktop Connector API",
     description="Local desktop sidecar API for Mash.",
-    version="1.0.0",
+    version="0.1.0",
     lifespan=lifespan,
 )
 

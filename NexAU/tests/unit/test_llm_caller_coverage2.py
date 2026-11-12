@@ -63,16 +63,6 @@ def responses_config():
 
 
 @pytest.fixture
-def anthropic_config():
-    return LLMConfig(
-        model="claude-3",
-        base_url="https://api.anthropic.com",
-        api_key="test-key",
-        api_type="anthropic_chat_completion",
-    )
-
-
-@pytest.fixture
 def gemini_config():
     return LLMConfig(
         model="gemini-pro",
@@ -138,25 +128,6 @@ class TestCallOnceSyncSessionIdInjection:
             tool_call_mode="xml",
             tools=None,
             api_params={"model": "gpt-4o-mini"},
-            openai_client=Mock(),
-        )
-        with patch(
-            "nexau.archs.main_sub.execution.llm_caller.call_llm_with_different_client",
-            return_value=_make_model_response(),
-        ):
-            result = caller._call_once_sync(params)
-        assert result is not None
-
-    def test_anthropic_injects_metadata(self, anthropic_config):
-        caller = LLMCaller(Mock(), anthropic_config, session_id="sess-3")
-        params = ModelCallParams(
-            messages=[Message(role=Role.USER, content=[TextBlock(text="Hi")])],
-            max_tokens=100,
-            force_stop_reason=None,
-            agent_state=None,
-            tool_call_mode="xml",
-            tools=None,
-            api_params={"model": "claude-3"},
             openai_client=Mock(),
         )
         with patch(
@@ -511,49 +482,6 @@ class TestAdaptStructuredToolsForProvider:
         result = _adapt_structured_tools_for_provider(tools, "openai")
         assert result is not None
         assert len(result) == 1
-
-    def test_anthropic_adapts(self):
-        tools = [
-            {
-                "name": "my_tool",
-                "description": "desc",
-                "input_schema": {"type": "object", "properties": {}},
-                "kind": "tool",
-            }
-        ]
-        result = _adapt_structured_tools_for_provider(tools, "anthropic")
-        assert result is not None
-        assert len(result) == 1
-
-    def test_anthropic_adapts_tool_streaming_disabled(self):
-        """tool_streaming=False omits eager_input_streaming from Anthropic schemas."""
-        tools = [
-            {
-                "name": "my_tool",
-                "description": "desc",
-                "input_schema": {"type": "object", "properties": {}},
-                "kind": "tool",
-            }
-        ]
-        result = _adapt_structured_tools_for_provider(tools, "anthropic", tool_streaming=False)
-        assert result is not None
-        assert len(result) == 1
-        assert "eager_input_streaming" not in result[0]
-
-    def test_anthropic_adapts_tool_streaming_enabled(self):
-        """tool_streaming=True (default) includes eager_input_streaming."""
-        tools = [
-            {
-                "name": "my_tool",
-                "description": "desc",
-                "input_schema": {"type": "object", "properties": {}},
-                "kind": "tool",
-            }
-        ]
-        result = _adapt_structured_tools_for_provider(tools, "anthropic", tool_streaming=True)
-        assert result is not None
-        assert len(result) == 1
-        assert result[0]["eager_input_streaming"] is True
 
     def test_gemini_adapts(self):
         tools = [

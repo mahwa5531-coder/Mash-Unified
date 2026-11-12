@@ -36,6 +36,10 @@ def get_session_manager(request: Request = None) -> SessionManager:
         return request.app.state.session_manager
     if _session_manager is not None:
         return _session_manager
+    from app.routers import chat
+
+    if chat._sse_server_factory is not None or chat._sse_server is not None:
+        return chat.get_sse_server()._session_manager
     raise RuntimeError("Session manager not initialized")
 
 

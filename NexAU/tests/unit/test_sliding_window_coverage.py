@@ -217,21 +217,6 @@ class TestBuildClient:
         )
         assert compaction._build_client(llm_config) is None
 
-    def test_anthropic_client(self, compaction):
-        llm_config = LLMConfig(
-            model="claude-3",
-            base_url="https://api.anthropic.com",
-            api_key="test-key",
-            api_type="anthropic_chat_completion",
-        )
-        with patch(
-            "nexau.archs.main_sub.execution.middleware.context_compaction.compact_stratigies.sliding_window.Anthropic"
-        ) as mock_anthropic:
-            mock_anthropic.return_value = Mock()
-            client = compaction._build_client(llm_config)
-            assert client is not None
-            mock_anthropic.assert_called_once()
-
     def test_openai_client(self, compaction):
         llm_config = LLMConfig(
             model="gpt-4",

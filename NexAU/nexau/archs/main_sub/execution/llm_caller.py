@@ -41,7 +41,6 @@ from nexau.archs.main_sub.token_trace_session import TokenTraceSession
 from nexau.archs.tool.tool import (
     StructuredToolDefinitionLike,
     normalize_structured_tool_definition,
-    structured_tool_definition_to_anthropic,
     structured_tool_definition_to_openai,
 )
 from nexau.archs.tracer.context import TraceContext, get_current_span
@@ -270,22 +269,16 @@ def _adapt_structured_tools_for_provider(
     tools: Sequence[StructuredToolDefinitionLike] | None,
     provider_target: StructuredProviderTarget = "openai",
     *,
-    tool_streaming: bool = True,
     strict: bool = False,
 ) -> list[Mapping[str, object]] | None:
-    """Adapt neutral structured tools for provider format."""
+    """Adapt neutral structured tools for OpenAI-compatible gateways."""
     if not tools:
         return None
 
-    adapted_tools: list[Mapping[str, object]] = []
-    for tool in tools:
-        normalized = normalize_structured_tool_definition(tool)
-        if provider_target == "anthropic":
-            adapted_tools.append(structured_tool_definition_to_anthropic(normalized, tool_streaming=tool_streaming))
-        else:
-            adapted_tools.append(structured_tool_definition_to_openai(normalized, strict=strict))
-
-    return adapted_tools
+    return [
+        structured_tool_definition_to_openai(normalize_structured_tool_definition(tool), strict=strict)
+        for tool in tools
+    ]
 
 
 def _process_stream_chunk(
@@ -406,7 +399,6 @@ class LLMCaller:
             adapted_tools = _adapt_structured_tools_for_provider(
                 tools,
                 "openai",
-                tool_streaming=self.llm_config.tool_streaming,
                 strict=strict_tools,
             )
 

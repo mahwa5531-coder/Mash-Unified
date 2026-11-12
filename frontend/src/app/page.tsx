@@ -380,8 +380,8 @@ export default function Home() {
           {titleBar}
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[var(--bg-app)]">
             <div className="max-w-md p-6 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xl">
-              <h2 className="text-base font-semibold text-zinc-100 mb-2">MASH Recovered From Error</h2>
-              <p className="text-xs text-zinc-400 mb-4 font-mono break-all">{error.message}</p>
+              <h2 className="text-base font-semibold text-[var(--text-primary)] mb-2">MASH Recovered From Error</h2>
+              <p className="text-xs text-[var(--text-secondary)] mb-4 font-mono break-all">{error.message}</p>
               <button
                 type="button"
                 onClick={reset}

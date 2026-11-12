@@ -13,14 +13,26 @@ nexau_dir = root_dir / 'NexAU'
 
 from PyInstaller.utils.hooks import copy_metadata
 
+nexau_archs_dir = nexau_dir / 'nexau' / 'archs'
+# Bundle only non-Python assets from nexau/archs (.j2, .yaml, .sql, .md); Python modules live in PYZ.
+nexau_archs_datas = [
+    (
+        str(p),
+        'nexau/archs'
+        if p.relative_to(nexau_archs_dir).parent == Path('.')
+        else f"nexau/archs/{p.relative_to(nexau_archs_dir).parent.as_posix()}",
+    )
+    for p in nexau_archs_dir.rglob('*')
+    if p.is_file() and p.suffix not in {'.py', '.pyc'} and '__pycache__' not in p.parts
+]
+
 datas = [
     (str(connector_dir / 'app' / 'resources'), 'app/resources'),
     (str(connector_dir / 'app' / 'prompts'), 'app/prompts'),
     (str(connector_dir / 'app' / 'native_picker.ps1'), '.'),
     (str(nexau_dir / 'nexau' / 'agents'), 'nexau/agents'),
-    (str(nexau_dir / 'nexau' / 'archs'), 'nexau/archs'),
     (str(nexau_dir / 'nexau' / 'db' / 'migrations'), 'nexau/db/migrations'),
-]
+] + nexau_archs_datas
 if (nexau_dir / 'bin' / 'rg.exe').exists():
     datas.append((str(nexau_dir / 'bin' / 'rg.exe'), 'nexau/bin'))
 datas += copy_metadata('duckdb') + copy_metadata('polars')
@@ -79,6 +91,17 @@ a = Analysis(
         'pyarrow',
         'babel',
         'primp',
+        'anthropic',
+        'mypy',
+        'hypothesis',
+        '_pytest',
+        'traitlets',
+        'werkzeug',
+        'tornado',
+        'fsspec',
+        'aiohttp',
+        'pyreadline3',
+        'wolfxl',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

@@ -191,7 +191,6 @@ class TestLLMConfig:
             cache_control_ttl="1h",
             connect_timeout_ms=11_000,
             stream_idle_timeout_ms=22_000,
-            allow_unsigned_thinking=True,
             custom_param="value",
             reasoning={"effort": "high", "summary": "detailed"},
             additional_drop_params=["stop"],
@@ -208,7 +207,6 @@ class TestLLMConfig:
         assert copied.api_type == original.api_type
         assert copied.get_connect_timeout() == 11.0
         assert copied.get_stream_idle_timeout() == 22.0
-        assert copied.allow_unsigned_thinking is True
         assert copied is not original
 
     def test_repr_and_str(self):
@@ -269,67 +267,10 @@ class TestLLMConfig:
                 "LLM_API_KEY": "llm-key",
                 "OPENAI_API_KEY": "openai-key",
                 "API_KEY": "generic-key",
-                "ANTHROPIC_API_KEY": "anthropic-key",
             },
         ):
             config = LLMConfig()
             assert config.api_key == "llm-key"  # Highest priority
-
-    # -----------------------------------------------------------------------
-    # tool_streaming
-    # -----------------------------------------------------------------------
-
-    def test_tool_streaming_defaults_to_true(self):
-        """tool_streaming defaults to True for all api_types."""
-        config = LLMConfig(model="m", base_url="http://x", api_key="k")
-        assert config.tool_streaming is True
-
-    def test_tool_streaming_false_allowed_for_anthropic(self):
-        """Disabling tool_streaming is allowed for anthropic_chat_completion."""
-        config = LLMConfig(
-            model="claude-3-5-sonnet",
-            base_url="http://x",
-            api_key="k",
-            api_type="anthropic_chat_completion",
-            tool_streaming=False,
-        )
-        assert config.tool_streaming is False
-
-    def test_tool_streaming_false_rejected_for_non_anthropic(self):
-        """Setting tool_streaming=False on non-Anthropic api_type raises ValueError."""
-        with pytest.raises(ValueError, match="tool_streaming is only supported"):
-            LLMConfig(
-                model="gpt-4o",
-                base_url="http://x",
-                api_key="k",
-                api_type="openai_chat_completion",
-                tool_streaming=False,
-            )
-
-    def test_tool_streaming_preserved_in_copy(self):
-        """copy() must preserve tool_streaming=False."""
-        original = LLMConfig(
-            model="claude-3-5-sonnet",
-            base_url="http://x",
-            api_key="k",
-            api_type="anthropic_chat_completion",
-            tool_streaming=False,
-        )
-        copied = original.copy()
-        assert copied.tool_streaming is False
-
-    def test_allow_unsigned_thinking_defaults_false_and_is_not_provider_param(self):
-        """allow_unsigned_thinking is an internal Anthropic serializer switch."""
-        config = LLMConfig(
-            model="claude-3-5-sonnet",
-            base_url="http://x",
-            api_key="k",
-            api_type="anthropic_chat_completion",
-            allow_unsigned_thinking=True,
-        )
-
-        assert config.allow_unsigned_thinking is True
-        assert "allow_unsigned_thinking" not in config.to_openai_params()
 
     def test_invalid_temperature(self):
         """Test validation of temperature parameter."""

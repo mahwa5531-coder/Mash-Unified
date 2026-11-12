@@ -315,38 +315,6 @@ class TestAgent:
             assert "GetWeather" not in payload_names
             assert "ToolSearch" in agent._tool_registry.get_all()
 
-    def test_tool_call_payload_uses_skill_description_for_as_skill_anthropic(self):
-        """Structured payload should expose only the brief skill description for as_skill tools."""
-        with patch("nexau.archs.main_sub.agent.openai") as mock_openai:
-            mock_openai.OpenAI.return_value = Mock()
-
-            skill_tool = Tool(
-                name="web_search",
-                description="FULL DESCRIPTION: search the web with examples and workflow guidance.",
-                input_schema={
-                    "type": "object",
-                    "properties": {"query": {"type": "string"}},
-                    "required": ["query"],
-                },
-                implementation=lambda query: {"query": query},
-                as_skill=True,
-                skill_description="BRIEF SKILL DESCRIPTION",
-            )
-            agent_config = AgentConfig(
-                name="parent",
-                llm_config=LLMConfig(model="gpt-4o-mini"),
-                tools=[skill_tool],
-                tool_call_mode="anthropic",
-            )
-
-            agent = Agent(config=agent_config)
-
-            payload_by_name = {spec["name"]: spec for spec in agent.tool_call_payload}
-            assert payload_by_name["web_search"]["description"] == "BRIEF SKILL DESCRIPTION"
-            assert payload_by_name["web_search"]["input_schema"]["properties"]["query"]["type"] == "string"
-            assert agent.skill_registry["web_search"].detail is not None
-            assert "FULL DESCRIPTION" in (agent.skill_registry["web_search"].detail or "")
-
     def test_reusing_agent_config_keeps_skill_source_folder_and_runtime_mapping(self, tmp_path):
         """Reusing the same AgentConfig should not rewrite skill source folders to sandbox paths."""
         local_skill_folder = tmp_path / "feishu-toolkit"
@@ -375,31 +343,6 @@ class TestAgent:
         assert agent2.skill_registry["feishu-skill"].folder == str(local_skill_folder)
         assert agent1.sandbox_manager._session_context.get("upload_assets", []) == []
         assert agent2.sandbox_manager._session_context.get("upload_assets", []) == []
-
-    def test_tool_call_payload_anthropic_mode(self, sample_tool):
-        """RFC-0015: Agent is a regular builtin tool registered in ToolRegistry.
-
-        When sub_agents is configured, AgentConfig._finalize() injects an Agent
-        tool. The tool_call_payload should include 'Agent' as a regular tool.
-        """
-        with patch("nexau.archs.main_sub.agent.openai") as mock_openai:
-            mock_openai.OpenAI.return_value = Mock()
-
-            child_config = AgentConfig(name="child", llm_config=LLMConfig(model="gpt-4o-mini"))
-            agent_config = AgentConfig(
-                name="parent",
-                llm_config=LLMConfig(model="gpt-4o-mini"),
-                tools=[sample_tool],
-                sub_agents={"child": child_config},
-                tool_call_mode="anthropic",
-            )
-
-            agent = Agent(config=agent_config)
-
-            names = {spec["name"] for spec in agent.tool_call_payload}
-            assert sample_tool.name in names
-            assert "Agent" in names
-            assert "sub-agent-child" not in names
 
     def test_token_counter_callable_is_wrapped(self, global_storage):
         """Callable token_counter should be wrapped into TokenCounter instance."""

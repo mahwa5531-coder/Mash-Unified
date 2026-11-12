@@ -307,17 +307,15 @@ def test_tool_import_path_formatter_is_used() -> None:
         ),
     ],
 )
-def test_to_openai_and_anthropic_fill_missing_schema_fields(tool_kwargs, expected_props):
+def test_to_openai_fills_missing_schema_fields(tool_kwargs, expected_props):
     tool = Tool(**tool_kwargs)
 
     openai_params = tool.to_openai()["function"]["parameters"]
-    anthropic_params = tool.to_anthropic()["input_schema"]
 
-    assert openai_params["type"] == anthropic_params["type"] == "object"
+    assert openai_params["type"] == "object"
 
     for prop in expected_props:
         assert prop in openai_params.get("properties", {})
-        assert prop in anthropic_params.get("properties", {})
 
 
 def test_to_structured_definition_uses_skill_description_for_structured_models():

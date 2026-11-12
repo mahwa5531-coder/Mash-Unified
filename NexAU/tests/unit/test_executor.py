@@ -1320,7 +1320,7 @@ class TestExecutorHelperMethods:
             stop_tools=set(),
             openai_client=Mock(),
             llm_config=mock_llm_config,
-            tool_call_mode="anthropic",
+            tool_call_mode="structured",
         )
 
         payload_by_name = {spec["name"]: spec for spec in executor.structured_tool_payload}

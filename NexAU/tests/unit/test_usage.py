@@ -6,7 +6,6 @@ import yaml
 
 from nexau.archs.main_sub.execution.model_response import ModelResponse
 from nexau.core.usage import (
-    AnthropicUsageConverter,
     GeminiUsageConverter,
     OpenAIChatUsageConverter,
     OpenAIResponsesUsageConverter,
@@ -62,14 +61,6 @@ def test_builtin_usage_converters():
             "output_tokens_details": {"reasoning_tokens": 4},
         }
     )
-    anthropic_usage = AnthropicUsageConverter().convert(
-        {
-            "input_tokens": 10,
-            "output_tokens": 5,
-            "cache_creation_input_tokens": 2,
-            "cache_read_input_tokens": 3,
-        }
-    )
     gemini_usage = GeminiUsageConverter().convert(
         {
             "promptTokenCount": 8,
@@ -95,15 +86,6 @@ def test_builtin_usage_converters():
         cache_read_tokens=2,
         input_tokens_uncached=10,
     )
-    assert anthropic_usage == TokenUsage(
-        input_tokens=10,
-        completion_tokens=5,
-        reasoning_tokens=0,
-        total_tokens=20,
-        cache_creation_tokens=2,
-        cache_read_tokens=3,
-        input_tokens_uncached=10,
-    )
     assert gemini_usage == TokenUsage(
         input_tokens=8,
         completion_tokens=4,
@@ -111,28 +93,6 @@ def test_builtin_usage_converters():
         total_tokens=14,
         input_tokens_uncached=8,
         cache_read_tokens=0,
-    )
-
-
-def test_anthropic_cache_write_uses_first_non_null_source():
-    usage = AnthropicUsageConverter().convert(
-        {
-            "input_tokens": 10,
-            "output_tokens": 5,
-            "cache_creation_input_tokens": 7,
-            "cache_write_5m_input_tokens": 6,
-            "cache_write_1h_input_tokens": 4,
-        }
-    )
-
-    assert usage == TokenUsage(
-        input_tokens=10,
-        completion_tokens=5,
-        reasoning_tokens=0,
-        total_tokens=22,
-        cache_creation_tokens=7,
-        cache_read_tokens=0,
-        input_tokens_uncached=10,
     )
 
 

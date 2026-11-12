@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import anthropic
 import openai
 import pytest
 
@@ -91,14 +90,6 @@ def _ok_response() -> ModelResponse:
 class TestExtractStatusCode:
     def test_openai_api_error(self) -> None:
         exc = openai.InternalServerError(
-            message="internal",
-            response=MagicMock(status_code=500, headers={}),
-            body=None,
-        )
-        assert _extract_status_code(exc) == 500
-
-    def test_anthropic_api_error(self) -> None:
-        exc = anthropic.InternalServerError(
             message="internal",
             response=MagicMock(status_code=500, headers={}),
             body=None,

@@ -5,12 +5,15 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException, Request
 from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
-from nexau.archs.transports.http.sse_server import SSETransportServer
+
+if TYPE_CHECKING:
+    from nexau.archs.transports.http.sse_server import SSETransportServer
 
 from app.dependencies import get_engine
 from app.services.chat_permissions import resolve_tool_approval
@@ -29,9 +32,13 @@ from app.services.chat_streamer import (
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
 _sse_server: SSETransportServer | None = None
+_sse_server_factory: Callable[[], SSETransportServer] | None = None
 
 
 def get_sse_server() -> SSETransportServer:
+    global _sse_server
+    if _sse_server is None and _sse_server_factory is not None:
+        _sse_server = _sse_server_factory()
     if _sse_server is None:
         raise HTTPException(status_code=503, detail="SSETransportServer not initialized")
     return _sse_server

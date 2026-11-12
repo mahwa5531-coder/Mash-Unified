@@ -19,7 +19,6 @@ from dataclasses import replace
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-import anthropic
 import openai
 
 from nexau.archs.llm.llm_aggregators.events import CompactionFinishedEvent, CompactionStartedEvent
@@ -46,7 +45,6 @@ from nexau.core.messages import Message, Role, TextBlock, ToolUseBlock
 logger = logging.getLogger(__name__)
 
 OpenAI = openai.OpenAI
-Anthropic = anthropic.Anthropic
 
 _CONTEXT_OVERFLOW_MARKERS = (
     "maximum context length",
@@ -219,8 +217,6 @@ class ContextCompactionMiddleware(Middleware):
         if llm_config.api_type == "gemini_rest":
             return None
         client_kwargs = llm_config.to_client_kwargs()
-        if llm_config.api_type == "anthropic_chat_completion":
-            return Anthropic(**client_kwargs)
         if llm_config.api_type in ["openai_responses", "openai_chat_completion"]:
             return OpenAI(**client_kwargs)
         raise ValueError(f"Invalid API type: {llm_config.api_type}")

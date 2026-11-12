@@ -41,7 +41,6 @@ from nexau.archs.permissions.types import AskPermission, PermissionDenied
 from .formatters import ToolFormatter, ToolFormatterContext, resolve_tool_formatter
 
 if TYPE_CHECKING:
-    from anthropic.types import ToolParam
     from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 
 logger = logging.getLogger(__name__)
@@ -212,43 +211,6 @@ def structured_tool_definition_to_openai(
         "type": "function",
         "function": func_def,
     }
-
-
-def structured_tool_definition_to_anthropic(
-    tool_definition: StructuredToolDefinitionLike,
-    *,
-    tool_streaming: bool = True,
-) -> ToolParam:
-    """Convert a neutral or compatible tool definition into Anthropic schema.
-
-    RFC-0006: Provider
-
-    Anthropic tool schema  provider,  Agent / Executor
-     neutral structured definition .
-
-    Parameters
-    ----------
-    tool_definition:
-        The neutral structured tool definition to convert.
-    tool_streaming:
-        When *True* (default), include ``eager_input_streaming: True`` to
-        enable fine-grained tool streaming and reduce first-token latency for
-        large arguments.  Set to *False* to omit the field entirely - some
-        non-Anthropic providers that share the schema shape reject unknown
-        fields.
-    """
-
-    normalized = normalize_structured_tool_definition(tool_definition)
-    result: ToolParam = {
-        "name": normalized["name"],
-        "description": normalized["description"],
-        "input_schema": normalize_input_schema(normalized["input_schema"]),
-    }
-    if tool_streaming:
-        # fine-grained tool streaming, token
-        # SSE timeout.
-        result["eager_input_streaming"] = True
-    return result
 
 
 class ToolYamlSchema(BaseModel):
@@ -1023,24 +985,3 @@ class Tool:
         """
 
         return structured_tool_definition_to_openai(self.to_structured_definition())
-
-    def to_anthropic(self, *, tool_streaming: bool = True) -> ToolParam:
-        """Return the Anthropic-compatible tool schema.
-
-        RFC-0006: Provider package
-
-        method,  neutral structured definition →
-        Anthropic adapter,  Tool  Anthropic .
-
-        Parameters
-        ----------
-        tool_streaming:
-            Forward to :func:`structured_tool_definition_to_anthropic`.  When
-            *False*, the ``eager_input_streaming`` field is omitted from the
-            returned schema.
-        """
-
-        return structured_tool_definition_to_anthropic(
-            self.to_structured_definition(),
-            tool_streaming=tool_streaming,
-        )

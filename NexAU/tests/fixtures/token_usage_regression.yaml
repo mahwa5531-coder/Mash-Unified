@@ -35,22 +35,6 @@
     cache_read_tokens: 15
     input_tokens_uncached: 75
 
-- name: anthropic_cache_accounting
-  api_type: anthropic_chat_completion
-  raw_usage:
-    input_tokens: 100
-    output_tokens: 50
-    cache_creation_input_tokens: 200
-    cache_read_input_tokens: 300
-  expected:
-    input_tokens: 100
-    completion_tokens: 50
-    reasoning_tokens: 0
-    total_tokens: 650
-    cache_creation_tokens: 200
-    cache_read_tokens: 300
-    input_tokens_uncached: 100
-
 - name: gemini_reasoning_excluded_from_fallback_total
   api_type: gemini_rest
   raw_usage:

@@ -285,10 +285,10 @@ class TestSlidingWindowCompaction:
         replacement_client = Mock()
         mock_openai_class.return_value = replacement_client
         base_llm_config = LLMConfig(
-            model="claude-3-7-sonnet",
-            base_url="https://api.anthropic.com",
-            api_key="anthropic-key",
-            api_type="anthropic_chat_completion",
+            model="gpt-4o",
+            base_url="https://api.openai.com/v1",
+            api_key="base-key",
+            api_type="openai_chat_completion",
             temperature=0.4,
             max_tokens=1024,
             top_p=0.95,
@@ -500,10 +500,10 @@ class TestEmergencySummaryRuntime:
 
         replacement_client = Mock()
         base_llm_config = LLMConfig(
-            model="claude-3-7-sonnet",
-            base_url="https://api.anthropic.com",
-            api_key="anthropic-key",
-            api_type="anthropic_chat_completion",
+            model="gpt-4o",
+            base_url="https://api.openai.com/v1",
+            api_key="base-key",
+            api_type="openai_chat_completion",
             temperature=0.25,
             max_tokens=2048,
             top_p=0.8,
@@ -516,7 +516,7 @@ class TestEmergencySummaryRuntime:
             max_tokens=512,
             force_stop_reason=None,
             agent_state=agent_state,
-            tool_call_mode="anthropic",
+            tool_call_mode="structured",
             tools=None,
             api_params={},
             openai_client=mock_openai_client,
