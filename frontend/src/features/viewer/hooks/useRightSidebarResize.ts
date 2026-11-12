@@ -6,14 +6,18 @@ const MIN_WIDTH = 340;
 const MAX_WIDTH = 760;
 const DEFAULT_WIDTH = 360;
 
+const RIGHT_CHROME_INSET_PX = 7; // 6px outer gutter (`pr-1.5`) + 1px box border
+
 interface UseRightSidebarResizeProps {
   controlledIsMaximized?: boolean;
   onToggleMaximize?: () => void;
+  shellRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function useRightSidebarResize({
   controlledIsMaximized,
   onToggleMaximize,
+  shellRef,
 }: UseRightSidebarResizeProps) {
   const [width, setWidth] = useState<number>(() => {
     if (typeof window !== 'undefined') {
@@ -31,7 +35,6 @@ export function useRightSidebarResize({
   const [internalIsMaximized, setInternalIsMaximized] = useState(false);
   const isMaximized = controlledIsMaximized !== undefined ? controlledIsMaximized : internalIsMaximized;
   const prevWidthRef = useRef<number>(width);
-  const sidebarRef = useRef<HTMLDivElement>(null);
   const widthRef = useRef(width);
 
   const startResizing = useCallback((e: ReactMouseEvent) => {
@@ -45,7 +48,7 @@ export function useRightSidebarResize({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing || isMaximized) return;
-      let newWidth = window.innerWidth - e.clientX;
+      let newWidth = window.innerWidth - RIGHT_CHROME_INSET_PX - e.clientX;
       if (newWidth < MIN_WIDTH) newWidth = MIN_WIDTH;
       // Reserve at least 280px for left sidebar + 400px for center chat = 680px minimum non-right-sidebar space
       const safeMax = Math.max(MIN_WIDTH, window.innerWidth - 680);
@@ -56,8 +59,8 @@ export function useRightSidebarResize({
       if (resizeRaf === null) {
         resizeRaf = requestAnimationFrame(() => {
           resizeRaf = null;
-          if (sidebarRef.current) {
-            sidebarRef.current.style.width = `${widthRef.current}px`;
+          if (shellRef?.current) {
+            shellRef.current.style.setProperty('--right-sidebar-w', `${widthRef.current}px`);
           }
         });
       }
@@ -100,7 +103,7 @@ export function useRightSidebarResize({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, isMaximized]);
+  }, [isResizing, isMaximized, shellRef]);
 
   const handleToggleMaximize = useCallback(() => {
     if (onToggleMaximize) {
@@ -120,7 +123,6 @@ export function useRightSidebarResize({
     width,
     isResizing,
     isMaximized,
-    sidebarRef,
     startResizing,
     handleToggleMaximize,
   };

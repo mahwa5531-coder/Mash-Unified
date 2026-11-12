@@ -101,7 +101,7 @@ export function ExcelViewerCard({
   const downloadUrl = `${BASE_URL}/files/content?path=${encodeURIComponent(path || filename)}&raw=true${sessionQuery}`;
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center bg-[var(--bg-app)] dark:bg-black select-none">
+    <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center bg-[var(--bg-app)] select-none">
       {/* Fluent Excel Logo */}
       <div className="w-12 h-12 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mb-3 shadow-2xs">
         <FluentExcelLogo size={28} />

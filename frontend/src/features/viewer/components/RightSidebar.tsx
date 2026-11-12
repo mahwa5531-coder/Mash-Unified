@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, MouseEvent as ReactMouseEvent 
 import SafeFileViewer from '@/features/viewer/components/SafeFileViewer';
 import { TerminalViewer } from '@/features/viewer/components/TerminalViewer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { ViewerHeader } from './ViewerHeader';
 import { ExplorerPanel } from './ExplorerPanel';
 import { ViewerEmptyState } from './ViewerEmptyState';
@@ -27,14 +26,26 @@ export interface RightSidebarProps {
   onToggleMaximize?: () => void;
 }
 
-export default function RightSidebar({ 
-  onToggle, 
-  fileToOpen, 
-  onFileOpened, 
+export interface UseRightSidebarControllerProps extends RightSidebarProps {
+  enabled?: boolean;
+  shellRef?: React.RefObject<HTMLDivElement | null>;
+}
+
+/**
+ * Decouples RightSidebar state & views into Row-2 header (`headerNode`),
+ * left-edge resizer (`resizeHandleNode`), and inset body (`bodyNode`) so
+ * WorkbenchShell can frame Chat + Viewer inside a single unified rounded box.
+ */
+export function useRightSidebarController({
+  enabled = true,
+  shellRef,
+  onToggle,
+  fileToOpen,
+  onFileOpened,
   sessionId,
   isMaximized: controlledIsMaximized,
-  onToggleMaximize
-}: RightSidebarProps) {
+  onToggleMaximize,
+}: UseRightSidebarControllerProps) {
   // Accordion Sections State (Audit Deliverables & Working Papers only)
   const [openSections, setOpenSections] = useState({
     deliverables: true,
@@ -47,17 +58,17 @@ export default function RightSidebar({
 
   const [fileViewMode, setFileViewMode] = useState<'preview' | 'raw'>('preview');
 
-  // Atomised Resizing
+  // Atomised Resizing (syncs `--right-sidebar-w` on shellRef)
   const {
     width,
     isResizing,
     isMaximized,
-    sidebarRef,
     startResizing,
     handleToggleMaximize,
   } = useRightSidebarResize({
     controlledIsMaximized,
     onToggleMaximize,
+    shellRef,
   });
 
   // Atomised Tab Management
@@ -78,9 +89,9 @@ export default function RightSidebar({
     activeTab,
   } = useViewerTabs(sessionId);
 
-  // Live Terminal Log Streamer for Background Process Tabs
+  // Live Terminal Log Streamer for Background Process Tabs (idle when panel is closed)
   const { terminalStatuses, terminalPreRef, setTerminalScroller } = useTerminalLogStream({
-    activeTab,
+    activeTab: enabled ? activeTab : undefined,
     viewMode,
     tabContent,
     setTabContent,
@@ -105,7 +116,7 @@ export default function RightSidebar({
 
   // Load Session Artifacts (Deliverables & Working Papers)
   const loadArtifacts = useCallback(async () => {
-    if (!sessionId) return;
+    if (!enabled || !sessionId) return;
     try {
       const data = await fetchSessionArtifactsData(sessionId);
       setArtifactsData(data);
@@ -117,15 +128,17 @@ export default function RightSidebar({
         items: [],
       });
     }
-  }, [sessionId]);
+  }, [enabled, sessionId]);
 
   // Initial Load & Visibility Refresh
   useEffect(() => {
+    if (!enabled) return;
     loadArtifacts();
-  }, [loadArtifacts]);
+  }, [enabled, loadArtifacts]);
 
   // Listen for instant turn completion to refresh deliverables without waiting for timer
   useEffect(() => {
+    if (!enabled) return;
     const handleTurnDone = (e: Event) => {
       const customEvt = e as CustomEvent;
       if (!customEvt.detail?.sessionId || customEvt.detail?.sessionId === sessionId) {
@@ -134,10 +147,10 @@ export default function RightSidebar({
     };
     window.addEventListener('mash:turn_completed', handleTurnDone);
     return () => window.removeEventListener('mash:turn_completed', handleTurnDone);
-  }, [sessionId, loadArtifacts]);
+  }, [enabled, sessionId, loadArtifacts]);
 
   useEffect(() => {
-    if (viewMode !== 'explorer') return;
+    if (!enabled || viewMode !== 'explorer') return;
 
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
@@ -155,20 +168,21 @@ export default function RightSidebar({
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [viewMode, loadArtifacts]);
+  }, [enabled, viewMode, loadArtifacts]);
 
   // Listen to fileToOpen prop from chat/workspace and open automatically
   useEffect(() => {
-    if (fileToOpen) {
+    if (enabled && fileToOpen) {
       const pathWithoutAnchor = normalizePath(fileToOpen);
       const basename = pathWithoutAnchor.split(/[/\\]/).pop() || pathWithoutAnchor;
       openFileTab(basename, pathWithoutAnchor);
       onFileOpened?.();
     }
-  }, [fileToOpen, openFileTab, onFileOpened]);
+  }, [enabled, fileToOpen, openFileTab, onFileOpened]);
 
   // Global listener to open background task terminal output in RightSidebar
   useEffect(() => {
+    if (!enabled) return;
     const handleOpenTerminal = (e: any) => {
       if (e.detail?.taskId) {
         const taskId = String(e.detail.taskId);
@@ -178,109 +192,104 @@ export default function RightSidebar({
     };
     window.addEventListener('mash:open-terminal', handleOpenTerminal);
     return () => window.removeEventListener('mash:open-terminal', handleOpenTerminal);
-  }, [openTerminalTab]);
+  }, [enabled, openTerminalTab]);
 
-  return (
-    <TooltipProvider delayDuration={150}>
-      <div 
-        ref={sidebarRef}
-        className={`h-full bg-[var(--bg-app)] text-[var(--text-primary)] border-l border-zinc-200/70 dark:border-white/[0.06] flex flex-col font-sans shrink-0 antialiased relative z-30 select-none ${
-          isMaximized ? 'flex-1 w-full min-w-0' : (isResizing ? '' : 'transition-all duration-75')
-        }`}
-        style={isMaximized ? undefined : { width: `${width}px` }}
-      >
-        {/* Draggable Resizer Handle */}
-        {!isMaximized && (
-          <div 
-            className="absolute -left-1.5 top-0 w-3 h-full cursor-col-resize z-50 group flex items-center justify-center select-none"
-            onMouseDown={startResizing}
-            title="Drag to resize sidebar"
-          >
-            <div className="w-[2px] h-12 rounded-full bg-zinc-300 dark:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
-          </div>
-        )}
+  const headerNode = enabled ? (
+    <ViewerHeader
+      viewMode={viewMode}
+      setViewMode={setViewMode}
+      openTabs={openTabs}
+      activeTabId={activeTabId}
+      setActiveTabId={setActiveTabId}
+      openSections={openSections}
+      setOpenSections={setOpenSections}
+      isMaximized={isMaximized}
+      onToggle={onToggle}
+      handleToggleMaximize={handleToggleMaximize}
+      handleCloseTab={handleCloseTab}
+    />
+  ) : null;
 
-        <ViewerHeader
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          openTabs={openTabs}
-          activeTabId={activeTabId}
-          setActiveTabId={setActiveTabId}
-          openSections={openSections}
-          setOpenSections={setOpenSections}
-          isMaximized={isMaximized}
-          onToggle={onToggle}
-          handleToggleMaximize={handleToggleMaximize}
-          handleCloseTab={handleCloseTab}
-        />
+  const resizeHandleNode = enabled && !isMaximized ? (
+    <div
+      className="absolute -left-1.5 top-0 w-3 h-full cursor-col-resize z-50 group flex items-center justify-center select-none"
+      onMouseDown={startResizing}
+      title="Drag to resize sidebar"
+    >
+      <div className="w-[2px] h-12 rounded-full bg-zinc-300 dark:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
+    </div>
+  ) : null;
 
-        {/* Main Content Body */}
-        {viewMode === 'explorer' ? (
-          <ExplorerPanel
-            artifactsData={artifactsData}
-            openSections={openSections}
-            toggleSection={toggleSection}
-            openFileTab={openFileTab}
+  const bodyNode = !enabled ? null : viewMode === 'explorer' ? (
+    <ExplorerPanel
+      artifactsData={artifactsData}
+      openSections={openSections}
+      toggleSection={toggleSection}
+      openFileTab={openFileTab}
+    />
+  ) : !activeTab ? (
+    <ViewerEmptyState setViewMode={setViewMode} />
+  ) : (
+    <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
+      <FileBreadcrumbBar
+        path={activeTab.path || activeTab.title || ''}
+        type={activeTab.type}
+        actions={
+          <ViewerTabMenu
+            activeTab={activeTab}
+            content={tabContent[activeTab.id]}
+            onCloseTab={handleCloseTab}
+            sessionId={sessionId}
           />
-        ) : !activeTab ? (
-          <ViewerEmptyState setViewMode={setViewMode} />
-        ) : (
-          <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-app)] text-[var(--text-primary)]">
-            {/* Canonical FileBreadcrumbBar Primitive */}
-            <FileBreadcrumbBar
-              path={activeTab.path || activeTab.title || ''}
-              type={activeTab.type}
-              actions={
-                <ViewerTabMenu
-                  activeTab={activeTab}
-                  content={tabContent[activeTab.id]}
-                  onCloseTab={handleCloseTab}
-                  sessionId={sessionId}
-                />
-              }
-            />
+        }
+      />
 
-            {/* Content Body: Terminal Viewer vs Safe File Viewer */}
-            {activeTab.type === 'terminal' ? (
-              <div className="flex-1 overflow-hidden bg-[var(--bg-app)]">
-                <ErrorBoundary scope="terminal-viewer">
-                  <TerminalViewer
-                    activeTab={activeTab}
-                    terminalStatuses={terminalStatuses}
-                    tabContent={tabContent}
-                    handleKillTask={handleKillTask}
-                    terminalPreRef={terminalPreRef}
-                    onScrollerRef={setTerminalScroller}
-                  />
-                </ErrorBoundary>
-              </div>
-            ) : (
-              <div className="flex-1 overflow-hidden bg-[var(--bg-app)]">
-                <ErrorBoundary scope="safe-file-viewer">
-                  <SafeFileViewer
-                    filename={activeTab?.title || ''}
-                    path={activeTab?.path}
-                    sessionId={sessionId}
-                    content={activeTab ? tabContent[activeTab.id] || '' : ''}
-                    isTruncated={Boolean(activeTab && (tabTruncated?.[activeTab.id] || (activeTab.path && isFileTruncatedFromCache(activeTab.path, sessionId))))}
-                    isLoading={isLoadingContent}
-                    viewMode={fileViewMode}
-                    onViewModeChange={setFileViewMode}
-                    hideToolbar={true}
-                    onRetry={() => retryTabContent(activeTab?.id)}
-                    onOpenFile={(p) => {
-                      const [pathWithoutAnchor] = p.split('#');
-                      const norm = normalizePath(pathWithoutAnchor);
-                      const base = norm.split(/[/\\]/).pop() || norm;
-                      openFileTab(base, norm);
-                    }}
-                  />
-                </ErrorBoundary>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </TooltipProvider>
+      {activeTab.type === 'terminal' ? (
+        <div className="flex-1 overflow-hidden bg-[var(--bg-app)]">
+          <ErrorBoundary scope="terminal-viewer">
+            <TerminalViewer
+              activeTab={activeTab}
+              terminalStatuses={terminalStatuses}
+              tabContent={tabContent}
+              handleKillTask={handleKillTask}
+              terminalPreRef={terminalPreRef}
+              onScrollerRef={setTerminalScroller}
+            />
+          </ErrorBoundary>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-hidden bg-[var(--bg-app)]">
+          <ErrorBoundary scope="safe-file-viewer">
+            <SafeFileViewer
+              filename={activeTab?.title || ''}
+              path={activeTab?.path}
+              sessionId={sessionId}
+              content={activeTab ? tabContent[activeTab.id] || '' : ''}
+              isTruncated={Boolean(activeTab && (tabTruncated?.[activeTab.id] || (activeTab.path && isFileTruncatedFromCache(activeTab.path, sessionId))))}
+              isLoading={isLoadingContent}
+              viewMode={fileViewMode}
+              onViewModeChange={setFileViewMode}
+              hideToolbar={true}
+              onRetry={() => retryTabContent(activeTab?.id)}
+              onOpenFile={(p) => {
+                const [pathWithoutAnchor] = p.split('#');
+                const norm = normalizePath(pathWithoutAnchor);
+                const base = norm.split(/[/\\]/).pop() || norm;
+                openFileTab(base, norm);
+              }}
+            />
+          </ErrorBoundary>
+        </div>
+      )}
+    </div>
   );
+
+  return {
+    width,
+    isResizing,
+    isMaximized,
+    headerNode,
+    resizeHandleNode,
+    bodyNode,
+  };
 }

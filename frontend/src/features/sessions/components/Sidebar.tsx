@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
+import { useState, useEffect, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
 import { markSessionViewed, renameSession, deleteSession, markSessionDeleted, unmarkSessionDeleted, cleanupSessionStorage, SessionItem } from '@/services/sessions';
 import { ProjectItem, selectFolder, resolveFolder, createProject, deleteProject } from '@/services/projects';
 import { sessionStore, isSessionStreaming } from '@/features/chat';
@@ -115,10 +115,25 @@ export default function Sidebar({
     const el = scrollContainerRef.current;
     if (!el) return;
     const hasUp = el.scrollTop > 4;
-    const hasDown = el.scrollHeight - el.scrollTop - el.clientHeight > 12;
+    const hasDown = el.scrollHeight - el.scrollTop - el.clientHeight > 6;
     setCanScrollUp(prev => (prev !== hasUp ? hasUp : prev));
     setCanScrollDown(prev => (prev !== hasDown ? hasDown : prev));
   }, []);
+
+  // Keep scroll state accurate on initial mount, session/folder toggles, and container resize
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const rafId = requestAnimationFrame(updateScrollShading);
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(updateScrollShading)
+      : null;
+    observer?.observe(el);
+    return () => {
+      cancelAnimationFrame(rafId);
+      observer?.disconnect();
+    };
+  }, [updateScrollShading, sessions, registeredProjects, pinnedSessions.length, openFolders, sectionsState, loading]);
 
   // Context Menu State
   const [activeMenuSessionId, setActiveMenuSessionId] = useState<string | null>(null);
@@ -439,7 +454,7 @@ export default function Sidebar({
   return (
     <div 
       data-testid="left-sidebar"
-      className="bg-[var(--bg-sidebar)] border-r border-zinc-200/70 dark:border-white/[0.06] h-full flex flex-col text-zinc-700 dark:text-zinc-300 font-sans shrink-0 select-none relative transition-colors"
+      className="bg-[var(--bg-sidebar)] h-full flex flex-col text-zinc-700 dark:text-zinc-300 font-sans shrink-0 select-none relative transition-colors"
       style={{ width: `${effectiveWidth}px` }}
       onClick={() => setActiveMenuSessionId(null)}
     >
@@ -471,7 +486,11 @@ export default function Sidebar({
       )}
 
       {/* Scrollable Content Area */}
-      <div className="relative flex-1 min-h-0 flex flex-col">
+      <div
+        className={`relative flex-1 min-h-0 flex flex-col border-t transition-colors duration-150 ${
+          canScrollUp ? 'border-zinc-200/70 dark:border-white/[0.06]' : 'border-transparent'
+        }`}
+      >
         <div 
           ref={scrollContainerRef}
           onScroll={updateScrollShading}
@@ -480,7 +499,6 @@ export default function Sidebar({
           {/* Pinned Section */}
           <PinnedSection
             pinnedSessions={pinnedSessions}
-            canScrollUp={canScrollUp}
             renderSessionItem={renderSessionItem}
             isOpen={sectionsState.pinned}
             onToggleOpen={() => toggleSection('pinned')}
@@ -491,7 +509,6 @@ export default function Sidebar({
             workspaceSessions={workspaceSessions}
             registeredProjects={registeredProjects}
             openFolders={openFolders}
-            canScrollUp={canScrollUp}
             onToggleFolder={toggleFolder}
             onNewSession={onNewSession}
             onNewProject={handleAddWorkspace}
@@ -506,7 +523,6 @@ export default function Sidebar({
           <DirectConversationsSection
             directConversations={directConversations}
             loading={loading}
-            canScrollUp={canScrollUp}
             onNewSession={onNewSession}
             renderSessionItem={renderSessionItem}
             isOpen={sectionsState.conversations}
@@ -516,7 +532,7 @@ export default function Sidebar({
 
         {/* Ambient Bottom Scroll Fade */}
         <div 
-          className={`pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-[var(--bg-sidebar)] via-[var(--bg-sidebar)]/80 to-transparent transition-opacity duration-300 z-10 ${
+          className={`pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-[var(--bg-sidebar)] via-[var(--bg-sidebar)]/85 to-transparent transition-opacity duration-150 z-10 ${
             canScrollDown ? 'opacity-100' : 'opacity-0'
           }`}
         />
@@ -540,8 +556,13 @@ export default function Sidebar({
         />
       )}
 
-      {/* Fixed Footer - Settings & Account Badge */}
-      <SidebarFooter onOpenSettings={onOpenSettings} authUser={authUser} />
+      {/* Fixed Footer - Blends at rest, differentiates cleanly when sessions scroll/overflow */}
+      <SidebarFooter
+        onOpenSettings={onOpenSettings}
+        authUser={authUser}
+        isScrolled={canScrollUp || canScrollDown}
+        canScrollDown={canScrollDown}
+      />
 
       {/* Quick Project Creation Modal */}
       <QuickProjectModal

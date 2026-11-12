@@ -17,7 +17,6 @@ export interface WorkspacesSectionProps {
   workspaceSessions: Record<string, SessionItem[]>;
   registeredProjects: ProjectItem[];
   openFolders: Record<string, boolean>;
-  canScrollUp: boolean;
   onToggleFolder: (repoName: string) => void;
   onNewSession: (repoName?: string, folderPath?: string) => void;
   onNewProject: () => void;
@@ -32,7 +31,6 @@ export function WorkspacesSection({
   workspaceSessions,
   registeredProjects,
   openFolders,
-  canScrollUp,
   onToggleFolder,
   onNewSession,
   onNewProject,
@@ -59,9 +57,7 @@ export function WorkspacesSection({
     <div className="relative pb-2">
       {/* Workspaces Sticky Header */}
       <div 
-        className={`sticky top-0 z-20 bg-[var(--bg-sidebar)] px-3 pt-2 pb-1.5 flex justify-between items-center select-none text-zinc-500 dark:text-zinc-400 transition-colors relative ${
-          canScrollUp ? 'border-b border-zinc-200 dark:border-white/[0.04]' : ''
-        }`}
+        className="sticky top-0 z-20 bg-[var(--bg-sidebar)] px-3 pt-2 pb-1.5 flex justify-between items-center select-none text-zinc-500 dark:text-zinc-400 transition-colors relative"
       >
         <div 
           onClick={handleToggle}

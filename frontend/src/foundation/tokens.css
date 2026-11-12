@@ -5,12 +5,14 @@
  */
 
 :root {
-  /* Surface & Canvas (Light Theme) */
-  --m-bg-app: #F0F1F3;
-  --m-bg-sidebar: #F9F9F9;
+  /* Surface & Canvas (Light Theme: crisp #FFFFFF inset canvas inside #F0F1F3 chrome) */
+  --m-bg-app: #FFFFFF;
+  --m-bg-sidebar: #F0F1F3;
+  --m-bg-toolbar: var(--m-bg-sidebar);
   --m-bg-surface: #FFFFFF;
-  --m-bg-surface-hover: #F1F3F5;
-  --m-bg-surface-active: #E9ECEF;
+  --m-bg-raised: #FFFFFF;
+  --m-bg-surface-hover: #E6E8EC;
+  --m-bg-surface-active: #DFE2E7;
   /* Borders (Light Theme) */
   --m-border-subtle: #E5E7EB;
   --m-border: #D6D9DE;
@@ -38,10 +40,12 @@
 
 [data-theme="dark"],
 .dark {
-  /* Surface & Canvas (Dark Theme) */
+  /* Surface & Canvas (Dark Theme: deep #09090b inset canvas inside #141416 chrome) */
   --m-bg-app: #09090b;
-  --m-bg-sidebar: #101010;
+  --m-bg-sidebar: #141416;
+  --m-bg-toolbar: var(--m-bg-sidebar);
   --m-bg-surface: #141416;
+  --m-bg-raised: #1A1A1D;
   --m-bg-surface-hover: rgba(255, 255, 255, 0.05);
   --m-bg-surface-active: rgba(255, 255, 255, 0.09);
   /* Borders (Dark Theme) */

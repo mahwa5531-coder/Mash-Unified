@@ -48,10 +48,10 @@ export function useSidebarResize({
         onWidthChange(newWidth);
       } else {
         setInternalWidth(newWidth);
+        try {
+          localStorage.setItem('mash_sidebar_width', String(newWidth));
+        } catch {}
       }
-      try {
-        localStorage.setItem('mash_sidebar_width', String(newWidth));
-      } catch {}
     };
 
     const handleMouseUp = () => {

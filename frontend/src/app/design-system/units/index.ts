@@ -20,3 +20,4 @@ export * from './Unit20FileViewerStates';
 export * from './Unit21SignIn';
 export * from './Unit22SettingsModal';
 export * from './Unit23LLMResponseShowcase';
+export * from './Unit24WorkbenchShell';

@@ -7,9 +7,18 @@ import type { AuthUser } from '@/services/auth';
 export interface SidebarFooterProps {
   onOpenSettings?: (tab?: string) => void;
   authUser?: AuthUser | null;
+  /** True whenever session list overflows/scrolls so footer differentiates softly instead of colliding. */
+  isScrolled?: boolean;
+  /** True when more sessions lie below the fold. */
+  canScrollDown?: boolean;
 }
 
-export function SidebarFooter({ onOpenSettings, authUser }: SidebarFooterProps) {
+export function SidebarFooter({
+  onOpenSettings,
+  authUser,
+  isScrolled = false,
+  canScrollDown = false,
+}: SidebarFooterProps) {
   const initial = ((authUser?.name || authUser?.email || 'U').charAt(0) || 'U').toUpperCase();
   const displayName = authUser?.name || authUser?.email?.split('@')[0] || 'Account';
   const planName = (authUser?.plan || 'Free').toUpperCase();
@@ -26,7 +35,19 @@ export function SidebarFooter({ onOpenSettings, authUser }: SidebarFooterProps) 
   }, [authUser?.quota?.windows]);
 
   return (
-    <div className="mt-auto p-2 bg-[var(--bg-sidebar)] shrink-0 border-t border-zinc-200/50 dark:border-white/[0.04] flex items-center justify-between gap-1.5">
+    <div
+      data-testid="sidebar-footer"
+      data-scrolled={isScrolled ? 'true' : 'false'}
+      className={`mt-auto p-2 bg-[var(--bg-sidebar)] shrink-0 border-t transition-[border-color,box-shadow] duration-150 flex items-center justify-between gap-1.5 relative z-20 ${
+        isScrolled
+          ? `border-zinc-200/80 dark:border-white/[0.07] ${
+              canScrollDown
+                ? 'shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_-6px_16px_-4px_rgba(0,0,0,0.4)]'
+                : ''
+            }`
+          : 'border-transparent'
+      }`}
+    >
       {authUser?.authenticated ? (
         <button
           type="button"

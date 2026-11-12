@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from '@/features/sessions/components/Sidebar';
 import ChatCanvas from '@/features/chat/components/ChatCanvas';
-import RightSidebar from '@/features/viewer/components/RightSidebar';
+import { useRightSidebarController } from '@/features/viewer/components/RightSidebar';
 import ConversationHistory from '@/features/sessions/components/ConversationHistory';
 import SettingsModal from '@/features/settings/components/SettingsModal';
 import DesktopSignInView from '@/features/auth/components/DesktopSignInView';
@@ -17,6 +17,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { sessionStore } from '@/features/chat';
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar';
 import { ChatToolbar } from '@/components/layout/ChatToolbar';
+import { WorkbenchShell } from '@/primitives';
 
 export default function Home() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -314,6 +315,26 @@ export default function Home() {
     return () => window.removeEventListener('mash:open-file', handleGlobalOpenFile);
   }, [handleOpenFile]);
 
+  const shellRef = useRef<HTMLDivElement>(null);
+
+  const handleCloseRightSidebar = useCallback(() => {
+    setIsRightSidebarOpen(false);
+    setIsRightSidebarMaximized(false);
+  }, []);
+  const handleFileOpened = useCallback(() => setFileToOpen(null), []);
+  const handleToggleRightMaximize = useCallback(() => setIsRightSidebarMaximized(prev => !prev), []);
+
+  const rightPanel = useRightSidebarController({
+    enabled: Boolean(authUser?.authenticated && !isAuthLoading && isRightSidebarOpen),
+    shellRef,
+    onToggle: handleCloseRightSidebar,
+    fileToOpen,
+    onFileOpened: handleFileOpened,
+    sessionId: selectedSessionId || undefined,
+    isMaximized: isRightSidebarMaximized,
+    onToggleMaximize: handleToggleRightMaximize,
+  });
+
   const titleBar = (
     <WindowTitleBar
       onToggleFullscreen={() => {
@@ -330,7 +351,7 @@ export default function Home() {
 
   if (isAuthLoading) {
     return (
-      <div className="flex flex-col h-screen w-full bg-[#09090b] text-zinc-400 overflow-hidden">
+      <div className="flex flex-col h-screen w-full bg-[var(--bg-app)] text-zinc-400 overflow-hidden">
         {titleBar}
         <div className="flex flex-1 min-h-0 items-center justify-center">
           <div className="flex flex-col items-center gap-3">
@@ -352,13 +373,11 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[var(--bg-app)] overflow-hidden text-[var(--text-primary)] font-sans transition-colors">
-      {/* Row 1: Window Frame Title Bar (Matches Desktop Window in Images 1 & 2) */}
-      {titleBar}
-
-      <ErrorBoundary
-        scope="workbench-root"
-        fallbackRender={(error, reset) => (
+    <ErrorBoundary
+      scope="workbench-root"
+      fallbackRender={(error, reset) => (
+        <div className="flex flex-col h-screen w-full bg-[var(--bg-sidebar)] overflow-hidden text-[var(--text-primary)] font-sans">
+          {titleBar}
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[var(--bg-app)]">
             <div className="max-w-md p-6 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xl">
               <h2 className="text-base font-semibold text-zinc-100 mb-2">MASH Recovered From Error</h2>
@@ -372,123 +391,110 @@ export default function Home() {
               </button>
             </div>
           </div>
-        )}
-      >
-        <TooltipProvider delayDuration={150}>
-          <main className="flex flex-1 overflow-hidden min-h-0">
-            {/* Column 1: Left Sidebar (starts with Row 2 header when open) */}
-            {isSidebarOpen && !(isRightSidebarOpen && isRightSidebarMaximized) && (
-              <Sidebar
-                selectedSessionId={selectedSessionId}
-                selectedSessionTitle={selectedSessionTitle}
-                selectedSessionRepo={selectedSessionRepo}
+        </div>
+      )}
+    >
+      <TooltipProvider delayDuration={150}>
+        <WorkbenchShell
+          shellRef={shellRef}
+          titleBar={titleBar}
+          isSidebarOpen={isSidebarOpen}
+          sidebar={
+            <Sidebar
+              selectedSessionId={selectedSessionId}
+              selectedSessionTitle={selectedSessionTitle}
+              selectedSessionRepo={selectedSessionRepo}
+              onSelectSession={handleSelectSession}
+              onNewSession={handleNewSession}
+              onToggle={() => setIsSidebarOpen(false)}
+              isHistoryActive={isHistoryActive}
+              onOpenHistory={handleOpenHistory}
+              onOpenSettings={(tab?: string) => { setSettingsTab(tab || 'appearance'); setIsSettingsOpen(true); }}
+              width={sidebarWidth}
+              onWidthChange={handleSidebarWidthChange}
+              archivedSessionIds={archivedSessionIds}
+              onToggleArchive={handleToggleArchive}
+              onDeleteSession={handleDeleteSession}
+              onRenameSession={handleRenameSession}
+              authUser={authUser}
+            />
+          }
+          chatToolbar={
+            <ChatToolbar
+              isSidebarOpen={isSidebarOpen}
+              onOpenSidebar={() => setIsSidebarOpen(true)}
+              isRightSidebarOpen={isRightSidebarOpen}
+              onOpenRightSidebar={() => setIsRightSidebarOpen(true)}
+              isHistoryActive={isHistoryActive}
+              sessionRepo={selectedSessionRepo}
+              sessionTitle={selectedSessionTitle}
+              selectedSessionId={selectedSessionId}
+            />
+          }
+          rightHeader={rightPanel.headerNode}
+          mainContent={
+            isHistoryActive ? (
+              <ConversationHistory
+                sessions={allSessions}
                 onSelectSession={handleSelectSession}
-                onNewSession={handleNewSession}
-                onToggle={() => setIsSidebarOpen(false)}
-                isHistoryActive={isHistoryActive}
-                onOpenHistory={handleOpenHistory}
-                onOpenSettings={(tab?: string) => { setSettingsTab(tab || 'appearance'); setIsSettingsOpen(true); }}
-                width={sidebarWidth}
-                onWidthChange={handleSidebarWidthChange}
+                onDeleteSession={handleDeleteSession}
                 archivedSessionIds={archivedSessionIds}
                 onToggleArchive={handleToggleArchive}
-                onDeleteSession={handleDeleteSession}
-
-                onRenameSession={handleRenameSession}
-                authUser={authUser}
               />
-            )}
-
-            {/* Column 2: Center Chat Column (Row 2 Header + Chat Body) */}
-            <div className={`flex flex-col flex-1 min-w-0 h-full overflow-hidden ${isRightSidebarMaximized && isRightSidebarOpen ? 'hidden' : ''}`}>
-              {/* Row 2: Chat Navigation Toolbar (height h-9 = 36px, matches Sidebar & RightSidebar) */}
-              <ChatToolbar
-                isSidebarOpen={isSidebarOpen}
-                onOpenSidebar={() => setIsSidebarOpen(true)}
-                isRightSidebarOpen={isRightSidebarOpen}
-                onOpenRightSidebar={() => setIsRightSidebarOpen(true)}
-                isHistoryActive={isHistoryActive}
-                sessionRepo={selectedSessionRepo}
+            ) : (
+              <ChatCanvas
+                sessionId={selectedSessionId}
                 sessionTitle={selectedSessionTitle}
-                selectedSessionId={selectedSessionId}
+                sessionRepo={selectedSessionRepo}
+                pendingWorkspacePath={pendingWorkspacePath}
+                onSelectProject={handleNewSession}
+                onSessionCreated={(id, title, repo) => {
+                  setSelectedSessionId(id);
+                  if (title) setSelectedSessionTitle(title);
+                  if (repo) setSelectedSessionRepo(repo);
+                  setPendingWorkspacePath(null);
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('nexau:projects-updated'));
+                  }
+                }}
+                onToggleRightSidebar={() => setIsRightSidebarOpen(prev => !prev)}
+                isRightSidebarOpen={isRightSidebarOpen}
+                onOpenFile={handleOpenFile}
+                onOpenSettings={(tab?: string) => { setSettingsTab(tab || 'account'); setIsSettingsOpen(true); }}
               />
-
-              {/* Chat Canvas / Conversation History Body */}
-              <div className="flex-1 min-h-0 overflow-hidden">
-                {isHistoryActive ? (
-                  <ConversationHistory
-                    sessions={allSessions}
-                    onSelectSession={handleSelectSession}
-                    onDeleteSession={handleDeleteSession}
-
-                    archivedSessionIds={archivedSessionIds}
-                    onToggleArchive={handleToggleArchive}
-                  />
-                ) : (
-                  <ChatCanvas
-                    sessionId={selectedSessionId}
-                    sessionTitle={selectedSessionTitle}
-                    sessionRepo={selectedSessionRepo}
-                    pendingWorkspacePath={pendingWorkspacePath}
-                    onSelectProject={handleNewSession}
-                    onSessionCreated={(id, title, repo) => {
-                      setSelectedSessionId(id);
-                      if (title) setSelectedSessionTitle(title);
-                      if (repo) setSelectedSessionRepo(repo);
-                      setPendingWorkspacePath(null);
-                      if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('nexau:projects-updated'));
-                      }
-                    }}
-                    onToggleRightSidebar={() => setIsRightSidebarOpen(prev => !prev)}
-                    isRightSidebarOpen={isRightSidebarOpen}
-                    onOpenFile={handleOpenFile}
-                    onOpenSettings={(tab?: string) => { setSettingsTab(tab || 'account'); setIsSettingsOpen(true); }}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Column 3: Right Sidebar (Row 1 Header in Row 2 + Row 2 Subheader + File View) */}
-            {isRightSidebarOpen && (
-              <RightSidebar
-                onToggle={() => {
-                  setIsRightSidebarOpen(false);
-                  setIsRightSidebarMaximized(false);
-                }} 
-                fileToOpen={fileToOpen}
-                onFileOpened={() => setFileToOpen(null)}
-                sessionId={selectedSessionId || undefined}
-                isMaximized={isRightSidebarMaximized}
-                onToggleMaximize={() => setIsRightSidebarMaximized(prev => !prev)}
-              />
-            )}
-          </main>
-        </TooltipProvider>
-
-        <SettingsModal
-          isOpen={isSettingsOpen}
-          initialTab={settingsTab}
-          onClose={() => setIsSettingsOpen(false)}
-          onThemeChange={setIsDark}
-          onSignOut={() => setAuthUser(null)}
-          currentProjectName={selectedSessionRepo && selectedSessionRepo !== 'No Repo' ? selectedSessionRepo : 'Mash'}
-          onProjectDeleted={(projectName) => {
-            if (selectedSessionRepo === projectName) {
-              handleNewSession('No Repo');
-            }
-          }}
+            )
+          }
+          rightContent={rightPanel.bodyNode}
+          rightResizeHandle={rightPanel.resizeHandleNode}
+          isRightOpen={isRightSidebarOpen}
+          isRightMaximized={isRightSidebarMaximized}
+          rightWidth={rightPanel.width}
+          isRightResizing={rightPanel.isResizing}
         />
-        {deleteError && (
-          <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <FailedToDeleteCard
-              title={deleteError.title}
-              message={deleteError.message}
-              onClose={() => setDeleteError(null)}
-            />
-          </div>
-        )}
-      </ErrorBoundary>
-    </div>
+      </TooltipProvider>
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        initialTab={settingsTab}
+        onClose={() => setIsSettingsOpen(false)}
+        onThemeChange={setIsDark}
+        onSignOut={() => setAuthUser(null)}
+        currentProjectName={selectedSessionRepo && selectedSessionRepo !== 'No Repo' ? selectedSessionRepo : 'Mash'}
+        onProjectDeleted={(projectName) => {
+          if (selectedSessionRepo === projectName) {
+            handleNewSession('No Repo');
+          }
+        }}
+      />
+      {deleteError && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <FailedToDeleteCard
+            title={deleteError.title}
+            message={deleteError.message}
+            onClose={() => setDeleteError(null)}
+          />
+        </div>
+      )}
+    </ErrorBoundary>
   );
 }

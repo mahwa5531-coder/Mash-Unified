@@ -29,6 +29,7 @@ const Unit20FileViewerStates = dynamic(() => import('./units').then(m => m.Unit2
 const Unit21SignIn = dynamic(() => import('./units').then(m => m.Unit21SignIn), { ssr: false });
 const Unit22SettingsModal = dynamic(() => import('./units').then(m => m.Unit22SettingsModal), { ssr: false });
 const Unit23LLMResponseShowcase = dynamic(() => import('./units').then(m => m.Unit23LLMResponseShowcase), { ssr: false });
+const Unit24WorkbenchShell = dynamic(() => import('./units').then(m => m.Unit24WorkbenchShell), { ssr: false });
 
 export default function DesignSystemPreviewPage() {
   if (process.env.NODE_ENV === 'production') {
@@ -163,6 +164,9 @@ export default function DesignSystemPreviewPage() {
 
         {/* UNIT 23: Complete LLM Response Showcase */}
         <Unit23LLMResponseShowcase />
+
+        {/* UNIT 24: Unified Two-Tone Inset Workbench Shell */}
+        <Unit24WorkbenchShell />
 
       </div>
     </div>

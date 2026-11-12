@@ -207,9 +207,9 @@ export default function SafeFileViewer({
       inherit: true,
       rules: [],
       colors: {
-        'editor.background': '#F0F1F3',
-        'editorGutter.background': '#F0F1F3',
-        'editor.lineHighlightBackground': '#e4e4e7',
+        'editor.background': '#FFFFFF',
+        'editorGutter.background': '#FFFFFF',
+        'editor.lineHighlightBackground': '#F4F4F5',
         'editorLineNumber.foreground': '#a1a1aa',
         'editorLineNumber.activeForeground': '#52525b',
       },

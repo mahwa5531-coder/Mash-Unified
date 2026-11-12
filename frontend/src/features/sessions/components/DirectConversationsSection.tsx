@@ -7,7 +7,6 @@ import { SessionItem } from '@/services/sessions';
 export interface DirectConversationsSectionProps {
   directConversations: SessionItem[];
   loading: boolean;
-  canScrollUp: boolean;
   onNewSession?: (repoName?: string) => void;
   renderSessionItem: (session: SessionItem) => React.ReactNode;
   isOpen?: boolean;
@@ -17,7 +16,6 @@ export interface DirectConversationsSectionProps {
 export function DirectConversationsSection({
   directConversations,
   loading,
-  canScrollUp,
   onNewSession,
   renderSessionItem,
   isOpen,
@@ -31,9 +29,7 @@ export function DirectConversationsSection({
     <div className="relative pb-2">
       {/* Header: Conversations on left, + button on right */}
       <div 
-        className={`sticky top-0 z-20 bg-[var(--bg-sidebar)] px-3 pt-2 pb-1.5 flex justify-between items-center select-none text-zinc-500 dark:text-zinc-400 transition-colors ${
-          canScrollUp ? 'border-b border-zinc-200 dark:border-white/[0.04]' : ''
-        }`}
+        className="sticky top-0 z-20 bg-[var(--bg-sidebar)] px-3 pt-2 pb-1.5 flex justify-between items-center select-none text-zinc-500 dark:text-zinc-400 transition-colors"
       >
         <div 
           onClick={handleToggle}

@@ -122,7 +122,7 @@ export function WindowTitleBar({
   return (
     <div
       data-tauri-drag-region
-      className="h-[30px] bg-zinc-100 dark:bg-[#0d0d0f] border-b border-zinc-200/80 dark:border-white/[0.06] flex items-center justify-between select-none shrink-0 text-xs text-zinc-600 dark:text-zinc-400 z-50 transition-colors"
+      className="h-[30px] bg-[var(--bg-sidebar)] flex items-center justify-between select-none shrink-0 text-xs text-zinc-600 dark:text-zinc-400 z-50 transition-colors"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {/* Left: Branding & App Identity */}

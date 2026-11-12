@@ -28,12 +28,12 @@ export function Unit10ColorTokens({ onSelectComponent }: Unit10ColorTokensProps)
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
-              { name: 'Layer 0: App Canvas', token: '--m-bg-app', hexDark: '#101012', hexLight: '#F7F8F9', desc: 'Main window backdrop' },
-              { name: 'Layer 1: Surface Card', token: '--m-bg-surface', hexDark: '#141416', hexLight: '#FFFFFF', desc: 'Sidebars, cards, panels' },
+              { name: 'Layer 0: Inset Canvas', token: '--m-bg-app', hexDark: '#09090b', hexLight: '#FFFFFF', desc: 'Chat & Right Viewer box' },
+              { name: 'Layer 1: Outer Chrome', token: '--m-bg-sidebar', hexDark: '#141416', hexLight: '#F0F1F3', desc: 'TitleBar, Sidebar, Row 2, gutter' },
               { name: 'Layer 2: Raised Modal', token: '--m-bg-raised', hexDark: '#1A1A1D', hexLight: '#FFFFFF', desc: 'Dialogs & popovers' },
-              { name: 'Layer 3: Toolbar Row', token: '--m-bg-toolbar', hexDark: '#121214', hexLight: '#F1F3F5', desc: 'Row 1 & Row 2 headers' },
-              { name: 'Hover State Surface', token: '--m-bg-surface-hover', hexDark: 'rgba(255,255,255,0.05)', hexLight: '#F1F3F5', desc: 'Hover feedback' },
-              { name: 'Active State Surface', token: '--m-bg-surface-active', hexDark: 'rgba(255,255,255,0.09)', hexLight: '#E9ECEF', desc: 'Pressed / active items' },
+              { name: 'Layer 3: Toolbar Row', token: '--m-bg-toolbar', hexDark: '#141416', hexLight: '#F0F1F3', desc: 'Merged Row 1 & Row 2 bars' },
+              { name: 'Hover State Surface', token: '--m-bg-surface-hover', hexDark: 'rgba(255,255,255,0.05)', hexLight: '#E6E8EC', desc: 'Hover feedback' },
+              { name: 'Active State Surface', token: '--m-bg-surface-active', hexDark: 'rgba(255,255,255,0.09)', hexLight: '#DFE2E7', desc: 'Pressed / active items' },
             ].map((tier) => (
               <button
                 key={tier.token}

@@ -42,9 +42,9 @@ export function TerminalViewer({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#121214] overflow-hidden text-zinc-100 select-text">
+    <div className="flex flex-col h-full bg-[#09090b] overflow-hidden text-zinc-100 select-text">
       {/* Top Task Header Bar */}
-      <div className="px-3.5 py-2.5 border-b border-zinc-800/80 bg-[#161619] flex items-center justify-between shrink-0">
+      <div className="px-3.5 py-2.5 border-b border-zinc-800/80 bg-[#121214] flex items-center justify-between shrink-0">
         <div className="flex flex-col min-w-0 pr-2">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold tracking-wide text-zinc-200">Background Task Output</span>
@@ -99,7 +99,7 @@ export function TerminalViewer({
         data={logLines}
         followOutput={isRunning ? 'auto' : false}
         initialTopMostItemIndex={Math.max(0, logLines.length - 1)}
-        className="p-3 overflow-auto custom-scrollbar font-mono text-[11.5px] leading-relaxed text-zinc-300 flex-1 bg-[#0d0d0f]"
+        className="p-3 overflow-auto custom-scrollbar font-mono text-[11.5px] leading-relaxed text-zinc-300 flex-1 bg-[#09090b]"
         itemContent={(idx, line) => {
           const displayLine = line.length > 10000 ? line.slice(0, 10000) + '... [line truncated for browser safety]' : line;
           return (

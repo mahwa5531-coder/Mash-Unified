@@ -3,7 +3,8 @@
 // Row-2 toolbar above the chat canvas: logo cluster (when sidebar closed),
 // back/forward, session breadcrumb, right-panel toggle.
 // Pure presentation — all behavior arrives via callbacks.
-import { PanelLeft, PanelRight, Sparkles, ArrowRight } from 'lucide-react';
+import { PanelRight, Sparkles, ArrowRight } from 'lucide-react';
+import { SidebarBrandToggle } from '@/features/sessions/components/SidebarHeader';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -42,22 +43,12 @@ export function ChatToolbar({
     : (sessionTitle || 'New Conversation');
 
   return (
-    <div id="chat-top-toolbar" className="h-9 bg-zinc-100/90 dark:bg-[#121214] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center justify-between px-3 select-none shrink-0 z-40 transition-colors">
+    <div id="chat-top-toolbar" className="h-9 bg-[var(--bg-sidebar)] flex items-center justify-between px-3 select-none shrink-0 z-40 transition-colors">
       <div className="flex items-center h-full min-w-0 flex-1">
         {/* When Left Sidebar is CLOSED: show Logo and PanelLeft here */}
         {!isSidebarOpen && (
-          <div className="flex items-center gap-1.5 shrink-0 mr-3">
-            <div className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-100 flex items-center justify-center font-bold text-[11px] shadow-xs select-none mr-1">
-              M
-            </div>
-            <button
-              type="button"
-              onClick={onOpenSidebar}
-              className="p-1 rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Expand sidebar"
-            >
-              <PanelLeft size={15} />
-            </button>
+          <div className="mr-3">
+            <SidebarBrandToggle onToggle={onOpenSidebar} title="Expand sidebar" />
           </div>
         )}
 

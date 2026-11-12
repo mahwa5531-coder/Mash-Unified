@@ -3,6 +3,29 @@
 import React from 'react';
 import { PanelLeft, Plus, Clock } from 'lucide-react';
 
+export interface SidebarBrandToggleProps {
+  onToggle: () => void;
+  title: string;
+}
+
+export function SidebarBrandToggle({ onToggle, title }: SidebarBrandToggleProps) {
+  return (
+    <div className="flex items-center gap-1.5 shrink-0">
+      <div className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-100 flex items-center justify-center font-bold text-[11px] shadow-xs select-none mr-1">
+        M
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="p-1 rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+        title={title}
+      >
+        <PanelLeft size={15} />
+      </button>
+    </div>
+  );
+}
+
 export interface SidebarHeaderProps {
   onNewSession: (repoName?: string) => void;
   onToggle: () => void;
@@ -18,19 +41,9 @@ export function SidebarHeader({
 }: SidebarHeaderProps) {
   return (
     <>
-      {/* Row 2: Top Header Bar (height h-9 = 36px, matching Row 2 of window) */}
-      <div className="h-9 bg-zinc-100/90 dark:bg-[#121214] border-b border-zinc-200/70 dark:border-white/[0.06] flex items-center gap-1.5 px-3 select-none shrink-0 transition-colors">
-        <div className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-100 flex items-center justify-center font-bold text-[11px] shadow-xs select-none mr-1">
-          M
-        </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="p-1 rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
-          title="Collapse sidebar"
-        >
-          <PanelLeft size={15} />
-        </button>
+      {/* Row 2: Top Header Bar (height h-9 = 36px, seamlessly merged into outer chrome) */}
+      <div className="h-9 bg-[var(--bg-sidebar)] flex items-center px-3 select-none shrink-0 transition-colors">
+        <SidebarBrandToggle onToggle={onToggle} title="Collapse sidebar" />
       </div>
 
       {/* Top Quick Actions (+ New Conversation, Conversation History) */}
