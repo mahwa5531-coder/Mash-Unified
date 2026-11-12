@@ -49,6 +49,12 @@ async def test_safe_rmtree_session_brain_both_roots():
     assert not nexau_brain.exists(), "Legacy nexau brain directory must be removed"
     assert not mash_brain.exists(), "Mash brain directory must also be removed"
 
+    # With brain_dir=None -> must resolve both roots cleanly without NameError
+    mash_brain.mkdir(parents=True, exist_ok=True)
+    nexau_brain.mkdir(parents=True, exist_ok=True)
+    assert safe_rmtree_session_brain(sid) is True
+    assert not nexau_brain.exists() and not mash_brain.exists()
+
 
 @pytest.mark.anyio
 async def test_safe_rmtree_session_brain_confinement_guards():

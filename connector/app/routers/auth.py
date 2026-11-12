@@ -35,7 +35,7 @@ from nexau.archs.platform.crypto_vault import (
 )
 from pydantic import BaseModel
 
-from app.client import MAShClient
+from app.client import MAShClient, resolve_cloud_gateway_url
 
 logger = logging.getLogger(__name__)
 
@@ -240,13 +240,7 @@ class SwitchAccountPayload(BaseModel):
 @router.get("/config")
 async def get_auth_config() -> dict[str, Any]:
     """Returns dynamic cloud gateway and auth settings to frontend."""
-    config = AppConfig.load()
-    cloud_url = (
-        os.getenv("CLOUD_GATEWAY_URL")
-        or os.getenv("GATEWAY_URL")
-        or config.model.gateway_url
-        or "https://api.mash.ai"
-    ).rstrip("/")
+    cloud_url = resolve_cloud_gateway_url()
     mash_env = os.getenv("MASH_ENV", "production").lower()
     auth_required = os.getenv("MASH_AUTH_REQUIRED", "").lower() in ("true", "1", "yes") or mash_env == "production"
     return {

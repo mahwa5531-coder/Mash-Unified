@@ -229,3 +229,33 @@ def test_zero_doubled_api_routes():
     doubled = [r for r in routes if "/api/api/" in r]
     assert len(doubled) == 0, f"Found doubled routes: {doubled}"
     assert "/health" in routes
+
+
+def test_desktop_only_cors_allows_dynamic_loopback_and_app_protocol(client):
+    """Desktop CORS accepts any local loopback port and app://mash, never Tauri or remote hosts."""
+    for origin in (
+        "http://localhost:5173",
+        "http://127.0.0.1:49201",
+        "http://[::1]:54321",
+        "app://mash",
+    ):
+        res = client.get("/health", headers={"Origin": origin})
+        assert res.status_code == 200
+        assert res.headers.get("access-control-allow-origin") == origin
+
+    for blocked in (
+        "tauri://localhost",
+        "http://tauri.localhost",
+        "https://evil.example",
+    ):
+        res = client.get("/health", headers={"Origin": blocked})
+        assert res.status_code == 200
+        assert "access-control-allow-origin" not in res.headers
+
+
+def test_zero_stale_team_routes():
+    """Verify dead NexAU multi-agent team routes are not mounted on the desktop API."""
+    routes = [r.path for r in app.routes if hasattr(r, "path")]
+    team_routes = [r for r in routes if "/teams" in r or r.startswith("/team")]
+    assert len(team_routes) == 0, f"Found unexpected team routes: {team_routes}"
+

@@ -196,7 +196,7 @@ def safe_rmtree_session_brain(session_id: str, brain_dir: str | Path | None = No
                 targets.append(alt)
     else:
         targets.append((mash_brain_root / safe_sid).resolve())
-        legacy_target = (nexau_brain_root / safe_sid).resolve()
+        legacy_target = (legacy_nexau_brain_root / safe_sid).resolve()
         if legacy_target.exists() and legacy_target not in targets:
             targets.append(legacy_target)
 

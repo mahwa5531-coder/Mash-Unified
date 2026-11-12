@@ -30,6 +30,20 @@ from nexau.archs.platform.app_config import AppConfig
 logger = logging.getLogger(__name__)
 
 
+def resolve_cloud_gateway_url() -> str:
+    """Resolve the MASH Cloud gateway base URL from env, saved config, or default."""
+    config = AppConfig.load()
+    return (
+        os.getenv("MASH_API_BASE_URL")
+        or os.getenv("CLOUD_GATEWAY_URL")
+        or os.getenv("GATEWAY_URL")
+        or os.getenv("MASH_GATEWAY_URL")
+        or os.getenv("NEXAU_CLOUD_API_URL")
+        or config.model.gateway_url
+        or "https://api.mash.ai"
+    ).rstrip("/")
+
+
 class MAShClient:
     """Centralized client for all desktop-to-cloud communications.
 
@@ -38,17 +52,7 @@ class MAShClient:
     """
 
     def __init__(self, base_url: str | None = None, timeout: float = 30.0):
-        if not base_url:
-            config = AppConfig.load()
-            base_url = (
-                os.getenv("MASH_API_BASE_URL")
-                or os.getenv("CLOUD_GATEWAY_URL")
-                or os.getenv("GATEWAY_URL")
-                or os.getenv("NEXAU_CLOUD_API_URL")
-                or config.model.gateway_url
-                or "https://api.mash.ai"
-            )
-        self.base_url = base_url.rstrip("/")
+        self.base_url = (base_url or resolve_cloud_gateway_url()).rstrip("/")
         self.timeout = httpx.Timeout(connect=5.0, read=timeout, write=10.0, pool=10.0)
 
     # --- Authentication Lifecycle ---

@@ -4,48 +4,40 @@ import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
-# Load single unified root .env file
 from dotenv import load_dotenv
 
-_root_env = Path(__file__).resolve().parent.parent.parent / ".env"
-if _root_env.exists():
-    load_dotenv(_root_env)
-else:
-    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+logger = logging.getLogger(__name__)
 
-# Ensure NexAU engine is importable from sibling directory
-_nexau_dir = Path(__file__).resolve().parent.parent.parent / "NexAU"
+_connector_dir = Path(__file__).resolve().parent.parent
+_root_dir = _connector_dir.parent
+load_dotenv(_root_dir / ".env" if (_root_dir / ".env").exists() else _connector_dir / ".env")
+
+# Ensure NexAU engine is importable when launched directly via uvicorn without run_server.py
+_nexau_dir = _root_dir / "NexAU"
 if _nexau_dir.exists() and str(_nexau_dir) not in sys.path:
     sys.path.insert(0, str(_nexau_dir))
 
-# Add bundled binaries (ripgrep, etc.) to PATH so all subprocesses and tools inherit them
-_bin_dirs = [
-    Path(__file__).resolve().parent.parent / "bin",
-    Path(__file__).resolve().parent.parent.parent / "NexAU" / "bin",
-]
-for _bd in _bin_dirs:
-    if _bd.exists():
-        _p = str(_bd.resolve())
-        if _p not in os.environ.get("PATH", ""):
-            os.environ["PATH"] = _p + os.pathsep + os.environ.get("PATH", "")
+# Add bundled ripgrep binary directory to PATH so shell tools inherit it in dev and frozen builds
+_rg_bin_dir = (
+    Path(getattr(sys, "_MEIPASS", "")) / "nexau" / "bin"
+    if getattr(sys, "frozen", False)
+    else _nexau_dir / "bin"
+)
+if _rg_bin_dir.exists() and str(_rg_bin_dir) not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = str(_rg_bin_dir) + os.pathsep + os.environ.get("PATH", "")
 
+import nexau
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from nexau import AgentConfig, LLMConfig
+from nexau.archs.platform.crypto_vault import _IN_MEMORY_AUTH_META, load_secure_vault
 from nexau.archs.transports.http import HTTPConfig, SSETransportServer
 
+from app import dependencies as _deps
+from app.client import resolve_cloud_gateway_url
 from app.dependencies import init_engine
 from app.models.project import ProjectModel
-
-# ──────────────────────────────────────────────
-# DB path (~/.mash/database/mash.db)
-# ──────────────────────────────────────────────
-from app.paths import (
-    get_database_path,
-    get_mash_home,
-)
+from app.paths import get_database_path, scaffold_nexau_system_storage
 from app.routers import (
     artifacts,
     auth,
@@ -58,54 +50,17 @@ from app.routers import (
     uploads,
 )
 
-_DB_DIR = get_mash_home()
-_DB_PATH = get_database_path()
-_DB_ASYNC_URL = f"sqlite+aiosqlite:///{_DB_PATH}"
-_DB_SYNC_URL  = f"sqlite:///{_DB_PATH}"
-
-# ──────────────────────────────────────────────
-# Agent config with core tools
-# ──────────────────────────────────────────────
-
 
 def _build_agent_config() -> AgentConfig:
-    import nexau
-    from nexau.archs.main_sub.config import AgentConfig
-    from nexau.archs.platform.app_config import AppConfig
-    from nexau.archs.platform.crypto_vault import _IN_MEMORY_AUTH_META, load_secure_vault
-
-    # Load canonical agent configuration (local Mash manifest preferred)
+    """Build runtime AgentConfig from manifest, encrypted local vault, and cloud gateway config."""
     local_manifest = Path(__file__).resolve().parent / "resources" / "main_agent.yaml"
     fallback_manifest = Path(nexau.__file__).parent / "agents" / "main_agent.yaml"
-    manifest_path = local_manifest if local_manifest.exists() else fallback_manifest
-    agent_config = AgentConfig.from_yaml(manifest_path)
+    agent_config = AgentConfig.from_yaml(local_manifest if local_manifest.exists() else fallback_manifest)
 
-    # Runtime LLM credential resolution from settings/vault/env
-    app_cfg = AppConfig.load()
     vault = load_secure_vault() or {}
-
-    # The desktop connector communicates exclusively with the MASH Cloud API layer
-    cloud_gateway = (
-        os.getenv("MASH_API_BASE_URL")
-        or os.getenv("CLOUD_GATEWAY_URL")
-        or os.getenv("GATEWAY_URL")
-        or os.getenv("MASH_GATEWAY_URL")
-        or os.getenv("NEXAU_CLOUD_API_URL")
-        or app_cfg.model.gateway_url
-        or "https://api.mash.ai"
-    )
-
-    active_key = (
-        _IN_MEMORY_AUTH_META.get("access_token")
-        or "bearer-pending-auth"
-    )
-    # The desktop uses the abstract model alias "mash/auto" unless overridden by env.
-    active_model = (
-        os.getenv("MASH_MODEL")
-        or os.getenv("LLM_MODEL")
-        or os.getenv("OPENAI_MODEL")
-        or "mash/auto"
-    )
+    cloud_gateway = resolve_cloud_gateway_url()
+    active_key = _IN_MEMORY_AUTH_META.get("access_token") or "bearer-pending-auth"
+    active_model = os.getenv("MASH_MODEL") or os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "mash/auto"
 
     is_mock = os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes") or active_key.lower() in ("mock", "none", "test")
     if is_mock:
@@ -115,9 +70,7 @@ def _build_agent_config() -> AgentConfig:
         if llm_base:
             default_base_url = llm_base.rstrip("/")
         else:
-            clean_gw = cloud_gateway.rstrip("/")
-            if clean_gw.endswith("/v1/agent"):
-                clean_gw = clean_gw[:-6]
+            clean_gw = cloud_gateway.removesuffix("/v1/agent")
             default_base_url = clean_gw if clean_gw.endswith("/v1") else f"{clean_gw}/v1"
 
     retries = int(os.getenv("LLM_MAX_RETRIES", "3"))
@@ -145,55 +98,25 @@ def _build_agent_config() -> AgentConfig:
 
     return agent_config
 
-# ──────────────────────────────────────────────
-# Lifespan
-# ──────────────────────────────────────────────
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    import app.dependencies as _deps
-    from app.paths import scaffold_nexau_system_storage
-    from app.routers.auth import ensure_valid_token
-
     scaffold_nexau_system_storage()
     engine = init_engine(f"sqlite+aiosqlite:///{get_database_path()}")
     await engine.setup_models([ProjectModel])
 
-    # Automatic cold boot token refresh from vaulted refresh token
     try:
-        await ensure_valid_token()
+        await auth.ensure_valid_token()
     except Exception as e:
         logger.warning("Cold boot token refresh skipped or offline: %s", e)
 
-    agent_config = _build_agent_config()
-    http_config = HTTPConfig()
-    sse_server = SSETransportServer(engine=engine, config=http_config, default_agent_config=agent_config)
+    sse_server = SSETransportServer(engine=engine, config=HTTPConfig(), default_agent_config=_build_agent_config())
 
-    # Set clean FastAPI app.state references
     app.state.engine = engine
     app.state.sse_server = sse_server
     app.state.session_manager = sse_server._session_manager
-
-    # Backward compatibility references
-    _deps._engine = engine
     _deps._session_manager = sse_server._session_manager
-
-    from app.routers import chat as chat_router
-    chat_router._sse_server = sse_server
-
-    if sse_server.team_registry:
-        sse_server.team_registry.register_config(
-            "default",
-            leader_config=agent_config,
-            candidates={"main_auditor": agent_config},
-        )
-        from nexau.archs.transports.http.team_routes import create_team_router
-        team_router = create_team_router(
-            sse_server.team_registry,
-            on_stream_event=sse_server._on_stream_event,
-            get_history=sse_server._get_history,
-            count_events=sse_server._count_events,
-        )
-        app.include_router(team_router)
+    chat._sse_server = sse_server
 
     try:
         yield
@@ -205,43 +128,25 @@ async def lifespan(app: FastAPI):
         if getattr(_deps, "_engine", None) is engine:
             _deps._engine = None
             _deps._session_manager = None
-        try:
-            from app.routers import chat as chat_router
-            if getattr(chat_router, "_sse_server", None) is sse_server:
-                chat_router._sse_server = None
-        except Exception:
-            pass
+        if getattr(chat, "_sse_server", None) is sse_server:
+            chat._sse_server = None
         try:
             await engine.dispose()
         except Exception as e:
             logger.debug("Engine dispose on shutdown failed: %s", e)
 
 
-
-# ──────────────────────────────────────────────
-# App
-# ──────────────────────────────────────────────
 app = FastAPI(
-    title="NexAU Audit Desktop App API",
-    description="Backend for the custom React/Next.js frontend.",
+    title="Mash Desktop Connector API",
+    description="Local desktop sidecar API for Mash.",
     version="1.0.0",
     lifespan=lifespan,
 )
 
-_cors_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "tauri://localhost",
-    "http://tauri.localhost",
-    "app://mash",
-] + [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
-
+# Local desktop only: Next dev server on any loopback port and packaged Electron app://mash origin.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1)(:\d+)?|app://.*)$",
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?|app://mash)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -259,16 +164,8 @@ app.include_router(system.router)
 app.include_router(auth.router)
 app.include_router(settings.router)
 
-# Root /health probe for external container/monitoring health checks
+
 @app.get("/health", tags=["system"])
 async def root_health():
-    """Root health probe delegating directly to get_system_health."""
+    """Root /health probe used by Electron's backend supervisor."""
     return await system.get_system_health()
-
-
-if __name__ == "__main__":
-    import uvicorn
-    # Default to loopback for desktop security; override via HOST env for container deployment
-    host = os.getenv("HOST", "127.0.0.1")
-    port = int(os.getenv("PORT", "8000"))
-    uvicorn.run("app.main:app", host=host, port=port)
