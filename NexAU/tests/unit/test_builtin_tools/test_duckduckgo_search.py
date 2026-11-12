@@ -75,3 +75,36 @@ def test_search_exception_handled_gracefully(mock_ddgs_cls):
 def test_aliases_point_to_duckduckgo():
     assert duckduckgo_web_search is web_search
     assert duckduckgo_web_search is google_web_search
+
+
+@patch("nexau.archs.tool.builtin.web_tools.duckduckgo_search.DDGS", None)
+def test_missing_dependency_returns_honest_error():
+    res = duckduckgo_web_search(query="python")
+    assert res["error"]["type"] == "DEPENDENCY_MISSING"
+    assert "No relevant web results found" not in res["content"]
+    assert res["sources"] == []
+
+
+@patch("nexau.archs.tool.builtin.web_tools.duckduckgo_search.DDGS")
+def test_alias_parameters_and_empty_results(mock_ddgs_cls):
+    mock_instance = MagicMock()
+    mock_ddgs_cls.return_value = mock_instance
+    mock_instance.text.return_value = []
+
+    res = duckduckgo_web_search(Query="fastapi auth", Domain="fastapi.tiangolo.com", limit=2)
+    mock_instance.text.assert_called_once_with("site:fastapi.tiangolo.com fastapi auth", max_results=2)
+    assert res.get("error") is None
+    assert 'Web search results for "fastapi auth":' in res["content"]
+    assert "No relevant web results found." in res["content"]
+    assert 'Search results for "fastapi auth" returned (0 results).' in res["returnDisplay"]
+
+
+@patch("nexau.archs.tool.builtin.web_tools.duckduckgo_search.DDGS")
+def test_null_fields_in_results_handled_safely(mock_ddgs_cls):
+    mock_instance = MagicMock()
+    mock_ddgs_cls.return_value = mock_instance
+    mock_instance.text.return_value = [{"title": None, "href": None, "body": None}]
+
+    res = duckduckgo_web_search(query="edge case")
+    assert res.get("error") is None
+    assert res["sources"] == [{"title": "Untitled", "url": "", "snippet": ""}]

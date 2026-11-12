@@ -11,7 +11,7 @@ root_dir = Path(SPECPATH).parent.resolve()
 connector_dir = root_dir / 'connector'
 nexau_dir = root_dir / 'NexAU'
 
-from PyInstaller.utils.hooks import copy_metadata
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 nexau_archs_dir = nexau_dir / 'nexau' / 'archs'
 # Bundle only non-Python assets from nexau/archs (.j2, .yaml, .sql, .md); Python modules live in PYZ.
@@ -60,7 +60,9 @@ hiddenimports = [
     'pydantic',
     'openai',
     'httpx',
-    'duckduckgo_search',
+    'ddgs',
+    *collect_submodules('ddgs.engines'),
+    'primp',
     'duckdb',
     'polars',
     'sqlmodel',
@@ -90,7 +92,6 @@ a = Analysis(
         'notebook',
         'pyarrow',
         'babel',
-        'primp',
         'anthropic',
         'mypy',
         'hypothesis',

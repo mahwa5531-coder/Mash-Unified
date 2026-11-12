@@ -30,45 +30,39 @@ except ImportError:
         DDGS = None  # type: ignore[assignment]
 
 
-def _format_citations(results: list[dict[str, Any]]) -> str:
-    """Format search results into clean, readable citations."""
-    lines: list[str] = []
-    for idx, item in enumerate(results, 1):
-        title = item.get("title", "Untitled").strip()
-        url = item.get("href", item.get("url", "")).strip()
-        snippet = item.get("body", item.get("snippet", "")).strip().replace("\n", " ")
+def _format_citations(sources: list[dict[str, str]]) -> str:
+    """Format normalized search sources into readable numbered citations."""
+    lines = []
+    for idx, src in enumerate(sources, 1):
+        snippet = src["snippet"].replace("\n", " ")
         if len(snippet) > 350:
             snippet = snippet[:350] + "..."
-        lines.append(f"[{idx}] {title} ({url})\n    {snippet}")
+        lines.append(f"[{idx}] {src['title']} ({src['url']})\n    {snippet}")
     return "\n\n".join(lines) if lines else "No relevant web results found."
 
 
 def duckduckgo_web_search(
     query: str | None = None,
     domain: str | None = None,
-    num_results: int = 4,
-    *,
-    Query: str | None = None,
+    num_results: int | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Search the web using DuckDuckGo with domain prioritization and clean citations.
+    """Search the web using DuckDuckGo with optional domain restriction and citations.
 
     Args:
         query: Search query string.
-        domain: Optional domain to restrict the search (e.g., 'arxiv.org', 'github.com').
-        num_results: Maximum results to return (default: 4).
+        domain: Optional domain to restrict results (e.g., 'arxiv.org', 'github.com').
+        num_results: Maximum number of results to return (clamped to 1..20, default 4).
     """
-    query_str = Query or query or kwargs.get("search_query") or kwargs.get("q") or ""
-    if not str(query_str).strip():
+    raw_query = query if query is not None else (kwargs.get("Query") or kwargs.get("search_query") or kwargs.get("q") or "")
+    clean_query = str(raw_query).strip()
+    if not clean_query:
         return {
             "content": "The 'query' parameter cannot be empty.",
             "returnDisplay": "Error: Empty search query.",
             "error": {"message": "The 'query' parameter cannot be empty.", "type": "INVALID_QUERY"},
         }
 
-    domain = domain or kwargs.get("Domain") or kwargs.get("site")
-    num_results = num_results or kwargs.get("limit") or kwargs.get("max_results") or 4
-    search_query = str(query_str).strip()
     if DDGS is None:
         return {
             "content": "Web search is unavailable: 'ddgs' package is not installed.",
@@ -77,30 +71,39 @@ def duckduckgo_web_search(
             "sources": [],
         }
 
-    if domain and domain.strip() and f"site:{domain.strip()}" not in search_query:
-        search_query = f"site:{domain.strip()} {search_query}"
+    raw_domain = domain if domain is not None else (kwargs.get("Domain") or kwargs.get("site") or "")
+    clean_domain = str(raw_domain).strip()
+    effective_query = (
+        f"site:{clean_domain} {clean_query}"
+        if clean_domain and f"site:{clean_domain}" not in clean_query
+        else clean_query
+    )
 
-    max_count = max(1, min(int(num_results or 4), 20))
+    raw_count = num_results if num_results is not None else (kwargs.get("limit") or kwargs.get("max_results") or 4)
+    try:
+        max_count = max(1, min(int(raw_count), 20))
+    except (TypeError, ValueError):
+        max_count = 4
 
     try:
-        raw_results = DDGS().text(search_query, max_results=max_count) or []
-        formatted_sources = [
+        raw_results = list(DDGS().text(effective_query, max_results=max_count) or [])
+        sources = [
             {
-                "title": r.get("title", "Untitled"),
-                "url": r.get("href", r.get("url", "")),
-                "snippet": r.get("body", r.get("snippet", "")),
+                "title": str(r.get("title") or "Untitled").strip(),
+                "url": str(r.get("href") or r.get("url") or "").strip(),
+                "snippet": str(r.get("body") or r.get("snippet") or "").strip(),
             }
             for r in raw_results
         ]
-        citation_text = _format_citations(formatted_sources)
+        citations = _format_citations(sources)
 
         return {
-            "content": f'Web search results for "{query}":\n\n{citation_text}',
-            "returnDisplay": f'Search results for "{query}" returned ({len(formatted_sources)} results).',
-            "sources": formatted_sources,
+            "content": f'Web search results for "{clean_query}":\n\n{citations}',
+            "returnDisplay": f'Search results for "{clean_query}" returned ({len(sources)} results).',
+            "sources": sources,
         }
     except Exception as e:
-        logger.warning("DuckDuckGo search error for query '%s': %s", query, e)
+        logger.warning("DuckDuckGo search error for query '%s': %s", clean_query, e)
         return {
             "content": f"Web search could not be completed: {e}",
             "returnDisplay": "Web search encountered an error.",

@@ -8,6 +8,7 @@ dependencies = [
   "requests>=2.25.0",
   "jinja2>=3.0.0",
   "beautifulsoup4>=4.9.0",
+  "ddgs>=9.0.0",
   "openai>=2.14.0,<3.0.0",
   "httpx[socks]>=0.28.1",
   "mcp>=1.12.3",
