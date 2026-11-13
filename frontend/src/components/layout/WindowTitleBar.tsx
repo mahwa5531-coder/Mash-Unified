@@ -128,7 +128,7 @@ export function WindowTitleBar({
       {/* Left: Branding & App Identity */}
       <div className="flex items-center gap-2 px-3 h-full no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <div className="flex items-center gap-1.5 text-zinc-900 dark:text-zinc-100 font-semibold tracking-wider text-[11px]">
-          <MashBrandIcon size={14} className="text-cyan-600 dark:text-cyan-400 shrink-0" />
+          <MashBrandIcon size={16} className="shrink-0" />
           <span>MASH</span>
         </div>
       </div>

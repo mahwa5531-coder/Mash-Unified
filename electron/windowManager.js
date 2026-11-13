@@ -6,6 +6,7 @@
 // - Bidirectional maximize/restore event sync
 
 const fs = require('fs');
+const path = require('path');
 const { app, BrowserWindow, screen, shell } = require('electron');
 const { getWindowStateFilePath, getPreloadPath } = require('./paths');
 
@@ -157,6 +158,7 @@ async function createMainWindow() {
     frame: false,
     backgroundColor: '#09090b',
     title: 'Mash',
+    icon: path.join(__dirname, '../build/icon.ico'),
     show: false,
     webPreferences: {
       preload: getPreloadPath(),
