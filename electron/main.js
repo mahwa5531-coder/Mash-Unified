@@ -64,12 +64,16 @@ app.whenReady().then(async () => {
 
   try {
     const port = await allocateEphemeralPort();
-    await launchBackendSupervisor(port);
+    // Launch backend supervisor asynchronously in background without blocking UI
+    // ponytail: window renders immediately (< 1.0s); backend sidecar connects concurrently
+    const supervisorPromise = launchBackendSupervisor(port).catch((err) => {
+      console.error('[Supervisor] Background connector launch failed:', err?.message || err);
+    });
     const mainWindow = await createMainWindow();
 
     const coldDeepLink = process.argv.find((arg) => arg.startsWith('mash://'));
     if (coldDeepLink) {
-      setTimeout(() => forwardDeepLinkToConnector(coldDeepLink), 500);
+      supervisorPromise.then(() => forwardDeepLinkToConnector(coldDeepLink));
     }
 
     if (app.isPackaged) {

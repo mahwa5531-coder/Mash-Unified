@@ -62,21 +62,45 @@ export default function Home() {
 
   useEffect(() => {
     let isMounted = true;
-    fetchAuthMe().then((user) => {
-      if (isMounted) {
-        if (user && user.authenticated) {
-          setAuthUser(user);
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    const startTime = Date.now();
+    const MAX_WAIT_MS = 10000;
+
+    // ponytail: poll backend /api/auth/me during parallel cold boot until sidecar connects (max 10s ceiling)
+    const checkAuthWithRetry = async () => {
+      try {
+        const user = await fetchAuthMe();
+        if (!isMounted) return;
+
+        if (user !== null) {
+          if (user.authenticated) {
+            setAuthUser(user);
+          } else {
+            setAuthUser(null);
+          }
+          setIsAuthLoading(false);
+          return;
+        }
+
+        if (Date.now() - startTime < MAX_WAIT_MS) {
+          pollTimer = setTimeout(checkAuthWithRetry, 250);
         } else {
           setAuthUser(null);
+          setIsAuthLoading(false);
         }
-        setIsAuthLoading(false);
+      } catch {
+        if (!isMounted) return;
+        if (Date.now() - startTime < MAX_WAIT_MS) {
+          pollTimer = setTimeout(checkAuthWithRetry, 250);
+        } else {
+          setAuthUser(null);
+          setIsAuthLoading(false);
+        }
       }
-    }).catch(() => {
-      if (isMounted) {
-        setAuthUser(null);
-        setIsAuthLoading(false);
-      }
-    });
+    };
+
+    checkAuthWithRetry();
+
     const handleAuthExpired = () => {
       if (isMounted) {
         setAuthUser(null);
@@ -86,6 +110,7 @@ export default function Home() {
 
     return () => {
       isMounted = false;
+      if (pollTimer) clearTimeout(pollTimer);
       window.removeEventListener('mash:auth_expired', handleAuthExpired);
     };
   }, []);
