@@ -16,6 +16,7 @@ from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 nexau_archs_dir = nexau_pkg_dir / 'archs'
 # Bundle only non-Python assets from nexau/archs (.j2, .yaml, .sql, .md); Python modules live in PYZ.
+# Exclude CLAUDE.md and temporary/log files.
 nexau_archs_datas = [
     (
         str(p),
@@ -24,7 +25,12 @@ nexau_archs_datas = [
         else f"nexau/archs/{p.relative_to(nexau_archs_dir).parent.as_posix()}",
     )
     for p in nexau_archs_dir.rglob('*')
-    if p.is_file() and p.suffix not in {'.py', '.pyc'} and '__pycache__' not in p.parts
+    if (
+        p.is_file()
+        and p.suffix not in {'.py', '.pyc', '.log', '.tmp'}
+        and '__pycache__' not in p.parts
+        and p.name != 'CLAUDE.md'
+    )
 ]
 
 # Enumerate all nexau modules (including YAML-imported PEP 420 middlewares & lazy submodules) for PYZ.
@@ -36,13 +42,24 @@ nexau_hiddenimports = sorted(
     if '__pycache__' not in p.parts and 'migrations' not in p.parts
 )
 
+nexau_migrations_dir = nexau_dir / 'nexau' / 'db' / 'migrations'
+nexau_migrations_datas = [
+    (
+        str(p),
+        'nexau/db/migrations'
+        if p.relative_to(nexau_migrations_dir).parent == Path('.')
+        else f"nexau/db/migrations/{p.relative_to(nexau_migrations_dir).parent.as_posix()}",
+    )
+    for p in nexau_migrations_dir.rglob('*')
+    if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc'
+]
+
 datas = [
     (str(connector_dir / 'app' / 'resources'), 'app/resources'),
     (str(connector_dir / 'app' / 'prompts'), 'app/prompts'),
     (str(connector_dir / 'app' / 'native_picker.ps1'), '.'),
     (str(nexau_dir / 'nexau' / 'agents'), 'nexau/agents'),
-    (str(nexau_dir / 'nexau' / 'db' / 'migrations'), 'nexau/db/migrations'),
-] + nexau_archs_datas
+] + nexau_migrations_datas + nexau_archs_datas
 if (nexau_dir / 'bin').is_dir():
     datas.append((str(nexau_dir / 'bin'), 'nexau/bin'))
 datas += copy_metadata('duckdb') + copy_metadata('polars')
