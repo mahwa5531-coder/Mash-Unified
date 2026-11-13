@@ -12,8 +12,9 @@
   "scripts": {
     "electron:dev": "electron electron/main.js",
     "build:frontend": "npm run build --prefix frontend",
-    "build:backend": "python -m PyInstaller connector/connector.spec --distpath dist/bin --clean -y",
-    "build:desktop": "npm run build:frontend && npm run build:backend && electron-builder --win nsis"
+    "build:backend": "python -m PyInstaller connector/connector.spec --distpath dist/bin -y",
+    "build:backend:clean": "python -m PyInstaller connector/connector.spec --distpath dist/bin --clean -y",
+    "build:desktop": "npm run build:frontend && npm run build:backend:clean && electron-builder --win nsis"
   },
   "build": {
     "appId": "com.mash.desktop",
