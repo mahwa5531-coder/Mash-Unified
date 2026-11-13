@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { PanelLeft, Plus, Clock } from 'lucide-react';
+import { MashBrandIcon } from '@/primitives/MashBrandIcon';
 
 export interface SidebarBrandToggleProps {
   onToggle: () => void;
@@ -11,8 +12,8 @@ export interface SidebarBrandToggleProps {
 export function SidebarBrandToggle({ onToggle, title }: SidebarBrandToggleProps) {
   return (
     <div className="flex items-center gap-1.5 shrink-0">
-      <div className="w-5 h-5 rounded-md bg-zinc-800 text-zinc-100 flex items-center justify-center font-bold text-[11px] shadow-xs select-none mr-1">
-        M
+      <div className="w-5 h-5 rounded-md bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center shadow-xs select-none mr-1 overflow-hidden p-0.5">
+        <MashBrandIcon size={16} className="shrink-0" />
       </div>
       <button
         type="button"

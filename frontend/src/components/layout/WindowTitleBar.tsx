@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Minus, Square, Copy, X } from 'lucide-react';
-import { MashBrandIcon } from '@/primitives/MashBrandIcon';
 
 interface WindowTitleBarProps {
   onToggleFullscreen?: () => void;
@@ -127,10 +126,9 @@ export function WindowTitleBar({
     >
       {/* Left: Branding & App Identity */}
       <div className="flex items-center gap-2 px-3 h-full no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-        <div className="flex items-center gap-1.5 text-zinc-900 dark:text-zinc-100 font-semibold tracking-wider text-[11px]">
-          <MashBrandIcon size={16} className="shrink-0" />
-          <span>MASH</span>
-        </div>
+        <span className="text-zinc-900 dark:text-zinc-100 font-semibold tracking-wider text-[11px]">
+          MASH
+        </span>
       </div>
 
       {/* Center Draggable Spacer */}
