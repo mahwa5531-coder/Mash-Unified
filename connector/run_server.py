@@ -7,6 +7,21 @@ nexau_dir = (backend_dir.parent / 'NexAU').resolve()
 sys.path.insert(0, str(nexau_dir))
 sys.path.insert(0, str(backend_dir))
 
+# Honor PYTHONPATH in PyInstaller frozen mode and mount Mash user python environment
+pythonpath = os.environ.get("PYTHONPATH", "")
+if pythonpath:
+    for p in reversed(pythonpath.split(os.pathsep)):
+        if p and p not in sys.path:
+            sys.path.insert(0, p)
+
+mash_user_env = (
+    Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "Mash" / "python_env"
+    if sys.platform == "win32"
+    else Path.home() / ".local" / "share" / "mash" / "python_env"
+)
+if mash_user_env.is_dir() and str(mash_user_env) not in sys.path:
+    sys.path.append(str(mash_user_env))
+
 import uvicorn
 
 if __name__ == '__main__':

@@ -43,8 +43,10 @@ datas = [
     (str(nexau_dir / 'nexau' / 'agents'), 'nexau/agents'),
     (str(nexau_dir / 'nexau' / 'db' / 'migrations'), 'nexau/db/migrations'),
 ] + nexau_archs_datas
-if (nexau_dir / 'bin' / 'rg.exe').exists():
-    datas.append((str(nexau_dir / 'bin' / 'rg.exe'), 'nexau/bin'))
+for bin_name in ('rg.exe', 'uv.exe'):
+    bin_file = nexau_dir / 'bin' / bin_name
+    if bin_file.exists():
+        datas.append((str(bin_file), 'nexau/bin'))
 datas += copy_metadata('duckdb') + copy_metadata('polars')
 
 hiddenimports = [

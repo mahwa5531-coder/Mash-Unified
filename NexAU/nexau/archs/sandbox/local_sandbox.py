@@ -107,6 +107,122 @@ class LocalSandbox(BaseSandbox):
         """Convert a local native path into the active shell backend format."""
         return self._shell_backend.format_path_for_shell(path)
 
+    @staticmethod
+    def _get_mash_python_env() -> Path:
+        """Return persistent user package environment directory for clean PCs."""
+        if sys.platform == "win32":
+            local_appdata = os.environ.get("LOCALAPPDATA", "")
+            base = Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
+            return base / "Mash" / "python_env"
+        return Path.home() / ".local" / "share" / "mash" / "python_env"
+
+    @classmethod
+    def _find_bundled_bin_dir(cls) -> Path | None:
+        """Locate bundled binary directory containing uv.exe and rg.exe."""
+        if getattr(sys, "frozen", False):
+            base = Path(sys.executable).parent
+            candidates = [
+                base / "_internal" / "nexau" / "bin",
+                base / "nexau" / "bin",
+            ]
+            meipass = getattr(sys, "_MEIPASS", None)
+            if meipass:
+                candidates.append(Path(meipass) / "nexau" / "bin")
+        else:
+            here = Path(__file__).resolve()
+            candidates = [
+                here.parents[3] / "bin",
+                here.parents[4] / "NexAU" / "bin",
+            ]
+        for c in candidates:
+            if (c / "uv.exe").is_file() or (c / "uv").is_file() or (c / "rg.exe").is_file() or (c / "rg").is_file():
+                return c
+        return None
+
+    def _find_workspace_venv(self) -> tuple[Path, Path] | None:
+        """Locate workspace project virtual environment if present (DeepSeek harness pattern)."""
+        if not self.work_dir:
+            return None
+        work_path = Path(self.work_dir)
+        scripts_name = "Scripts" if sys.platform == "win32" else "bin"
+        exe_name = "python.exe" if sys.platform == "win32" else "python"
+        for venv_name in (".venv", "venv", "env"):
+            cand = work_path / venv_name
+            exe = cand / scripts_name / exe_name
+            if exe.is_file():
+                return cand, cand / scripts_name
+        return None
+
+    @classmethod
+    def _find_host_python(cls) -> Path | None:
+        """Find user's host Python interpreter on PATH (ignoring Windows Store stubs and frozen connector)."""
+        cand = shutil.which("python.exe") or shutil.which("python")
+        if not cand:
+            return None
+        cand_path = Path(cand).resolve()
+        # Ignore Microsoft Store zero-byte redirector stubs in WindowsApps
+        if "windowsapps" in str(cand_path).lower():
+            try:
+                if cand_path.stat().st_size == 0:
+                    return None
+            except OSError:
+                return None
+        # In frozen desktop mode, ignore the bundled connector binary directory
+        if getattr(sys, "frozen", False):
+            base_dir = Path(sys.executable).parent.resolve()
+            try:
+                if cand_path.is_relative_to(base_dir):
+                    return None
+            except AttributeError:
+                if str(cand_path).startswith(str(base_dir)):
+                    return None
+        if cand_path.is_file():
+            return cand_path
+        return None
+
+    @classmethod
+    def _has_host_pip(cls) -> bool:
+        """Check if a real host or virtualenv pip is available on PATH."""
+        cand = shutil.which("pip.exe") or shutil.which("pip")
+        if not cand:
+            return False
+        cand_p = Path(cand).resolve()
+        if getattr(sys, "frozen", False):
+            base_dir = Path(sys.executable).parent.resolve()
+            try:
+                if cand_p.is_relative_to(base_dir):
+                    return False
+            except AttributeError:
+                if str(cand_p).startswith(str(base_dir)):
+                    return False
+        return cand_p.is_file()
+
+    @classmethod
+    def _rewrite_pip_install_to_uv(cls, command: str, is_powershell: bool = False) -> str:
+        """Rewrite pip install commands to bundled uv on clean PCs lacking pip."""
+        m = re.match(
+            r'^\s*(?:(?:&?\s*["\']?[^"\';\n]*?python(?:\.exe)?["\']?\s+)?-m\s+)?pip\s+install\b(.*)$',
+            command,
+            re.IGNORECASE,
+        )
+        if not m:
+            return command
+
+        bin_dir = cls._find_bundled_bin_dir()
+        if not bin_dir:
+            return command
+        uv_name = "uv.exe" if sys.platform == "win32" else "uv"
+        uv_exe = bin_dir / uv_name
+        if not uv_exe.is_file():
+            return command
+
+        mash_env = cls._get_mash_python_env()
+        mash_env.mkdir(parents=True, exist_ok=True)
+        rest = m.group(1)
+        if is_powershell:
+            return f'& "{uv_exe}" pip install --target "{mash_env}"{rest}'
+        return f'"{uv_exe}" pip install --target "{mash_env}"{rest}'
+
     @classmethod
     def _resolve_runtime_python_dirs(cls) -> list[Path]:
         """Resolve directories containing Python executables and scripts.
@@ -155,20 +271,45 @@ class LocalSandbox(BaseSandbox):
         return [parent / scripts_name, parent]
 
     def get_python_command(self) -> str:
-        """Return the shell-safe Python interpreter command for LocalSandbox."""
+        """Return the shell-safe Python interpreter command for LocalSandbox.
+
+        Order of precedence (DeepSeek Agent Harness standard):
+        1. Workspace virtualenv (.venv/venv)
+        2. MASH_PYTHON_RUNTIME_DIR environment override
+        3. Real host Python
+        4. Bundled desktop Python runtime (connector/python.exe)
+        """
+        # 1. Workspace virtualenv
+        venv_info = self._find_workspace_venv()
+        if venv_info:
+            _, scripts_dir = venv_info
+            exe_name = "python.exe" if sys.platform == "win32" else "python"
+            exe = scripts_dir / exe_name
+            if exe.is_file():
+                return self._shell_backend.format_executable_for_shell(str(exe))
+
+        # 2. Environment override
+        override = os.environ.get("MASH_PYTHON_RUNTIME_DIR", "").strip().strip("\"'")
+        if override:
+            for d in self._resolve_runtime_python_dirs():
+                for name in ("python.exe", "python"):
+                    candidate = d / name
+                    if candidate.is_file():
+                        return self._shell_backend.format_executable_for_shell(str(candidate))
+
+        # 3. Host Python (if available and not shadowed)
+        host_py = self._find_host_python()
+        if host_py:
+            return self._shell_backend.format_executable_for_shell(str(host_py))
+
+        # 4. Bundled runtime python
         for d in self._resolve_runtime_python_dirs():
             for name in ("python.exe", "python"):
                 candidate = d / name
                 if candidate.is_file():
                     return self._shell_backend.format_executable_for_shell(str(candidate))
+
         if getattr(sys, "frozen", False):
-            # In PyInstaller frozen desktop mode, sys.executable is the app binary (e.g. Mash.exe).
-            # Invoking it with -c spawns a duplicate GUI instance (runaway loop).
-            # Fall back to system python in PATH if available.
-            import shutil
-            system_python = shutil.which("python.exe") or shutil.which("python")
-            if system_python:
-                return self._shell_backend.format_executable_for_shell(system_python)
             return "python"
         return self._shell_backend.format_executable_for_shell(sys.executable)
 
@@ -262,9 +403,8 @@ class LocalSandbox(BaseSandbox):
                 base.pop(k, None)
 
         # Smart PYTHONNOUSERSITE handling:
-        # Only set PYTHONNOUSERSITE = 1 if in a virtual environment or frozen app.
-        # If running on host system Python where libraries live in %APPDATA%\Python\...\site-packages,
-        # leave user site-packages intact.
+        # Isolate user site when in a virtual environment or frozen app;
+        # leave user site-packages intact when running on host system Python.
         is_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
         is_frozen = bool(getattr(sys, "frozen", False))
         if is_venv or is_frozen:
@@ -274,9 +414,7 @@ class LocalSandbox(BaseSandbox):
                 if k.upper() == "PYTHONNOUSERSITE":
                     base.pop(k, None)
 
-        # Prepend resolved runtime Python directories (Scripts and python root) to PATH without duplicating.
         # Consolidate all variations of PATH (case-insensitivity on Windows).
-        runtime_dirs = [str(d) for d in self._resolve_runtime_python_dirs()]
         path_fragments: list[str] = []
         for k in list(base.keys()):
             if k.upper() == "PATH":
@@ -290,10 +428,29 @@ class LocalSandbox(BaseSandbox):
                 if p:
                     existing_entries.append(p)
 
+        prepend_dirs: list[str] = []
+
+        # 1. Workspace virtualenv
+        venv_info = self._find_workspace_venv()
+        if venv_info:
+            venv_root, venv_scripts = venv_info
+            base["VIRTUAL_ENV"] = str(venv_root)
+            prepend_dirs.append(str(venv_scripts))
+
+        # 2. Environment override
+        has_override = bool(os.environ.get("MASH_PYTHON_RUNTIME_DIR", "").strip())
+        host_py = self._find_host_python()
+
+        # Only prepend runtime Python dirs if explicitly overridden or in clean PC fallback mode
+        # (prevents frozen PyInstaller connector from shadowing developer's host Python)
+        if has_override or (not venv_info and not host_py):
+            for d in self._resolve_runtime_python_dirs():
+                prepend_dirs.append(str(d))
+
         new_entries: list[str] = []
         seen: set[str] = set()
 
-        for d_str in runtime_dirs:
+        for d_str in prepend_dirs:
             norm = os.path.normcase(os.path.normpath(d_str))
             if norm not in seen:
                 seen.add(norm)
@@ -305,7 +462,21 @@ class LocalSandbox(BaseSandbox):
                 seen.add(norm)
                 new_entries.append(entry)
 
+        # Ensure bundled tool binaries (uv.exe, rg.exe) are accessible on PATH
+        bundled_bin = self._find_bundled_bin_dir()
+        if bundled_bin:
+            norm_bin = os.path.normcase(os.path.normpath(str(bundled_bin)))
+            if norm_bin not in seen:
+                seen.add(norm_bin)
+                new_entries.append(str(bundled_bin))
+
         base["PATH"] = os.pathsep.join(new_entries)
+
+        # On clean PC fallback, point PYTHONPATH to Mash user package environment
+        if not venv_info and not host_py:
+            mash_env = self._get_mash_python_env()
+            base["PYTHONPATH"] = str(mash_env)
+
         return base
 
     @staticmethod
@@ -368,6 +539,10 @@ class LocalSandbox(BaseSandbox):
             rest = path_with_spaces_match.group(2)
             command = f'& "{exe_path}"{rest}'
 
+        # 6. Automatic rewrite of pip install to bundled uv on clean PCs lacking pip
+        if not cls._has_host_pip():
+            command = cls._rewrite_pip_install_to_uv(command, is_powershell=True)
+
         return command
 
     @override
@@ -381,6 +556,10 @@ class LocalSandbox(BaseSandbox):
         fail before execution with guidance to use PowerShell here-strings or
         opt into Git Bash.
         """
+        if not self._has_host_pip():
+            is_ps = isinstance(self._shell_backend, WindowsPowerShellBackend)
+            command = self._rewrite_pip_install_to_uv(command, is_powershell=is_ps)
+
         if isinstance(self._shell_backend, WindowsPowerShellBackend):
             is_pwsh = getattr(self._shell_backend, "kind", getattr(self._shell_backend, "_kind", "powershell")) == "pwsh"
             command = self._normalize_powershell_command(command, is_pwsh=is_pwsh)
