@@ -297,9 +297,6 @@ export default function Home() {
 
   const handleSidebarWidthChange = useCallback((newWidth: number) => {
     setSidebarWidth(newWidth);
-    try {
-      localStorage.setItem('mash_sidebar_width', String(newWidth));
-    } catch {}
   }, []);
 
   const handleOpenFile = useCallback((path: string) => {
@@ -399,6 +396,7 @@ export default function Home() {
           shellRef={shellRef}
           titleBar={titleBar}
           isSidebarOpen={isSidebarOpen}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
           sidebar={
             <Sidebar
               selectedSessionId={selectedSessionId}

@@ -40,26 +40,39 @@ export function useSidebarResize({
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'col-resize';
 
+    let resizeRaf: number | null = null;
+    let pendingWidth = effectiveWidth;
+
     const handleMouseMove = (ev: MouseEvent) => {
       if (!isResizingRef.current) return;
       const delta = ev.clientX - startXRef.current;
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidthRef.current + delta));
-      if (onWidthChange) {
-        onWidthChange(newWidth);
-      } else {
-        setInternalWidth(newWidth);
-        try {
-          localStorage.setItem('mash_sidebar_width', String(newWidth));
-        } catch {}
+      pendingWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidthRef.current + delta));
+
+      if (resizeRaf === null) {
+        resizeRaf = requestAnimationFrame(() => {
+          resizeRaf = null;
+          if (onWidthChange) {
+            onWidthChange(pendingWidth);
+          } else {
+            setInternalWidth(pendingWidth);
+          }
+        });
       }
     };
 
     const handleMouseUp = () => {
+      if (resizeRaf !== null) {
+        cancelAnimationFrame(resizeRaf);
+        resizeRaf = null;
+      }
       isResizingRef.current = false;
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      try {
+        localStorage.setItem('mash_sidebar_width', String(pendingWidth));
+      } catch {}
     };
 
     window.addEventListener('mousemove', handleMouseMove);

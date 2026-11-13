@@ -2,13 +2,16 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { SidebarBrandToggle } from '@/features/sessions/components/SidebarHeader';
 
 export interface WorkbenchShellProps {
   /** Top OS / Frameless window title bar (Row 1). */
   titleBar?: React.ReactNode;
-  /** Left navigation sidebar (omitted automatically when collapsed or right panel is maximized). */
+  /** Left navigation sidebar (omitted automatically when collapsed). */
   sidebar?: React.ReactNode;
   isSidebarOpen: boolean;
+  /** Callback to open/expand the left sidebar when collapsed. */
+  onOpenSidebar?: () => void;
   /** Row-2 chat breadcrumb & control strip rendered above the left side of the inset box. */
   chatToolbar: React.ReactNode;
   /** Row-2 right-panel tab strip rendered above the right side of the inset box when open. */
@@ -38,11 +41,14 @@ export interface WorkbenchShellProps {
  * - Inner canvas (`--bg-app`): ONE rounded bordered inset container holding Chat + Right Viewer,
  *   divided internally by `border-l` strictly bounded inside the box.
  * - Row 2 shows a short disconnected `h-4` vertical tick above the split only while unmaximized & open.
+ * - When Right Panel is maximized, it fills the entire inset workbench canvas up to the Left Sidebar's
+ *   boundary. If Left Sidebar is toggled closed, Right Panel smoothly expands across the full screen.
  */
 export function WorkbenchShell({
   titleBar,
   sidebar,
   isSidebarOpen,
+  onOpenSidebar,
   chatToolbar,
   rightHeader,
   mainContent,
@@ -55,7 +61,7 @@ export function WorkbenchShell({
   shellRef,
   className,
 }: WorkbenchShellProps) {
-  const showLeftSidebar = isSidebarOpen && !(isRightOpen && isRightMaximized);
+  const showLeftSidebar = isSidebarOpen;
 
   return (
     <div
@@ -78,9 +84,16 @@ export function WorkbenchShell({
           <div
             className={cn(
               "h-9 shrink-0 flex items-center bg-[var(--bg-sidebar)] select-none pr-[7px]",
-              isRightOpen && isRightMaximized && "pl-[7px]"
+              isRightOpen && isRightMaximized && !showLeftSidebar && "pl-[7px]"
             )}
           >
+            {/* When Left Sidebar is closed AND Right Panel is Maximized: render un-collapse toggle so user is never trapped */}
+            {!showLeftSidebar && isRightOpen && isRightMaximized && onOpenSidebar && (
+              <div className="pl-1.5 pr-1 shrink-0">
+                <SidebarBrandToggle onToggle={onOpenSidebar} title="Expand sidebar" />
+              </div>
+            )}
+
             <div className={cn("flex-1 min-w-0 h-full", isRightOpen && isRightMaximized && "hidden")}>
               {chatToolbar}
             </div>

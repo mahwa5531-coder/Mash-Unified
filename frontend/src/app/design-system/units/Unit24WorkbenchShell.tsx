@@ -101,6 +101,7 @@ export function Unit24WorkbenchShell() {
             </div>
           }
           isSidebarOpen={isSidebarOpen}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
           sidebar={
             <div className="w-[215px] h-full bg-[var(--bg-sidebar)] flex flex-col shrink-0 select-none">
               <div className="h-9 bg-[var(--bg-sidebar)] flex items-center px-3 shrink-0">
