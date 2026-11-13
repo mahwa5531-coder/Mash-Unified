@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+BIN_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+MASH_PY_ENV="${LOCALAPPDATA:-$HOME/.local/share/mash}/python_env"
+mkdir -p "$MASH_PY_ENV" 2>/dev/null
+if [ "$1" = "install" ]; then
+    shift
+    exec "$BIN_DIR/uv" pip install --target "$MASH_PY_ENV" "$@"
+else
+    exec "$BIN_DIR/uv" pip "$@"
+fi
