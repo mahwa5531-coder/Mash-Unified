@@ -4,6 +4,13 @@ node_modules/
 out/
 build/*
 !build/icon.ico
+!build/icon.png
+!build/installerIcon.ico
+!build/uninstallerIcon.ico
+!build/installerHeaderIcon.ico
+!build/installerSidebar.bmp
+!build/installerHeader.bmp
+!build/uninstallerSidebar.bmp
 dist/
 frontend/public/monaco/
 public/monaco/
