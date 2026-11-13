@@ -202,16 +202,21 @@ class LocalSandbox(BaseSandbox):
         # Strip toxic PYTHONHOME from parent environment to prevent cross-version crashes
         base.pop("PYTHONHOME", None)
 
-        # Append bundled tools directory (rg, uv, pip shim) to PATH without shadowing host tools
-        bin_dir = (
-            Path(sys.executable).parent / "_internal" / "nexau" / "bin"
-            if getattr(sys, "frozen", False)
-            else Path(__file__).resolve().parents[3] / "bin"
-        )
-        if bin_dir.is_dir():
-            curr_path = base.get("PATH", "")
-            if str(bin_dir).lower() not in curr_path.lower():
-                base["PATH"] = f"{curr_path}{os.pathsep}{bin_dir}" if curr_path else str(bin_dir)
+        # Append bundled tools directory (rg, uv, pip shim) and bundled python to PATH without shadowing host tools
+        curr_path = base.get("PATH", "")
+        extra_dirs: list[Path] = []
+        if getattr(sys, "frozen", False):
+            bundled_bin = Path(sys.executable).parent / "_internal" / "nexau" / "bin"
+            bundled_root = Path(sys.executable).parent
+            extra_dirs.extend([bundled_bin, bundled_root])
+        else:
+            dev_bin = Path(__file__).resolve().parents[3] / "bin"
+            extra_dirs.append(dev_bin)
+
+        for d in extra_dirs:
+            if d.is_dir() and str(d).lower() not in curr_path.lower():
+                curr_path = f"{curr_path}{os.pathsep}{d}" if curr_path else str(d)
+        base["PATH"] = curr_path
 
         return base
 

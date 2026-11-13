@@ -35,7 +35,15 @@ if __name__ == '__main__':
     if is_cli:
         if args and args[0] == "--python":
             args = args[1:]
+        # Strip standard Python interpreter flags (e.g. -I, -s, -E, -u, -B, -v, -q, -O)
+        while args and args[0].startswith("-") and args[0] not in ("-c", "-m", "-V", "--version"):
+            flag = args.pop(0)
+            if flag in ("-W", "-X") and args:
+                args.pop(0)
         if not args:
+            sys.exit(0)
+        if args[0] in ("-V", "--version"):
+            print(f"Python {sys.version.split()[0]}")
             sys.exit(0)
         if args[0] == "-c":
             code = args[1] if len(args) > 1 else ""
