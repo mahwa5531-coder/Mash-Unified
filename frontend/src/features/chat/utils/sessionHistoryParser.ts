@@ -1,4 +1,5 @@
 import { Message, ToolCall } from '@/types/chat';
+import { extractToolMetadata } from '@/features/chat/components/work-log/toolTimeline';
 
 const PROTOCOL_TAGS_REGEX = /<\/?(?:user[\s_]+message|assistant[\s_]+message|task_result|user_rules|user_information|identity|system_prompt|session_mode|file_storage_and_discipline|tool_execution_discipline|ui_presentation_format|runtime_context|skills|Skill[A-Za-z0-9_-]+|scratchpad|thought|thinking|tool_use|tool_result|tool_name|tool_output|use_parallel_tool_calls|parallel_tool|summary_data_json|empty)>\s*/gi;
 const PROTOCOL_BRACKETS_REGEX = /\[(?:sub_agent_id|SYSTEM NOTICE):[^\]]*\]\s*/gi;
@@ -58,6 +59,7 @@ export function cleanUserPromptForComposer(text?: string): string {
 // Helper: Normalize tool call attributes without inventing data (no fabricated 'Done.')
 function normalizeTool(t: any, idx: number, prefix: string): ToolCall {
   const args = typeof t.args === 'object' && t.args !== null ? t.args : {};
+  const meta = extractToolMetadata(t, args);
   return {
     id: t.id || `${prefix}_tc_${idx}`,
     name: t.name || 'action',
@@ -65,10 +67,10 @@ function normalizeTool(t: any, idx: number, prefix: string): ToolCall {
     output: typeof t.output === 'string' ? t.output : (t.output ? String(t.output) : ''),
     status: t.status || 'completed',
     decision: t.decision,
-    toolSummary: t.toolSummary || t.tool_summary || args.toolSummary || args.tool_summary || args.summary || args.description,
-    toolAction: t.toolAction || t.tool_action || args.toolAction || args.tool_action,
-    command: t.command || args.CommandLine || args.command || args.cmd,
-    path: t.path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path,
+    toolSummary: meta.toolSummary,
+    toolAction: meta.toolAction,
+    command: meta.command,
+    path: meta.path,
     is_compacted: Boolean(t.is_compacted),
   };
 }
@@ -118,11 +120,14 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
         const tools: ToolCall[] = rawTools.map((t, i) => normalizeTool(t, i, prefix));
 
         const resolvedSteps = Array.isArray(step.steps)
-          ? step.steps.map((st: any) => ({
-              ...st,
-              toolSummary: st.toolSummary || st.tool_summary || st.args?.toolSummary || st.args?.tool_summary || st.args?.description || st.args?.Instruction || st.args?.summary,
-              toolAction: st.toolAction || st.tool_action || st.args?.toolAction || st.args?.tool_action,
-            }))
+          ? step.steps.map((st: any) => {
+              const meta = extractToolMetadata(st, st.args);
+              return {
+                ...st,
+                toolSummary: meta.toolSummary,
+                toolAction: meta.toolAction,
+              };
+            })
           : [];
 
         const isAborted = step.status === 'aborted' || step.status === 'cancelled' || step.stop_reason === 'user_stopped' || step.stop_reason === 'cancelled';

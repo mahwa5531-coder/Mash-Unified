@@ -6,12 +6,12 @@ export function shouldExcludePath(p: string): boolean {
   return (
     lower.includes('/.scratch/') ||
     lower.startsWith('.scratch/') ||
-    lower.includes('/.gemini/') ||
-    lower.startsWith('.gemini/') ||
-    lower.includes('/.mash/') ||
-    lower.startsWith('.mash/') ||
-    lower.includes('/.nexau/') ||
-    lower.startsWith('.nexau/') ||
+    (lower.includes('/.gemini/') && !lower.includes('/.gemini/antigravity/brain/')) ||
+    (lower.startsWith('.gemini/') && !lower.startsWith('.gemini/antigravity/brain/')) ||
+    (lower.includes('/.mash/') && !lower.includes('/.mash/brain/')) ||
+    (lower.startsWith('.mash/') && !lower.startsWith('.mash/brain/')) ||
+    (lower.includes('/.nexau/') && !lower.includes('/.nexau/brain/')) ||
+    (lower.startsWith('.nexau/') && !lower.startsWith('.nexau/brain/')) ||
     lower.includes('/.system_generated/') ||
     lower.startsWith('.system_generated/') ||
     lower.includes('/tmp/') ||

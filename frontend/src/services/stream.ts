@@ -2,6 +2,7 @@
 
 import { BASE_URL } from './client';
 import type { ToolCall } from '@/types/chat';
+import { extractToolMetadata } from '@/features/chat/components/work-log/toolTimeline';
 
 export interface StreamEventHandlers {
   onToken: (token: string) => void;
@@ -108,8 +109,7 @@ export async function streamQuery(
       if (!completedToolIds.has(callId)) {
         let finalArgs: Record<string, any> = {};
         try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
-        const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary;
-        const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
+        const { toolSummary, toolAction } = extractToolMetadata(undefined, finalArgs);
         onToolCall({
           id: callId,
           name: toolCallNames[callId],
@@ -313,8 +313,10 @@ export async function streamQuery(
               }
               if (onToolCall) {
                 const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
-                const toolSummary = parsedArgs?.toolSummary || parsedArgs?.tool_summary || parsedArgs?.description || parsedArgs?.Instruction || parsedArgs?.summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary || event.description || data.description;
-                const toolAction = parsedArgs?.toolAction || parsedArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
+                const { toolSummary, toolAction } = extractToolMetadata(
+                  { toolSummary: event.toolSummary || data.toolSummary, tool_summary: event.tool_summary || data.tool_summary, description: event.description || data.description, toolAction: event.toolAction || data.toolAction, tool_action: event.tool_action || data.tool_action },
+                  parsedArgs
+                );
                 onToolCall({
                   id: callId,
                   name: currentName,
@@ -335,8 +337,10 @@ export async function streamQuery(
               let finalArgs: Record<string, any> = {};
               try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
               const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
-              const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary || event.description || data.description;
-              const toolAction = finalArgs?.toolAction || finalArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
+              const { toolSummary, toolAction } = extractToolMetadata(
+                { toolSummary: event.toolSummary || data.toolSummary, tool_summary: event.tool_summary || data.tool_summary, description: event.description || data.description, toolAction: event.toolAction || data.toolAction, tool_action: event.tool_action || data.tool_action },
+                finalArgs
+              );
               onToolCall({
                 id: callId,
                 name: currentName,
@@ -359,8 +363,10 @@ export async function streamQuery(
               let finalArgs: Record<string, any> = {};
               try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
               const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
-              const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary || event.description || data.description;
-              const toolAction = finalArgs?.toolAction || finalArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
+              const { toolSummary, toolAction } = extractToolMetadata(
+                { toolSummary: event.toolSummary || data.toolSummary, tool_summary: event.tool_summary || data.tool_summary, description: event.description || data.description, toolAction: event.toolAction || data.toolAction, tool_action: event.tool_action || data.tool_action },
+                finalArgs
+              );
               // Only flag failed if wire protocol explicitly stamps event as failed/error.
               // Tool stdout/stderr (e.g. CLI non-zero returns or not-found) is valid observation
               // context for the LLM to inspect and self-correct, not a UI failure.
@@ -390,14 +396,18 @@ export async function streamQuery(
             const toolName = event.tool_name || data.tool_name || "action";
             const params = event.parameters || data.parameters || {};
             completedToolIds.add(callId);
+            const { toolSummary, toolAction } = extractToolMetadata(
+              { toolSummary: event.prompt || data.prompt },
+              params
+            );
             if (onToolCall) {
               onToolCall({
                 id: callId,
                 name: toolName,
                 args: params,
                 status: "pending_approval",
-                toolSummary: params.toolSummary || event.prompt || data.prompt,
-                toolAction: params.toolAction,
+                toolSummary,
+                toolAction,
               });
             }
           }

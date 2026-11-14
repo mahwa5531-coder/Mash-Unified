@@ -92,6 +92,70 @@ export function resolveToolCategory(name: string): TimelineEntry['type'] {
   return 'other';
 }
 
+/**
+ * Canonical tool metadata extractor: resolves toolSummary, toolAction, command, and path
+ * across runtime events, streaming deltas, and stored history.
+ */
+export function extractToolMetadata(
+  item?: any,
+  argsOverride?: any
+): {
+  toolSummary?: string;
+  toolAction?: string;
+  command?: string;
+  path?: string;
+} {
+  let args = argsOverride ?? item?.args ?? item?.parameters ?? item?.input ?? {};
+  if (typeof args === 'string') {
+    try { args = JSON.parse(args); } catch { args = {}; }
+  }
+  const rawArgs = typeof args === 'object' && args !== null ? args : {};
+
+  const summary =
+    item?.toolSummary ||
+    item?.tool_summary ||
+    item?.summary ||
+    item?.description ||
+    rawArgs.toolSummary ||
+    rawArgs.tool_summary ||
+    rawArgs.description ||
+    rawArgs.Instruction ||
+    rawArgs.summary;
+
+  const action =
+    item?.toolAction ||
+    item?.tool_action ||
+    rawArgs.toolAction ||
+    rawArgs.tool_action;
+
+  const command =
+    item?.command ||
+    rawArgs.CommandLine ||
+    rawArgs.command ||
+    rawArgs.cmd ||
+    rawArgs.code ||
+    rawArgs.source_code;
+
+  const path =
+    item?.path ||
+    rawArgs.TargetFile ||
+    rawArgs.AbsolutePath ||
+    rawArgs.file_path ||
+    rawArgs.path ||
+    rawArgs.Path ||
+    rawArgs.target_file ||
+    rawArgs.filepath ||
+    rawArgs.DirectoryPath ||
+    rawArgs.dir_path;
+
+  return {
+    toolSummary: summary ? String(summary).trim() : undefined,
+    toolAction: action ? String(action).trim() : undefined,
+    command: command ? String(command).trim() : undefined,
+    path: path ? String(path).trim() : undefined,
+  };
+}
+
 export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineEntry {
   const name = (t.name || '').toLowerCase();
   let args = t.args || (t as any).input || (t as any).parameters || {};
@@ -99,10 +163,9 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     try { args = JSON.parse(args); } catch { args = {}; }
   }
 
-  const rawSummary = t.toolSummary || args.toolSummary || args.tool_summary || args.summary || args.description || args.Instruction || (t as any).summary || null;
-  const toolSummary = rawSummary ? String(rawSummary).trim() : null;
-  const rawAction = t.toolAction || args.toolAction || args.tool_action || null;
-  const toolAction = rawAction ? String(rawAction).trim() : null;
+  const meta = extractToolMetadata(t, args);
+  const toolSummary = meta.toolSummary || null;
+  const toolAction = meta.toolAction || null;
 
   // The interactive approval card is ONLY rendered while waiting for human permission.
   // As soon as the user makes a decision (allow/deny) or status transitions, the card vanishes

@@ -12,7 +12,8 @@ export function isSameToolId(idA?: string, idB?: string): boolean {
   return cleanA === cleanB || idA.endsWith(`_${idB}`) || idB.endsWith(`_${idA}`);
 }
 
-export { isToolRunning } from '../components/work-log/toolTimeline';
+export { isToolRunning, extractToolMetadata } from '../components/work-log/toolTimeline';
+import { extractToolMetadata } from '../components/work-log/toolTimeline';
 
 export class InFlightToolTracker {
   toolArgBuffers: Record<string, string> = {};
@@ -45,8 +46,7 @@ export class InFlightToolTracker {
     this.toolArgBuffers[cid] = (this.toolArgBuffers[cid] || '') + deltaArg;
     let parsedArgs: any = {};
     try { parsedArgs = JSON.parse(this.toolArgBuffers[cid]); } catch {}
-    const toolSummary = parsedArgs?.toolSummary || parsedArgs?.tool_summary || parsedArgs?.description || parsedArgs?.Instruction || parsedArgs?.summary;
-    const toolAction = parsedArgs?.toolAction || parsedArgs?.tool_action;
+    const { toolSummary, toolAction } = extractToolMetadata(undefined, parsedArgs);
     if (onToolCall) onToolCall({
       id: cid,
       name: this.toolCallNames[cid] || 'action',
@@ -62,8 +62,7 @@ export class InFlightToolTracker {
     if (!cid || !onToolCall) return;
     let finalArgs: any = {};
     try { finalArgs = JSON.parse(this.toolArgBuffers[cid] || '{}'); } catch {}
-    const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary;
-    const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
+    const { toolSummary, toolAction } = extractToolMetadata(undefined, finalArgs);
     onToolCall({
       id: cid,
       name: this.toolCallNames[cid] || 'action',
@@ -80,8 +79,7 @@ export class InFlightToolTracker {
     if (cid && onToolCall) {
       let finalArgs: any = {};
       try { finalArgs = JSON.parse(this.toolArgBuffers[cid] || '{}'); } catch {}
-      const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary;
-      const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
+      const { toolSummary, toolAction } = extractToolMetadata(undefined, finalArgs);
       onToolCall({
         id: cid,
         name: this.toolCallNames[cid] || 'action',
@@ -99,7 +97,8 @@ export class InFlightToolTracker {
   handlePendingApproval(rawId: string, toolName: string, params: any, prompt?: string, action?: string, runId?: string, onToolCall?: (t: ToolCall) => void) {
     const cid = this.callId(rawId, runId);
     this.completedToolIds.add(cid);
-    if (onToolCall) onToolCall({ id: cid, name: toolName || 'action', args: params || {}, status: 'pending_approval', toolSummary: params?.toolSummary || prompt, toolAction: action || params?.toolAction });
+    const meta = extractToolMetadata({ toolSummary: prompt, toolAction: action }, params);
+    if (onToolCall) onToolCall({ id: cid, name: toolName || 'action', args: params || {}, status: 'pending_approval', toolSummary: meta.toolSummary, toolAction: meta.toolAction });
   }
 
   finalizeRunningTools(status: 'completed' | 'cancelled' = 'completed', onToolCall?: (t: ToolCall) => void) {
@@ -107,8 +106,7 @@ export class InFlightToolTracker {
       if (!this.completedToolIds.has(cid)) {
         let finalArgs: any = {};
         try { finalArgs = JSON.parse(this.toolArgBuffers[cid] || '{}'); } catch {}
-        const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary;
-        const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
+        const { toolSummary, toolAction } = extractToolMetadata(undefined, finalArgs);
         if (onToolCall) onToolCall({
           id: cid,
           name: this.toolCallNames[cid],
