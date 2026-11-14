@@ -81,8 +81,9 @@ def _build_agent_config() -> AgentConfig:
             clean_gw = cloud_gateway.removesuffix("/v1/agent")
             default_base_url = clean_gw if clean_gw.endswith("/v1") else f"{clean_gw}/v1"
 
-    retries = int(os.getenv("LLM_MAX_RETRIES", "3"))
+    retries = int(os.getenv("LLM_MAX_RETRIES", "7"))
     agent_config.retry_attempts = retries
+    agent_config.retry_backoff_max_seconds = int(os.getenv("LLM_RETRY_BACKOFF_MAX", "256"))
 
     agent_config.llm_config = LLMConfig(
         api_type="openai_chat_completion",

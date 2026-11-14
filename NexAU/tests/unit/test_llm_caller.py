@@ -521,8 +521,8 @@ class TestLLMCallerRetryLogic:
         # Check that sleep was called with exponential backoff
         sleep_calls = mock_sleep.call_args_list
         assert len(sleep_calls) == 2  # Two failures before success
-        assert sleep_calls[0] == call(1)  # First backoff: 1 second
-        assert sleep_calls[1] == call(2)  # Second backoff: 2 seconds
+        assert sleep_calls[0] == call(4.0)  # First backoff: 4 seconds
+        assert sleep_calls[1] == call(8.0)  # Second backoff: 8 seconds
 
     def test_call_llm_empty_response_triggers_retry(self, mock_openai_client, mock_llm_config, agent_state):
         """Test that empty response content triggers retry."""

@@ -350,6 +350,7 @@ class LLMCaller:
         llm_config: LLMConfig,
         retry_attempts: int = 5,
         *,
+        initial_backoff_seconds: float = 4.0,
         retry_backoff_max_seconds: int = 30,
         on_retry: OnRetryCallback | None = None,
         middleware_manager: MiddlewareManager | None = None,
@@ -361,6 +362,7 @@ class LLMCaller:
         self.async_openai_client = async_openai_client
         self.llm_config = llm_config
         self.retry_attempts = retry_attempts
+        self.initial_backoff_seconds = initial_backoff_seconds
         self.retry_backoff_max_seconds = retry_backoff_max_seconds
         self.on_retry = on_retry
         self.middleware_manager = middleware_manager
@@ -620,7 +622,7 @@ class LLMCaller:
         if force_stop_reason and force_stop_reason != AgentStopReason.SUCCESS:
             return None
 
-        backoff = 1
+        backoff = getattr(self, "initial_backoff_seconds", 4.0)
         for i in range(self.retry_attempts):
             try:
                 if force_stop_reason and force_stop_reason != AgentStopReason.SUCCESS:
@@ -701,7 +703,7 @@ class LLMCaller:
         if force_stop_reason and force_stop_reason != AgentStopReason.SUCCESS:
             return None
 
-        backoff = 1
+        backoff = getattr(self, "initial_backoff_seconds", 4.0)
         for i in range(self.retry_attempts):
             try:
                 if params.shutdown_event and params.shutdown_event.is_set():

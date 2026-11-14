@@ -155,13 +155,14 @@ export async function streamQuery(
     }
 
     if (initialError || (response && response.status >= 500)) {
-      const MAX_RETRY_ATTEMPTS = 3;
+      const MAX_RETRY_ATTEMPTS = 7;
       let succeeded = false;
 
       for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
         if (signal?.aborted) return;
         onRetryAttempt?.(attempt);
-        const backoff = Math.min(1000 * Math.pow(1.5, attempt), 5000);
+        // Exponential backoff starting at 4s: 4s, 8s, 16s, 32s, 64s, 128s, 256s
+        const backoff = 4000 * Math.pow(2, attempt - 1);
         await new Promise((r) => setTimeout(r, backoff));
         if (signal?.aborted) return;
 
