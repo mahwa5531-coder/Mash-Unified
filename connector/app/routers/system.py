@@ -258,15 +258,10 @@ async def open_system_file(request: OpenFileRequest):
     import re
     import subprocess
     import sys
-    from urllib.parse import unquote
-
-    from app.paths import validate_safe_id
+    from app.paths import normalize_local_path, validate_safe_id
     from app.workspace import is_path_in_base_roots
 
-    clean_path = unquote(request.file_path).strip()
-    clean_path = re.sub(r"^file:///?", "", clean_path, flags=re.IGNORECASE)
-    clean_path = re.sub(r"^/([a-zA-Z]:)", r"\1", clean_path)
-    clean_path = clean_path.split("#")[0].strip()
+    clean_path = normalize_local_path(request.file_path)
 
     if request.session_id:
         try:
