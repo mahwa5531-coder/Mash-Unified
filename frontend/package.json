@@ -22,6 +22,7 @@
     "test:perf": "npx tsx tests/test_virtualized_desktop_optimizations.mjs && npx tsx tests/test_ram_memory_and_virtualization_coverage.mjs",
     "test:e2e": "playwright test",
     "test:virtuoso": "npx tsx --tsconfig tsconfig.json tests/test_virtuoso_chat_contracts.ts",
+    "test:artifacts": "npx tsx --tsconfig tsconfig.json tests/test_paths_and_artifacts_classification.ts",
     "test:scenarios": "npx tsx --tsconfig tsconfig.json tests/test_pending_frontend_scenarios.ts",
     "test:stress": "npx tsx --tsconfig tsconfig.json tests/test_1000_turn_scroll_and_ram_matrix.ts",
     "test:50k": "npx tsx --tsconfig tsconfig.json tests/test_50k_steps_and_multi_session_ram.ts",

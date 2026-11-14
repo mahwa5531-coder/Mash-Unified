@@ -11,6 +11,8 @@ export function isScratchPath(p: string): boolean {
     lower.startsWith('scratch/') ||
     lower.includes('/.scratch/') ||
     lower.startsWith('.scratch/') ||
+    lower.includes('/.system_generated/') ||
+    lower.startsWith('.system_generated/') ||
     lower.includes('/tmp/') ||
     lower.startsWith('tmp/') ||
     lower.includes('/temp/') ||
@@ -26,7 +28,8 @@ export const shouldExcludePath = isScratchPath;
  * A path is an executive deliverable (artifact) if:
  * 1. It explicitly carries user-facing ArtifactMetadata from the tool call, OR
  * 2. It is a canonical executive plan / walkthrough (implementation_plan.md, walkthrough.md), OR
- * 3. It resides in a designated deliverable namespace (working_papers/, deliverables/, Audit_Deliverables/).
+ * 3. It resides in a designated deliverable namespace (working_papers/, workpapers/, deliverables/, Audit_Deliverables/), OR
+ * 4. It is an executive markdown (.md) document outside scratchpad/temp storage.
  */
 export function isArtifactPath(p: string, meta?: any): boolean {
   if (!p || isScratchPath(p)) return false;
@@ -49,9 +52,12 @@ export function isArtifactPath(p: string, meta?: any): boolean {
   }
 
   // 3. Designated deliverable namespaces (project deliverables or session brain working papers)
+  // Non-markdown formats (.xlsx, .csv, .pdf) are accepted within these explicit deliverable namespaces.
   if (
     lower.includes('/working_papers/') ||
     lower.startsWith('working_papers/') ||
+    lower.includes('/workpapers/') ||
+    lower.startsWith('workpapers/') ||
     lower.includes('/deliverables/') ||
     lower.startsWith('deliverables/') ||
     lower.includes('/audit_deliverables/') ||
@@ -60,7 +66,8 @@ export function isArtifactPath(p: string, meta?: any): boolean {
     return lower.endsWith('.md') || lower.endsWith('.xlsx') || lower.endsWith('.csv') || lower.endsWith('.pdf');
   }
 
-  return false;
+  // 4. Any executive markdown (.md) document outside scratch/tmp is a statutory deliverable / working paper
+  return lower.endsWith('.md');
 }
 
 // Canonical group for doc artifacts so revised plans/walkthroughs vanish from past turns
