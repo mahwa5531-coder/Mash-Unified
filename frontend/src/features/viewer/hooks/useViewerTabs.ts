@@ -457,7 +457,8 @@ export function useViewerTabs(sessionId?: string) {
       const isPdf = /\.pdf$/i.test(activeTab.path);
       const isUnsupported = UNSUPPORTED_DOC_REGEX.test(activeTab.path);
       const isBinaryExcel = /\.(xlsx|xls|xlsm|xltx|xltm|xlsb|ods)$/i.test(activeTab.path);
-      if (isPdf || isUnsupported || isBinaryExcel) return;
+      const isImg = /\.(png|jpe?g|gif|webp|svg|ico|bmp)$/i.test(activeTab.path);
+      if (isPdf || isUnsupported || isBinaryExcel || isImg) return;
 
       const tabId = activeTab.id;
       const current = tabContentRef.current[tabId];

@@ -65,6 +65,7 @@ function InlineMarkdownImage({
   ...props
 }: InlineMarkdownImageProps) {
   const [hasError, setHasError] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
 
   let cleanPath = (src || '').trim();
   if (!cleanPath) {
@@ -75,17 +76,27 @@ function InlineMarkdownImage({
   let resolvedSrc = cleanPath;
   if (cleanPath && !isRemote) {
     cleanPath = normalizePath(cleanPath);
-    resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}`;
+    resolvedSrc = `${BASE_URL}/files/content?path=${encodeURIComponent(cleanPath)}${sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''}${retryAttempt > 0 ? `&_retry=${retryAttempt}` : ''}`;
   }
 
   const caption = alt && alt.trim() ? alt.trim() : null;
   const parts = cleanPath.split(/[/\\]/);
   const filename = parts.pop() || cleanPath || 'Image';
 
+  const handleImageError = () => {
+    if (!isRemote && retryAttempt < 3) {
+      setTimeout(() => {
+        setRetryAttempt((prev) => prev + 1);
+      }, (retryAttempt + 1) * 1200);
+      return;
+    }
+    setHasError(true);
+  };
+
   if (hasError) {
     return (
       <span
-        className="my-3.5 block w-full max-w-xl rounded-xl border border-dashed border-zinc-300 dark:border-white/[0.14] bg-zinc-50/70 dark:bg-zinc-900/40 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] dark:bg-[radial-gradient(#27272a_1px,transparent_1px)] overflow-hidden transition-all duration-200 select-none shadow-xs"
+        className="my-3.5 flex flex-col items-center w-full max-w-xl mx-auto rounded-xl border border-dashed border-zinc-300 dark:border-white/[0.14] bg-zinc-50/70 dark:bg-zinc-900/40 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] dark:bg-[radial-gradient(#27272a_1px,transparent_1px)] overflow-hidden transition-all duration-200 select-none shadow-xs"
       >
         <span className="flex flex-col items-center justify-center p-6 text-center min-h-[190px]">
           {/* Authentic Icon Shield */}
@@ -117,19 +128,19 @@ function InlineMarkdownImage({
       onClick={() => {
         onImageClick?.({ src: resolvedSrc || '', alt: caption || '', path: cleanPath });
       }}
-      className="group/img my-3 block max-w-full cursor-pointer select-none"
+      className="group/img my-3 flex flex-col items-center max-w-full cursor-pointer select-none"
       title={caption ? `Click to inspect: ${caption}` : 'Click to inspect image'}
     >
       <img
         src={resolvedSrc}
         alt={caption || 'Chart'}
-        onError={() => setHasError(true)}
+        onError={handleImageError}
         className="max-w-full w-auto h-auto rounded-lg object-contain max-h-[480px] border border-zinc-200/60 dark:border-white/[0.08] transition-transform duration-200 group-hover/img:scale-[1.01]"
         loading="lazy"
         {...props}
       />
       {caption && (
-        <span className="block text-center text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 font-medium truncate px-1">
+        <span className="block text-center text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 font-medium truncate px-1 max-w-full">
           {caption}
         </span>
       )}

@@ -99,7 +99,7 @@ export function parseToolItem(t: ToolCallItem, tIdx: number | string): TimelineE
     try { args = JSON.parse(args); } catch { args = {}; }
   }
 
-  const rawSummary = t.toolSummary || args.toolSummary || args.tool_summary || args.summary || args.description || (t as any).summary || null;
+  const rawSummary = t.toolSummary || args.toolSummary || args.tool_summary || args.summary || args.description || args.Instruction || (t as any).summary || null;
   const toolSummary = rawSummary ? String(rawSummary).trim() : null;
   const rawAction = t.toolAction || args.toolAction || args.tool_action || null;
   const toolAction = rawAction ? String(rawAction).trim() : null;

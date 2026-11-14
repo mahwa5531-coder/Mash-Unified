@@ -114,7 +114,7 @@ export function computeInterleavedUnits(msg: Message, isActivelyStreaming: boole
         Boolean(step.tool_call_id) ||
         (step.tools && step.tools.length > 0);
 
-      const isMicroNote = step.type === 'text' && hasToolAfter[i] && !isSubstantiveProse(step.content);
+      const isMicroNote = step.type === 'text' && hasToolAfter[i] && Boolean(step.content?.trim()) && !isSubstantiveProse(step.content);
 
       if (isWork || isMicroNote) {
         currentWorkSteps.push(step);
