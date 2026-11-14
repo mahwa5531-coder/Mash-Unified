@@ -1,37 +1,30 @@
 import { normalizePath } from '@/utils/normalizePath';
 
+const EXCLUDED_SEGMENTS = new Set([
+  'node_modules',
+  '.git',
+  '.system_generated',
+  'scratch',
+  '.scratch',
+  'cache',
+  '.cache',
+  'tmp',
+  'temp',
+  'database',
+]);
+
 export function shouldExcludePath(p: string): boolean {
   if (!p) return true;
-  const lower = p.toLowerCase().replace(/\\/g, '/');
-  return (
-    lower.includes('/.scratch/') ||
-    lower.startsWith('.scratch/') ||
-    (lower.includes('/.gemini/') && !lower.includes('/.gemini/antigravity/brain/')) ||
-    (lower.startsWith('.gemini/') && !lower.startsWith('.gemini/antigravity/brain/')) ||
-    (lower.includes('/.mash/') && !lower.includes('/.mash/brain/')) ||
-    (lower.startsWith('.mash/') && !lower.startsWith('.mash/brain/')) ||
-    (lower.includes('/.nexau/') && !lower.includes('/.nexau/brain/')) ||
-    (lower.startsWith('.nexau/') && !lower.startsWith('.nexau/brain/')) ||
-    lower.includes('/.system_generated/') ||
-    lower.startsWith('.system_generated/') ||
-    lower.includes('/tmp/') ||
-    lower.startsWith('tmp/') ||
-    lower.includes('/temp/') ||
-    lower.startsWith('temp/') ||
-    lower.includes('/node_modules/')
-  );
+  const segments = p.toLowerCase().split(/[/\\]/);
+  return segments.some(seg => EXCLUDED_SEGMENTS.has(seg));
 }
 
 export function isArtifactPath(p: string): boolean {
   if (!p || shouldExcludePath(p)) return false;
-  const lower = p.toLowerCase().replace(/\\/g, '/');
-  // Scratch scripts/calculations belong in TurnFilesGenerated accordion, not executive deliverables
-  if (lower.includes('/scratch/') || lower.startsWith('scratch/')) return false;
-
   // STRICT AUDITOR RULE: Only executive markdown (.md) documents (reports, memos, plans, walkthroughs)
   // are rendered as standalone WorkingPaperCards at the end of the turn.
   // Spreadsheets (.xlsx, .csv) and calculation scripts belong in the supporting files drawer.
-  return lower.endsWith('.md');
+  return p.toLowerCase().endsWith('.md');
 }
 
 // canonical group for doc artifacts so revised plans/walkthroughs vanish from past turns

@@ -93,66 +93,26 @@ export function resolveToolCategory(name: string): TimelineEntry['type'] {
 }
 
 /**
- * Canonical tool metadata extractor: resolves toolSummary, toolAction, command, and path
- * across runtime events, streaming deltas, and stored history.
+ * Canonical tool metadata extractor: resolves toolSummary, toolAction, command, and path.
  */
 export function extractToolMetadata(
   item?: any,
   argsOverride?: any
-): {
-  toolSummary?: string;
-  toolAction?: string;
-  command?: string;
-  path?: string;
-} {
-  let args = argsOverride ?? item?.args ?? item?.parameters ?? item?.input ?? {};
+): { toolSummary?: string; toolAction?: string; command?: string; path?: string } {
+  let args = argsOverride ?? item?.args ?? item?.parameters ?? {};
   if (typeof args === 'string') {
     try { args = JSON.parse(args); } catch { args = {}; }
   }
-  const rawArgs = typeof args === 'object' && args !== null ? args : {};
-
-  const summary =
-    item?.toolSummary ||
-    item?.tool_summary ||
-    item?.summary ||
-    item?.description ||
-    rawArgs.toolSummary ||
-    rawArgs.tool_summary ||
-    rawArgs.description ||
-    rawArgs.Instruction ||
-    rawArgs.summary;
-
-  const action =
-    item?.toolAction ||
-    item?.tool_action ||
-    rawArgs.toolAction ||
-    rawArgs.tool_action;
-
-  const command =
-    item?.command ||
-    rawArgs.CommandLine ||
-    rawArgs.command ||
-    rawArgs.cmd ||
-    rawArgs.code ||
-    rawArgs.source_code;
-
-  const path =
-    item?.path ||
-    rawArgs.TargetFile ||
-    rawArgs.AbsolutePath ||
-    rawArgs.file_path ||
-    rawArgs.path ||
-    rawArgs.Path ||
-    rawArgs.target_file ||
-    rawArgs.filepath ||
-    rawArgs.DirectoryPath ||
-    rawArgs.dir_path;
+  const s = item?.toolSummary || item?.tool_summary || args.toolSummary || args.tool_summary || args.description || args.Instruction || args.summary;
+  const a = item?.toolAction || item?.tool_action || args.toolAction || args.tool_action;
+  const c = item?.command || args.CommandLine || args.command || args.cmd;
+  const p = item?.path || args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.Path;
 
   return {
-    toolSummary: summary ? String(summary).trim() : undefined,
-    toolAction: action ? String(action).trim() : undefined,
-    command: command ? String(command).trim() : undefined,
-    path: path ? String(path).trim() : undefined,
+    toolSummary: s ? String(s).trim() : undefined,
+    toolAction: a ? String(a).trim() : undefined,
+    command: c ? String(c).trim() : undefined,
+    path: p ? String(p).trim() : undefined,
   };
 }
 
