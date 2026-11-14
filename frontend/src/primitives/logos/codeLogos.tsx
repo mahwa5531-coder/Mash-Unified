@@ -18,6 +18,15 @@ export function AuthenticPythonLogo({ size = 16, className = "" }: { size?: numb
   );
 }
 
+/** LOGO-JINJA-1: Official Jinja Template Torii Gate */
+export function JinjaTemplateLogo({ size = 16, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={`shrink-0 ${className}`}>
+      <path d="M3 5.5h18v2.5H3V5.5zm2 4h14v2H5v-2zm3 4v7h2.5v-7H8zm5.5 0v7H16v-7h-2.5z" fill="#B41717" />
+    </svg>
+  );
+}
+
 /** LOGO-SQL-1: Dual Relational Cylinders with Query Spark */
 export function SqlDatabaseLogo({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (

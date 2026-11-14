@@ -21,6 +21,7 @@ export {
 
 export {
   AuthenticPythonLogo,
+  JinjaTemplateLogo,
   SqlDatabaseLogo,
   JsonObjectLogo,
   JupyterNotebookLogo,

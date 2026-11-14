@@ -24,23 +24,28 @@ export function isScratchPath(p: string): boolean {
 export const shouldExcludePath = isScratchPath;
 
 /**
- * Positive deliverable classification (DeepSeek Harness / SWE-bench domain scoping):
- * A path is an executive deliverable (artifact) if:
- * 1. It explicitly carries user-facing ArtifactMetadata from the tool call, OR
- * 2. It is a canonical executive plan / walkthrough (implementation_plan.md, walkthrough.md), OR
- * 3. It resides in a designated deliverable namespace (working_papers/, workpapers/, deliverables/, Audit_Deliverables/), OR
- * 4. It is an executive markdown (.md) document outside scratchpad/temp storage.
+ * Positive deliverable classification:
+ * Artifact Cards (<WorkingPaperCard /> / <ArtifactCard />) are strictly and exclusively
+ * for markdown (.md) documents created in that exact turn (Audit Memos, Plans, Walkthroughs).
+ * 
+ * Non-markdown files (spreadsheets, PDFs, images) are NOT rendered as artifact cards;
+ * they are rendered cleanly in <TurnFilesGenerated /> as <FilePill />s, or embedded inline.
  */
 export function isArtifactPath(p: string, meta?: any): boolean {
   if (!p || isScratchPath(p)) return false;
   const lower = p.toLowerCase().replace(/\\/g, '/');
 
-  // 1. Explicit tool metadata declaring a user-facing artifact
+  // Strict Invariant: Cards are ONLY for .md files created in that exact turn!
+  if (!lower.endsWith('.md')) {
+    return false;
+  }
+
+  // 1. Explicit tool metadata declaring a user-facing artifact (.md)
   if (meta?.UserFacing !== false && (meta?.Summary || meta?.summary || meta?.RequestFeedback !== undefined)) {
     return true;
   }
 
-  // 2. Canonical executive plans and walkthroughs
+  // 2. Canonical executive plans and walkthroughs (.md)
   if (
     lower.endsWith('implementation_plan.md') ||
     lower.endsWith('plan.md') ||
@@ -51,33 +56,20 @@ export function isArtifactPath(p: string, meta?: any): boolean {
     return true;
   }
 
-  // 3. Designated deliverable namespaces (project deliverables or session brain working papers)
-  // Non-markdown formats (.xlsx, .csv, .pdf, images) are accepted within these explicit deliverable namespaces.
+  // 3. Designated deliverable namespaces (.md only!)
   if (
     lower.includes('/working_papers/') ||
     lower.startsWith('working_papers/') ||
     lower.includes('/workpapers/') ||
     lower.startsWith('workpapers/') ||
-    lower.includes('/deliverables/') ||
-    lower.startsWith('deliverables/') ||
     lower.includes('/audit_deliverables/') ||
     lower.startsWith('audit_deliverables/')
   ) {
-    return (
-      lower.endsWith('.md') ||
-      lower.endsWith('.xlsx') ||
-      lower.endsWith('.csv') ||
-      lower.endsWith('.pdf') ||
-      lower.endsWith('.png') ||
-      lower.endsWith('.svg') ||
-      lower.endsWith('.jpg') ||
-      lower.endsWith('.jpeg') ||
-      lower.endsWith('.webp')
-    );
+    return true;
   }
 
   // 4. Any executive markdown (.md) document outside scratch/tmp is a statutory deliverable / working paper
-  return lower.endsWith('.md');
+  return true;
 }
 
 // Canonical group for doc artifacts so revised plans/walkthroughs vanish from past turns

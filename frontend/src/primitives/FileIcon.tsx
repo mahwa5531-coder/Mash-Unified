@@ -11,6 +11,7 @@ import {
   FluentWordLogo,
   AuthenticPythonLogo,
   OfficialMarkdownLogo,
+  JinjaTemplateLogo,
   SqlDatabaseLogo,
   JsonObjectLogo,
   ConsoleTerminalLogo,
@@ -221,6 +222,9 @@ const EXTENSION_MAP: Record<string, LogoComponent> = {
   'properties': ConfigSettingsLogo,
 
   // Documentation & Templates
+  'j2': JinjaTemplateLogo,
+  'jinja': JinjaTemplateLogo,
+  'jinja2': JinjaTemplateLogo,
   'md': OfficialMarkdownLogo,
   'markdown': OfficialMarkdownLogo,
   'mdx': OfficialMarkdownLogo,

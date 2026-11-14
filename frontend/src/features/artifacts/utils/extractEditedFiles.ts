@@ -71,7 +71,7 @@ export function extractEditedFiles(msg: Message): {
           fileMap.set(cleanPath, {
             path: cleanPath,
             filename,
-            dir: dir ? (dir.startsWith('/') || dir.includes(':') ? dir : `/${dir}`) : '',
+            dir: dir || '',
             addedLines: added,
             deletedLines: deleted,
           });
