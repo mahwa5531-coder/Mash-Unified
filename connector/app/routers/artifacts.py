@@ -10,7 +10,7 @@ from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 
 from app.dependencies import DatabaseEngineDep, resolve_engine as _get_engine
-from app.paths import get_mash_home, get_session_brain_dir, validate_safe_id
+from app.paths import get_mash_home, get_session_brain_dir, normalize_local_path, validate_safe_id
 from app.workspace import APP_WORKSPACE_ROOT, resolve_session_workspace
 
 logger = logging.getLogger(__name__)
@@ -164,7 +164,7 @@ async def get_file_content(
     engine: DatabaseEngineDep = None,
 ):
     """Read and return file content or stream on local disk."""
-    clean_path = unquote(path).strip()
+    clean_path = normalize_local_path(path)
     if not clean_path:
         raise HTTPException(status_code=400, detail="File path cannot be empty.")
 
@@ -187,6 +187,8 @@ async def get_file_content(
                     s_dir / rel_path,
                     s_dir / "working_papers" / rel_path,
                     s_dir / "scratch" / rel_path,
+                    s_dir / "Audit_Deliverables" / rel_path,
+                    s_dir / ".user_uploaded" / rel_path,
                 ])
             try:
                 # Lazy DB engine resolution: only query database when relative workspace resolution is needed
@@ -212,17 +214,12 @@ async def get_file_content(
     else:
         p = p.resolve()
 
-    # Enforce session authorization for brain storage access
-    brain_root = (get_mash_home() / "brain").resolve()
-    if p.is_relative_to(brain_root):
-        if not session_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: Direct access to session brain files without session authorization is forbidden."
-            )
-        validate_safe_id(session_id, "session_id")
-
-    # desktop read model — any local file the host OS user can read is viewable
+    # Desktop read model — any local file the host OS user can read is viewable
+    if session_id:
+        try:
+            validate_safe_id(session_id, "session_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     try:
         exists = p.exists()

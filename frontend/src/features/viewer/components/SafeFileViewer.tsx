@@ -140,6 +140,30 @@ export default function SafeFileViewer({
     );
   }
 
+  // Dedicated binary & media renderers evaluated first
+  if (isImage) {
+    return <ImageViewer filename={filename} path={path} sessionQuery={sessionQuery} />;
+  }
+
+  if (isPdf) {
+    return <PdfViewer filename={filename} path={path} sessionId={sessionId} sessionQuery={sessionQuery} />;
+  }
+
+  if (isBinaryExcel) {
+    return (
+      <ExcelViewerCard
+        filename={filename}
+        path={path}
+        sessionId={sessionId}
+        sessionQuery={sessionQuery}
+      />
+    );
+  }
+
+  if (isUnsupported) {
+    return <FileViewerNotice message="File format not supported" filename={filename} path={path} />;
+  }
+
   const isAccessDenied = Boolean(
     content && (
       content.includes('Access denied') ||
@@ -164,29 +188,6 @@ export default function SafeFileViewer({
 
   if (isFileNotFound) {
     return <FileViewerNotice message="File not found" filename={filename} path={path} onRetry={onRetry} />;
-  }
-
-  if (isBinaryExcel) {
-    return (
-      <ExcelViewerCard
-        filename={filename}
-        path={path}
-        sessionId={sessionId}
-        sessionQuery={sessionQuery}
-      />
-    );
-  }
-
-  if (isUnsupported) {
-    return <FileViewerNotice message="File format not supported" filename={filename} path={path} />;
-  }
-
-  if (isImage) {
-    return <ImageViewer filename={filename} path={path} sessionQuery={sessionQuery} />;
-  }
-
-  if (isPdf) {
-    return <PdfViewer filename={filename} path={path} sessionId={sessionId} sessionQuery={sessionQuery} />;
   }
 
   const handleEditorWillMount = (monaco: any) => {

@@ -99,6 +99,11 @@ export async function fetchFileContent(filePath: string, sessionId?: string, byp
         cacheFileContent(cacheKey, csvContent);
         return csvContent;
       }
+      const isBinaryMedia = /\.(png|jpg|jpeg|svg|gif|webp|ico|bmp|pdf)$/i.test(cleanKey);
+      if (isBinaryMedia) {
+        cacheFileContent(cacheKey, "");
+        return "";
+      }
       const data = await res.json();
       if (data.type === 'excel') {
         const serialized = JSON.stringify(data);

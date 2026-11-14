@@ -108,7 +108,7 @@ export async function streamQuery(
       if (!completedToolIds.has(callId)) {
         let finalArgs: Record<string, any> = {};
         try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
-        const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary;
+        const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary;
         const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
         onToolCall({
           id: callId,
@@ -313,7 +313,7 @@ export async function streamQuery(
               }
               if (onToolCall) {
                 const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
-                const toolSummary = parsedArgs?.toolSummary || parsedArgs?.tool_summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary;
+                const toolSummary = parsedArgs?.toolSummary || parsedArgs?.tool_summary || parsedArgs?.description || parsedArgs?.Instruction || parsedArgs?.summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary || event.description || data.description;
                 const toolAction = parsedArgs?.toolAction || parsedArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
                 onToolCall({
                   id: callId,
@@ -335,7 +335,7 @@ export async function streamQuery(
               let finalArgs: Record<string, any> = {};
               try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
               const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
-              const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary;
+              const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary || event.description || data.description;
               const toolAction = finalArgs?.toolAction || finalArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
               onToolCall({
                 id: callId,
@@ -359,7 +359,7 @@ export async function streamQuery(
               let finalArgs: Record<string, any> = {};
               try { finalArgs = JSON.parse(toolArgBuffers[callId] || "{}"); } catch { /* noop */ }
               const currentName = toolCallNames[callId] || event.tool_call_name || data.tool_call_name || "action";
-              const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary;
+              const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary || event.toolSummary || data.toolSummary || event.tool_summary || data.tool_summary || event.description || data.description;
               const toolAction = finalArgs?.toolAction || finalArgs?.tool_action || event.toolAction || data.toolAction || event.tool_action || data.tool_action;
               // Only flag failed if wire protocol explicitly stamps event as failed/error.
               // Tool stdout/stderr (e.g. CLI non-zero returns or not-found) is valid observation

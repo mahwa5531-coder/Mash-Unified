@@ -45,7 +45,7 @@ export class InFlightToolTracker {
     this.toolArgBuffers[cid] = (this.toolArgBuffers[cid] || '') + deltaArg;
     let parsedArgs: any = {};
     try { parsedArgs = JSON.parse(this.toolArgBuffers[cid]); } catch {}
-    const toolSummary = parsedArgs?.toolSummary || parsedArgs?.tool_summary;
+    const toolSummary = parsedArgs?.toolSummary || parsedArgs?.tool_summary || parsedArgs?.description || parsedArgs?.Instruction || parsedArgs?.summary;
     const toolAction = parsedArgs?.toolAction || parsedArgs?.tool_action;
     if (onToolCall) onToolCall({
       id: cid,
@@ -62,7 +62,7 @@ export class InFlightToolTracker {
     if (!cid || !onToolCall) return;
     let finalArgs: any = {};
     try { finalArgs = JSON.parse(this.toolArgBuffers[cid] || '{}'); } catch {}
-    const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary;
+    const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary;
     const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
     onToolCall({
       id: cid,
@@ -80,7 +80,7 @@ export class InFlightToolTracker {
     if (cid && onToolCall) {
       let finalArgs: any = {};
       try { finalArgs = JSON.parse(this.toolArgBuffers[cid] || '{}'); } catch {}
-      const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary;
+      const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary;
       const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
       onToolCall({
         id: cid,
@@ -107,7 +107,7 @@ export class InFlightToolTracker {
       if (!this.completedToolIds.has(cid)) {
         let finalArgs: any = {};
         try { finalArgs = JSON.parse(this.toolArgBuffers[cid] || '{}'); } catch {}
-        const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary;
+        const toolSummary = finalArgs?.toolSummary || finalArgs?.tool_summary || finalArgs?.description || finalArgs?.Instruction || finalArgs?.summary;
         const toolAction = finalArgs?.toolAction || finalArgs?.tool_action;
         if (onToolCall) onToolCall({
           id: cid,

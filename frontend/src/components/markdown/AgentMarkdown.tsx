@@ -158,7 +158,11 @@ export const AgentMarkdown = memo(function AgentMarkdown({
   const components = useAgentMarkdownComponents({ mode, sessionId, onOpenFile, onImageClick });
   const sanitizedContent = React.useMemo(() => {
     if (!content) return '';
-    return escapeCurrencyInMarkdown(content);
+    const withEscapedCurrency = escapeCurrencyInMarkdown(content);
+    // Pre-normalize backslashes inside markdown link/image destinations to prevent CommonMark escape stripping
+    return withEscapedCurrency.replace(/(!?\[.*?\]\()(.*?)(\))/g, (_match, prefix, dest, suffix) => {
+      return prefix + dest.replace(/\\/g, '/') + suffix;
+    });
   }, [content]);
 
   if (!content) return null;

@@ -35,6 +35,13 @@ export interface SidebarSectionsState {
   conversations: boolean;
 }
 
+export function getSessionTimestamp(s: SessionItem): number {
+  const ts = s.updated_at || s.created_at || (s as any).timestamp;
+  if (!ts) return 0;
+  const t = new Date(ts).getTime();
+  return isNaN(t) ? 0 : t;
+}
+
 export function groupSidebarSessions(
   sessions: SessionItem[],
   pinnedSessionIds: Set<string>,
@@ -88,6 +95,13 @@ export function groupSidebarSessions(
     const targetGroupName = matched ? matched.name : (uri.includes('/') || uri.includes('\\') ? uri.split(/[/\\]/).filter(Boolean).pop() || uri : uri);
     if (!workspaceMap[targetGroupName]) workspaceMap[targetGroupName] = [];
     workspaceMap[targetGroupName].push(s);
+  }
+
+  // Strictly sort all groups descending by activity timestamp (newest first)
+  pinned.sort((a, b) => getSessionTimestamp(b) - getSessionTimestamp(a));
+  direct.sort((a, b) => getSessionTimestamp(b) - getSessionTimestamp(a));
+  for (const k of Object.keys(workspaceMap)) {
+    workspaceMap[k].sort((a, b) => getSessionTimestamp(b) - getSessionTimestamp(a));
   }
 
   return { pinnedSessions: pinned, workspaceSessions: workspaceMap, directConversations: direct };
@@ -250,16 +264,20 @@ export function useSidebarData({
           }
         }
 
-        // 2. Prepend any new sessions from backend not in cache
+        // 2. Append any new sessions from backend not in cache
         for (const s of fetchedSessions) {
           if (!seen.has(s.session_id) && !deletedSessionIds.has(s.session_id)) {
-            reconciled.unshift({
+            reconciled.push({
               ...s,
               title: (curId === s.session_id && curTitle && !/^(new conversation|new chat)$/i.test(curTitle.trim())) ? curTitle : (s.custom_title || s.title),
               has_unread: curId === s.session_id ? false : s.has_unread,
             });
+            seen.add(s.session_id);
           }
         }
+
+        // 3. Strictly sort reconciled sessions descending by activity timestamp (newest first)
+        reconciled.sort((a, b) => getSessionTimestamp(b) - getSessionTimestamp(a));
 
         setCache('mash_cached_sessions', reconciled, 'nexau_cached_sessions');
         return reconciled;

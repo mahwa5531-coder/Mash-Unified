@@ -120,8 +120,8 @@ export function parseSessionHistory(rawLines: any[]): Message[] {
         const resolvedSteps = Array.isArray(step.steps)
           ? step.steps.map((st: any) => ({
               ...st,
-              toolSummary: st.toolSummary || st.args?.toolSummary,
-              toolAction: st.toolAction || st.args?.toolAction,
+              toolSummary: st.toolSummary || st.tool_summary || st.args?.toolSummary || st.args?.tool_summary || st.args?.description || st.args?.Instruction || st.args?.summary,
+              toolAction: st.toolAction || st.tool_action || st.args?.toolAction || st.args?.tool_action,
             }))
           : [];
 

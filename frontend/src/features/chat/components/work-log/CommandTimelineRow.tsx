@@ -28,6 +28,7 @@ export function CommandTimelineRow({
   toggleCmd,
 }: CommandTimelineRowProps) {
   const [internalCopiedId, setInternalCopiedId] = useState<string | null>(null);
+  const [localExpanded, setLocalExpanded] = useState<boolean>(false);
 
   const activeCopiedId = externalCopiedId !== undefined ? externalCopiedId : internalCopiedId;
   const activeHandleCopy = (text: string, id: string) => {
@@ -48,12 +49,14 @@ export function CommandTimelineRow({
   const rawOutput = entry.data?.tool?.output || '';
   const outputText = rawOutput.trim();
 
-
   const isCmdExpanded = directIsCmdExpanded !== undefined
     ? directIsCmdExpanded
-    : expandedCmds instanceof Set
-      ? expandedCmds.has(toolId)
-      : Boolean(expandedCmds?.[toolId]);
+    : ((expandedCmds instanceof Set ? expandedCmds.has(toolId) : Boolean(expandedCmds?.[toolId])) || localExpanded);
+
+  const handleToggle = () => {
+    setLocalExpanded(prev => !prev);
+    toggleCmd?.(toolId);
+  };
 
   // Defer JSON parsing of command output until user expands the terminal drawer
   let displayOutput = outputText;
@@ -71,6 +74,8 @@ export function CommandTimelineRow({
 
   const toolAction = entry.data?.toolAction || entry.data?.tool?.toolAction;
   const toolSummary = entry.data?.toolSummary || entry.data?.tool?.toolSummary;
+  const rawCmd = entry.data?.cmd || '';
+  const cleanSummary = toolSummary && toolSummary !== rawCmd ? toolSummary : '';
 
   let displayLabel: string;
   let showCmd = false;
@@ -88,13 +93,16 @@ export function CommandTimelineRow({
     if (toolAction) {
       displayLabel = toolAction;
       showCmd = false;
+    } else if (cleanSummary) {
+      displayLabel = cleanSummary;
+      showCmd = false;
     } else {
       displayLabel = 'Running';
       showCmd = true;
     }
   } else {
-    if (toolSummary) {
-      displayLabel = toolSummary;
+    if (cleanSummary) {
+      displayLabel = cleanSummary;
       showCmd = false;
     } else {
       displayLabel = 'Ran';
@@ -102,12 +110,11 @@ export function CommandTimelineRow({
     }
   }
 
-
   return (
     <div key={entry.id} className={cn("flex flex-col text-xs select-none transition-colors", isChild ? "pl-2 py-0.5" : "my-0.5", isDenied && "opacity-75")}>
       <button
         type="button"
-        onClick={() => toggleCmd?.(toolId)}
+        onClick={handleToggle}
         className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-normal py-0.5 cursor-pointer select-none transition-colors group text-left w-fit"
       >
         <span
@@ -146,13 +153,13 @@ export function CommandTimelineRow({
 
       {isCmdExpanded && (
         <div className="mt-1 mb-2 pl-3 transition-all">
-          <div className="w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-950 p-2.5 font-mono text-[11px] text-zinc-200">
-            <div className="text-zinc-400 mb-1.5 flex items-center justify-between border-b border-zinc-800 pb-1 text-[10.5px]">
+          <div className="w-full rounded-md border border-zinc-200 dark:border-zinc-800 bg-[#f4f4f6] dark:bg-[#0c0c0e] p-2.5 font-mono text-[11px] text-zinc-800 dark:text-zinc-200 shadow-2xs">
+            <div className="text-zinc-500 dark:text-zinc-400 mb-1.5 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-1 text-[10.5px]">
               <div className="flex items-center gap-1.5 truncate">
-                <span className="text-zinc-500 font-mono text-[10.5px] select-none shrink-0">&gt;</span>
-                <span className="text-zinc-200 font-medium truncate text-[10.5px]">{entry.data?.fullCmd || entry.data?.cmd}</span>
+                <span className="text-zinc-400 dark:text-zinc-500 font-mono text-[10.5px] select-none shrink-0">&gt;</span>
+                <span className="text-zinc-800 dark:text-zinc-200 font-medium truncate text-[10.5px]">{entry.data?.fullCmd || entry.data?.cmd}</span>
                 {entry.data?.tool?.is_compacted && (
-                  <span className="text-[9.5px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 select-none">
+                  <span className="text-[9.5px] px-1 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700 select-none">
                     compacted in LLM
                   </span>
                 )}
@@ -164,16 +171,16 @@ export function CommandTimelineRow({
                     e.stopPropagation();
                     activeHandleCopy(displayOutput || entry.data?.fullCmd || entry.data?.cmd || '', toolId);
                   }}
-                  className="p-1 text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800 transition-colors cursor-pointer"
+                  className="p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                   title="Copy command/output"
                 >
-                  {activeCopiedId === toolId ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                  {activeCopiedId === toolId ? <Check size={11} className="text-emerald-500 dark:text-emerald-400" /> : <Copy size={11} />}
                 </button>
               </div>
             </div>
-            <pre className="text-zinc-300 whitespace-pre-wrap leading-tight max-h-36 overflow-y-auto custom-scrollbar font-mono text-[10.5px] select-text">
+            <pre className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-tight max-h-36 overflow-y-auto custom-scrollbar font-mono text-[10.5px] select-text">
               {displayOutput || (
-                <span className="text-zinc-500">
+                <span className="text-zinc-400 dark:text-zinc-500">
                   {isRunning ? 'Running command...' : 'Done (no output)'}
                 </span>
               )}

@@ -43,7 +43,6 @@ export function WorkspacesSection({
   const [internalIsOpen, setInternalIsOpen] = useState(true);
   const isSectionOpen = isOpen !== undefined ? isOpen : internalIsOpen;
   const handleToggle = onToggleOpen || (() => setInternalIsOpen(prev => !prev));
-  const entries = Object.entries(workspaceSessions);
 
   const projectsByName = React.useMemo(() => {
     const map = new Map<string, ProjectItem>();
@@ -52,6 +51,24 @@ export function WorkspacesSection({
     }
     return map;
   }, [registeredProjects]);
+
+  const sortedEntries = React.useMemo(() => {
+    const getTs = (s: SessionItem) => {
+      const ts = s.updated_at || s.created_at || (s as any).timestamp;
+      if (!ts) return 0;
+      const t = new Date(ts).getTime();
+      return isNaN(t) ? 0 : t;
+    };
+    return [...Object.entries(workspaceSessions)].sort(([nameA, sessA], [nameB, sessB]) => {
+      const matchA = projectsByName.get(nameA);
+      const matchB = projectsByName.get(nameB);
+      const projTsA = matchA?.created_at ? new Date(matchA.created_at).getTime() : 0;
+      const projTsB = matchB?.created_at ? new Date(matchB.created_at).getTime() : 0;
+      const latestA = sessA.length > 0 ? Math.max(...sessA.map(getTs)) : projTsA;
+      const latestB = sessB.length > 0 ? Math.max(...sessB.map(getTs)) : projTsB;
+      return latestB - latestA;
+    });
+  }, [workspaceSessions, projectsByName]);
 
   return (
     <div className="relative pb-2">
@@ -121,12 +138,12 @@ export function WorkspacesSection({
       {/* Workspaces List with Dropdown Accordion */}
       {isSectionOpen && (
         <div className="flex flex-col space-y-0.5">
-          {entries.length === 0 ? (
+          {sortedEntries.length === 0 ? (
             <div className="px-4 py-1 text-[12px] text-zinc-500 italic select-none">
               No projects added
             </div>
           ) : (
-            entries.map(([repoName, repoSessions]) => {
+            sortedEntries.map(([repoName, repoSessions]) => {
               const match = projectsByName.get(repoName);
               const folderKey = match?.id || repoName;
               const folderOpen = openFolders[folderKey] ?? openFolders[repoName] ?? false;

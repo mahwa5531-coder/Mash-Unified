@@ -68,15 +68,21 @@ export default function TaskWorkLogAccordion({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const thoughtScrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-collapse completed turns upon stream termination
+  // Auto-collapse completed turns upon stream termination unless user has expanded child rows
   const wasStreamingRef = useRef(isStreaming);
   useEffect(() => {
     if (wasStreamingRef.current && !isStreaming) {
-      setClusterOpen(false);
-      if (id) recordAccordionExpanded(id, false);
+      const hasUserExpandedChildren =
+        Object.values(expandedCmds).some(Boolean) ||
+        Object.values(expandedThoughts).some(Boolean) ||
+        Object.values(expandedGroups).some(Boolean);
+      if (!hasUserExpandedChildren) {
+        setClusterOpen(false);
+        if (id) recordAccordionExpanded(id, false);
+      }
     }
     wasStreamingRef.current = isStreaming;
-  }, [isStreaming, id]);
+  }, [isStreaming, id, expandedCmds, expandedThoughts, expandedGroups]);
 
   const toggleCluster = () => {
     setClusterOpen((prev) => {
