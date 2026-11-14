@@ -1,7 +1,7 @@
 import { Message } from '@/types/chat';
 import { EditedFileItem } from '@/types/artifacts';
 import { normalizePath } from '@/utils/normalizePath';
-import { shouldExcludePath } from './paths';
+import { isScratchPath } from './paths';
 
 // ----------------------------------------------------------------------
 // Edited Files (Extract created/modified code files for Antigravity-style drawer)
@@ -82,7 +82,7 @@ export function extractEditedFiles(msg: Message): {
         const p = args.file_path || args.TargetFile || args.AbsolutePath || args.path || args.target_file || args.filepath;
         if (p) {
           const clean = normalizeClean(String(p));
-          if (!shouldExcludePath(clean)) {
+          if (!isScratchPath(clean)) {
             const newText = args.new_string ?? args.ReplacementContent ?? '';
             const oldText = args.old_string ?? args.TargetContent ?? '';
             const added = newText ? String(newText).trim().split('\n').length : 1;
@@ -94,7 +94,7 @@ export function extractEditedFiles(msg: Message): {
         const p = args.file_path || args.TargetFile || args.AbsolutePath || args.path || args.target_file || args.filepath;
         if (p) {
           const clean = normalizeClean(String(p));
-          if (!shouldExcludePath(clean)) {
+          if (!isScratchPath(clean)) {
             const code = args.content ?? args.CodeContent ?? '';
             const added = code ? String(code).trim().split('\n').length : 1;
             recordEdit(clean, added, 0);
@@ -104,7 +104,7 @@ export function extractEditedFiles(msg: Message): {
         const p = args.file_path || args.TargetFile || args.AbsolutePath || args.path || args.target_file || args.filepath;
         if (p) {
           const clean = normalizeClean(String(p));
-          if (!shouldExcludePath(clean)) {
+          if (!isScratchPath(clean)) {
             let added = 0;
             let deleted = 0;
             if (Array.isArray(args.edits)) {
@@ -124,7 +124,7 @@ export function extractEditedFiles(msg: Message): {
           const rawPath = fileMatch[1].trim();
           if (!rawPath) continue;
           const clean = normalizeClean(rawPath);
-          if (shouldExcludePath(clean)) continue;
+          if (isScratchPath(clean)) continue;
 
           const nextIdx = patchText.indexOf('*** ', fileMatch.index + fileMatch[0].length);
           const hunk = nextIdx !== -1 ? patchText.slice(fileMatch.index, nextIdx) : patchText.slice(fileMatch.index);

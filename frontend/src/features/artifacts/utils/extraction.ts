@@ -13,9 +13,9 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
   const artifacts: ArtifactItem[] = [];
   const seenPaths = new Set<string>();
 
-  const classifyArtifact = (p: string): { isArtifact: boolean; type: 'plan' | 'walkthrough' | 'doc' } => {
-    // Strictly guard: only .md documents are standalone executive deliverables/working papers
-    if (!isArtifactPath(p)) {
+  const classifyArtifact = (p: string, meta?: any): { isArtifact: boolean; type: 'plan' | 'walkthrough' | 'doc' } => {
+    // DeepSeek Harness domain scoping: positive deliverable classification
+    if (!isArtifactPath(p, meta)) {
       return { isArtifact: false, type: 'doc' };
     }
     const lower = p.toLowerCase().replace(/\\/g, '/');
@@ -54,14 +54,14 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
       const rawPath = args.TargetFile || args.AbsolutePath || args.file_path || args.path || args.target_file || args.filepath || args.ImageName;
       if (rawPath) {
         const pathStr = String(rawPath);
-        const { isArtifact, type } = classifyArtifact(pathStr);
+        const meta = args.ArtifactMetadata || args.artifact_metadata;
+        const { isArtifact, type } = classifyArtifact(pathStr, meta);
         const canonicalKey = (pathStr.split(/[/\\]/).pop() || pathStr).toLowerCase();
-        if (isArtifact && !shouldExcludePath(pathStr) && !seenPaths.has(canonicalKey)) {
+        if (isArtifact && !seenPaths.has(canonicalKey)) {
           seenPaths.add(canonicalKey);
           const rawFilename = pathStr.split(/[/\\]/).pop() || '';
           const rawTitle = rawFilename.replace(/\.[^/.]+$/, '') || 'Artifact';
           const friendlyTitle = rawTitle.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-          const meta = args.ArtifactMetadata || args.artifact_metadata;
 
           // Dynamic summaries derived from file type and context (zero hardcoded static boilerplate)
           let dynamicSummary = meta?.Summary || meta?.summary;
