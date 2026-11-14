@@ -35,10 +35,7 @@ export function TurnFilesGenerated({
   if (!files || files.length === 0) return null;
 
   const count = files.length;
-  const isScratchOnly = files.every(f => (f.dir || f.path || '').toLowerCase().includes('scratch'));
-  const headerLabel = isScratchOnly 
-    ? `${count} supporting calculation file${count > 1 ? 's' : ''}`
-    : `${count} file${count > 1 ? 's' : ''} generated in this turn`;
+  const headerLabel = `${count} file${count > 1 ? 's' : ''} generated in this turn`;
 
   return (
     <div className={cn(
@@ -117,12 +114,6 @@ export function TurnFilesGenerated({
                     </span>
                   )}
                 </div>
-
-                {file.addedLines !== undefined && file.addedLines > 0 && (
-                  <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 shrink-0 ml-2">
-                    +{file.addedLines}
-                  </span>
-                )}
               </div>
             );
           })}

@@ -52,7 +52,7 @@ export function isArtifactPath(p: string, meta?: any): boolean {
   }
 
   // 3. Designated deliverable namespaces (project deliverables or session brain working papers)
-  // Non-markdown formats (.xlsx, .csv, .pdf) are accepted within these explicit deliverable namespaces.
+  // Non-markdown formats (.xlsx, .csv, .pdf, images) are accepted within these explicit deliverable namespaces.
   if (
     lower.includes('/working_papers/') ||
     lower.startsWith('working_papers/') ||
@@ -63,7 +63,17 @@ export function isArtifactPath(p: string, meta?: any): boolean {
     lower.includes('/audit_deliverables/') ||
     lower.startsWith('audit_deliverables/')
   ) {
-    return lower.endsWith('.md') || lower.endsWith('.xlsx') || lower.endsWith('.csv') || lower.endsWith('.pdf');
+    return (
+      lower.endsWith('.md') ||
+      lower.endsWith('.xlsx') ||
+      lower.endsWith('.csv') ||
+      lower.endsWith('.pdf') ||
+      lower.endsWith('.png') ||
+      lower.endsWith('.svg') ||
+      lower.endsWith('.jpg') ||
+      lower.endsWith('.jpeg') ||
+      lower.endsWith('.webp')
+    );
   }
 
   // 4. Any executive markdown (.md) document outside scratch/tmp is a statutory deliverable / working paper

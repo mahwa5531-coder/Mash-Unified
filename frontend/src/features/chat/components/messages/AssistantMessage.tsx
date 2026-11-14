@@ -165,8 +165,8 @@ const AssistantMessage = memo(function AssistantMessage({
         </div>
       )}
 
-      {/* 5. Additional Code / Configuration Files Modified in this turn */}
-      {nonArtifactEditedFiles.length > 0 && (
+      {/* 5. Additional Code / Configuration Files Modified in this turn (strictly post-streaming) */}
+      {nonArtifactEditedFiles.length > 0 && !isStillStreaming && (
         <TurnFilesGenerated
           files={nonArtifactEditedFiles}
           totalAdded={editedFilesData.totalAdded}

@@ -136,6 +136,17 @@ export function extractEditedFiles(msg: Message): {
           }
           recordEdit(clean, Math.max(1, added), deleted);
         }
+      } else if (name.includes('command') || name.includes('shell') || name === 'run_code') {
+        const text = `${args.CommandLine || args.cmd || args.command || ''} ${String(t.output || '')}`;
+        const match = text.match(/(?:Audit_Deliverables|working_papers|workpapers)[/\\][^\s"'<>|;]+\.[a-zA-Z0-9]+/gi);
+        if (match) {
+          for (const m of match) {
+            const clean = normalizeClean(m);
+            if (!isScratchPath(clean)) {
+              recordEdit(clean, 0, 0);
+            }
+          }
+        }
       }
     }
   }
