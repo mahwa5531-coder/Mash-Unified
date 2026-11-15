@@ -169,25 +169,26 @@ async def get_file_content(
         raise HTTPException(status_code=400, detail="File path cannot be empty.")
 
     # Traversal defense
-    if any(p in clean_path.split("/") or p in clean_path.split("\\") for p in ("..", ".%2e", "%2e.")):
+    if any(segment in clean_path.split("/") or segment in clean_path.split("\\") for segment in ("..", ".%2e", "%2e.")):
         raise HTTPException(status_code=403, detail="Invalid path traversal detected.")
+
+    if session_id:
+        try:
+            validate_safe_id(session_id, "session_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     p = Path(clean_path).expanduser()
     if not (p.is_absolute() and p.is_file()):
         rel_path = clean_path.lstrip("/\\")
         candidates: list[Path] = []
         if session_id:
-            try:
-                validate_safe_id(session_id, "session_id")
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e))
             s_dir = get_session_brain_dir(session_id).resolve()
             if s_dir.is_dir():
                 candidates.extend([
                     s_dir / rel_path,
                     s_dir / "working_papers" / rel_path,
                     s_dir / "scratch" / rel_path,
-                    s_dir / "Audit_Deliverables" / rel_path,
                     s_dir / ".user_uploaded" / rel_path,
                 ])
             try:
@@ -198,28 +199,16 @@ async def get_file_content(
                     candidates.extend([
                         ws / rel_path,
                         ws / "Audit_Deliverables" / rel_path,
-                        ws / "working_papers" / rel_path,
                     ])
             except Exception:
                 pass
-        candidates.extend([
-            APP_WORKSPACE_ROOT / rel_path,
-        ])
+        candidates.append(APP_WORKSPACE_ROOT / rel_path)
         for cand in candidates:
             if cand.is_file():
-                p = cand.resolve()
+                p = cand
                 break
-        else:
-            p = p.resolve()
-    else:
-        p = p.resolve()
 
-    # Desktop read model — any local file the host OS user can read is viewable
-    if session_id:
-        try:
-            validate_safe_id(session_id, "session_id")
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+    p = p.resolve()
 
     try:
         exists = p.exists()
