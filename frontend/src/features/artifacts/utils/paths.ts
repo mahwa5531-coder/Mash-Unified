@@ -5,18 +5,25 @@ import { normalizePath } from '@/utils/normalizePath';
  */
 export function isScratchPath(p: string): boolean {
   if (!p) return false;
-  const lower = p.toLowerCase().replace(/\\/g, '/');
+  let lower = p.toLowerCase().replace(/\\/g, '/');
+  if (lower.startsWith('./')) {
+    lower = lower.slice(2);
+  }
   return (
-    lower.includes('/scratch/') ||
+    lower === 'scratch' ||
     lower.startsWith('scratch/') ||
-    lower.includes('/.scratch/') ||
+    lower.includes('/scratch/') ||
+    lower === '.scratch' ||
     lower.startsWith('.scratch/') ||
-    lower.includes('/.system_generated/') ||
+    lower.includes('/.scratch/') ||
     lower.startsWith('.system_generated/') ||
-    lower.includes('/tmp/') ||
+    lower.includes('/.system_generated/') ||
+    lower === 'tmp' ||
     lower.startsWith('tmp/') ||
-    lower.includes('/temp/') ||
-    lower.startsWith('temp/')
+    lower.includes('/tmp/') ||
+    lower === 'temp' ||
+    lower.startsWith('temp/') ||
+    lower.includes('/temp/')
   );
 }
 

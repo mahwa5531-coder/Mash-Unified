@@ -348,21 +348,19 @@ def resolve_deliverables_dir(
     working_directory: str | Path | None = None,
     brain_directory: str | Path | None = None,
 ) -> Path:
-    """Resolve and scaffold the visible deliverables directory for reports, working papers, and proofs.
-    If working_directory exists: <working_directory>/Audit_Deliverables (or legacy NexAU_Outputs).
+    """Resolve and scaffold the visible deliverables directory for reports and formal audit outputs.
+    If working_directory exists: <working_directory>/Audit_Deliverables.
     Else: <brain_directory>/working_papers.
     """
     if working_directory and str(working_directory) != "No Repo" and Path(working_directory).exists():
         deliverables_dir = Path(working_directory) / "Audit_Deliverables"
-        legacy_dir = Path(working_directory) / "NexAU_Outputs"
-        out_dir = legacy_dir if (legacy_dir.exists() and not deliverables_dir.exists()) else deliverables_dir
-        out_dir.mkdir(parents=True, exist_ok=True)
-        return out_dir
+        deliverables_dir.mkdir(parents=True, exist_ok=True)
+        return deliverables_dir
     if brain_directory:
         wp_dir = Path(brain_directory) / "working_papers"
         wp_dir.mkdir(parents=True, exist_ok=True)
         return wp_dir
-    fallback = get_nexau_home() / "outputs"
+    fallback = get_nexau_home() / "working_papers"
     fallback.mkdir(parents=True, exist_ok=True)
     return fallback
 
@@ -375,7 +373,7 @@ def resolve_sandbox_work_dir(
     """Resolve the sandbox execution directory: workspace root if valid, else session scratch/brain."""
     if working_directory and str(working_directory) != "No Repo" and Path(working_directory).exists():
         return str(Path(working_directory).resolve())
-    for fallback in [scratch_directory, brain_directory]:
+    for fallback in [brain_directory, scratch_directory]:
         if fallback and Path(fallback).exists():
             return str(Path(fallback).resolve())
     return str(Path.cwd().resolve())

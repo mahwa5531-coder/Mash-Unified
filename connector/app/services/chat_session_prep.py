@@ -67,6 +67,7 @@ async def ensure_project_and_context(
     brain_path = scaffold_session_storage(sid, project_id)
     resolved_context.update({
         "brain_directory": str(brain_path),
+        "working_papers_directory": str(brain_path / "working_papers"),
         "scratch_directory": str(brain_path / "scratch"),
         "cache_directory": str(brain_path / "cache"),
         "session_id": sid,
@@ -74,7 +75,10 @@ async def ensure_project_and_context(
     if not resolved_context.get("working_directory"):
         resolved_context["working_directory"] = workspace_target
 
-    if workspace_target and workspace_target != "No Repo" and os.path.exists(workspace_target):
+    is_proj = bool(workspace_target and workspace_target != "No Repo" and os.path.exists(workspace_target))
+    resolved_context["is_project_session"] = is_proj
+
+    if is_proj:
         try:
             scaffold_workspace_storage(workspace_target)
         except Exception:
@@ -101,6 +105,7 @@ async def ensure_project_and_context(
                     brain_path = scaffold_session_storage(sid, project_id)
                     resolved_context.update({
                         "brain_directory": str(brain_path),
+                        "working_papers_directory": str(brain_path / "working_papers"),
                         "scratch_directory": str(brain_path / "scratch"),
                         "cache_directory": str(brain_path / "cache"),
                     })
@@ -136,6 +141,7 @@ async def ensure_project_and_context(
                     "workspace_uri": existing_proj.local_folder_path or existing_proj.name,
                     "working_directory": existing_proj.local_folder_path,
                     "brain_directory": str(brain_path),
+                    "working_papers_directory": str(brain_path / "working_papers"),
                     "scratch_directory": str(brain_path / "scratch"),
                     "cache_directory": str(brain_path / "cache"),
                 })
@@ -266,12 +272,21 @@ def setup_sandbox_and_model(
         resolved_context.get("scratch_directory"),
         resolved_context.get("brain_directory"),
     )
-    resolved_context["outputs_directory"] = str(
-        resolve_deliverables_dir(
-            resolved_context.get("working_directory"),
-            resolved_context.get("brain_directory"),
+    work_dir = resolved_context.get("working_directory")
+    is_project_session = bool(work_dir and work_dir != "No Repo" and os.path.exists(work_dir))
+    resolved_context["is_project_session"] = is_project_session
+
+    if is_project_session:
+        resolved_context["outputs_directory"] = str(
+            resolve_deliverables_dir(
+                work_dir,
+                resolved_context.get("brain_directory"),
+            )
         )
-    )
+    else:
+        resolved_context["outputs_directory"] = None
+    if "working_papers_directory" not in resolved_context and resolved_context.get("brain_directory"):
+        resolved_context["working_papers_directory"] = str(Path(resolved_context["brain_directory"]) / "working_papers")
 
     if effective_agent_config is None:
         return None

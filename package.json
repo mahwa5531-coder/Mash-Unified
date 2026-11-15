@@ -35,8 +35,7 @@
       "electron/**/*",
       "frontend/out/**/*",
       "!**/.env*",
-      "!**/*.map",
-      "!**/design-system.*"
+      "!**/*.map"
     ],
     "extraResources": [
       {

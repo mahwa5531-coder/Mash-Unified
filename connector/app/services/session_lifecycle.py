@@ -161,14 +161,27 @@ async def create_new_session(
     has_ws = workspace_uri not in ("No Repo", "", None) or project or project_id
     sec, ws_uri = section or ("workspace" if has_ws else "conversation"), workspace_uri or (project.name if project else "No Repo")
     work_dir = project.local_folder_path if project else (ws_uri if ws_uri != "No Repo" else None)
-    if work_dir and os.path.exists(work_dir):
-        out = os.path.join(work_dir, "NexAU_Outputs" if (os.path.exists(os.path.join(work_dir, "NexAU_Outputs")) and not os.path.exists(os.path.join(work_dir, "Audit_Deliverables"))) else "Audit_Deliverables")
+    is_proj = bool(work_dir and os.path.exists(work_dir))
+    if is_proj:
+        out = os.path.join(work_dir, "Audit_Deliverables")
         try:
             os.makedirs(out, exist_ok=True)
         except Exception:
             pass
 
-    ctx = {"project_id": project.id if project else project_id, "title": title, "custom_title": title, "workspace_uri": ws_uri, "working_directory": work_dir, "section": sec, "brain_directory": str(brain_path), "scratch_directory": str(brain_path / "scratch")}
+    ctx = {
+        "project_id": project.id if project else project_id,
+        "title": title,
+        "custom_title": title,
+        "workspace_uri": ws_uri,
+        "working_directory": work_dir,
+        "section": sec,
+        "is_project_session": is_proj,
+        "outputs_directory": os.path.join(work_dir, "Audit_Deliverables") if is_proj else None,
+        "brain_directory": str(brain_path),
+        "working_papers_directory": str(brain_path / "working_papers"),
+        "scratch_directory": str(brain_path / "scratch"),
+    }
     sm = None
     try:
         from app.routers.chat import _sse_server
@@ -363,7 +376,10 @@ async def fork_session(engine: Any, session_id: str, user_id: str = "default_use
     fork_title = title or f"Fork of {ctx.get('title') or session_id[:8]}"
     ctx["title"] = ctx["custom_title"] = fork_title
     brain_path = scaffold_session_storage(new_sid, ctx.get("project_id"))
-    ctx["brain_directory"], ctx["scratch_directory"] = str(brain_path), str(brain_path / "scratch")
+    is_proj = bool(ctx.get("working_directory") and ctx.get("working_directory") != "No Repo" and os.path.exists(ctx["working_directory"]))
+    ctx["is_project_session"] = is_proj
+    ctx["outputs_directory"] = os.path.join(ctx["working_directory"], "Audit_Deliverables") if is_proj else None
+    ctx["brain_directory"], ctx["scratch_directory"], ctx["working_papers_directory"] = str(brain_path), str(brain_path / "scratch"), str(brain_path / "working_papers")
     await eng.create(SessionModel(user_id=user_id, session_id=new_sid, context=ctx))
     actions = sorted(await eng.find_many(AgentRunActionModel, filters=ComparisonFilter.eq("session_id", session_id)), key=lambda x: getattr(x, "created_at_ns", 0) or 0)
     for a in actions:

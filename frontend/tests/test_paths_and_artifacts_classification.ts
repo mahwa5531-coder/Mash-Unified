@@ -10,6 +10,10 @@ console.log('--- STARTING PATHS & ARTIFACT CLASSIFICATION VERTICAL MATRIX ---');
 // Suite 1: Scratch and Temp File Detection
 console.log('\n[Suite 1: Scratch & Temp File Detection]');
 assert.equal(isScratchPath('scratch/calc.py'), true, 'scratch/ prefix must be detected');
+assert.equal(isScratchPath('./scratch/calc.py'), true, './scratch/ relative path detected');
+assert.equal(isScratchPath('.\\scratch\\calc.py'), true, '.\\scratch\\ Windows relative path detected');
+assert.equal(isScratchPath('scratch'), true, 'bare scratch folder detected');
+assert.equal(isScratchPath('./scratch'), true, './scratch folder detected');
 assert.equal(isScratchPath('/workspace/scratch/calc.py'), true, '/scratch/ segment must be detected');
 assert.equal(isScratchPath('C:\\workspace\\scratch\\notes.md'), true, 'Windows backslash scratch detected');
 assert.equal(isScratchPath('.scratch/temp.json'), true, '.scratch prefix detected');
@@ -80,6 +84,7 @@ const sampleAssistantMessage: Message = {
   id: 'msg_1',
   role: 'assistant',
   content: 'Here are the deliverables for this turn.',
+  thoughts: [],
   tools: [
     {
       id: 'tool_1',
@@ -144,6 +149,7 @@ const commandGeneratedMessage: Message = {
   id: 'msg_cmd_1',
   role: 'assistant',
   content: 'Generated reports via Python script.',
+  thoughts: [],
   tools: [
     {
       id: 'tool_cmd_1',
@@ -182,6 +188,7 @@ const turn2MentionOnlyMessage: Message = {
   id: 'msg_turn_2',
   role: 'assistant',
   content: 'As shown in our earlier [Audit Plan](working_papers/plan.md) and [Opinion](Audit_Deliverables/Statutory_Opinion.md), the audit is complete.',
+  thoughts: [],
   tools: [], // Turn 2 executed NO tools creating files
 };
 

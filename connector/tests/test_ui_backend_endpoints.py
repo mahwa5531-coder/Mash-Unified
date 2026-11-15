@@ -156,8 +156,10 @@ async def test_ui_backend_comprehensive_unit_suite():
             assert res.status_code == 403
             assert "traversal" in res.json()["detail"].lower()
 
-            # Path targeting a directory returns 400 Bad Request
-            res = await client.get(f"/files/content?path={Path.home() / 'Downloads'}")
+            # Path targeting a directory returns 403 Forbidden
+            downloads_dir = Path.home() / "Downloads"
+            downloads_dir.mkdir(parents=True, exist_ok=True)
+            res = await client.get(f"/files/content?path={downloads_dir}")
             assert res.status_code == 403
             assert "directory" in res.json()["detail"].lower()
 

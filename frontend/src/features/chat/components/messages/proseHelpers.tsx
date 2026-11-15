@@ -1,6 +1,7 @@
 import React from 'react';
 import { FilePill, AuditBadge } from '@/primitives';
 import { normalizePath, safeDecodeURI } from '@/utils/normalizePath';
+import { isScratchPath } from '@/features/artifacts/utils/paths';
 
 // Safely extract plain text from markdown AST / React children
 export function extractChildText(node: any): string {
@@ -139,7 +140,7 @@ export function processTextNodes(children: any, onOpenFile?: (path: string) => v
       pathParts.forEach((pPart, pIdx) => {
         if (!pPart) return; // Prune empty string fragments
         const { cleanPath, trailingPunctuation } = prunePathPunctuation(pPart);
-        if (cleanPath && isFullFilePath(cleanPath)) {
+        if (cleanPath && isFullFilePath(cleanPath) && !isScratchPath(cleanPath)) {
           const { filePath, display } = formatFilePill(cleanPath, cleanPath);
           nodes.push(
             <FilePill

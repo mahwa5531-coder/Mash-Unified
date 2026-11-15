@@ -57,7 +57,7 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
       const toolName = (t.name || '').toLowerCase();
       if (!rawPath && (toolName.includes('command') || toolName.includes('shell') || toolName === 'run_code')) {
         const cmdText = `${args.CommandLine || args.cmd || args.command || ''} ${String(t.output || '')}`;
-        const match = cmdText.match(/(?:Audit_Deliverables|working_papers|workpapers)[/\\][^\s"'<>|;]+\.md/i);
+        const match = cmdText.match(/(?:Audit_Deliverables|working_papers)[/\\][^\s"'<>|;]+\.md/i);
         if (match) {
           rawPath = match[0];
         }
@@ -81,10 +81,6 @@ export function extractArtifacts(msg: Message): ArtifactItem[] {
               dynamicSummary = `Implementation plan for review and execution verification`;
             } else if (type === 'walkthrough') {
               dynamicSummary = `Walkthrough documentation and execution results`;
-            } else if (type === 'spreadsheet') {
-              dynamicSummary = `${friendlyTitle} audit schedule and testing reconciliation`;
-            } else if (type === 'chart') {
-              dynamicSummary = `${friendlyTitle} visual analytical exhibit`;
             } else {
               dynamicSummary = `${friendlyTitle} documentation and analysis findings`;
             }

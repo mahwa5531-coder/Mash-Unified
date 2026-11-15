@@ -19,8 +19,10 @@ def anyio_backend():
 @pytest.mark.anyio
 async def test_file_content_rejects_unregistered_downloads_root() -> None:
     """Local Downloads is not an app workspace unless the user registers it."""
+    downloads_dir = Path.home() / "Downloads"
+    downloads_dir.mkdir(parents=True, exist_ok=True)
     with pytest.raises(HTTPException) as exc_info:
-        await get_file_content(path=str(Path.home() / "Downloads"), engine=None)
+        await get_file_content(path=str(downloads_dir), engine=None)
 
     assert exc_info.value.status_code == 403
 

@@ -32,9 +32,6 @@ const Unit23LLMResponseShowcase = dynamic(() => import('./units').then(m => m.Un
 const Unit24WorkbenchShell = dynamic(() => import('./units').then(m => m.Unit24WorkbenchShell), { ssr: false });
 
 export default function DesignSystemPreviewPage() {
-  if (process.env.NODE_ENV === 'production') {
-    notFound();
-  }
 
   const [isDark, setIsDark] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
