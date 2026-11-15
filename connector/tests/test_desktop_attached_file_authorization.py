@@ -92,9 +92,9 @@ async def test_r2_7a_poisoned_root_attachment_defense():
             await engine.create(session)
             invalidate_roots_cache()
 
-            # 1. Non-existent system path, traversal, or readable OS file returns valid response
+            # 1. Non-existent system path or traversal returns 403 or 404
             res_passwd = await client.get("/files/content?path=/etc/passwd")
-            assert res_passwd.status_code in (200, 403, 404), f"Expected 200, 403, or 404 for /etc/passwd, got {res_passwd.status_code}"
+            assert res_passwd.status_code in (403, 404), f"Expected 403 or 404 for /etc/passwd, got {res_passwd.status_code}"
 
             res_winini = await client.get("/files/content?path=C:/Windows/win.ini")
             assert res_winini.status_code in (200, 403, 404), f"Expected valid response for C:/Windows/win.ini, got {res_winini.status_code}"

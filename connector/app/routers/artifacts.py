@@ -214,6 +214,11 @@ async def get_file_content(
     else:
         p = p.resolve()
 
+    # R2-7a: Sensitive system path defense
+    from app.workspace import is_safe_attachment_root
+    if not is_safe_attachment_root(p):
+        raise HTTPException(status_code=403, detail="Access denied: Path is a restricted system path.")
+
     # Desktop read model — any local file the host OS user can read is viewable
     if session_id:
         try:
