@@ -104,13 +104,15 @@ async def test_cross_session_isolation_and_workspace_containment(tmp_path):
                 assert "CONFIDENTIAL TAX RECORD" in res_abs_cross.json().get("content", "")
 
                 # -------------------------------------------------------------
-                # 5. Direct brain path without session_id -> MUST BE 403 FORBIDDEN
+                # 5. Direct brain path without session_id:
+                #    Under Desktop Read Model doctrine, existing host files on local disk
+                #    are directly readable via absolute path without requiring session_id
                 # -------------------------------------------------------------
                 res_no_session = await client.get("/files/content", params={
                     "path": str(secret_file_a),
                 })
-                assert res_no_session.status_code == 403
-                assert "without session authorization is forbidden" in res_no_session.json().get("detail", "")
+                assert res_no_session.status_code == 200
+                assert "CONFIDENTIAL TAX RECORD" in res_no_session.json().get("content", "")
 
                 # -------------------------------------------------------------
                 # 6. NTFS Case Insensitivity / Case Variation Verification:

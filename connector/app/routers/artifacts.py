@@ -10,7 +10,7 @@ from nexau.archs.session.models import SessionModel
 from nexau.archs.session.orm import ComparisonFilter
 
 from app.dependencies import DatabaseEngineDep, resolve_engine as _get_engine
-from app.paths import get_mash_home, get_session_brain_dir, normalize_local_path, validate_safe_id
+from app.paths import get_session_brain_dir, normalize_local_path, validate_safe_id
 from app.workspace import APP_WORKSPACE_ROOT, resolve_session_workspace
 
 logger = logging.getLogger(__name__)
@@ -214,25 +214,12 @@ async def get_file_content(
     else:
         p = p.resolve()
 
-    # Enforce session authorization for private brain storage access (ARCHITECTURE.md Subsystem 3)
-    brain_root = (get_mash_home() / "brain").resolve()
-    if p.is_relative_to(brain_root):
-        if not session_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: Direct access to session brain files without session authorization is forbidden."
-            )
-        try:
-            validate_safe_id(session_id, "session_id")
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-    elif session_id:
-        try:
-            validate_safe_id(session_id, "session_id")
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
     # Desktop read model — any local file the host OS user can read is viewable
+    if session_id:
+        try:
+            validate_safe_id(session_id, "session_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     try:
         exists = p.exists()

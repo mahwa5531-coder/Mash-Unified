@@ -62,10 +62,14 @@ The primary failure mode of automated AI coding assistants when working on Mash 
 1. **The Desktop Read Model**:
    - The user frequently asks Mash to view files located in `~/Downloads`, `~/Desktop`, external storage drives (`D:\`, `E:\`, `/Volumes/`), or sibling repositories.
    - Any local file readable by the host operating system user MUST be viewable in Mash's Universal File Viewer via `GET /files/content`.
-   - Never artificially restrict reads to the project workspace root.
+   - Never artificially restrict reads to the project workspace root or session brain storage.
 2. **Missing Files Return 404, Not 403**:
    - Returning `403 Forbidden` for a file that does not exist on disk is an anti-pattern. If a path does not exist, return `404 Not Found`.
-   - Only return `403 Forbidden` when the operating system raises `PermissionError` (e.g. attempting to read a protected system file without OS permissions), when attempting to read a directory as a file, or when attempting unauthorized access to another session's private brain storage.
+   - `403 Forbidden` is strictly and exclusively returned for:
+     a) Relative path traversal attempts containing `..`, `.%2e`, or `%2e.`
+     b) Attempting to read a directory as a file (`p.is_dir()`)
+     c) Operating system permission denials (`PermissionError`)
+   - The file viewer never returns `403 Forbidden` based on artificial directory boundaries, root paths, or session ownership. Mash is a single-user desktop application; all sessions, working papers, and brain storage belong to the workstation owner, who has unrestricted read access to inspect any local file on their machine.
 3. **Execution & Mutation Security (Human-in-the-Loop)**:
    - Security in Mash is enforced strictly at the **mutation boundary**:
      - Running shell commands (`run_shell_command`)
@@ -258,14 +262,12 @@ flowchart TD
     Start["Incoming Request: path, session_id"] --> Step0{"Contains relative '..' segment?"}
     Step0 -- Yes --> Ret403Rel["Return 403 Forbidden<br/>(Relative traversal defense)"]
     Step0 -- No --> Step1{"1. Is path an existing Absolute Host File?<br/>(p.is_absolute() and p.is_file())"}
-    Step1 -- Yes --> BrainAuthCheck{"Is path inside ~/.mash/brain/?"}
+    Step1 -- Yes --> CheckPerm{"OS Permission Denied?"}
     Step1 -- No --> Step2{"2. Search Relative Candidates:<br/>1. s_dir (brain, working_papers, scratch)<br/>2. ws (workspace, Audit_Deliverables, working_papers)<br/>3. APP_WORKSPACE_ROOT"}
-    Step2 -- Found --> BrainAuthCheck
+    Step2 -- Found --> CheckPerm
     Step2 -- Not Found --> Step3{"3. Found in SQLite Action History?<br/>(_recover_from_sqlite_direct)"}
     Step3 -- Yes --> ServeVirtual["Return Virtual Content (Text)"]
     Step3 -- No --> Ret404["Return 404 Not Found<br/>(File does not exist on local disk)"]
-    BrainAuthCheck -- Yes & session_id missing --> Ret403Brain["Return 403 Forbidden<br/>(Brain authorization required)"]
-    BrainAuthCheck -- No or Authorized --> CheckPerm{"OS Permission Denied?"}
     CheckPerm -- Yes --> Ret403Perm["Return 403 Forbidden<br/>(OS PermissionError)"]
     CheckPerm -- No --> CheckDir{"Is Directory?"}
     CheckDir -- Yes --> Ret403Dir["Return 403 Forbidden<br/>(Path is a directory)"]
