@@ -214,17 +214,25 @@ async def get_file_content(
     else:
         p = p.resolve()
 
-    # R2-7a: Sensitive system path defense
-    from app.workspace import is_safe_attachment_root
-    if not is_safe_attachment_root(p):
-        raise HTTPException(status_code=403, detail="Access denied: Path is a restricted system path.")
-
-    # Desktop read model — any local file the host OS user can read is viewable
-    if session_id:
+    # Enforce session authorization for private brain storage access (ARCHITECTURE.md Subsystem 3)
+    brain_root = (get_mash_home() / "brain").resolve()
+    if p.is_relative_to(brain_root):
+        if not session_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Direct access to session brain files without session authorization is forbidden."
+            )
         try:
             validate_safe_id(session_id, "session_id")
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+    elif session_id:
+        try:
+            validate_safe_id(session_id, "session_id")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    # Desktop read model — any local file the host OS user can read is viewable
 
     try:
         exists = p.exists()

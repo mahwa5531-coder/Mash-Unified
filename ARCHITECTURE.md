@@ -275,6 +275,9 @@ flowchart TD
 #### 2. Relative Traversal vs Absolute Host Access
 - **Relative Path Traversal Defense**: Passing relative paths containing `..` (e.g. `path="../../foo.txt"`) is rejected with `403 Invalid path traversal detected` to prevent ambiguous directory escaping.
 - **Absolute Host Paths**: Fully supported! The host OS user can open any absolute path (`C:\Users\rama\Desktop\notes.txt`, `D:\data\sample.csv`, `/home/user/paper.pdf`). Absolute paths bypass relative candidate searching and are directly served.
+- **No Artificial Root Path Blocking in File Viewer**:
+  Mash is a single-user desktop application running as the workstation owner, NOT a multi-tenant cloud SaaS. `GET /files/content` does NOT block system paths, external drives, or root directories (e.g. `/etc`, `/usr`, `C:\Program Files`, `C:\Windows`). Any local file the host OS user can read is viewable.
+  - **R2-7a (`is_safe_attachment_root`) Scope**: `is_safe_attachment_root` is strictly an attachment-root sanitizer in [`connector/app/workspace.py`](file:///c:/Users/rama/Downloads/Mash/connector/app/workspace.py) used within `get_allowed_file_roots()`. It prevents session `attached_files` (like `["/", "C:\\"]`) from poisoning dynamic workspace roots and turning the entire filesystem into a recursive directory scan or an external app execution target (`system.py:open_external_file`). It is NEVER used to block direct read access in `get_file_content`.
 
 #### 3. Content Dispatch & MIME Handling
 - **PDF Documents** (`.pdf`): Served via `FileResponse(media_type="application/pdf", content_disposition_type="inline")`.

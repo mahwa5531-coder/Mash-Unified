@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import urllib.parse
+import uuid
 from pathlib import Path
 
 import httpx
@@ -44,8 +45,9 @@ async def test_scenario_matrix():
 
             # 1. Left Sidebar: Project Creation & Session Creation
             print("\n[Test 1] Left Sidebar: Project & Session Creation")
+            proj_name = f"Test Project Alpha {uuid.uuid4().hex[:6]}"
             p_status, p_data = await request(client, "/api/projects", method="POST", body={
-                "name": "Test Project Alpha",
+                "name": proj_name,
                 "local_folder_path": str(Path.cwd().resolve())
             })
             print(f"  -> Create Project: status={p_status}, id={p_data.get('id') if isinstance(p_data, dict) else None}")
@@ -57,7 +59,7 @@ async def test_scenario_matrix():
                 "session_id": sid_a,
                 "title": "Alpha Session 1",
                 "project_id": project_id,
-                "workspace_uri": "Test Project Alpha"
+                "workspace_uri": proj_name
             })
             print(f"  -> Create Project Session: status={s_status}, session_id={sid_a}")
             assert s_status == 200
