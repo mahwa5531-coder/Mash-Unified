@@ -3,7 +3,6 @@
 // Generic collapsible section with header, count badge, optional right action.
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 
 interface CollapsibleSectionProps {
   title: string;
@@ -45,9 +44,9 @@ export function CollapsibleSection({ title, count, isOpen, onToggle, rightAction
               {rightAction}
             </div>
           )}
-          <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-mono font-normal">
+          <span className="inline-flex items-center rounded-md border border-transparent bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 h-4 px-1.5 text-[10px] font-mono font-normal select-none">
             {count}
-          </Badge>
+          </span>
         </div>
       </div>
       {isOpen && (

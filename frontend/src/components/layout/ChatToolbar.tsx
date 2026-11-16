@@ -3,15 +3,8 @@
 // Row-2 toolbar above the chat canvas: logo cluster (when sidebar closed),
 // back/forward, session breadcrumb, right-panel toggle.
 // Pure presentation — all behavior arrives via callbacks.
-import { PanelRight, Sparkles, ArrowRight } from 'lucide-react';
+import { PanelRight, Sparkles, ArrowRight, ChevronRight } from 'lucide-react';
 import { SidebarBrandToggle } from '@/features/sessions/components/SidebarHeader';
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { generateCleanSessionTitle } from '@/utils/sessionTitle';
 import { useDesktopAutoUpdate } from '@/hooks/useDesktopAutoUpdate';
 
@@ -54,42 +47,44 @@ export function ChatToolbar({
 
         {/* Breadcrumb: Aligned directly above the chat canvas */}
         <div className="flex items-center min-w-0 flex-1 pl-1">
-          <Breadcrumb className="min-w-0">
-            <BreadcrumbList className="gap-1.5 sm:gap-2 flex-nowrap overflow-hidden">
+          <nav aria-label="breadcrumb" className="min-w-0">
+            <ol className="flex items-center gap-1.5 sm:gap-2 flex-nowrap overflow-hidden text-xs text-zinc-500 dark:text-zinc-400">
               {isHistoryActive ? (
-                <BreadcrumbItem className="min-w-0">
-                  <BreadcrumbPage className="font-medium text-xs text-zinc-800 dark:text-zinc-200 truncate">
+                <li className="inline-flex items-center gap-1.5 min-w-0">
+                  <span className="font-medium text-xs text-zinc-800 dark:text-zinc-200 truncate">
                     History
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
+                  </span>
+                </li>
               ) : (
                 <>
                   {isProjectSession && (
                     <>
-                      <BreadcrumbItem className="shrink-0">
+                      <li className="inline-flex items-center gap-1.5 shrink-0">
                         <span className="text-zinc-500 dark:text-zinc-400 font-normal text-xs">
                           {sessionRepo}
                         </span>
-                      </BreadcrumbItem>
-                      <BreadcrumbSeparator className="shrink-0 text-zinc-400 dark:text-zinc-600" />
+                      </li>
+                      <li role="presentation" aria-hidden="true" className="shrink-0 text-zinc-400 dark:text-zinc-600">
+                        <ChevronRight size={13} />
+                      </li>
                     </>
                   )}
-                  <BreadcrumbItem className="min-w-0">
+                  <li className="inline-flex items-center gap-1.5 min-w-0">
                     {!selectedSessionId ? (
-                      <BreadcrumbPage className="font-medium text-xs text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 truncate">
+                      <span className="font-medium text-xs text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 truncate">
                         <Sparkles size={11} className="text-sky-500 dark:text-sky-400 shrink-0" />
                         <span className="truncate">New Conversation</span>
-                      </BreadcrumbPage>
+                      </span>
                     ) : (
-                      <BreadcrumbPage className="font-medium text-xs text-zinc-800 dark:text-zinc-200 truncate max-w-[280px] sm:max-w-[450px]">
+                      <span className="font-medium text-xs text-zinc-800 dark:text-zinc-200 truncate max-w-[280px] sm:max-w-[450px]">
                         {cleanTitle}
-                      </BreadcrumbPage>
+                      </span>
                     )}
-                  </BreadcrumbItem>
+                  </li>
                 </>
               )}
-            </BreadcrumbList>
-          </Breadcrumb>
+            </ol>
+          </nav>
         </div>
       </div>
 

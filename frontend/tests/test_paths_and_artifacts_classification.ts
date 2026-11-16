@@ -56,6 +56,7 @@ assert.equal(isArtifactPath('summary.md', { Summary: 'Custom Executive Brief' })
 assert.equal(isArtifactPath('review.md', { RequestFeedback: true }), true, 'RequestFeedback marks artifact');
 assert.equal(isArtifactPath('summary.txt', { Summary: 'Text file' }), false, 'Non-md is rejected even with summary');
 assert.equal(isArtifactPath('internal.py', { UserFacing: false }), false, 'UserFacing: false rejects artifact');
+assert.equal(isArtifactPath('internal.md', { UserFacing: false }), false, 'UserFacing: false rejects md artifact');
 
 // Case 2F: Scratchpad Exclusions take Precedence
 assert.equal(isArtifactPath('scratch/Audit_Report.md'), false, 'Scratchpad markdown must NEVER be an artifact');

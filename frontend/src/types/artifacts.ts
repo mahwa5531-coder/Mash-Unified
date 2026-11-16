@@ -6,8 +6,7 @@ export interface ArtifactItem {
   title: string;
   summary: string;
   filePath: string;
-  type?: 'doc' | 'plan' | 'walkthrough' | 'spreadsheet' | 'chart';
-  thumbnailUrl?: string;
+  type?: 'doc' | 'plan' | 'walkthrough';
   requestFeedback?: boolean;
 }
 

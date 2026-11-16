@@ -21,6 +21,10 @@
 
 # production
 /build
+public/*.wasm
+public/xlsx-worker.js*
+public/*.xlsx
+*.xlsx
 
 # misc
 .DS_Store

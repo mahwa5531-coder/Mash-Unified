@@ -2,29 +2,13 @@ import { normalizePath } from '@/utils/normalizePath';
 
 /**
  * Returns true if a path points to an internal disposable scratchpad or temp file.
+ * Matches any folder segment named scratch, .scratch, .system_generated, tmp, or temp.
  */
 export function isScratchPath(p: string): boolean {
   if (!p) return false;
-  let lower = p.toLowerCase().replace(/\\/g, '/');
-  if (lower.startsWith('./')) {
-    lower = lower.slice(2);
-  }
-  return (
-    lower === 'scratch' ||
-    lower.startsWith('scratch/') ||
-    lower.includes('/scratch/') ||
-    lower === '.scratch' ||
-    lower.startsWith('.scratch/') ||
-    lower.includes('/.scratch/') ||
-    lower.startsWith('.system_generated/') ||
-    lower.includes('/.system_generated/') ||
-    lower === 'tmp' ||
-    lower.startsWith('tmp/') ||
-    lower.includes('/tmp/') ||
-    lower === 'temp' ||
-    lower.startsWith('temp/') ||
-    lower.includes('/temp/')
-  );
+  const clean = normalizePath(p).toLowerCase().trim();
+  const lower = clean.replace(/^\.\//, '');
+  return /(?:^|\/)(?:\.?scratch|\.system_generated|tmp|temp)(?:$|\/)/i.test(lower);
 }
 
 // Backward-compatible alias for existing callers
@@ -40,6 +24,12 @@ export const shouldExcludePath = isScratchPath;
  */
 export function isArtifactPath(p: string, meta?: any): boolean {
   if (!p || isScratchPath(p)) return false;
+
+  // Explicit tool metadata rejecting a user-facing artifact card
+  if (meta?.UserFacing === false || meta?.userFacing === false || meta?.user_facing === false) {
+    return false;
+  }
+
   const lower = p.toLowerCase().replace(/\\/g, '/');
 
   // Strict Invariant: Cards are ONLY for .md files created in that exact turn!
@@ -47,35 +37,6 @@ export function isArtifactPath(p: string, meta?: any): boolean {
     return false;
   }
 
-  // 1. Explicit tool metadata declaring a user-facing artifact (.md)
-  if (meta?.UserFacing !== false && (meta?.Summary || meta?.summary || meta?.RequestFeedback !== undefined)) {
-    return true;
-  }
-
-  // 2. Canonical executive plans and walkthroughs (.md)
-  if (
-    lower.endsWith('implementation_plan.md') ||
-    lower.endsWith('plan.md') ||
-    lower.endsWith('walkthrough.md') ||
-    lower.includes('implementation_plan') ||
-    lower.includes('walkthrough')
-  ) {
-    return true;
-  }
-
-  // 3. Designated deliverable namespaces (.md only!)
-  if (
-    lower.includes('/working_papers/') ||
-    lower.startsWith('working_papers/') ||
-    lower.includes('/workpapers/') ||
-    lower.startsWith('workpapers/') ||
-    lower.includes('/audit_deliverables/') ||
-    lower.startsWith('audit_deliverables/')
-  ) {
-    return true;
-  }
-
-  // 4. Any executive markdown (.md) document outside scratch/tmp is a statutory deliverable / working paper
   return true;
 }
 

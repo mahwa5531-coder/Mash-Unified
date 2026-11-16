@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npm run copy:monaco && next dev",
-    "build": "npm run copy:monaco && tsc --noEmit && next build",
+    "dev": "npm run copy:monaco && npm run copy:wasm && next dev",
+    "build": "npm run copy:monaco && npm run copy:wasm && tsc --noEmit && next build",
     "start": "next start",
     "lint": "eslint src",
     "test:chat": "npx tsx --tsconfig tsconfig.json tests/test_chat_scenarios.mjs",
@@ -27,9 +27,11 @@
     "test:stress": "npx tsx --tsconfig tsconfig.json tests/test_1000_turn_scroll_and_ram_matrix.ts",
     "test:50k": "npx tsx --tsconfig tsconfig.json tests/test_50k_steps_and_multi_session_ram.ts",
     "test": "npx tsx --tsconfig tsconfig.json tests/test_chat_scenarios.mjs && node tests/test_right_sidebar_logic.cjs && npx tsx tests/test_virtualized_desktop_optimizations.mjs && npx tsx tests/test_ram_memory_and_virtualization_coverage.mjs && node tests/test_dsa_frontend_optimizations.mjs && npx tsx tests/test_error_classification.ts && npx tsx --tsconfig tsconfig.json tests/test_stream_retry_and_recovery.ts && node tests/test_file_viewer_and_composer.mjs && npx tsx tests/test_clean_title_and_tags.ts && npx tsx tests/test_tool_actions_and_timeline.ts && npx tsx tests/test_deletion_error_handling.ts && node tests/test_execution_status_disclosure.mjs && npx tsx tests/test_stream_idempotency_and_crlf.ts && npx tsx tests/test_viewport_windowing_and_dom_culling.ts && npx tsx tests/test_reverse_scroll_and_island_deferral.ts && npx tsx --tsconfig tsconfig.json tests/test_attachment_limit.ts && npx tsx --tsconfig tsconfig.json tests/test_sidebar_scenarios.ts && npx tsx --tsconfig tsconfig.json tests/adversarial_challenger_m1_token_and_stream.ts && npx tsx --tsconfig tsconfig.json tests/challenger_m1_rep_streaming_stability.ts && npx tsx --tsconfig tsconfig.json tests/test_multi_tab_concurrency.ts && npx tsx --tsconfig tsconfig.json tests/fuzz_viewer_tabs_and_cache.ts && npm run test:virtuoso && npm run test:hero && npm run test:electron && npm run test:matrix && npm run test:chat-matrix && npm run test:senior && npm run test:scenarios",
-    "copy:monaco": "node -e \"const fs=require('fs'),p=require('path'); if (!fs.existsSync('public/monaco/vs')) { fs.mkdirSync('public/monaco', {recursive:true}); fs.cpSync('node_modules/monaco-editor/min/vs', 'public/monaco/vs', {recursive:true, filter:(s)=>!s.split(p.sep).join('/').includes('/nls/lang')}); }\""
+    "copy:monaco": "node -e \"const fs=require('fs'),p=require('path'); if (!fs.existsSync('public/monaco/vs')) { fs.mkdirSync('public/monaco', {recursive:true}); fs.cpSync('node_modules/monaco-editor/min/vs', 'public/monaco/vs', {recursive:true, filter:(s)=>!s.split(p.sep).join('/').includes('/nls/lang')}); }\"",
+    "copy:wasm": "node -e \"const fs=require('fs'),p=require('path'); const src='node_modules/@extend-ai/react-xlsx/dist'; if(!fs.existsSync('public/duke_sheets_wasm_bg.wasm')){['duke_sheets_wasm_bg.wasm','office_charts_bg.wasm','office_charts_full_bg.wasm','xlsx-worker.js'].forEach(function(f){const s=p.join(src,f);if(fs.existsSync(s))fs.copyFileSync(s,p.join('public',f));});}\""
   },
   "dependencies": {
+    "@extend-ai/react-xlsx": "^0.23.0",
     "@monaco-editor/react": "^4.7.0",
     "@panzoom/panzoom": "^4.6.2",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
