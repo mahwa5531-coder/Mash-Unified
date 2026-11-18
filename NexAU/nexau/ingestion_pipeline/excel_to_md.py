@@ -170,14 +170,25 @@ def parse_excel_to_markdown(
     except Exception as e:
         # Fallback for HTML-disguised .xls files (e.g. government/tax portal exports)
         try:
-            import pandas as pd
-            dfs = pd.read_html(str(path_obj))
-            sheet_names = [f"Table_{i+1}" for i in range(len(dfs))]
+            from bs4 import BeautifulSoup
+
+            html_text = path_obj.read_text(encoding="utf-8", errors="replace")
+            soup = BeautifulSoup(html_text, "html.parser")
+            tables = soup.find_all("table")
+            if not tables:
+                raise ValueError("No HTML tables found")
             sheets_data = []
-            for name, df in zip(sheet_names, dfs):
-                headers = [str(c) for c in df.columns]
-                rows = [headers] + df.values.tolist()
-                sheets_data.append((name, rows))
+            for idx, tbl in enumerate(tables, 1):
+                rows = [
+                    [cell.get_text(" ", strip=True) for cell in tr.find_all(["th", "td"])]
+                    for tr in tbl.find_all("tr")
+                ]
+                rows = [r for r in rows if r]
+                if rows:
+                    sheets_data.append((f"Table_{idx}", rows))
+            if not sheets_data:
+                raise ValueError("No non-empty HTML tables found")
+            sheet_names = [name for name, _ in sheets_data]
             if sheet_name:
                 req_norm = sheet_name.strip().lower()
                 sheets_data = [(name, grid) for name, grid in sheets_data if req_norm in name.strip().lower()]

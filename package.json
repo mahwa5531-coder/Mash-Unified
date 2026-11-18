@@ -28,6 +28,7 @@
     ],
     "electronLanguages": ["en-US", "en"],
     "asar": true,
+    "compression": "maximum",
     "directories": {
       "output": "dist/release"
     },

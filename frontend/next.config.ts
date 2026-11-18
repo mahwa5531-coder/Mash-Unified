@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "export",
+  // Exclude dev-only routes (*.dev.tsx such as /design-system) from production desktop exports
+  pageExtensions:
+    process.env.NODE_ENV === "production"
+      ? ["tsx", "ts", "jsx", "js"]
+      : ["dev.tsx", "tsx", "ts", "jsx", "js"],
   images: {
     unoptimized: true,
   },

@@ -4,19 +4,11 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { Loader2, AlertCircle, Download } from 'lucide-react';
 
-// Dynamically import XlsxViewer with SSR disabled for browser WebAssembly execution
+// Dynamically import XlsxViewer with SSR disabled for browser WebAssembly execution.
+// Turbopack bundles duke_sheets_wasm_bg.wasm, office_charts*.wasm, and xlsx-worker.js
+// into _next/static/media automatically via import.meta.url (no public/ duplicate needed).
 const DynamicXlsxViewer = dynamic(
-  () => import('@extend-ai/react-xlsx').then((mod) => {
-    // Bootstrap public WebAssembly asset source
-    if (typeof window !== 'undefined' && mod.setWasmSource) {
-      try {
-        mod.setWasmSource('/duke_sheets_wasm_bg.wasm');
-      } catch {
-        // already initialized
-      }
-    }
-    return mod.XlsxViewer;
-  }),
+  () => import('@extend-ai/react-xlsx').then((mod) => mod.XlsxViewer),
   {
     ssr: false,
     loading: () => (

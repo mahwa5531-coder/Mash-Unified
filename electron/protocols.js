@@ -18,6 +18,7 @@ const MIME_TYPES = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
+  '.wasm': 'application/wasm',
 };
 
 // 1. Privileged scheme registration must run synchronously BEFORE app.whenReady()

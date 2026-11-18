@@ -39,7 +39,9 @@ nexau_hiddenimports = sorted(
     if (parts := p.relative_to(nexau_pkg_dir).with_suffix('').parts) == ('__init__',)
     else 'nexau.' + '.'.join(parts[:-1] if parts[-1] == '__init__' else parts)
     for p in nexau_pkg_dir.rglob('*.py')
-    if '__pycache__' not in p.parts and 'migrations' not in p.parts
+    if '__pycache__' not in p.parts
+    and 'migrations' not in p.parts
+    and p.name != 'llm_friendly.py'
 )
 
 nexau_migrations_dir = nexau_dir / 'nexau' / 'db' / 'migrations'
@@ -136,6 +138,12 @@ a = Analysis(
         'setuptools',
         'distutils',
         'wheel',
+        'pandas',
+        'numpy',
+        'rapidfuzz',
+        'langsmith',
+        'langchain',
+        'langchain_core',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
