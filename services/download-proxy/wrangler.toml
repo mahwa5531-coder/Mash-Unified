@@ -5,4 +5,4 @@ account_id = "e90d46c6d02731d46bd509ea67fa8875"
 workers_dev = true
 
 [vars]
-GITHUB_REPO = "mahwa5531-coder/mash"
+GITHUB_REPO = "mahwa5531-coder/Mash-Unified"

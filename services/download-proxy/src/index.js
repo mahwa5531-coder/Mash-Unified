@@ -3,7 +3,7 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    const GITHUB_REPO = env.GITHUB_REPO || "mahwa5531-coder/mash";
+    const GITHUB_REPO = env.GITHUB_REPO || "mahwa5531-coder/Mash-Unified";
     const GITHUB_TOKEN = env.GITHUB_TOKEN;
 
     if (!GITHUB_TOKEN) {
