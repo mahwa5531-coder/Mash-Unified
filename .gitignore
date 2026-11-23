@@ -74,5 +74,7 @@ test-results/
 *_complete_prompts.txt
 tests/fixtures/
 website/
+scripts/benchmark_results.json
+frontend/public/screenshots/
 
 
