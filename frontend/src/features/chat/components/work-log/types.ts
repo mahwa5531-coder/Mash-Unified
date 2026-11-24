@@ -1,38 +1,9 @@
 // Work-log timeline types (tool calls, execution steps, timeline entries).
-export interface ToolCallItem {
-  id?: string;
-  name: string;
-  args?: Record<string, any>;
-  output?: string;
-  status?: 'running' | 'completed' | 'failed' | 'cancelled' | 'pending_approval' | 'denied';
-  durationSeconds?: number;
-  toolSummary?: string;
-  toolAction?: string;
-  decision?: 'allow' | 'allow_once' | 'deny' | null;
-  is_compacted?: boolean;
-}
+import type { ToolCall, ExecutionStep as CoreExecutionStep } from '@/types/chat';
 
-export interface ExecutionStep {
-  id?: string;
-  step_index?: number;
-  type?: string;
-  content?: string;
-  name?: string;
-  args?: Record<string, any>;
-  output?: string;
-  status?: 'running' | 'completed' | 'failed' | 'cancelled' | 'pending_approval' | 'denied';
-  action_type?: string;
-  tool_call_id?: string;
-  durationMs?: number;
-  durationSeconds?: number;
-  thinkingDurationSeconds?: number;
-  startTime?: number;
-  thoughts?: string[];
-  tools?: ToolCallItem[];
-  toolAction?: string;
-  toolSummary?: string;
-  is_compacted?: boolean;
-}
+// Re-export canonical types to prevent type duplication and schema drift
+export type ToolCallItem = ToolCall;
+export type ExecutionStep = CoreExecutionStep;
 
 export interface TimelineEntry {
   id: string;

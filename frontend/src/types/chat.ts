@@ -51,7 +51,7 @@ export interface ExecutionStep {
   name?: string;
   args?: Record<string, any>;
   output?: string;
-  status?: 'running' | 'completed' | 'failed' | 'cancelled';
+  status?: 'running' | 'completed' | 'failed' | 'cancelled' | 'pending_approval' | 'denied';
   action_type?: string;
   tool_call_id?: string;
   durationMs?: number;
@@ -62,6 +62,7 @@ export interface ExecutionStep {
   tools?: ToolCall[];
   toolAction?: string;
   toolSummary?: string;
+  is_compacted?: boolean;
 }
 
 export interface Message {

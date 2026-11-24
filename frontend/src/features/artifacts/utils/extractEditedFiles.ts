@@ -2,7 +2,7 @@ import { Message } from '@/types/chat';
 import { EditedFileItem } from '@/types/artifacts';
 import { normalizePath } from '@/utils/normalizePath';
 import { isScratchPath } from './paths';
-import { isSuccessfulToolCall, parseToolArgs, resolveToolFilePath } from './extraction';
+import { isSuccessfulToolCall, parseToolArgs, resolveToolFilePath } from './toolHelpers';
 
 /**
  * High-performance line counter with zero heap array allocation.

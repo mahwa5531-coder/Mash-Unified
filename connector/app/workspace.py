@@ -57,6 +57,18 @@ async def resolve_workspace_directory(engine: Any, project_id: str | None) -> Pa
     return workspace
 
 
+def extract_working_directory_from_context(ctx: dict | None) -> str | None:
+    """Extract canonical working directory from session/request context, handling legacy aliases."""
+    if not ctx or not isinstance(ctx, dict):
+        return None
+    return (
+        ctx.get("working_directory")
+        or ctx.get("workspace_uri")
+        or ctx.get("workspace_dir")
+        or ctx.get("cwd")
+    )
+
+
 async def resolve_session_workspace(engine: Any, session_id: str | None) -> Path:
     """Resolve the working workspace directory for a session or fallback to APP_WORKSPACE_ROOT."""
     if not session_id or engine is None:
@@ -65,7 +77,7 @@ async def resolve_session_workspace(engine: Any, session_id: str | None) -> Path
         session = await engine.find_first(SessionModel, filters=ComparisonFilter.eq("session_id", session_id))
         if session and session.context:
             ctx = session.context
-            work_dir = ctx.get("working_directory") or ctx.get("workspace_dir") or ctx.get("cwd") or ctx.get("workspace_uri")
+            work_dir = extract_working_directory_from_context(ctx)
             if work_dir and work_dir != "No Repo" and Path(work_dir).is_dir():
                 return Path(work_dir).resolve()
             if ctx.get("project_id"):
@@ -122,7 +134,7 @@ async def get_allowed_file_roots(engine: Any | None) -> list[Path]:
         for session in sessions:
             context = session.context or {}
             # Allow session working directories
-            work_dir = context.get("working_directory") or context.get("workspace_dir") or context.get("cwd") or context.get("workspace_uri")
+            work_dir = extract_working_directory_from_context(context)
             if work_dir and work_dir != "No Repo" and Path(work_dir).is_dir():
                 roots.append(Path(work_dir).resolve())
 
