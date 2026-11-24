@@ -117,6 +117,22 @@ export async function selectFolder(folderPath?: string): Promise<{
   folder_name: string | null;
   detail?: string;
 }> {
+  // 1. Direct native OS dialog via Electron IPC when running in desktop shell
+  if (typeof window !== 'undefined' && window.__MASH_DESKTOP__?.selectFolder) {
+    try {
+      const selected = await window.__MASH_DESKTOP__.selectFolder();
+      if (!selected) {
+        return { status: 'cancelled', folder_path: null, folder_name: null };
+      }
+      const parts = selected.replace(/\\/g, '/').split('/').filter(Boolean);
+      const folder_name = parts[parts.length - 1] || selected;
+      return { status: 'ok', folder_path: selected, folder_name };
+    } catch (e) {
+      console.warn("Native Electron folder dialog failed, falling back to HTTP:", e);
+    }
+  }
+
+  // 2. HTTP daemon fallback for browser / development environment
   try {
     const res = await safeFetch(`${BASE_URL}/api/system/select-folder`, {
       method: 'POST',

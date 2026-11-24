@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return file?.path || null;
   },
   restartAndInstall: () => ipcRenderer.send('mash-restart-and-install'),
+  selectFolder: () => ipcRenderer.invoke('mash-select-folder'),
   onUpdateDownloading: (callback) => {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on('mash-update-downloading', handler);
@@ -61,4 +62,5 @@ contextBridge.exposeInMainWorld('__MASH_DESKTOP__', {
   platform: process.platform,
   isDesktop: true,
   version: appVersion,
+  selectFolder: () => ipcRenderer.invoke('mash-select-folder'),
 });

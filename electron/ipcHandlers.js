@@ -4,7 +4,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { app, ipcMain, shell } = require('electron');
+const { app, ipcMain, shell, dialog } = require('electron');
 
 const BLOCKED_EXTENSIONS = new Set([
   '.exe', '.bat', '.cmd', '.ps1', '.vbs', '.vbe', '.js', '.jse',
@@ -23,6 +23,18 @@ function registerIpcHandlers({
 
   ipcMain.on('mash-get-version', (event) => {
     event.returnValue = app.getVersion();
+  });
+
+  ipcMain.handle('mash-select-folder', async () => {
+    const win = getMainWindow();
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select Workspace Folder',
+    });
+    if (result.canceled || !result.filePaths || !result.filePaths.length) {
+      return null;
+    }
+    return result.filePaths[0];
   });
 
   ipcMain.on('window-is-maximized', (event) => {

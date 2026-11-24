@@ -10,6 +10,7 @@ declare global {
       openPath: (path: string) => Promise<string | undefined>;
       getPathForFile: (file: File) => string | null;
       restartAndInstall: () => void;
+      selectFolder?: () => Promise<string | null>;
       onUpdateDownloading: (callback: (data: { progress: number }) => void) => () => void;
       onUpdateReady: (callback: (data: { version: string }) => void) => () => void;
     };
@@ -18,6 +19,7 @@ declare global {
       platform: string;
       isDesktop: boolean;
       version?: string;
+      selectFolder?: () => Promise<string | null>;
     };
     __TAURI__?: any;
     pywebview?: any;

@@ -45,13 +45,13 @@ async def get_system_info():
 
 class UpdateStateRequest(BaseModel):
     status: str
-    version: str | None = "1.2.0"
+    version: str | None = "0.1.0"
     progress: int | None = 0
 
 
 _desktop_update_state = {
     "status": "idle",
-    "version": "1.2.0",
+    "version": "0.1.0",
     "progress": 0,
 }
 
@@ -92,72 +92,11 @@ class SelectFolderRequest(BaseModel):
 
 
 def _open_folder_dialog() -> str | None:
-    """Open real native Windows File Explorer folder selection dialog with rapid failover."""
+    """Fallback folder selection dialog for headless/browser development."""
     import subprocess
     import sys
 
-    if sys.platform == "win32":
-        # 1. Native folder picker via native_picker.ps1 (IFileOpenDialog with FOS_PICKFOLDERS)
-        picker_script = Path(__file__).resolve().parent.parent / "native_picker.ps1"
-        if not picker_script.exists() and getattr(sys, "frozen", False):
-            picker_script = Path(sys.executable).parent / "native_picker.ps1"
-            if not picker_script.exists() and hasattr(sys, "_MEIPASS"):
-                picker_script = Path(sys._MEIPASS) / "native_picker.ps1"
-        if picker_script.exists():
-            try:
-                res = subprocess.run(
-                    [
-                        "powershell",
-                        "-STA",
-                        "-NoProfile",
-                        "-ExecutionPolicy",
-                        "Bypass",
-                        "-File",
-                        str(picker_script),
-                        "-Title",
-                        "Select Workspace Folder",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                )
-                out = res.stdout.strip()
-                if out == "__CANCELLED__":
-                    return None
-                if out and Path(out).is_dir():
-                    return out
-            except Exception as e:
-                logger.warning(f"Native folder picker failed: {e}")
-
-        # 2. PowerShell OpenFileDialog fallback with folder selection (File Explorer window)
-        ps_fallback = (
-            "Add-Type -AssemblyName System.Windows.Forms; "
-            "$f = New-Object System.Windows.Forms.OpenFileDialog; "
-            "$f.ValidateNames = $false; "
-            "$f.CheckFileExists = $false; "
-            "$f.CheckPathExists = $true; "
-            "$f.FileName = 'Select Folder'; "
-            "$f.Title = 'Select Workspace Folder'; "
-            "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { "
-            "  [System.IO.Path]::GetDirectoryName($f.FileName) "
-            "} else { '__CANCELLED__' }"
-        )
-        try:
-            res = subprocess.run(
-                ["powershell", "-STA", "-NoProfile", "-Command", ps_fallback],
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-            out = res.stdout.strip()
-            if out == "__CANCELLED__":
-                return None
-            if out and Path(out).is_dir():
-                return out
-        except Exception:
-            pass
-
-    # 3. Tkinter fallback
+    # Tkinter dialog in isolated subprocess to prevent blocking the event loop or COM threading issues
     script = (
         "import tkinter as tk\n"
         "from tkinter import filedialog\n"
@@ -180,8 +119,8 @@ def _open_folder_dialog() -> str | None:
         out = res.stdout.strip()
         if out and Path(out).is_dir():
             return out
-    except Exception:
-        pass
+    except Exception as e:
+        logger.info(f"Fallback folder dialog skipped: {e}")
 
     return None
 
