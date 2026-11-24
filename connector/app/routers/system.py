@@ -64,7 +64,10 @@ async def get_system_updates():
 
 @router.post("/system/updates/set-state")
 async def set_system_update_state(req: UpdateStateRequest):
-    """Sync or mock updater status."""
+    """Sync or mock updater status in development only."""
+    import sys
+    if getattr(sys, "frozen", False):
+        raise HTTPException(status_code=403, detail="Forbidden in production build.")
     _desktop_update_state["status"] = req.status
     if req.version:
         _desktop_update_state["version"] = req.version

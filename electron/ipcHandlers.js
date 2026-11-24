@@ -21,6 +21,10 @@ function registerIpcHandlers({
     event.returnValue = getAssignedApiUrl();
   });
 
+  ipcMain.on('mash-get-version', (event) => {
+    event.returnValue = app.getVersion();
+  });
+
   ipcMain.on('window-is-maximized', (event) => {
     const win = getMainWindow();
     event.returnValue = win ? win.isMaximized() : false;

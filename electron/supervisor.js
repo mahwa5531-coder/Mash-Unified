@@ -111,6 +111,7 @@ async function launchBackendSupervisor(port) {
   connectorProcess = spawn(command, args, {
     cwd,
     env,
+    windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 

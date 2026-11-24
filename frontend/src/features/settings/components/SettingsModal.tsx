@@ -461,7 +461,9 @@ export default function SettingsModal({
                   Privacy Policy
                 </a>
                 <span className="text-zinc-400 dark:text-zinc-600"> · </span>
-                <span className="font-mono text-zinc-500">v1.0.0</span>
+                <span className="font-mono text-zinc-500">
+                  v{typeof window !== 'undefined' && window.__MASH_DESKTOP__?.version ? window.__MASH_DESKTOP__.version : '0.1.0'}
+                </span>
               </div>
 
             </div>

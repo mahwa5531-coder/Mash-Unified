@@ -3,10 +3,12 @@
 
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-// Synchronously query the assigned ephemeral backend URL from Main process
+// Synchronously query the assigned ephemeral backend URL and version from Main process
 let backendUrl = 'http://127.0.0.1:8000';
+let appVersion = '0.1.0';
 try {
   backendUrl = ipcRenderer.sendSync('mash-get-api-url') || backendUrl;
+  appVersion = ipcRenderer.sendSync('mash-get-version') || appVersion;
 } catch (_) {}
 
 // Native window control bridge matching WindowTitleBar.tsx and useDesktopAutoUpdate.ts
@@ -58,4 +60,5 @@ contextBridge.exposeInMainWorld('__MASH_DESKTOP__', {
   apiUrl: backendUrl,
   platform: process.platform,
   isDesktop: true,
+  version: appVersion,
 });

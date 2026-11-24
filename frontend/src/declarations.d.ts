@@ -17,6 +17,7 @@ declare global {
       apiUrl: string;
       platform: string;
       isDesktop: boolean;
+      version?: string;
     };
     __TAURI__?: any;
     pywebview?: any;

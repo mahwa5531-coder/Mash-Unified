@@ -18,6 +18,7 @@ import { ChatHistoryLoadState } from './ChatHistoryLoadState';
 import { cleanUserPromptForComposer } from '@/features/chat/utils/sessionHistoryParser';
 import { fetchSessionPermissions, updateSessionPermissionMode } from '@/services/sessions';
 import type { PermissionMode } from './composer/PermissionModeSelector';
+import type { AuthUser } from '@/services/auth';
 
 interface ChatCanvasProps {
   sessionId: string | null;
@@ -32,6 +33,7 @@ interface ChatCanvasProps {
   onToggleRightSidebar?: () => void;
   onOpenFile?: (path: string) => void;
   onOpenSettings?: (tab?: string) => void;
+  authUser?: AuthUser | null;
 }
 
 // Module-level stable empty array prevents breaking AssistantMessage memo on every token
@@ -131,6 +133,7 @@ export default function ChatCanvas({
   onSelectProject,
   onOpenFile,
   onOpenSettings,
+  authUser,
 }: ChatCanvasProps) {
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
@@ -429,6 +432,7 @@ export default function ChatCanvas({
               <QuotaBanner
                 open={showQuotaBanner}
                 onOpenChange={setShowQuotaBanner}
+                refreshDate={authUser?.quota?.windows?.[0]?.resets_at}
                 onSeePlans={() => onOpenSettings?.('usage')}
                 onDismiss={() => setShowQuotaBanner(false)}
               />

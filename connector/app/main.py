@@ -173,10 +173,18 @@ async def lifespan(app: FastAPI):
             logger.debug("Engine dispose on shutdown failed: %s", e)
 
 
+is_debug = os.getenv("MASH_DEBUG", "").lower() in ("true", "1", "yes")
+is_frozen = getattr(sys, "frozen", False)
+is_prod = is_frozen or os.getenv("MASH_ENV", "").lower() in ("production", "prod")
+show_docs = is_debug or not is_prod
+
 app = FastAPI(
     title="Mash Desktop Connector API",
     description="Local desktop sidecar API for Mash.",
     version="0.1.0",
+    docs_url="/docs" if show_docs else None,
+    redoc_url="/redoc" if show_docs else None,
+    openapi_url="/openapi.json" if show_docs else None,
     lifespan=lifespan,
 )
 

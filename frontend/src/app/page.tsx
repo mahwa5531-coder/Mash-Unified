@@ -484,6 +484,7 @@ export default function Home() {
                 isRightSidebarOpen={isRightSidebarOpen}
                 onOpenFile={handleOpenFile}
                 onOpenSettings={(tab?: string) => { setSettingsTab(tab || 'account'); setIsSettingsOpen(true); }}
+                authUser={authUser}
               />
             )
           }

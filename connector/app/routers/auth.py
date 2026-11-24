@@ -19,6 +19,7 @@ Handles local authentication state, DPAPI credential storage, and account switch
 
 import logging
 import os
+import sys
 import time
 from typing import Any
 
@@ -66,7 +67,7 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
        and saving rotated refresh_token in the vault.
     3. Fallback: returns live in-memory access_token or None if offline/unauthenticated.
     """
-    if os.getenv("MASH_BYPASS_AUTH", "").lower() in ("true", "1", "yes"):
+    if not getattr(sys, "frozen", False) and os.getenv("MASH_BYPASS_AUTH", "").lower() in ("true", "1", "yes"):
         dev_token = (
             os.getenv("LLM_API_KEY")
             or os.getenv("OPENAI_API_KEY")
@@ -252,7 +253,7 @@ async def get_auth_config() -> dict[str, Any]:
 
 @router.get("/me")
 async def get_current_user_auth(fresh: bool = False) -> dict[str, Any]:
-    if os.getenv("MASH_BYPASS_AUTH", "").lower() in ("true", "1", "yes"):
+    if not getattr(sys, "frozen", False) and os.getenv("MASH_BYPASS_AUTH", "").lower() in ("true", "1", "yes"):
         token = await ensure_valid_token()
         return {
             "authenticated": True,
