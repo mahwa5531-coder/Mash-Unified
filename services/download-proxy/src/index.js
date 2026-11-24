@@ -16,11 +16,17 @@ export default {
       "X-GitHub-Api-Version": "2022-11-28",
     };
 
-    // 1. Fetch latest release from private repo
-    const releaseRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, { headers });
+    // 1. Fetch latest release (with resilient fallback across distribution repos)
+    let releaseRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, { headers });
+    if (!releaseRes.ok && GITHUB_REPO !== "mahwa5531-coder/mash-website") {
+      const fallbackRes = await fetch(`https://api.github.com/repos/mahwa5531-coder/mash-website/releases/latest`, { headers });
+      if (fallbackRes.ok) {
+        releaseRes = fallbackRes;
+      }
+    }
     if (!releaseRes.ok) {
       const errText = await releaseRes.text();
-      return new Response(`Release not found in private repo: ${releaseRes.status} ${errText}`, { status: 404 });
+      return new Response(`Release not found in release repos: ${releaseRes.status} ${errText}`, { status: 404 });
     }
     const release = await releaseRes.json();
 
