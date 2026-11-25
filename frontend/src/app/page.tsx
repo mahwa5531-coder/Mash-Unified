@@ -17,6 +17,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { sessionStore } from '@/features/chat';
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar';
 import { ChatToolbar } from '@/components/layout/ChatToolbar';
+import { OfflineToast } from '@/components/layout/OfflineToast';
+import { useOfflineStatus } from '@/hooks/useOfflineStatus';
 import { WorkbenchShell } from '@/primitives';
 
 export default function Home() {
@@ -370,27 +372,12 @@ export default function Home() {
   const handleFileOpened = useCallback(() => setFileToOpen(null), []);
   const handleToggleRightMaximize = useCallback(() => setIsRightSidebarMaximized(prev => !prev), []);
 
-  const tryUpgradeOfflineSession = useCallback(async () => {
-    try {
-      const user = await fetchAuthMe();
-      if (user && (user.authenticated || user.offline)) {
-        setAuthUser(user);
-      }
-    } catch {
-      // Ignore network errors while still offline
-    }
-  }, []);
-
-  // Automatically upgrade an offline session to live online auth on reconnect or window focus
-  useEffect(() => {
-    if (!authUser?.offline) return;
-    window.addEventListener('online', tryUpgradeOfflineSession);
-    window.addEventListener('focus', tryUpgradeOfflineSession);
-    return () => {
-      window.removeEventListener('online', tryUpgradeOfflineSession);
-      window.removeEventListener('focus', tryUpgradeOfflineSession);
-    };
-  }, [authUser?.offline, tryUpgradeOfflineSession]);
+  const {
+    isOffline,
+    showToast: showOfflineToast,
+    dismissToast: dismissOfflineToast,
+    retryConnection: retryOfflineConnection,
+  } = useOfflineStatus(authUser, setAuthUser);
 
   const rightPanel = useRightSidebarController({
     enabled: Boolean((authUser?.authenticated || authUser?.offline) && !isAuthLoading && isRightSidebarOpen),
@@ -501,11 +488,17 @@ export default function Home() {
               sessionRepo={selectedSessionRepo}
               sessionTitle={selectedSessionTitle}
               selectedSessionId={selectedSessionId}
-              isOffline={Boolean(authUser?.offline)}
-              onRetryOffline={tryUpgradeOfflineSession}
+              isOffline={isOffline}
+              onRetryOffline={retryOfflineConnection}
             />
           }
           rightHeader={rightPanel.headerNode}
+          mainOverlay={
+            <OfflineToast
+              visible={showOfflineToast}
+              onDismiss={dismissOfflineToast}
+            />
+          }
           mainContent={
             isHistoryActive ? (
               <ConversationHistory

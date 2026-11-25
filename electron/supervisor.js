@@ -264,12 +264,8 @@ async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
     showFatalRecoveryDialog(false);
   });
 
-  proc.on('exit', (code, signal) => {
-    if (connectorProcess !== proc) return;
-    connectorProcess = null;
-    log.warn(`[MashConnector] Exited with code ${code}, signal ${signal}. Tail: ${stderrTail.slice(-1000)}`);
+  function handleSidecarFailure() {
     if (isQuitting) return;
-
     if (restartCount < MAX_RESTARTS) {
       restartCount++;
       log.warn(`[Supervisor] Silent respawn ${restartCount}/${MAX_RESTARTS}...`);
@@ -291,6 +287,13 @@ async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
       setBackendStatus({ status: 'error' });
       showFatalRecoveryDialog(false);
     }
+  }
+
+  proc.on('exit', (code, signal) => {
+    if (connectorProcess !== proc) return;
+    connectorProcess = null;
+    log.warn(`[MashConnector] Exited with code ${code}, signal ${signal}. Tail: ${stderrTail.slice(-1000)}`);
+    handleSidecarFailure();
   });
 
   try {
@@ -299,10 +302,7 @@ async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
     if (connectorProcess === proc && !isQuitting) {
       terminateConnector();
       log.error(`[Supervisor] Health probe failure: ${err?.message || err}`);
-      if (restartCount >= MAX_RESTARTS) {
-        setBackendStatus({ status: 'error' });
-        showFatalRecoveryDialog(false);
-      }
+      handleSidecarFailure();
     }
     throw err;
   }

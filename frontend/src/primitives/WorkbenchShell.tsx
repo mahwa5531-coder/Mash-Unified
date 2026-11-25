@@ -18,6 +18,8 @@ export interface WorkbenchShellProps {
   rightHeader?: React.ReactNode;
   /** Left interior body inside the inset box (ChatCanvas / History). */
   mainContent: React.ReactNode;
+  /** Non-blocking overlay pinned inside the main chat pane (shifts with RightSidebar). */
+  mainOverlay?: React.ReactNode;
   /** Right interior body inside the inset box (FileBreadcrumbBar + Viewer / Explorer). */
   rightContent?: React.ReactNode;
   isRightOpen: boolean;
@@ -52,6 +54,7 @@ export function WorkbenchShell({
   chatToolbar,
   rightHeader,
   mainContent,
+  mainOverlay,
   rightContent,
   isRightOpen,
   isRightMaximized = false,
@@ -138,11 +141,12 @@ export function WorkbenchShell({
             >
               <div
                 className={cn(
-                  "flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden",
+                  "flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden relative",
                   isRightOpen && isRightMaximized && "hidden"
                 )}
               >
                 {mainContent}
+                {mainOverlay}
               </div>
 
               {isRightOpen && (
