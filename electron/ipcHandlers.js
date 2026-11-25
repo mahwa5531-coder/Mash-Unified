@@ -15,7 +15,6 @@ function registerIpcHandlers({
   getMainWindow,
   getAssignedApiUrl,
   getBackendStatus,
-  restartBackendSupervisor,
   saveWindowStateSync,
   terminateConnector,
 }) {
@@ -29,32 +28,6 @@ function registerIpcHandlers({
 
   ipcMain.on('mash-get-version', (event) => {
     event.returnValue = app.getVersion();
-  });
-
-  ipcMain.handle('mash-restart-backend', async () => {
-    if (!restartBackendSupervisor) return { ok: false, error: 'Unavailable' };
-    try {
-      const info = await restartBackendSupervisor({ isRespawn: true, allocateFreshPort: true, resetAttempts: true });
-      const win = getMainWindow();
-      if (info.portChanged && win && !win.isDestroyed()) {
-        win.webContents.reloadIgnoringCache();
-      }
-      return { ok: true, ...info };
-    } catch (err) {
-      return { ok: false, error: err?.message || 'Restart failed' };
-    }
-  });
-
-  ipcMain.handle('mash-open-logs', async () => {
-    try {
-      const logsDir = app.getPath('logs');
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true });
-      }
-      return await shell.openPath(logsDir);
-    } catch (err) {
-      return err?.message || 'Failed to open logs folder';
-    }
   });
 
   ipcMain.handle('mash-select-folder', async () => {

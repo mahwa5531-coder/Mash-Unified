@@ -79,8 +79,27 @@ def _run_cli(args: list[str]) -> None:
     sys.exit(0)
 
 
+def _start_parent_watchdog() -> None:
+    """Exit sidecar cleanly if parent Electron process dies unexpectedly (stdin pipe EOF)."""
+    if os.getenv("MASH_WATCH_PARENT_STDIN") != "1":
+        return
+    import threading
+
+    def _watch() -> None:
+        try:
+            reader = getattr(sys.stdin, "buffer", sys.stdin)
+            while reader.read(1):
+                pass
+        except Exception:
+            pass
+        os._exit(0)
+
+    threading.Thread(target=_watch, name="mash-parent-watchdog", daemon=True).start()
+
+
 def _run_server() -> None:
     """Lazily load FastAPI and Uvicorn to run the backend server."""
+    _start_parent_watchdog()
     import uvicorn
     from app.main import app
 

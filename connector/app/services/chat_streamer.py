@@ -339,11 +339,14 @@ async def stream_chat_query(
         _request_idempotency_store[req_id] = _TurnExecutionRecord(session_id=sid, status="executing")
 
     try:
+        from nexau.archs.platform.crypto_vault import _IN_MEMORY_AUTH_META
         from app.routers.auth import ensure_valid_token
         live_token = await ensure_valid_token()
         if not live_token and os.getenv("MOCK_LLM", "").lower() in ("true", "1", "yes"):
             live_token = "mock-test-token"
         if not live_token or live_token == "bearer-pending-auth":
+            if _IN_MEMORY_AUTH_META.get("offline"):
+                raise HTTPException(status_code=503, detail="No internet connection. Reconnect to send new prompts.")
             raise HTTPException(status_code=401, detail="Authentication required. Please sign in to MASH.")
 
         eng = None

@@ -1,12 +1,12 @@
 // Mash Desktop Backend Process Supervisor
-// Orchestrates Python sidecar lifecycle, ephemeral port allocation, health probes,
-// crash backoff recovery, rotating disk logging, and zero-zombie-process cleanup on Windows.
+// Orchestrates Python sidecar lifecycle, parent-death stdin pipe watchdog, UTF-8 runtime isolation,
+// ephemeral port allocation, health probes, rotating disk logging, and native OS recovery dialogs.
 
 const fs = require('fs');
 const netSocket = require('net');
 const http = require('http');
 const { spawn, execSync } = require('child_process');
-const { app } = require('electron');
+const { app, dialog } = require('electron');
 const { getConnectorPaths } = require('./paths');
 
 let log = console;
@@ -14,7 +14,7 @@ try {
   log = require('electron-log/main');
 } catch (_) {}
 
-const MAX_STDERR_BYTES = 65536; // 64 KiB rolling diagnostic buffer (DSH pattern)
+const MAX_STDERR_BYTES = 65536; // 64 KiB rolling diagnostic buffer kept strictly in disk/main logs
 const MAX_RESTARTS = 3;
 
 let connectorProcess = null;
@@ -22,17 +22,17 @@ let assignedPort = 8000;
 let assignedApiUrl = 'http://127.0.0.1:8000';
 let isQuitting = false;
 let restartCount = 0;
+let fatalDialogOpen = false;
 let stderrTail = '';
 let statusListener = null;
+let windowReloader = null;
 let backendStatus = {
   status: 'starting', // 'starting' | 'ready' | 'restarting' | 'error'
-  message: 'Starting local engine...',
-  detail: '',
   port: assignedPort,
 };
 
 function appendStderrTail(text) {
-  stderrTail = (stderrTail + text + '\n');
+  stderrTail = stderrTail + text + '\n';
   if (stderrTail.length > MAX_STDERR_BYTES) {
     stderrTail = stderrTail.slice(-MAX_STDERR_BYTES);
   }
@@ -49,6 +49,10 @@ function setBackendStatus(next) {
 
 function setStatusListener(fn) {
   statusListener = typeof fn === 'function' ? fn : null;
+}
+
+function setWindowReloader(fn) {
+  windowReloader = typeof fn === 'function' ? fn : null;
 }
 
 function getBackendStatus() {
@@ -69,6 +73,52 @@ function getConnectorProcess() {
 
 function setSupervisorQuitting(quitting) {
   isQuitting = Boolean(quitting);
+}
+
+// Native OS fatal recovery dialog (DeepSeek Harness pattern: zero source/tracebacks in renderer)
+async function showFatalRecoveryDialog(isMissingBinary = false) {
+  if (isQuitting || fatalDialogOpen || !dialog || typeof dialog.showMessageBox !== 'function') {
+    return;
+  }
+  fatalDialogOpen = true;
+  try {
+    const detail = isMissingBinary
+      ? 'A required application file is missing or blocked. Reinstalling Mash or checking antivirus settings may resolve this.'
+      : 'A required background service stopped unexpectedly. Restarting Mash usually resolves this.';
+
+    const { response } = await dialog.showMessageBox({
+      type: 'error',
+      title: 'Mash',
+      message: 'Mash could not start',
+      detail,
+      buttons: ['Restart Mash', 'Quit'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+
+    if (response === 0 && !isQuitting) {
+      restartBackendSupervisor({
+        isRespawn: true,
+        allocateFreshPort: true,
+        resetAttempts: true,
+      }).then((info) => {
+        if (info?.portChanged && typeof windowReloader === 'function') {
+          windowReloader();
+        }
+      }).catch((err) => {
+        log.error('[Supervisor] Manual restart failed:', err?.message || err);
+      });
+    } else {
+      isQuitting = true;
+      terminateConnector();
+      if (app && typeof app.quit === 'function') {
+        app.quit();
+      }
+    }
+  } finally {
+    fatalDialogOpen = false;
+  }
 }
 
 // 1. Ephemeral Port Allocation: tries standard loopback 8000 first, falls back to dynamic port
@@ -127,6 +177,11 @@ function terminateConnector() {
   const proc = connectorProcess;
   connectorProcess = null;
   if (!proc || proc.killed) return;
+  try {
+    if (proc.stdin && !proc.stdin.destroyed) {
+      proc.stdin.end();
+    }
+  } catch (_) {}
   const pid = proc.pid;
   try {
     if (process.platform === 'win32') {
@@ -146,17 +201,13 @@ async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
   const isPackaged = app.isPackaged;
   const { command, args, cwd, runtimeDir } = getConnectorPaths(isPackaged);
 
-  setBackendStatus({
-    status: isRespawn ? 'restarting' : 'starting',
-    message: isRespawn ? 'Restarting local engine...' : 'Starting local engine...',
-    detail: '',
-  });
+  setBackendStatus({ status: isRespawn ? 'restarting' : 'starting' });
 
   if (isPackaged && !fs.existsSync(command)) {
-    const msg = `Local engine binary missing at ${command} (antivirus may have quarantined it).`;
-    log.error(`[Supervisor] ${msg}`);
-    setBackendStatus({ status: 'error', message: msg, detail: '' });
-    throw new Error(msg);
+    log.error(`[Supervisor] Binary missing at ${command}`);
+    setBackendStatus({ status: 'error' });
+    showFatalRecoveryDialog(true);
+    throw new Error('Backend binary missing');
   }
 
   const env = {
@@ -164,26 +215,33 @@ async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
     PORT: String(port),
     HOST: '127.0.0.1',
     MASH_CONNECTOR_URL: assignedApiUrl,
-    PYTHONUNBUFFERED: '1',
     MASH_PYTHON_RUNTIME_DIR: runtimeDir,
+    MASH_WATCH_PARENT_STDIN: '1',
+    PYTHONUNBUFFERED: '1',
+    PYTHONUTF8: '1',
+    PYTHONIOENCODING: 'utf-8',
   };
 
   let proc;
   try {
+    // Keep stdin open as a parent-death pipe: if Electron dies unexpectedly, OS closes pipe & child exits.
     proc = spawn(command, args, {
       cwd,
       env,
       windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
   } catch (err) {
-    const msg = err?.message || 'Failed to spawn local engine process.';
-    log.error(`[Supervisor] Spawn exception: ${msg}`);
-    setBackendStatus({ status: 'error', message: msg, detail: '' });
+    log.error(`[Supervisor] Spawn exception: ${err?.message || err}`);
+    setBackendStatus({ status: 'error' });
+    showFatalRecoveryDialog(false);
     throw err;
   }
 
   connectorProcess = proc;
+  if (proc.stdin) {
+    proc.stdin.on('error', () => {});
+  }
 
   proc.stdout.on('data', (chunk) => {
     const line = chunk.toString().trim();
@@ -200,43 +258,38 @@ async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
 
   proc.on('error', (err) => {
     if (connectorProcess !== proc) return;
-    const msg = err?.message || 'Failed to start local engine.';
-    log.error(`[MashConnector] Process error: ${msg}`);
-    appendStderrTail(msg);
-    setBackendStatus({
-      status: 'error',
-      message: 'Failed to launch local engine.',
-      detail: stderrTail.slice(-1500),
-    });
+    log.error(`[MashConnector] Process error: ${err?.message || err}`);
+    appendStderrTail(err?.message || 'Process error');
+    setBackendStatus({ status: 'error' });
+    showFatalRecoveryDialog(false);
   });
 
   proc.on('exit', (code, signal) => {
     if (connectorProcess !== proc) return;
     connectorProcess = null;
-    log.warn(`[MashConnector] Exited with code ${code}, signal ${signal}`);
+    log.warn(`[MashConnector] Exited with code ${code}, signal ${signal}. Tail: ${stderrTail.slice(-1000)}`);
     if (isQuitting) return;
 
     if (restartCount < MAX_RESTARTS) {
       restartCount++;
-      log.warn(`[Supervisor] Unexpected exit. Respawning attempt ${restartCount}/${MAX_RESTARTS}...`);
-      setBackendStatus({
-        status: 'restarting',
-        message: `Local engine exited unexpectedly. Restarting (${restartCount}/${MAX_RESTARTS})...`,
-        detail: '',
-      });
+      log.warn(`[Supervisor] Silent respawn ${restartCount}/${MAX_RESTARTS}...`);
+      setBackendStatus({ status: 'restarting' });
       setTimeout(() => {
         if (!isQuitting) {
-          restartBackendSupervisor({ isRespawn: true, allocateFreshPort: true }).catch((err) => {
-            log.error('[Supervisor] Respawn failed:', err?.message || err);
-          });
+          restartBackendSupervisor({ isRespawn: true, allocateFreshPort: true })
+            .then((info) => {
+              if (info?.portChanged && typeof windowReloader === 'function') {
+                windowReloader();
+              }
+            })
+            .catch((err) => {
+              log.error('[Supervisor] Respawn failed:', err?.message || err);
+            });
         }
       }, 1000);
     } else {
-      setBackendStatus({
-        status: 'error',
-        message: `Local engine stopped unexpectedly (exit code ${code ?? 'unknown'}).`,
-        detail: stderrTail.slice(-1500),
-      });
+      setBackendStatus({ status: 'error' });
+      showFatalRecoveryDialog(false);
     }
   });
 
@@ -245,19 +298,17 @@ async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
   } catch (err) {
     if (connectorProcess === proc && !isQuitting) {
       terminateConnector();
-      const msg = err?.message || 'Local engine failed health check.';
-      log.error(`[Supervisor] ${msg}`);
-      setBackendStatus({
-        status: 'error',
-        message: msg,
-        detail: stderrTail.slice(-1500),
-      });
+      log.error(`[Supervisor] Health probe failure: ${err?.message || err}`);
+      if (restartCount >= MAX_RESTARTS) {
+        setBackendStatus({ status: 'error' });
+        showFatalRecoveryDialog(false);
+      }
     }
     throw err;
   }
 
   if (connectorProcess === proc && !isQuitting) {
-    setBackendStatus({ status: 'ready', message: '', detail: '' });
+    setBackendStatus({ status: 'ready' });
     // QA-BUG-9 Fix: Only reset restart counter after sustained healthy runtime (60s)
     // to prevent rapid crash-loops from respawning indefinitely
     setTimeout(() => {
@@ -315,6 +366,7 @@ module.exports = {
   getBackendStatus,
   getConnectorProcess,
   setStatusListener,
+  setWindowReloader,
   setSupervisorQuitting,
   allocateEphemeralPort,
   waitForBackendReady,

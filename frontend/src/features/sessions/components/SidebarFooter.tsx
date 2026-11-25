@@ -48,12 +48,12 @@ export function SidebarFooter({
           : 'border-transparent'
       }`}
     >
-      {authUser?.authenticated ? (
+      {authUser?.authenticated || authUser?.offline ? (
         <button
           type="button"
           onClick={() => onOpenSettings?.('account')}
           className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] text-left transition-colors cursor-pointer group"
-          title={`${displayName} (${planName})`}
+          title={`${displayName} (${planName})${authUser?.offline ? ' · Offline' : ''}`}
         >
           <div className="w-6 h-6 rounded-full bg-zinc-800 dark:bg-zinc-700 text-zinc-100 flex items-center justify-center text-[11px] font-semibold shrink-0 border border-zinc-700/60 dark:border-white/10">
             {initial}

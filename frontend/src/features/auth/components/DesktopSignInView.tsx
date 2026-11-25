@@ -1,32 +1,25 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Loader2, CheckCircle2, WifiOff } from 'lucide-react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
 import { fetchAuthMe, AuthUser } from '@/services/auth';
 import { BASE_URL, safeFetch } from '@/services/client';
 import { cn } from '@/lib/utils';
 
 export interface DesktopSignInViewProps {
   onAuthSuccess: (user: AuthUser) => void;
-  offlineEmail?: string;
   className?: string;
 }
 
 type SignInMode = 'idle' | 'business' | 'authenticated';
 
-export default function DesktopSignInView({ onAuthSuccess, offlineEmail, className }: DesktopSignInViewProps) {
+export default function DesktopSignInView({ onAuthSuccess, className }: DesktopSignInViewProps) {
   const [mode, setMode] = useState<SignInMode>('idle');
   const [isAuthorizing, setIsAuthorizing] = useState(false);
-  const [isRetryingOffline, setIsRetryingOffline] = useState(false);
-  const [dismissedOffline, setDismissedOffline] = useState(false);
   const [businessEmail, setBusinessEmail] = useState('');
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    setDismissedOffline(false);
-  }, [offlineEmail]);
 
   // Stop polling helper
   const stopPolling = useCallback(() => {
@@ -58,30 +51,16 @@ export default function DesktopSignInView({ onAuthSuccess, offlineEmail, classNa
     return false;
   }, [stopPolling, onAuthSuccess]);
 
-  // Window focus & online listeners: restore automatically when returning from browser or reconnecting
+  // Window focus listener: auto-check auth immediately when returning from browser login
   useEffect(() => {
-    const handleReconnectCheck = () => {
+    const handleWindowFocus = () => {
       if (mode !== 'authenticated') {
         checkAuthStatus();
       }
     };
-    window.addEventListener('focus', handleReconnectCheck);
-    window.addEventListener('online', handleReconnectCheck);
-    return () => {
-      window.removeEventListener('focus', handleReconnectCheck);
-      window.removeEventListener('online', handleReconnectCheck);
-    };
+    window.addEventListener('focus', handleWindowFocus);
+    return () => window.removeEventListener('focus', handleWindowFocus);
   }, [mode, checkAuthStatus]);
-
-  const handleRetryOffline = async () => {
-    setIsRetryingOffline(true);
-    setAuthError(null);
-    const ok = await checkAuthStatus();
-    setIsRetryingOffline(false);
-    if (!ok) {
-      setAuthError("Still offline — check your internet connection and retry.");
-    }
-  };
 
   // Background polling while authorizing in browser
   useEffect(() => {
@@ -196,45 +175,6 @@ export default function DesktopSignInView({ onAuthSuccess, offlineEmail, classNa
               <p className="text-[11px] text-zinc-500">
                 Unlocking your workspace...
               </p>
-            </div>
-          ) : offlineEmail && !dismissedOffline ? (
-            /* STATE 1B: SAVED SESSION OFFLINE RECONNECT */
-            <div className="py-1 flex flex-col items-center text-center space-y-3.5">
-              <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
-                <WifiOff size={20} />
-              </div>
-              <div className="space-y-1">
-                <div className="text-sm font-semibold text-white">You&apos;re offline</div>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Connect to the internet to unlock{' '}
-                  <span className="font-mono text-zinc-200">{offlineEmail}</span>.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleRetryOffline}
-                disabled={isRetryingOffline}
-                className="w-full h-10 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs sm:text-[13px] font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-70"
-              >
-                {isRetryingOffline ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Reconnecting...</span>
-                  </>
-                ) : (
-                  <span>Retry Connection</span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthError(null);
-                  setDismissedOffline(true);
-                }}
-                className="text-[11px] text-zinc-400 hover:text-zinc-200 underline underline-offset-2 cursor-pointer"
-              >
-                Sign in with another account
-              </button>
             </div>
           ) : mode === 'business' ? (
             /* STATE 2: BUSINESS ACCOUNT DOMAIN */

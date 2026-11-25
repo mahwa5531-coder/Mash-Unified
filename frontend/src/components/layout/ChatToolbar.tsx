@@ -17,6 +17,8 @@ interface ChatToolbarProps {
   sessionRepo: string;
   sessionTitle: string;
   selectedSessionId: string | null;
+  isOffline?: boolean;
+  onRetryOffline?: () => void;
 }
 
 export function ChatToolbar({
@@ -28,6 +30,8 @@ export function ChatToolbar({
   sessionRepo,
   sessionTitle,
   selectedSessionId,
+  isOffline = false,
+  onRetryOffline,
 }: ChatToolbarProps) {
   const { updateState, handleRestart } = useDesktopAutoUpdate();
   const isProjectSession = Boolean(sessionRepo && sessionRepo !== 'No Repo');
@@ -90,6 +94,17 @@ export function ChatToolbar({
 
       {/* Right Controls Container: Always visible in toolbar */}
       <div className="flex items-center gap-2 shrink-0 ml-3">
+        {/* Offline status (understated ghost text; clicking retries connection) */}
+        {isOffline && (
+          <button
+            type="button"
+            onClick={() => onRetryOffline?.()}
+            className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 font-mono text-[11px] leading-none tracking-tight mr-1 cursor-pointer transition-colors"
+            title="Offline mode — local history & files remain available. Click to reconnect."
+          >
+            offline
+          </button>
+        )}
         {/* State A: Downloading Update (raw ghost text, zero badge, zero pill background, zero color) */}
         {updateState.status === 'downloading' && (
           <span

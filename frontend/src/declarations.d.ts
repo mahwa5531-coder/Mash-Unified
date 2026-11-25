@@ -2,8 +2,6 @@
 declare global {
   interface BackendStatusPayload {
     status: 'starting' | 'ready' | 'restarting' | 'error';
-    message?: string;
-    detail?: string;
     port?: number;
   }
 
@@ -20,8 +18,6 @@ declare global {
       selectFolder?: () => Promise<string | null>;
       getBackendStatus?: () => BackendStatusPayload;
       onBackendStatus?: (callback: (data: BackendStatusPayload) => void) => () => void;
-      restartBackend?: () => Promise<{ ok: boolean; error?: string }>;
-      openLogsFolder?: () => Promise<string | undefined>;
       onUpdateDownloading: (callback: (data: { progress: number }) => void) => () => void;
       onUpdateReady: (callback: (data: { version: string }) => void) => () => void;
     };

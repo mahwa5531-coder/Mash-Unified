@@ -59,15 +59,11 @@ export default function Home() {
   const [settingsTab, setSettingsTab] = useState<string>('appearance');
   const [allSessions, setAllSessions] = useState<SessionItem[]>([]);
   const [deleteError, setDeleteError] = useState<{ title: string; message: string } | null>(null);
-  const [backendStatus, setBackendStatus] = useState<BackendStatusPayload>(() => {
-    if (typeof window !== 'undefined' && window.electronAPI?.getBackendStatus) {
-      return window.electronAPI.getBackendStatus();
-    }
-    return { status: 'ready' };
-  });
-  const [isRestartingBackend, setIsRestartingBackend] = useState(false);
-  const backendStatusRef = useRef<BackendStatusPayload>(backendStatus);
-  backendStatusRef.current = backendStatus;
+  const backendStatusRef = useRef<BackendStatusPayload>(
+    typeof window !== 'undefined' && window.electronAPI?.getBackendStatus
+      ? window.electronAPI.getBackendStatus()
+      : { status: 'ready' }
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -118,13 +114,10 @@ export default function Home() {
 
     const unsubBackend = window.electronAPI?.onBackendStatus?.((st) => {
       if (!isMounted) return;
-      setBackendStatus(st);
       backendStatusRef.current = st;
       if (st.status === 'ready') {
-        setIsRestartingBackend(false);
         checkAuthWithRetry();
       } else if (st.status === 'error') {
-        setIsRestartingBackend(false);
         setIsAuthLoading(false);
       }
     });
@@ -377,8 +370,30 @@ export default function Home() {
   const handleFileOpened = useCallback(() => setFileToOpen(null), []);
   const handleToggleRightMaximize = useCallback(() => setIsRightSidebarMaximized(prev => !prev), []);
 
+  const tryUpgradeOfflineSession = useCallback(async () => {
+    try {
+      const user = await fetchAuthMe();
+      if (user && (user.authenticated || user.offline)) {
+        setAuthUser(user);
+      }
+    } catch {
+      // Ignore network errors while still offline
+    }
+  }, []);
+
+  // Automatically upgrade an offline session to live online auth on reconnect or window focus
+  useEffect(() => {
+    if (!authUser?.offline) return;
+    window.addEventListener('online', tryUpgradeOfflineSession);
+    window.addEventListener('focus', tryUpgradeOfflineSession);
+    return () => {
+      window.removeEventListener('online', tryUpgradeOfflineSession);
+      window.removeEventListener('focus', tryUpgradeOfflineSession);
+    };
+  }, [authUser?.offline, tryUpgradeOfflineSession]);
+
   const rightPanel = useRightSidebarController({
-    enabled: Boolean(authUser?.authenticated && !isAuthLoading && isRightSidebarOpen),
+    enabled: Boolean((authUser?.authenticated || authUser?.offline) && !isAuthLoading && isRightSidebarOpen),
     shellRef,
     onToggle: handleCloseRightSidebar,
     fileToOpen,
@@ -402,54 +417,6 @@ export default function Home() {
     />
   );
 
-  if (backendStatus.status === 'error') {
-    return (
-      <div className="flex flex-col h-screen w-full bg-[#0e0e11] text-zinc-200 overflow-hidden font-sans">
-        {titleBar}
-        <div className="flex flex-1 min-h-0 items-center justify-center p-6">
-          <div className="max-w-md w-full rounded-2xl bg-[#17171a] border border-zinc-800/80 p-6 shadow-2xl space-y-4">
-            <div className="space-y-1.5">
-              <h2 className="text-base font-semibold text-white">Local Engine Unavailable</h2>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                {backendStatus.message || 'The local Mash engine stopped unexpectedly.'}
-              </p>
-            </div>
-            {backendStatus.detail && (
-              <details className="rounded-lg bg-[#111114] border border-zinc-800/80 p-2.5 text-[11px] text-zinc-400">
-                <summary className="cursor-pointer font-medium text-zinc-300 select-none">Diagnostic details</summary>
-                <pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap break-all font-mono text-[10px] text-zinc-400">
-                  {backendStatus.detail}
-                </pre>
-              </details>
-            )}
-            <div className="flex items-center gap-2.5 pt-1">
-              <button
-                type="button"
-                disabled={isRestartingBackend}
-                onClick={async () => {
-                  setIsRestartingBackend(true);
-                  setIsAuthLoading(true);
-                  await window.electronAPI?.restartBackend?.();
-                  setIsRestartingBackend(false);
-                }}
-                className="flex-1 h-9 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-60"
-              >
-                {isRestartingBackend ? 'Restarting Engine...' : 'Restart Engine'}
-              </button>
-              <button
-                type="button"
-                onClick={() => window.electronAPI?.openLogsFolder?.()}
-                className="h-9 px-3.5 rounded-xl bg-[#262629] hover:bg-[#303035] text-zinc-200 text-xs font-medium transition-colors cursor-pointer"
-              >
-                Open Logs
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (isAuthLoading) {
     return (
       <div className="flex flex-col h-screen w-full bg-[var(--bg-app)] text-zinc-400 overflow-hidden">
@@ -457,21 +424,18 @@ export default function Home() {
         <div className="flex flex-1 min-h-0 items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="w-6 h-6 rounded-full border-2 border-zinc-500 border-t-transparent animate-spin" />
-            <span className="text-xs font-mono tracking-wider text-zinc-500 uppercase">
-              {backendStatus.status === 'restarting' ? 'Restarting Engine...' : 'MASH'}
-            </span>
+            <span className="text-xs font-mono tracking-wider text-zinc-500 uppercase">MASH</span>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!authUser || !authUser.authenticated) {
+  if (!authUser || (!authUser.authenticated && !authUser.offline)) {
     return (
       <div className="flex flex-col h-screen w-full bg-[#0e0e11] overflow-hidden">
         {titleBar}
         <DesktopSignInView
-          offlineEmail={authUser?.offline ? authUser.email : undefined}
           onAuthSuccess={(user) => setAuthUser(user)}
           className="min-h-0 flex-1 overflow-y-auto"
         />
@@ -537,6 +501,8 @@ export default function Home() {
               sessionRepo={selectedSessionRepo}
               sessionTitle={selectedSessionTitle}
               selectedSessionId={selectedSessionId}
+              isOffline={Boolean(authUser?.offline)}
+              onRetryOffline={tryUpgradeOfflineSession}
             />
           }
           rightHeader={rightPanel.headerNode}

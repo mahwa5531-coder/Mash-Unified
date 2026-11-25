@@ -57,8 +57,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('mash-backend-status', handler);
     return () => ipcRenderer.removeListener('mash-backend-status', handler);
   },
-  restartBackend: () => ipcRenderer.invoke('mash-restart-backend'),
-  openLogsFolder: () => ipcRenderer.invoke('mash-open-logs'),
   onUpdateDownloading: (callback) => {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on('mash-update-downloading', handler);

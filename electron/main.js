@@ -18,12 +18,12 @@ const {
 const {
   allocateEphemeralPort,
   launchBackendSupervisor,
-  restartBackendSupervisor,
   terminateConnector,
   forwardDeepLinkToConnector,
   getAssignedApiUrl,
   getBackendStatus,
   setStatusListener,
+  setWindowReloader,
   setSupervisorQuitting,
   getConnectorProcess,
 } = require('./supervisor');
@@ -69,7 +69,6 @@ app.whenReady().then(async () => {
     getMainWindow,
     getAssignedApiUrl,
     getBackendStatus,
-    restartBackendSupervisor,
     saveWindowStateSync,
     terminateConnector,
   });
@@ -78,6 +77,13 @@ app.whenReady().then(async () => {
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {
       win.webContents.send('mash-backend-status', st);
+    }
+  });
+
+  setWindowReloader(() => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.reloadIgnoringCache();
     }
   });
 

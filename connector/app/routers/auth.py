@@ -301,6 +301,10 @@ async def get_current_user_auth(fresh: bool = False) -> dict[str, Any]:
             offline_email = meta.get("email") or vault.get("active_account")
             if offline_email:
                 res["email"] = offline_email
+            if meta.get("name"):
+                res["name"] = meta["name"]
+            if meta.get("plan"):
+                res["plan"] = meta["plan"]
             return res
         return {
             "authenticated": False,
