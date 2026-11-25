@@ -1,7 +1,6 @@
 import { Message } from '@/types/chat';
 import { ArtifactItem } from '@/types/artifacts';
-import { isArtifactPath, shouldExcludePath, getArtifactCanonicalGroup } from './paths';
-import { extractEditedFiles } from './extractEditedFiles';
+import { isArtifactPath } from './paths';
 import { isSuccessfulToolCall, parseToolArgs, resolveToolFilePath } from './toolHelpers';
 
 export { isArtifactPath, shouldExcludePath, getArtifactCanonicalGroup } from './paths';

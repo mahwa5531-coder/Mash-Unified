@@ -126,7 +126,7 @@ export async function selectFolder(folderPath?: string): Promise<{
       }
       const parts = selected.replace(/\\/g, '/').split('/').filter(Boolean);
       const folder_name = parts[parts.length - 1] || selected;
-      return { status: 'ok', folder_path: selected, folder_name };
+      return { status: 'success', folder_path: selected, folder_name };
     } catch (e) {
       console.warn("Native Electron folder dialog failed, falling back to HTTP:", e);
     }

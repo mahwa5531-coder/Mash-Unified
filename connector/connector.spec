@@ -59,7 +59,6 @@ nexau_migrations_datas = [
 datas = [
     (str(connector_dir / 'app' / 'resources'), 'app/resources'),
     (str(connector_dir / 'app' / 'prompts'), 'app/prompts'),
-    (str(connector_dir / 'app' / 'native_picker.ps1'), '.'),
     (str(nexau_dir / 'nexau' / 'agents'), 'nexau/agents'),
 ] + nexau_migrations_datas + nexau_archs_datas
 if (nexau_dir / 'bin').is_dir():

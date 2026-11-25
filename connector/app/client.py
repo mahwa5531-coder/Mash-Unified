@@ -31,10 +31,11 @@ logger = logging.getLogger(__name__)
 
 
 def resolve_cloud_gateway_url() -> str:
-    """Resolve the MASH Cloud gateway base URL from canonical env, saved config, or default."""
+    """Resolve the MASH Cloud gateway base URL from env, saved config, or default."""
     config = AppConfig.load()
     return (
         os.getenv("MASH_API_BASE_URL")
+        or os.getenv("CLOUD_GATEWAY_URL")
         or os.getenv("GATEWAY_URL")
         or config.model.gateway_url
         or "https://api.mash.ai"
