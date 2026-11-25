@@ -586,10 +586,12 @@ async def test_cold_boot_transient_offline_recovers_on_network_restore(client, m
     tok = await ensure_valid_token()
     assert tok is None
 
-    # 2. /api/auth/me fails closed while offline
+    # 2. /api/auth/me fails closed while offline, surfacing offline hint for UI reconnect banner
     res1 = client.get("/api/auth/me")
     assert res1.status_code == 200
     assert res1.json()["authenticated"] is False
+    assert res1.json().get("offline") is True
+    assert res1.json().get("email") == "offline_recovery@mash.local"
 
     # 3. Refresh token was NOT scrubbed from vault
     vault = cv.load_secure_vault()
@@ -609,6 +611,7 @@ async def test_cold_boot_transient_offline_recovers_on_network_restore(client, m
     res2 = client.get("/api/auth/me")
     assert res2.status_code == 200
     assert res2.json()["authenticated"] is True
+    assert res2.json().get("offline") is not True
     assert res2.json()["email"] == "offline_recovery@mash.local"
 
     cv.clear_vault()

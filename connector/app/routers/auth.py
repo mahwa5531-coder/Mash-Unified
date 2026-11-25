@@ -91,6 +91,7 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
 
     # 2. Expired or expiring soon: rotate using sliding refresh_token via centralized MAShClient
     if refresh_token:
+        _IN_MEMORY_AUTH_META.pop("offline", None)
         try:
             client = MAShClient()
             data = await client.refresh_access_token(refresh_token)
@@ -147,6 +148,8 @@ async def ensure_valid_token(force_refresh: bool = False) -> str | None:
                             acc.pop("refresh_token", None)
                 save_secure_vault(vault, {"authenticated": False})
                 return None
+
+            _IN_MEMORY_AUTH_META["offline"] = True
 
     live_token = _IN_MEMORY_AUTH_META.get("access_token")
     if not live_token and not (vault and vault.get("refresh_token")):
@@ -288,6 +291,17 @@ async def get_current_user_auth(fresh: bool = False) -> dict[str, Any]:
 
     # If still no valid token could be produced (e.g. cold boot offline), fail closed to unauthenticated
     if not live_token or not meta.get("authenticated"):
+        is_offline_session = bool(
+            _IN_MEMORY_AUTH_META.get("offline")
+            and vault
+            and vault.get("refresh_token")
+        )
+        if is_offline_session:
+            res: dict[str, Any] = {"authenticated": False, "offline": True}
+            offline_email = meta.get("email") or vault.get("active_account")
+            if offline_email:
+                res["email"] = offline_email
+            return res
         return {
             "authenticated": False,
         }

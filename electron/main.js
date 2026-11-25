@@ -3,6 +3,13 @@
 // custom frameless window management, and zero-zombie-process cleanup on Windows.
 
 const { app } = require('electron');
+let log = console;
+try {
+  log = require('electron-log/main');
+  if (typeof log.initialize === 'function') {
+    log.initialize();
+  }
+} catch (_) {}
 const {
   registerPrivilegedSchemes,
   setupDefaultProtocolClient,
@@ -11,9 +18,12 @@ const {
 const {
   allocateEphemeralPort,
   launchBackendSupervisor,
+  restartBackendSupervisor,
   terminateConnector,
   forwardDeepLinkToConnector,
   getAssignedApiUrl,
+  getBackendStatus,
+  setStatusListener,
   setSupervisorQuitting,
   getConnectorProcess,
 } = require('./supervisor');
@@ -58,8 +68,17 @@ app.whenReady().then(async () => {
   registerIpcHandlers({
     getMainWindow,
     getAssignedApiUrl,
+    getBackendStatus,
+    restartBackendSupervisor,
     saveWindowStateSync,
     terminateConnector,
+  });
+
+  setStatusListener((st) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('mash-backend-status', st);
+    }
   });
 
   try {
@@ -67,9 +86,14 @@ app.whenReady().then(async () => {
     // Launch backend supervisor asynchronously in background without blocking UI
     // ponytail: window renders immediately (< 1.0s); backend sidecar connects concurrently
     const supervisorPromise = launchBackendSupervisor(port).catch((err) => {
-      console.error('[Supervisor] Background connector launch failed:', err?.message || err);
+      log.error('[Supervisor] Background connector launch failed:', err?.message || err);
     });
     const mainWindow = await createMainWindow();
+    mainWindow.webContents.on('did-finish-load', () => {
+      if (!mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('mash-backend-status', getBackendStatus());
+      }
+    });
 
     const coldDeepLink = process.argv.find((arg) => arg.startsWith('mash://'));
     if (coldDeepLink) {

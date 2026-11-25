@@ -44,6 +44,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   restartAndInstall: () => ipcRenderer.send('mash-restart-and-install'),
   selectFolder: () => ipcRenderer.invoke('mash-select-folder'),
+  getBackendStatus: () => {
+    try {
+      return ipcRenderer.sendSync('mash-get-backend-status');
+    } catch (_) {
+      return { status: 'ready', port: 8000 };
+    }
+  },
+  onBackendStatus: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('mash-backend-status', handler);
+    return () => ipcRenderer.removeListener('mash-backend-status', handler);
+  },
+  restartBackend: () => ipcRenderer.invoke('mash-restart-backend'),
+  openLogsFolder: () => ipcRenderer.invoke('mash-open-logs'),
   onUpdateDownloading: (callback) => {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on('mash-update-downloading', handler);

@@ -28,6 +28,7 @@ export interface UsageInfo {
 
 export interface AuthUser {
   authenticated: boolean;
+  offline?: boolean;
   email?: string;
   name?: string;
   plan?: string;
