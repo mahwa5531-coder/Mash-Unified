@@ -2,7 +2,7 @@
 // Orchestrates Python backend sidecar lifecycle, ephemeral port 0 binding,
 // custom frameless window management, and zero-zombie-process cleanup on Windows.
 
-const { app } = require('electron');
+const { app, session } = require('electron');
 let log = console;
 try {
   log = require('electron-log/main');
@@ -21,6 +21,7 @@ const {
   terminateConnector,
   forwardDeepLinkToConnector,
   getAssignedApiUrl,
+  getIpcToken,
   getBackendStatus,
   setStatusListener,
   setWindowReloader,
@@ -105,6 +106,27 @@ app.on('second-instance', (_event, commandLine) => {
 app.whenReady().then(async () => {
   // Protocol handler routing app://mash/* to frontend/out/*
   registerCustomProtocolHandlers();
+
+  // Inject per-boot IPC capability token exclusively into requests from Mash's own window
+  // targeting the local sidecar; keeps the secret unreadable by renderer JS, extensions, or other local apps.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['http://127.0.0.1/*'] },
+    (details, callback) => {
+      const apiUrl = getAssignedApiUrl();
+      const win = getMainWindow();
+      const headers = { ...details.requestHeaders };
+      if (
+        apiUrl &&
+        win &&
+        !win.isDestroyed() &&
+        details.webContentsId === win.webContents.id &&
+        details.url.startsWith(`${apiUrl}/`)
+      ) {
+        headers['X-Mash-Token'] = getIpcToken();
+      }
+      callback({ requestHeaders: headers });
+    }
+  );
 
   // Register native IPC listeners
   registerIpcHandlers({

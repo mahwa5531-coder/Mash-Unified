@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hmac
 import logging
 import os
 import sys
@@ -36,6 +37,8 @@ if _rg_bin_dir.exists() and str(_rg_bin_dir) not in os.environ.get("PATH", ""):
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import dependencies as _deps
 from app.client import resolve_cloud_gateway_url
@@ -173,6 +176,21 @@ async def lifespan(app: FastAPI):
             logger.debug("Engine dispose on shutdown failed: %s", e)
 
 
+_PUBLIC_LOCAL_PATHS = frozenset({"/health", "/api/health", "/api/system/health", "/api/auth/callback"})
+
+
+class _IpcTokenMiddleware(BaseHTTPMiddleware):
+    """Require per-launch X-Mash-Token from Electron when MASH_IPC_TOKEN is active."""
+
+    async def dispatch(self, request: Request, call_next):
+        expected = os.getenv("MASH_IPC_TOKEN", "")
+        if expected and request.method != "OPTIONS" and request.url.path not in _PUBLIC_LOCAL_PATHS:
+            provided = request.headers.get("x-mash-token", "")
+            if not provided or not hmac.compare_digest(provided, expected):
+                return JSONResponse({"detail": "Forbidden"}, status_code=403)
+        return await call_next(request)
+
+
 is_debug = os.getenv("MASH_DEBUG", "").lower() in ("true", "1", "yes")
 is_frozen = getattr(sys, "frozen", False)
 is_prod = is_frozen or os.getenv("MASH_ENV", "").lower() in ("production", "prod")
@@ -188,10 +206,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Local desktop only: Next dev server on any loopback port and packaged Electron app://mash origin.
+# Register IPC auth inside CORSMiddleware so CORS preflights/headers still evaluate outermost.
+app.add_middleware(_IpcTokenMiddleware)
+
+# Packaged desktop accepts strictly app://mash; dev mode allows local Next dev servers.
+_cors_origin_regex = (
+    r"^app://mash$"
+    if is_frozen
+    else r"^(https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?|app://mash)$"
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?|app://mash)$",
+    allow_origin_regex=_cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

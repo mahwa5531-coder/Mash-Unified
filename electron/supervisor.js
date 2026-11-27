@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const netSocket = require('net');
 const http = require('http');
 const { spawn, execSync } = require('child_process');
@@ -17,6 +18,7 @@ try {
 
 const MAX_STDERR_BYTES = 65536; // 64 KiB rolling diagnostic buffer kept strictly in disk/main logs
 const MAX_RESTARTS = 3;
+const ipcToken = crypto.randomBytes(32).toString('hex');
 
 let connectorProcess = null;
 let assignedPort = 8000;
@@ -68,6 +70,10 @@ function getAssignedPort() {
 
 function getAssignedApiUrl() {
   return assignedApiUrl;
+}
+
+function getIpcToken() {
+  return ipcToken;
 }
 
 function getConnectorProcess() {
@@ -316,6 +322,7 @@ async function launchAttempt(port, { isRespawn = false } = {}) {
       PORT: String(port),
       HOST: '127.0.0.1',
       MASH_CONNECTOR_URL: assignedApiUrl,
+      MASH_IPC_TOKEN: ipcToken,
       MASH_PYTHON_RUNTIME_DIR: runtimeDir,
       MASH_WATCH_PARENT_STDIN: '1',
       PYTHONUNBUFFERED: '1',
@@ -428,6 +435,7 @@ function forwardDeepLinkToConnector(rawUrl) {
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(postData),
+          'X-Mash-Token': ipcToken,
         },
       },
       (res) => {
@@ -447,6 +455,7 @@ function forwardDeepLinkToConnector(rawUrl) {
 module.exports = {
   getAssignedPort,
   getAssignedApiUrl,
+  getIpcToken,
   getBackendStatus,
   getConnectorProcess,
   setStatusListener,
