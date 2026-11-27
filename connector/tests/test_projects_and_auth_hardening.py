@@ -654,3 +654,118 @@ async def test_account_switch_credential_validation(client, monkeypatch):
     cv.clear_vault()
 
 
+@pytest.mark.anyio
+async def test_transient_5xx_with_expired_text_preserves_refresh_token(monkeypatch):
+    """Verify HTTP 5xx bodies mentioning 'expired' do not wipe the 30-day DPAPI refresh token."""
+    import httpx
+    import nexau.archs.platform.crypto_vault as cv
+    from app.client import MAShClient
+    from app.routers.auth import ensure_valid_token
+
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("MASH_BYPASS_AUTH", raising=False)
+    cv.clear_vault()
+    cv._IN_MEMORY_AUTH_META.clear()
+    cv.save_secure_vault(
+        {"active_account": "keep@mash.local", "refresh_token": "valid_rt_5xx_test"},
+        meta_dict={"authenticated": True, "email": "keep@mash.local"},
+    )
+
+    async def mock_503_expired(self, tok: str):
+        req = httpx.Request("POST", "https://api.mash.test/v1/auth/refresh")
+        resp = httpx.Response(503, text="Upstream gateway session expired", request=req)
+        raise httpx.HTTPStatusError("503 Service Unavailable", request=req, response=resp)
+
+    monkeypatch.setattr(MAShClient, "refresh_access_token", mock_503_expired)
+    tok = await ensure_valid_token()
+    assert tok is None
+    vault = cv.load_secure_vault()
+    assert vault is not None
+    assert vault.get("refresh_token") == "valid_rt_5xx_test"
+    cv.clear_vault()
+
+
+@pytest.mark.anyio
+async def test_sleep_wake_expired_jwt_offline_returns_none_and_preserves_vault(monkeypatch):
+    """Verify sleep/wake with an expired RAM JWT offline returns None (503 path) without clearing the 30d vault."""
+    import time
+    import httpx
+    import nexau.archs.platform.crypto_vault as cv
+    from app.client import MAShClient
+    from app.routers.auth import ensure_valid_token
+
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("MASH_BYPASS_AUTH", raising=False)
+    cv.clear_vault()
+    cv._IN_MEMORY_AUTH_META.clear()
+    cv.save_secure_vault(
+        {"active_account": "wake@mash.local", "refresh_token": "valid_rt_30d_wake"},
+        meta_dict={"authenticated": True, "email": "wake@mash.local"},
+    )
+    cv._IN_MEMORY_AUTH_META["access_token"] = "expired_pre_sleep_jwt"
+    cv._IN_MEMORY_AUTH_META["expires_at"] = int(time.time()) - 7200
+
+    async def mock_offline_wake(self, tok: str):
+        raise httpx.ConnectError("Network still reconnecting after wake")
+
+    monkeypatch.setattr(MAShClient, "refresh_access_token", mock_offline_wake)
+    tok = await ensure_valid_token()
+    assert tok is None
+    assert cv._IN_MEMORY_AUTH_META.get("offline") is True
+    assert cv._IN_MEMORY_AUTH_META.get("access_token") is None
+    vault = cv.load_secure_vault()
+    assert vault is not None
+    assert vault.get("refresh_token") == "valid_rt_30d_wake"
+    cv.clear_vault()
+
+
+@pytest.mark.anyio
+async def test_concurrent_refresh_is_single_flight(monkeypatch):
+    """Verify simultaneous callers share one refresh request instead of double-spending sliding tokens."""
+    import asyncio
+    import time
+    import nexau.archs.platform.crypto_vault as cv
+    from app.client import MAShClient
+    from app.routers.auth import ensure_valid_token
+
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("MASH_BYPASS_AUTH", raising=False)
+    cv.clear_vault()
+    cv._IN_MEMORY_AUTH_META.clear()
+    cv.save_secure_vault(
+        {"active_account": "race@mash.local", "refresh_token": "rt_family_1"},
+        meta_dict={"authenticated": True, "email": "race@mash.local"},
+    )
+    cv._IN_MEMORY_AUTH_META["access_token"] = "expired_jwt_1"
+    cv._IN_MEMORY_AUTH_META["expires_at"] = int(time.time()) - 60
+
+    refresh_calls = 0
+
+    async def mock_rotating_refresh(self, tok: str):
+        nonlocal refresh_calls
+        refresh_calls += 1
+        await asyncio.sleep(0.05)
+        if tok != "rt_family_1":
+            raise AssertionError(f"Unexpected refresh token reuse: {tok}")
+        return {
+            "access_token": "fresh_singleflight_jwt",
+            "expires_in": 900,
+            "refresh_token": "rt_family_2",
+        }
+
+    monkeypatch.setattr(MAShClient, "refresh_access_token", mock_rotating_refresh)
+    t1, t2, t3 = await asyncio.gather(
+        ensure_valid_token(),
+        ensure_valid_token(),
+        ensure_valid_token(force_refresh=True),
+    )
+    assert t1 == "fresh_singleflight_jwt"
+    assert t2 == "fresh_singleflight_jwt"
+    assert t3 == "fresh_singleflight_jwt"
+    assert refresh_calls == 1
+    vault = cv.load_secure_vault()
+    assert vault is not None
+    assert vault.get("refresh_token") == "rt_family_2"
+    cv.clear_vault()
+
+

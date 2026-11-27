@@ -34,6 +34,28 @@ import openai
 from openai import AsyncStream, Stream
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
+
+def _is_non_retryable_llm_error(exc: Exception) -> bool:
+    """Return True for terminal auth/permission/validation/window-quota errors that will not succeed on immediate retry."""
+    status = getattr(exc, "status_code", None)
+    msg = str(exc).lower()
+    if status in (400, 401, 403, 404):
+        return True
+    if "window_quota_exceeded" in msg or "token quota for this plan window" in msg:
+        return True
+    if status == 429 and ("quota" in msg or "window" in msg):
+        return True
+    return any(
+        needle in msg
+        for needle in (
+            "model_not_entitled",
+            "account_inactive",
+            "authentication required",
+            "invalid bearer token",
+            "unauthorized",
+        )
+    )
+
 from nexau.archs.llm.llm_aggregators import OpenAIChatCompletionAggregator
 from nexau.archs.llm.llm_aggregators.events import Event
 from nexau.archs.llm.llm_config import LLMConfig
@@ -633,6 +655,9 @@ class LLMCaller:
                 if params.shutdown_event and params.shutdown_event.is_set():
                     logger.info("🛑 LLM call interrupted by shutdown_event, skipping retry")
                     return None
+                if _is_non_retryable_llm_error(e):
+                    logger.warning(f"🛑 Non-retryable LLM error, skipping retry: {e}")
+                    raise e
 
                 logger.error(
                     f"❌ LLM call failed (attempt {i + 1}/{self.retry_attempts}): {e}",
@@ -728,6 +753,9 @@ class LLMCaller:
                 if params.shutdown_event and params.shutdown_event.is_set():
                     logger.info("🛑 LLM call interrupted by shutdown_event (async), skipping retry")
                     return None
+                if _is_non_retryable_llm_error(e):
+                    logger.warning(f"🛑 Non-retryable LLM error (async), skipping retry: {e}")
+                    raise e
 
                 err_str = str(e).lower()
                 if "requires more credits" in err_str or "fewer max_tokens" in err_str or "402" in err_str:

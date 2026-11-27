@@ -438,6 +438,9 @@ export async function streamQuery(
           else if (eventType === "RUN_ERROR" || eventType === "TRANSPORT_ERROR") {
             finalizeRunningTools("cancelled");
             const errStr = event.message || data.message || event.error_message || data.error_message || data.error || "Unknown error";
+            if (typeof window !== 'undefined' && (String(errStr).includes("401") || String(errStr).toLowerCase().includes("unauthorized"))) {
+              window.dispatchEvent(new CustomEvent('mash:auth_expired'));
+            }
             const formatted = formatErrorMessage(errStr);
             const errId = event.run_id || data.run_id || event.error_id || data.error_id || event.id;
             if (onError) {

@@ -18,7 +18,7 @@ import { ChatHistoryLoadState } from './ChatHistoryLoadState';
 import { cleanUserPromptForComposer } from '@/features/chat/utils/sessionHistoryParser';
 import { fetchSessionPermissions, updateSessionPermissionMode } from '@/services/sessions';
 import type { PermissionMode } from './composer/PermissionModeSelector';
-import type { AuthUser } from '@/services/auth';
+import { openPricingPage, type AuthUser } from '@/services/auth';
 
 interface ChatCanvasProps {
   sessionId: string | null;
@@ -432,8 +432,12 @@ export default function ChatCanvas({
               <QuotaBanner
                 open={showQuotaBanner}
                 onOpenChange={setShowQuotaBanner}
-                refreshDate={authUser?.quota?.windows?.[0]?.resets_at}
-                onSeePlans={() => onOpenSettings?.('account')}
+                refreshDate={
+                  authUser?.quota?.windows?.find((w) => (w.used_percent ?? w.percent ?? 0) >= 100)?.resets_at ??
+                  authUser?.quota?.windows?.find((w) => Boolean(w.resets_at))?.resets_at ??
+                  authUser?.quota?.windows?.[0]?.resets_at
+                }
+                onSeePlans={() => openPricingPage()}
                 onDismiss={() => setShowQuotaBanner(false)}
               />
             </div>

@@ -1,32 +1,16 @@
 "use client";
 
 import React from 'react';
-import { WifiOff, RotateCw, X } from 'lucide-react';
+import { WifiOff, X } from 'lucide-react';
 
 export interface OfflineToastProps {
   visible: boolean;
-  isOffline?: boolean;
-  syncError?: string;
-  isRetrying?: boolean;
-  onRetry?: () => void;
   onDismiss: () => void;
 }
 
-/** Floating top-right chat-pane notice shown while offline or when cloud sync fails. */
-export function OfflineToast({
-  visible,
-  isOffline = true,
-  syncError,
-  isRetrying = false,
-  onRetry,
-  onDismiss,
-}: OfflineToastProps) {
+/** Floating top-right chat-pane notice shown while offline. */
+export function OfflineToast({ visible, onDismiss }: OfflineToastProps) {
   if (!visible) return null;
-
-  const heading = isOffline ? 'No internet connection' : 'Could not reach MASh Cloud';
-  const subtitle = isOffline
-    ? 'Local files & history remain available.'
-    : syncError || 'Connection timed out.';
 
   return (
     <div
@@ -39,24 +23,11 @@ export function OfflineToast({
         <WifiOff size={15} className="mt-0.5 shrink-0 text-amber-500 dark:text-amber-400" />
         <div className="flex-1 min-w-0">
           <div className="text-[12.5px] font-medium text-zinc-900 dark:text-zinc-100 leading-tight">
-            {heading}
+            No internet connection
           </div>
           <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
-            {subtitle}
+            Local files &amp; history remain available.
           </p>
-          {onRetry && (
-            <div className="mt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={onRetry}
-                disabled={isRetrying}
-                className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-md text-[11px] font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-white/[0.07] dark:hover:bg-white/[0.12] text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-white/[0.08] transition-colors cursor-pointer disabled:opacity-60"
-              >
-                <RotateCw size={11} className={isRetrying ? 'animate-spin' : ''} />
-                <span>{isRetrying ? 'Retrying...' : 'Retry'}</span>
-              </button>
-            </div>
-          )}
         </div>
         <button
           type="button"

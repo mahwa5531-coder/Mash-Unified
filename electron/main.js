@@ -48,6 +48,14 @@ if (!gotTheLock) {
 
 let isAppQuitting = false;
 let relaunchOnQuit = false;
+let latestUpdateEvent = null;
+
+function notifyMainWindow(channel, payload) {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(channel, payload);
+  }
+}
 
 function beginShutdown() {
   isAppQuitting = true;
@@ -68,6 +76,9 @@ async function openOrFocusMainWindow() {
     win.webContents.on('did-finish-load', () => {
       if (!win.isDestroyed()) {
         win.webContents.send('mash-backend-status', getBackendStatus());
+        if (latestUpdateEvent) {
+          win.webContents.send(latestUpdateEvent.channel, latestUpdateEvent.payload);
+        }
       }
     });
     return win;
@@ -105,10 +116,7 @@ app.whenReady().then(async () => {
   });
 
   setStatusListener((st) => {
-    const win = getMainWindow();
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('mash-backend-status', st);
-    }
+    notifyMainWindow('mash-backend-status', st);
   });
 
   setWindowReloader(() => {
@@ -126,7 +134,7 @@ app.whenReady().then(async () => {
     const supervisorPromise = launchBackendSupervisor(port).catch((err) => {
       log.error('[Supervisor] Background connector launch failed:', err?.message || err);
     });
-    const mainWindow = await openOrFocusMainWindow();
+    await openOrFocusMainWindow();
 
     const coldDeepLink = process.argv.find((arg) => arg.startsWith('mash://'));
     if (coldDeepLink) {
@@ -136,20 +144,15 @@ app.whenReady().then(async () => {
     if (app.isPackaged) {
       try {
         const { autoUpdater } = require('electron-updater');
-        autoUpdater.on('download-progress', (progressObj) => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('mash-update-downloading', {
-              progress: Math.round(progressObj.percent),
-            });
-          }
-        });
-        autoUpdater.on('update-downloaded', (info) => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('mash-update-ready', {
-              version: info?.version,
-            });
-          }
-        });
+        for (const [eventName, channel, mapPayload] of [
+          ['download-progress', 'mash-update-downloading', (p) => ({ progress: Math.round(p.percent) })],
+          ['update-downloaded', 'mash-update-ready', (info) => ({ version: info?.version })],
+        ]) {
+          autoUpdater.on(eventName, (arg) => {
+            latestUpdateEvent = { channel, payload: mapPayload(arg) };
+            notifyMainWindow(latestUpdateEvent.channel, latestUpdateEvent.payload);
+          });
+        }
         autoUpdater.checkForUpdatesAndNotify().catch((e) =>
           log.info('[AutoUpdater] check skipped:', e?.message)
         );

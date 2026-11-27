@@ -140,6 +140,8 @@ export function classifyError(
   // 4b. QUOTA & ROLLING ALLOCATION (429 / WINDOW_QUOTA_EXCEEDED)
   const isQuota =
     lower.includes("window_quota_exceeded") ||
+    lower.includes("token quota for this plan window") ||
+    lower.includes("plan token quota reached") ||
     lower.includes("quota exceeded") ||
     lower.includes("rate limit") ||
     lower.includes("quota reached") ||

@@ -12,7 +12,7 @@ import { fetchSessions, fetchSessionsDetailed, deleteSession, unmarkSessionDelet
 import { evictRightSidebarMemory } from '@/features/viewer/hooks/useViewerTabs';
 import { invalidateFileCache } from '@/services/files';
 import { FailedToDeleteCard } from '@/features/sessions/components/FailedToDeleteCard';
-import { fetchAuthMe, AuthUser } from '@/services/auth';
+import { fetchAuthMe, getSiteUrls, syncAuthUsage, AuthUser } from '@/services/auth';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { sessionStore } from '@/features/chat';
 import { WindowTitleBar } from '@/components/layout/WindowTitleBar';
@@ -384,10 +384,31 @@ export default function Home() {
   const handleFileOpened = useCallback(() => setFileToOpen(null), []);
   const handleToggleRightMaximize = useCallback(() => setIsRightSidebarMaximized(prev => !prev), []);
 
+  useEffect(() => {
+    void getSiteUrls();
+    let pendingPlanSync = false;
+    const onPricingOpened = () => {
+      pendingPlanSync = true;
+    };
+    const onWindowFocus = () => {
+      if (!pendingPlanSync) return;
+      pendingPlanSync = false;
+      void syncAuthUsage().then((user) => {
+        if (user && (user.authenticated || user.offline)) {
+          setAuthUser(user);
+        }
+      });
+    };
+    window.addEventListener('mash:pricing_opened', onPricingOpened);
+    window.addEventListener('focus', onWindowFocus);
+    return () => {
+      window.removeEventListener('mash:pricing_opened', onPricingOpened);
+      window.removeEventListener('focus', onWindowFocus);
+    };
+  }, []);
+
   const {
     isOffline,
-    syncError,
-    isRetrying: isRetryingOffline,
     showToast: showOfflineToast,
     dismissToast: dismissOfflineToast,
     retryConnection: retryOfflineConnection,
@@ -510,10 +531,6 @@ export default function Home() {
           mainOverlay={
             <OfflineToast
               visible={showOfflineToast}
-              isOffline={isOffline}
-              syncError={syncError}
-              isRetrying={isRetryingOffline}
-              onRetry={retryOfflineConnection}
               onDismiss={dismissOfflineToast}
             />
           }
@@ -565,7 +582,6 @@ export default function Home() {
         onClose={() => setIsSettingsOpen(false)}
         onThemeChange={setIsDark}
         onSignOut={() => setAuthUser(null)}
-        onAuthUpdated={(user) => setAuthUser(user)}
         currentProjectName={selectedSessionRepo && selectedSessionRepo !== 'No Repo' ? selectedSessionRepo : 'Mash'}
         onProjectDeleted={(projectName) => {
           if (selectedSessionRepo === projectName) {

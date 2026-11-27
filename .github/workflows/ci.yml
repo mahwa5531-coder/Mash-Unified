@@ -94,6 +94,9 @@ jobs:
         run: |
           python -m pytest \
             connector/tests/test_backend_sanity.py \
+            connector/tests/test_auth_storage_hardening_e2e.py \
+            connector/tests/test_desktop_cloud_api_integration.py \
+            connector/tests/test_projects_and_auth_hardening.py \
             connector/tests/test_tasks_api.py \
             connector/tests/test_file_access_boundaries.py \
             connector/tests/test_desktop_attached_file_authorization.py \

@@ -1,4 +1,4 @@
-// Authentication: current-user, logout.
+// Authentication: current-user, logout, site links.
 
 import { BASE_URL, safeFetch } from './client';
 
@@ -29,7 +29,6 @@ export interface UsageInfo {
 export interface AuthUser {
   authenticated: boolean;
   offline?: boolean;
-  sync_error?: string;
   auth_expired?: boolean;
   email?: string;
   name?: string;
@@ -45,6 +44,48 @@ export interface AuthUser {
     plan: string;
     credits_remaining: number;
   }>;
+}
+
+export interface SiteUrls {
+  websiteUrl: string;
+  pricingUrl: string;
+}
+
+const DEFAULT_WEBSITE_URL = 'https://mahwa5531-coder.github.io/mash-website';
+
+let cachedSiteUrls: SiteUrls = {
+  websiteUrl: DEFAULT_WEBSITE_URL,
+  pricingUrl: `${DEFAULT_WEBSITE_URL}/pricing`,
+};
+let siteUrlsLoaded = false;
+
+export function getCachedSiteUrls(): SiteUrls {
+  return cachedSiteUrls;
+}
+
+export async function getSiteUrls(): Promise<SiteUrls> {
+  if (siteUrlsLoaded) return cachedSiteUrls;
+  const cfg = await fetchAuthConfig();
+  if (cfg) {
+    const base = (cfg.website_url || DEFAULT_WEBSITE_URL).replace(/\/+$/, '');
+    const pricing = (cfg.pricing_url || `${base}/pricing`).replace(/\/+$/, '');
+    cachedSiteUrls = { websiteUrl: base, pricingUrl: pricing };
+    siteUrlsLoaded = true;
+  }
+  return cachedSiteUrls;
+}
+
+export function markPricingOpened(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('mash:pricing_opened'));
+  }
+}
+
+export function openPricingPage(): void {
+  markPricingOpened();
+  if (typeof window !== 'undefined') {
+    window.open(cachedSiteUrls.pricingUrl, '_blank', 'noopener,noreferrer');
+  }
 }
 
 export async function fetchAuthMe(fresh = false): Promise<AuthUser | null> {
@@ -76,7 +117,11 @@ export async function fetchAuthConfig(): Promise<{ website_url?: string; pricing
 export async function syncAuthUsage(): Promise<AuthUser | null> {
   try {
     await safeFetch(`${BASE_URL}/api/auth/sync`, { method: "POST" });
-    return await fetchAuthMe(true);
+    const updated = await fetchAuthMe(true);
+    if (updated && (updated.authenticated || updated.offline) && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('mash:auth_updated', { detail: updated }));
+    }
+    return updated;
   } catch (err) {
     console.warn("Failed to sync auth usage:", err);
     return null;

@@ -91,14 +91,17 @@ class MAShClient:
             resp.raise_for_status()
             return resp.json()
 
-    async def logout(self, refresh_token: str) -> bool:
+    async def logout(self, refresh_token: str, access_token: str | None = None) -> bool:
         """Revokes active refresh token on cloud."""
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+        if access_token:
+            headers["Authorization"] = f"Bearer {access_token}"
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.post(
                     f"{self.base_url}/v1/auth/logout",
                     json={"refresh_token": refresh_token},
-                    headers={"Content-Type": "application/json"},
+                    headers=headers,
                 )
                 return resp.status_code == 200
         except Exception as e:
