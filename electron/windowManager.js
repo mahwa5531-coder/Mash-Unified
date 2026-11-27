@@ -9,6 +9,16 @@ const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow, screen, shell } = require('electron');
 const { getWindowStateFilePath, getPreloadPath } = require('./paths');
+const { showFatalRecoveryDialog } = require('./supervisor');
+
+let log = console;
+try {
+  log = require('electron-log/main');
+} catch (_) {}
+
+const MAX_RENDERER_RELOADS = 2;
+let rendererReloadAttempts = 0;
+let rendererHealthyTimer = null;
 
 const DEFAULT_WINDOW_STATE = {
   width: 1440,
@@ -216,10 +226,89 @@ async function createMainWindow() {
 
   mainWindow.on('close', () => {
     saveWindowStateSync();
+    // Hide immediately so shutdown never makes the window appear frozen during sidecar cleanup
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+      mainWindow.hide();
+    }
   });
 
   mainWindow.on('closed', () => {
+    if (rendererHealthyTimer) {
+      clearTimeout(rendererHealthyTimer);
+      rendererHealthyTimer = null;
+    }
     mainWindow = null;
+  });
+
+  const loadDocumentUrl = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.webContents.isLoading()) {
+      mainWindow.webContents.stop();
+    }
+    const targetUrl = !app.isPackaged && process.env.MASH_DEV_URL
+      ? process.env.MASH_DEV_URL
+      : 'app://mash/index.html';
+    mainWindow.loadURL(targetUrl).catch((err) => {
+      if (err?.code !== 'ERR_ABORTED') {
+        log.error('[Window] loadURL error:', err?.message || err);
+      }
+    });
+  };
+
+  const recoverOrPromptRenderer = (detail) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (rendererReloadAttempts < MAX_RENDERER_RELOADS) {
+      rendererReloadAttempts++;
+      log.warn(`[Window] Auto-reloading renderer (${rendererReloadAttempts}/${MAX_RENDERER_RELOADS})...`);
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) loadDocumentUrl();
+      }, 250);
+    } else {
+      void showFatalRecoveryDialog({
+        mode: 'app',
+        message: 'Mash window could not recover',
+        detail,
+      });
+    }
+  };
+
+  mainWindow.webContents.on('console-message', (eventOrDetails, level, message, line, sourceId) => {
+    const isErr = typeof eventOrDetails === 'object' && eventOrDetails !== null && 'level' in eventOrDetails
+      ? eventOrDetails.level === 'error'
+      : level === 3;
+    if (!isErr) return;
+    const msgText = typeof eventOrDetails === 'object' && eventOrDetails !== null && 'message' in eventOrDetails
+      ? `${eventOrDetails.sourceId}:${eventOrDetails.lineNumber} ${eventOrDetails.message}`
+      : `${sourceId}:${line} ${message}`;
+    log.error(`[Renderer:Console] ${msgText}`);
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (rendererHealthyTimer) clearTimeout(rendererHealthyTimer);
+    rendererHealthyTimer = setTimeout(() => {
+      rendererReloadAttempts = 0;
+    }, 60000);
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame || errorCode === -3) return;
+    log.error(`[Window] Main frame load failed (${errorCode}: ${errorDescription}) at ${validatedURL}`);
+    recoverOrPromptRenderer('The interface failed to load cleanly. Restarting Mash usually resolves this.');
+  });
+
+  mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
+    log.error(`[Window] Preload error (${preloadPath}):`, error?.message || error);
+    void showFatalRecoveryDialog({
+      mode: 'app',
+      message: 'Mash could not start',
+      detail: 'A window initialization component failed to load. Restarting or reinstalling Mash may resolve this.',
+    });
+  });
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    if (details?.reason === 'clean-exit') return;
+    log.error(`[Window] Renderer process gone (reason=${details?.reason}, exitCode=${details?.exitCode})`);
+    recoverOrPromptRenderer('The workspace display process exited unexpectedly. Restarting Mash usually resolves this.');
   });
 
   // Open external links (such as Google OAuth) in the system browser
@@ -246,11 +335,7 @@ async function createMainWindow() {
     }
   }, 1000);
 
-  if (!app.isPackaged && process.env.MASH_DEV_URL) {
-    mainWindow.loadURL(process.env.MASH_DEV_URL);
-  } else {
-    mainWindow.loadURL('app://mash/index.html');
-  }
+  loadDocumentUrl();
 
   return mainWindow;
 }

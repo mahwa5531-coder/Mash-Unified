@@ -3,10 +3,11 @@
 // ephemeral port allocation, health probes, rotating disk logging, and native OS recovery dialogs.
 
 const fs = require('fs');
+const path = require('path');
 const netSocket = require('net');
 const http = require('http');
 const { spawn, execSync } = require('child_process');
-const { app, dialog } = require('electron');
+const { app, dialog, shell } = require('electron');
 const { getConnectorPaths } = require('./paths');
 
 let log = console;
@@ -22,6 +23,8 @@ let assignedPort = 8000;
 let assignedApiUrl = 'http://127.0.0.1:8000';
 let isQuitting = false;
 let restartCount = 0;
+let currentAttemptId = 0;
+let lifecycleQueue = Promise.resolve();
 let fatalDialogOpen = false;
 let stderrTail = '';
 let statusListener = null;
@@ -75,46 +78,101 @@ function setSupervisorQuitting(quitting) {
   isQuitting = Boolean(quitting);
 }
 
-// Native OS fatal recovery dialog (DeepSeek Harness pattern: zero source/tracebacks in renderer)
-async function showFatalRecoveryDialog(isMissingBinary = false) {
+function enqueueLifecycle(task) {
+  const next = lifecycleQueue.then(task, task);
+  lifecycleQueue = next.catch(() => {});
+  return next;
+}
+
+function resolveMainLogPath() {
+  try {
+    const file = log?.transports?.file?.getFile?.();
+    if (file?.path) return file.path;
+  } catch (_) {}
+  try {
+    return path.join(app.getPath('logs'), 'main.log');
+  } catch (_) {
+    return '';
+  }
+}
+
+// Native OS fatal recovery dialog loop (DeepSeek Harness pattern: zero source/tracebacks in renderer)
+async function showFatalRecoveryDialog({
+  isMissingBinary = false,
+  mode = 'backend',
+  message = 'Mash could not start',
+  detail,
+} = {}) {
   if (isQuitting || fatalDialogOpen || !dialog || typeof dialog.showMessageBox !== 'function') {
     return;
   }
   fatalDialogOpen = true;
   try {
-    const detail = isMissingBinary
+    let heading = message;
+    let body = detail || (isMissingBinary
       ? 'A required application file is missing or blocked. Reinstalling Mash or checking antivirus settings may resolve this.'
-      : 'A required background service stopped unexpectedly. Restarting Mash usually resolves this.';
+      : 'A required background service stopped unexpectedly. Restarting Mash usually resolves this.');
 
-    const { response } = await dialog.showMessageBox({
-      type: 'error',
-      title: 'Mash',
-      message: 'Mash could not start',
-      detail,
-      buttons: ['Restart Mash', 'Quit'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-    });
-
-    if (response === 0 && !isQuitting) {
-      restartBackendSupervisor({
-        isRespawn: true,
-        allocateFreshPort: true,
-        resetAttempts: true,
-      }).then((info) => {
-        if (info?.portChanged && typeof windowReloader === 'function') {
-          windowReloader();
-        }
-      }).catch((err) => {
-        log.error('[Supervisor] Manual restart failed:', err?.message || err);
+    while (!isQuitting) {
+      const { response } = await dialog.showMessageBox({
+        type: 'error',
+        title: 'Mash',
+        message: heading,
+        detail: body,
+        buttons: ['Restart Mash', 'Open Log File', 'Quit'],
+        defaultId: 0,
+        cancelId: 2,
+        noLink: true,
       });
-    } else {
+
+      if (response === 1) {
+        try {
+          const logFile = resolveMainLogPath();
+          if (logFile && fs.existsSync(logFile) && typeof shell?.showItemInFolder === 'function') {
+            shell.showItemInFolder(logFile);
+          } else if (typeof app?.getPath === 'function' && typeof shell?.openPath === 'function') {
+            await shell.openPath(app.getPath('logs'));
+          }
+        } catch (err) {
+          log.warn('[Supervisor] Failed to open log location:', err?.message || err);
+        }
+        continue;
+      }
+
+      if (response === 0 && !isQuitting) {
+        if (mode === 'app') {
+          isQuitting = true;
+          terminateConnector();
+          if (app && typeof app.relaunch === 'function') {
+            app.relaunch();
+            app.exit(0);
+          }
+          return;
+        }
+        try {
+          const info = await restartBackendSupervisor({
+            isRespawn: true,
+            allocateFreshPort: true,
+            resetAttempts: true,
+          });
+          if (info?.portChanged && typeof windowReloader === 'function') {
+            windowReloader();
+          }
+          return;
+        } catch (err) {
+          log.error('[Supervisor] Manual restart failed:', err?.message || err);
+          heading = 'Mash still could not start';
+          body = 'Restarting the background service failed. You can try again, inspect the log file, or quit Mash.';
+          continue;
+        }
+      }
+
       isQuitting = true;
       terminateConnector();
       if (app && typeof app.quit === 'function') {
         app.quit();
       }
+      return;
     }
   } finally {
     fatalDialogOpen = false;
@@ -140,17 +198,21 @@ function allocateEphemeralPort() {
   });
 }
 
-// 2. Health Probe Poller
-function waitForBackendReady(port, timeoutMs = 45000) {
+// 2. Health Probe Poller (stops immediately if superseded or child exited)
+function waitForBackendReady(port, timeoutMs = 45000, isAttemptActive = () => true) {
   const startTime = Date.now();
   return new Promise((resolve, reject) => {
     const probe = () => {
-      if (isQuitting) {
-        reject(new Error('Application shutting down'));
+      if (isQuitting || !isAttemptActive()) {
+        reject(new Error('Sidecar attempt superseded or stopped'));
         return;
       }
       const req = http.get(`http://127.0.0.1:${port}/health`, (res) => {
         res.resume();
+        if (isQuitting || !isAttemptActive()) {
+          reject(new Error('Sidecar attempt superseded or stopped'));
+          return;
+        }
         if (res.statusCode === 200) {
           resolve(true);
         } else if (Date.now() - startTime < timeoutMs) {
@@ -160,6 +222,10 @@ function waitForBackendReady(port, timeoutMs = 45000) {
         }
       });
       req.on('error', () => {
+        if (isQuitting || !isAttemptActive()) {
+          reject(new Error('Sidecar attempt superseded or stopped'));
+          return;
+        }
         if (Date.now() - startTime < timeoutMs) {
           setTimeout(probe, 250);
         } else {
@@ -174,6 +240,7 @@ function waitForBackendReady(port, timeoutMs = 45000) {
 
 // 3. Windows Process Tree Terminator (Zero Zombie Processes)
 function terminateConnector() {
+  currentAttemptId++;
   const proc = connectorProcess;
   connectorProcess = null;
   if (!proc || proc.killed) return;
@@ -193,7 +260,11 @@ function terminateConnector() {
 }
 
 // 4. Backend Sidecar Process Supervisor
-async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
+async function launchAttempt(port, { isRespawn = false } = {}) {
+  terminateConnector();
+  const attemptId = ++currentAttemptId;
+  let attemptHandled = false;
+
   assignedPort = port;
   assignedApiUrl = `http://127.0.0.1:${port}`;
   stderrTail = '';
@@ -206,24 +277,52 @@ async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
   if (isPackaged && !fs.existsSync(command)) {
     log.error(`[Supervisor] Binary missing at ${command}`);
     setBackendStatus({ status: 'error' });
-    showFatalRecoveryDialog(true);
+    void showFatalRecoveryDialog({ isMissingBinary: true });
     throw new Error('Backend binary missing');
   }
 
-  const env = {
-    ...process.env,
-    PORT: String(port),
-    HOST: '127.0.0.1',
-    MASH_CONNECTOR_URL: assignedApiUrl,
-    MASH_PYTHON_RUNTIME_DIR: runtimeDir,
-    MASH_WATCH_PARENT_STDIN: '1',
-    PYTHONUNBUFFERED: '1',
-    PYTHONUTF8: '1',
-    PYTHONIOENCODING: 'utf-8',
-  };
+  function handleSidecarFailure(reason) {
+    if (attemptHandled || attemptId !== currentAttemptId || isQuitting) return;
+    attemptHandled = true;
+    if (reason) log.warn(`[Supervisor] ${reason}`);
+
+    if (restartCount < MAX_RESTARTS) {
+      restartCount++;
+      log.warn(`[Supervisor] Silent respawn ${restartCount}/${MAX_RESTARTS}...`);
+      setBackendStatus({ status: 'restarting' });
+      setTimeout(() => {
+        if (!isQuitting && attemptId === currentAttemptId) {
+          restartBackendSupervisor({ isRespawn: true, allocateFreshPort: true })
+            .then((info) => {
+              if (info?.portChanged && typeof windowReloader === 'function') {
+                windowReloader();
+              }
+            })
+            .catch((err) => {
+              log.error('[Supervisor] Respawn failed:', err?.message || err);
+            });
+        }
+      }, 1000);
+    } else {
+      setBackendStatus({ status: 'error' });
+      void showFatalRecoveryDialog();
+    }
+  }
 
   let proc;
   try {
+    const env = {
+      ...process.env,
+      PORT: String(port),
+      HOST: '127.0.0.1',
+      MASH_CONNECTOR_URL: assignedApiUrl,
+      MASH_PYTHON_RUNTIME_DIR: runtimeDir,
+      MASH_WATCH_PARENT_STDIN: '1',
+      PYTHONUNBUFFERED: '1',
+      PYTHONUTF8: '1',
+      PYTHONIOENCODING: 'utf-8',
+    };
+
     // Keep stdin open as a parent-death pipe: if Electron dies unexpectedly, OS closes pipe & child exits.
     proc = spawn(command, args, {
       cwd,
@@ -233,8 +332,7 @@ async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
     });
   } catch (err) {
     log.error(`[Supervisor] Spawn exception: ${err?.message || err}`);
-    setBackendStatus({ status: 'error' });
-    showFatalRecoveryDialog(false);
+    handleSidecarFailure(`Spawn exception: ${err?.message || err}`);
     throw err;
   }
 
@@ -257,75 +355,61 @@ async function launchBackendSupervisor(port, { isRespawn = false } = {}) {
   });
 
   proc.on('error', (err) => {
-    if (connectorProcess !== proc) return;
+    if (connectorProcess === proc) connectorProcess = null;
     log.error(`[MashConnector] Process error: ${err?.message || err}`);
     appendStderrTail(err?.message || 'Process error');
-    setBackendStatus({ status: 'error' });
-    showFatalRecoveryDialog(false);
+    handleSidecarFailure(`Process error: ${err?.message || err}`);
   });
-
-  function handleSidecarFailure() {
-    if (isQuitting) return;
-    if (restartCount < MAX_RESTARTS) {
-      restartCount++;
-      log.warn(`[Supervisor] Silent respawn ${restartCount}/${MAX_RESTARTS}...`);
-      setBackendStatus({ status: 'restarting' });
-      setTimeout(() => {
-        if (!isQuitting) {
-          restartBackendSupervisor({ isRespawn: true, allocateFreshPort: true })
-            .then((info) => {
-              if (info?.portChanged && typeof windowReloader === 'function') {
-                windowReloader();
-              }
-            })
-            .catch((err) => {
-              log.error('[Supervisor] Respawn failed:', err?.message || err);
-            });
-        }
-      }, 1000);
-    } else {
-      setBackendStatus({ status: 'error' });
-      showFatalRecoveryDialog(false);
-    }
-  }
 
   proc.on('exit', (code, signal) => {
-    if (connectorProcess !== proc) return;
-    connectorProcess = null;
+    if (connectorProcess === proc) connectorProcess = null;
     log.warn(`[MashConnector] Exited with code ${code}, signal ${signal}. Tail: ${stderrTail.slice(-1000)}`);
-    handleSidecarFailure();
+    handleSidecarFailure(`Exited with code ${code}, signal ${signal}`);
   });
 
+  const isAttemptActive = () => !attemptHandled && attemptId === currentAttemptId && connectorProcess === proc;
+
   try {
-    await waitForBackendReady(port);
+    await waitForBackendReady(port, 45000, isAttemptActive);
   } catch (err) {
-    if (connectorProcess === proc && !isQuitting) {
-      terminateConnector();
+    if (!attemptHandled && attemptId === currentAttemptId && !isQuitting) {
+      if (connectorProcess === proc) connectorProcess = null;
+      if (proc && !proc.killed) {
+        try {
+          if (process.platform === 'win32') execSync(`taskkill /pid ${proc.pid} /t /f`, { stdio: 'ignore' });
+          else proc.kill('SIGTERM');
+        } catch (_) {}
+      }
       log.error(`[Supervisor] Health probe failure: ${err?.message || err}`);
-      handleSidecarFailure();
+      handleSidecarFailure(`Health probe failure: ${err?.message || err}`);
     }
     throw err;
   }
 
-  if (connectorProcess === proc && !isQuitting) {
+  if (attemptId === currentAttemptId && connectorProcess === proc && !isQuitting) {
     setBackendStatus({ status: 'ready' });
     // QA-BUG-9 Fix: Only reset restart counter after sustained healthy runtime (60s)
     // to prevent rapid crash-loops from respawning indefinitely
     setTimeout(() => {
-      if (connectorProcess === proc && !proc.killed) {
+      if (attemptId === currentAttemptId && connectorProcess === proc && !proc.killed) {
         restartCount = 0;
       }
     }, 60000);
   }
 }
 
+async function launchBackendSupervisor(port, options = {}) {
+  return enqueueLifecycle(() => launchAttempt(port, options));
+}
+
 async function restartBackendSupervisor({ isRespawn = false, allocateFreshPort = false, resetAttempts = false } = {}) {
-  const prevPort = assignedPort;
-  if (resetAttempts) restartCount = 0;
-  terminateConnector();
-  const nextPort = allocateFreshPort ? await allocateEphemeralPort() : assignedPort;
-  await launchBackendSupervisor(nextPort, { isRespawn });
-  return { port: nextPort, apiUrl: assignedApiUrl, portChanged: nextPort !== prevPort };
+  return enqueueLifecycle(async () => {
+    const prevPort = assignedPort;
+    if (resetAttempts) restartCount = 0;
+    const nextPort = allocateFreshPort ? await allocateEphemeralPort() : assignedPort;
+    await launchAttempt(nextPort, { isRespawn });
+    return { port: nextPort, apiUrl: assignedApiUrl, portChanged: nextPort !== prevPort };
+  });
 }
 
 // 5. OAuth Deep Link Forwarder
@@ -368,6 +452,7 @@ module.exports = {
   setStatusListener,
   setWindowReloader,
   setSupervisorQuitting,
+  showFatalRecoveryDialog,
   allocateEphemeralPort,
   waitForBackendReady,
   terminateConnector,

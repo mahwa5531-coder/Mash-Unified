@@ -25,6 +25,7 @@ const {
   setStatusListener,
   setWindowReloader,
   setSupervisorQuitting,
+  showFatalRecoveryDialog,
   getConnectorProcess,
 } = require('./supervisor');
 const {
@@ -45,12 +46,42 @@ if (!gotTheLock) {
   process.exit(0);
 }
 
-app.on('second-instance', (_event, commandLine) => {
-  const mainWindow = getMainWindow();
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
+let isAppQuitting = false;
+let relaunchOnQuit = false;
+
+function beginShutdown() {
+  isAppQuitting = true;
+  setSupervisorQuitting(true);
+  saveWindowStateSync();
+  terminateConnector();
+}
+
+async function openOrFocusMainWindow() {
+  if (isAppQuitting) {
+    // User reopened Mash mid-shutdown: hand off to fresh instance once teardown frees locks
+    relaunchOnQuit = true;
+    return null;
   }
+  let win = getMainWindow();
+  if (!win || win.isDestroyed()) {
+    win = await createMainWindow();
+    win.webContents.on('did-finish-load', () => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('mash-backend-status', getBackendStatus());
+      }
+    });
+    return win;
+  }
+  if (win.isMinimized()) win.restore();
+  if (!win.isVisible()) win.show();
+  win.focus();
+  return win;
+}
+
+app.on('second-instance', (_event, commandLine) => {
+  void openOrFocusMainWindow().catch((err) => {
+    log.error('[Window] Failed to focus or recreate main window:', err?.message || err);
+  });
 
   // Windows passes custom protocol URL in commandLine arguments
   const deepLink = commandLine.find((arg) => arg.startsWith('mash://'));
@@ -83,6 +114,7 @@ app.whenReady().then(async () => {
   setWindowReloader(() => {
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {
+      if (win.webContents.isLoading()) win.webContents.stop();
       win.webContents.reloadIgnoringCache();
     }
   });
@@ -94,12 +126,7 @@ app.whenReady().then(async () => {
     const supervisorPromise = launchBackendSupervisor(port).catch((err) => {
       log.error('[Supervisor] Background connector launch failed:', err?.message || err);
     });
-    const mainWindow = await createMainWindow();
-    mainWindow.webContents.on('did-finish-load', () => {
-      if (!mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('mash-backend-status', getBackendStatus());
-      }
-    });
+    const mainWindow = await openOrFocusMainWindow();
 
     const coldDeepLink = process.argv.find((arg) => arg.startsWith('mash://'));
     if (coldDeepLink) {
@@ -124,44 +151,47 @@ app.whenReady().then(async () => {
           }
         });
         autoUpdater.checkForUpdatesAndNotify().catch((e) =>
-          console.log('[AutoUpdater] check skipped:', e?.message)
+          log.info('[AutoUpdater] check skipped:', e?.message)
         );
       } catch (e) {
-        console.log('[AutoUpdater] init skipped:', e?.message);
+        log.info('[AutoUpdater] init skipped:', e?.message);
       }
     }
   } catch (err) {
-    console.error('[Supervisor] Startup error:', err);
+    log.error('[Supervisor] Startup error:', err);
     terminateConnector();
-    app.quit();
+    await showFatalRecoveryDialog({
+      mode: 'app',
+      message: 'Mash could not start',
+      detail: 'An unexpected startup error prevented Mash from opening. Restarting Mash usually resolves this.',
+    });
   }
 });
 
 app.on('before-quit', () => {
-  setSupervisorQuitting(true);
-  saveWindowStateSync();
-  terminateConnector();
+  beginShutdown();
 });
 
 app.on('will-quit', () => {
-  setSupervisorQuitting(true);
-  saveWindowStateSync();
-  terminateConnector();
-});
-
-app.on('activate', async () => {
-  if (!getMainWindow()) {
-    if (!getConnectorProcess()) {
-      const port = await allocateEphemeralPort();
-      await launchBackendSupervisor(port);
-    }
-    await createMainWindow();
+  beginShutdown();
+  if (relaunchOnQuit) {
+    relaunchOnQuit = false;
+    app.relaunch();
   }
 });
 
+app.on('activate', async () => {
+  if (isAppQuitting) return;
+  if (!getMainWindow() && !getConnectorProcess()) {
+    const port = await allocateEphemeralPort();
+    void launchBackendSupervisor(port).catch((err) => {
+      log.error('[Supervisor] Activate connector launch failed:', err?.message || err);
+    });
+  }
+  await openOrFocusMainWindow();
+});
+
 app.on('window-all-closed', () => {
-  setSupervisorQuitting(true);
-  saveWindowStateSync();
-  terminateConnector();
+  beginShutdown();
   app.quit();
 });

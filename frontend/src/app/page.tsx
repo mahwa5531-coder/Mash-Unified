@@ -70,9 +70,30 @@ export default function Home() {
   useEffect(() => {
     let isMounted = true;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
-    const startTime = Date.now();
-    // Match Electron sidecar cold-boot timeout (45s) so AV scans don't drop signed-in users to Sign In
-    const MAX_WAIT_MS = typeof window !== 'undefined' && window.electronAPI ? 48000 : 10000;
+    const hasElectronSupervisor = typeof window !== 'undefined' && Boolean(window.electronAPI?.getBackendStatus);
+    let readyStartTime: number | null =
+      !hasElectronSupervisor || backendStatusRef.current.status === 'ready' ? Date.now() : null;
+    const READY_GRACE_MS = 10000;
+
+    const scheduleRetryOrFail = () => {
+      if (pollTimer) clearTimeout(pollTimer);
+      const st = backendStatusRef.current.status;
+      // Trust Electron supervisor while sidecar is still starting or restarting; never drop to Sign-In mid-boot
+      if (hasElectronSupervisor && (st === 'starting' || st === 'restarting')) {
+        readyStartTime = null;
+        pollTimer = setTimeout(checkAuthWithRetry, 250);
+        return;
+      }
+      if (readyStartTime === null) {
+        readyStartTime = Date.now();
+      }
+      if (Date.now() - readyStartTime < READY_GRACE_MS) {
+        pollTimer = setTimeout(checkAuthWithRetry, 250);
+      } else {
+        setAuthUser(null);
+        setIsAuthLoading(false);
+      }
+    };
 
     const checkAuthWithRetry = async () => {
       if (!isMounted) return;
@@ -86,9 +107,7 @@ export default function Home() {
         if (!isMounted) return;
 
         if (user !== null) {
-          if (user.authenticated) {
-            setAuthUser(user);
-          } else if (user.offline) {
+          if (user.authenticated || user.offline) {
             setAuthUser(user);
           } else {
             setAuthUser(null);
@@ -97,20 +116,10 @@ export default function Home() {
           return;
         }
 
-        if (Date.now() - startTime < MAX_WAIT_MS) {
-          pollTimer = setTimeout(checkAuthWithRetry, 250);
-        } else {
-          setAuthUser(null);
-          setIsAuthLoading(false);
-        }
+        scheduleRetryOrFail();
       } catch {
         if (!isMounted) return;
-        if (Date.now() - startTime < MAX_WAIT_MS) {
-          pollTimer = setTimeout(checkAuthWithRetry, 250);
-        } else {
-          setAuthUser(null);
-          setIsAuthLoading(false);
-        }
+        scheduleRetryOrFail();
       }
     };
 
@@ -118,7 +127,10 @@ export default function Home() {
       if (!isMounted) return;
       backendStatusRef.current = st;
       if (st.status === 'ready') {
+        if (readyStartTime === null) readyStartTime = Date.now();
         checkAuthWithRetry();
+      } else if (st.status === 'starting' || st.status === 'restarting') {
+        readyStartTime = null;
       } else if (st.status === 'error') {
         setIsAuthLoading(false);
       }
