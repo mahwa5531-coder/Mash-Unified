@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { fetchAuthMe, AuthUser } from '@/services/auth';
+import { fetchAuthMe, syncAuthUsage, AuthUser } from '@/services/auth';
 
-/** Tracks offline state from both auth cold-boot and live browser network events. */
+/** Tracks offline state, cloud sync errors, and live browser network transitions. */
 export function useOfflineStatus(
   authUser: AuthUser | null,
   onAuthUserChange: (user: AuthUser) => void
@@ -12,24 +12,33 @@ export function useOfflineStatus(
     () => typeof navigator !== 'undefined' && navigator.onLine === false
   );
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
+  const isAuthenticated = Boolean(authUser?.authenticated);
   const isOffline = Boolean(authUser?.offline || browserOffline);
+  const syncError = !isOffline ? authUser?.sync_error : undefined;
 
   const retryConnection = useCallback(async () => {
-    setBrowserOffline(typeof navigator !== 'undefined' && navigator.onLine === false);
+    const offlineNow = typeof navigator !== 'undefined' && navigator.onLine === false;
+    setBrowserOffline(offlineNow);
+    setIsRetrying(true);
     try {
-      const user = await fetchAuthMe();
+      const user = !offlineNow && isAuthenticated
+        ? await syncAuthUsage()
+        : await fetchAuthMe();
       if (user && (user.authenticated || user.offline)) {
         onAuthUserChange(user);
-        if (user.authenticated) {
+        if (user.authenticated && !user.sync_error) {
           setBrowserOffline(false);
           setIsDismissed(false);
         }
       }
     } catch {
-      // Remain in current offline state while network check fails
+      // Remain in current offline/sync_error state while check fails
+    } finally {
+      setIsRetrying(false);
     }
-  }, [onAuthUserChange]);
+  }, [isAuthenticated, onAuthUserChange]);
 
   useEffect(() => {
     const handleOffline = () => {
@@ -39,7 +48,7 @@ export function useOfflineStatus(
 
     const handleOnline = () => {
       setBrowserOffline(false);
-      retryConnection();
+      void retryConnection();
     };
 
     window.addEventListener('offline', handleOffline);
@@ -51,26 +60,28 @@ export function useOfflineStatus(
   }, [retryConnection]);
 
   useEffect(() => {
-    if (!isOffline) {
+    if (!isOffline && !syncError) {
       setIsDismissed(false);
       return;
     }
     const handleFocus = () => {
-      if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-        retryConnection();
+      if (isOffline && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+        void retryConnection();
       }
     };
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, [isOffline, retryConnection]);
+  }, [isOffline, syncError, retryConnection]);
 
   return {
     isOffline,
-    showToast: isOffline && !isDismissed,
+    syncError,
+    isRetrying,
+    showToast: (isOffline || Boolean(syncError)) && !isDismissed,
     dismissToast: () => setIsDismissed(true),
     retryConnection: () => {
       setIsDismissed(false);
-      retryConnection();
+      void retryConnection();
     },
   };
 }

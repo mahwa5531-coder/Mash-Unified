@@ -119,8 +119,27 @@ export function classifyError(
     };
   }
 
-  // 4. QUOTA & RATE LIMIT (429, insufficient quota, burst / weekly allocation)
+  // 4a. TRANSIENT RATE / CONCURRENCY BURST (retry in a few seconds without triggering QuotaBanner)
+  const isTransientBurst =
+    (lower.includes("rate_limited") || lower.includes("concurrency_limit")) &&
+    !lower.includes("window_quota_exceeded") &&
+    !lower.includes("quota");
+
+  if (isTransientBurst) {
+    return {
+      category: 'service_error',
+      title: 'Too Many Requests',
+      description: cleaned || 'Too many requests in a short window. Please retry in a few seconds.',
+      rawDetails: raw,
+      errorId: errorId || undefined,
+      actionType: 'retry',
+      iconType: 'error',
+    };
+  }
+
+  // 4b. QUOTA & ROLLING ALLOCATION (429 / WINDOW_QUOTA_EXCEEDED)
   const isQuota =
+    lower.includes("window_quota_exceeded") ||
     lower.includes("quota exceeded") ||
     lower.includes("rate limit") ||
     lower.includes("quota reached") ||
@@ -167,6 +186,9 @@ export function classifyError(
     lower.includes("502 bad gateway") ||
     lower.includes("503 service unavailable") ||
     lower.includes("model is overloaded") ||
+    lower.includes("upstream_unavailable") ||
+    lower.includes("upstream_timeout") ||
+    lower.includes("circuit_open") ||
     lower.includes("server error");
 
   if (isServiceError) {

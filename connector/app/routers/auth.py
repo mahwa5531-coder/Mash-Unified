@@ -167,9 +167,20 @@ async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | 
     if not token:
         return None
 
+    _IN_MEMORY_AUTH_META.pop("sync_error", None)
     try:
         client = MAShClient()
-        data = await client.get_me(token)
+        try:
+            data = await client.get_me(token)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 401:
+                raise
+            refreshed = await ensure_valid_token(force_refresh=True)
+            if not refreshed:
+                return None
+            token = refreshed
+            data = await client.get_me(token)
+
         meta = get_auth_metadata()
 
         user_info = data.get("user")
@@ -214,8 +225,17 @@ async def sync_user_account_state(token: str | None = None) -> dict[str, Any] | 
         vault = load_secure_vault() or {}
         save_secure_vault(vault, meta)
         return data
+    except httpx.HTTPStatusError as e:
+        logger.warning("Cloud /v1/me returned HTTP %s: %s", e.response.status_code, e)
+        if e.response.status_code == 401:
+            _IN_MEMORY_AUTH_META["authenticated"] = False
+        else:
+            _IN_MEMORY_AUTH_META["sync_error"] = f"Cloud returned HTTP {e.response.status_code}."
+        return None
     except Exception as e:
-        logger.debug("Cloud /v1/me sync skipped or offline: %s", e)
+        logger.debug("Cloud /v1/me sync skipped or timed out: %s", e)
+        is_timeout = isinstance(e, (httpx.TimeoutException, httpx.ConnectTimeout))
+        _IN_MEMORY_AUTH_META["sync_error"] = "Connection timed out." if is_timeout else "Could not reach MASh Cloud."
         return None
 
 
@@ -243,14 +263,26 @@ class SwitchAccountPayload(BaseModel):
 
 @router.get("/config")
 async def get_auth_config() -> dict[str, Any]:
-    """Returns dynamic cloud gateway and auth settings to frontend."""
+    """Returns dynamic cloud gateway, website links, and auth settings to frontend."""
     cloud_url = resolve_cloud_gateway_url()
     mash_env = os.getenv("MASH_ENV", "production").lower()
     auth_required = os.getenv("MASH_AUTH_REQUIRED", "").lower() in ("true", "1", "yes") or mash_env == "production"
+    website_url = (
+        os.getenv("MASH_WEBSITE_URL")
+        or os.getenv("NEXT_PUBLIC_WEBSITE_URL")
+        or "https://mahwa5531-coder.github.io/mash-website"
+    ).rstrip("/")
+    pricing_url = (
+        os.getenv("MASH_WEBSITE_PRICING_URL")
+        or os.getenv("NEXAU_WEBSITE_PRICING_URL")
+        or f"{website_url}/pricing"
+    ).rstrip("/")
     return {
         "gateway_url": cloud_url,
         "auth_required": auth_required,
         "env": mash_env,
+        "website_url": website_url,
+        "pricing_url": pricing_url,
     }
 
 
@@ -310,13 +342,14 @@ async def get_current_user_auth(fresh: bool = False) -> dict[str, Any]:
             "authenticated": False,
         }
 
-    token = _IN_MEMORY_AUTH_META.get("access_token")
     # Proactively sync rolling quota position if requested or if not yet populated
-    if token and (fresh or not meta.get("quota")):
-        await sync_user_account_state(token)
+    if fresh or not meta.get("quota"):
+        await sync_user_account_state()
         meta = get_auth_metadata()
+        if not meta.get("authenticated"):
+            return {"authenticated": False, "auth_expired": True}
 
-    return {
+    res: dict[str, Any] = {
         "authenticated": True,
         "email": meta.get("email"),
         "name": meta.get("name") or "User",
@@ -330,13 +363,24 @@ async def get_current_user_auth(fresh: bool = False) -> dict[str, Any]:
         "accounts": meta.get("accounts", []),
         "has_access_token": bool(_IN_MEMORY_AUTH_META.get("access_token")),
     }
+    if _IN_MEMORY_AUTH_META.get("sync_error"):
+        res["sync_error"] = _IN_MEMORY_AUTH_META["sync_error"]
+    return res
 
 
 @router.post("/sync")
 async def sync_auth_state() -> dict[str, Any]:
     """Explicitly triggers sync with Cloud API /v1/me to refresh rolling quota and plan."""
     data = await sync_user_account_state()
-    return {"status": "ok" if data else "offline", "data": data}
+    if data:
+        return {"status": "ok", "data": data}
+    if not get_auth_metadata().get("authenticated"):
+        return {"status": "auth_expired", "data": None}
+    return {
+        "status": "offline",
+        "data": None,
+        "sync_error": _IN_MEMORY_AUTH_META.get("sync_error"),
+    }
 
 
 @router.get("/callback", response_class=HTMLResponse)

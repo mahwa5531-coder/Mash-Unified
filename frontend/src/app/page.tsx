@@ -386,6 +386,8 @@ export default function Home() {
 
   const {
     isOffline,
+    syncError,
+    isRetrying: isRetryingOffline,
     showToast: showOfflineToast,
     dismissToast: dismissOfflineToast,
     retryConnection: retryOfflineConnection,
@@ -508,6 +510,10 @@ export default function Home() {
           mainOverlay={
             <OfflineToast
               visible={showOfflineToast}
+              isOffline={isOffline}
+              syncError={syncError}
+              isRetrying={isRetryingOffline}
+              onRetry={retryOfflineConnection}
               onDismiss={dismissOfflineToast}
             />
           }
@@ -559,6 +565,7 @@ export default function Home() {
         onClose={() => setIsSettingsOpen(false)}
         onThemeChange={setIsDark}
         onSignOut={() => setAuthUser(null)}
+        onAuthUpdated={(user) => setAuthUser(user)}
         currentProjectName={selectedSessionRepo && selectedSessionRepo !== 'No Repo' ? selectedSessionRepo : 'Mash'}
         onProjectDeleted={(projectName) => {
           if (selectedSessionRepo === projectName) {

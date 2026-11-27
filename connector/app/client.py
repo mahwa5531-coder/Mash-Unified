@@ -20,6 +20,7 @@ and OpenAI-compatible LLM routing against the MASh Cloud API.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any
@@ -108,16 +109,24 @@ class MAShClient:
 
     async def get_me(self, access_token: str) -> dict[str, Any]:
         """Fetches authoritative user identity, plan, models, and rolling-window quota position."""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            resp = await client.get(
-                f"{self.base_url}/v1/me",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Accept": "application/json",
-                },
-            )
-            resp.raise_for_status()
-            return resp.json()
+        for idx, delay in enumerate((0.5, 1.5, None)):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    resp = await client.get(
+                        f"{self.base_url}/v1/me",
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "Accept": "application/json",
+                        },
+                    )
+                    resp.raise_for_status()
+                    return resp.json()
+            except (httpx.ConnectTimeout, httpx.ConnectError):
+                if delay is None:
+                    raise
+                logger.debug("Cloud /v1/me connect error (attempt %d), retrying in %.1fs", idx + 1, delay)
+                await asyncio.sleep(delay)
+        raise RuntimeError("Unreachable get_me retry loop")
 
     async def get_usage(self, access_token: str) -> dict[str, Any]:
         """Fetches live token usage and percentage against quota from cloud."""

@@ -433,7 +433,7 @@ export default function ChatCanvas({
                 open={showQuotaBanner}
                 onOpenChange={setShowQuotaBanner}
                 refreshDate={authUser?.quota?.windows?.[0]?.resets_at}
-                onSeePlans={() => onOpenSettings?.('usage')}
+                onSeePlans={() => onOpenSettings?.('account')}
                 onDismiss={() => setShowQuotaBanner(false)}
               />
             </div>

@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Sun, Moon, Monitor, Palette, Activity, User, RotateCw } from 'lucide-react';
-import { fetchAuthMe, logoutUser, AuthUser } from '@/services/auth';
+import { fetchAuthConfig, fetchAuthMe, logoutUser, syncAuthUsage, AuthUser } from '@/services/auth';
 import { ThemeMode } from '../types';
 import { SignOutConfirmDialog } from './SignOutConfirmDialog';
+
+const DEFAULT_WEBSITE_URL = 'https://mahwa5531-coder.github.io/mash-website';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -15,6 +17,7 @@ interface SettingsModalProps {
   currentProjectName?: string;
   onProjectDeleted?: (projectName: string) => void;
   onSignOut?: () => void;
+  onAuthUpdated?: (user: AuthUser) => void;
 }
 
 export default function SettingsModal({
@@ -23,9 +26,15 @@ export default function SettingsModal({
   onThemeChange,
   initialTab,
   onSignOut,
+  onAuthUpdated,
 }: SettingsModalProps) {
   const [mounted, setMounted] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [siteUrls, setSiteUrls] = useState<{ websiteUrl: string; pricingUrl: string }>({
+    websiteUrl: DEFAULT_WEBSITE_URL,
+    pricingUrl: `${DEFAULT_WEBSITE_URL}/pricing`,
+  });
+  const pendingPlanSyncRef = useRef(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     if (typeof window === 'undefined') return 'dark';
     try {
@@ -43,12 +52,24 @@ export default function SettingsModal({
     initialTab === 'usage' ? 'usage' : initialTab === 'appearance' ? 'appearance' : 'account'
   );
 
+  // Sync activeTab whenever modal opens with an explicit target tab (e.g. QuotaBanner -> account)
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab === 'usage' ? 'usage' : initialTab === 'appearance' ? 'appearance' : 'account');
+    }
+  }, [isOpen, initialTab]);
+
   // Load auth state with optional fresh sync from cloud
-  const loadAuth = async (fresh = false) => {
+  const loadAuth = useCallback(async (fresh = false) => {
     if (fresh) setIsRefreshing(true);
     try {
-      const info = await fetchAuthMe(fresh);
-      if (info) setAuthInfo(info);
+      const info = fresh ? await syncAuthUsage() : await fetchAuthMe(false);
+      if (info) {
+        setAuthInfo(info);
+        if (info.authenticated || info.offline) {
+          onAuthUpdated?.(info);
+        }
+      }
     } catch (err) {
       console.warn("Failed to load auth:", err);
     } finally {
@@ -56,7 +77,31 @@ export default function SettingsModal({
         setTimeout(() => setIsRefreshing(false), 500);
       }
     }
-  };
+  }, [onAuthUpdated]);
+
+  // Refresh dynamic website/pricing URLs on open so domain updates require no binary rebuild
+  useEffect(() => {
+    if (!isOpen) return;
+    fetchAuthConfig().then((cfg) => {
+      if (!cfg) return;
+      const base = (cfg.website_url || DEFAULT_WEBSITE_URL).replace(/\/+$/, '');
+      const pricing = (cfg.pricing_url || `${base}/pricing`).replace(/\/+$/, '');
+      setSiteUrls({ websiteUrl: base, pricingUrl: pricing });
+    }).catch(() => {});
+  }, [isOpen]);
+
+  // Auto-sync plan & quotas when returning from browser checkout after clicking Upgrade/Manage
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleWindowFocus = () => {
+      if (pendingPlanSyncRef.current) {
+        pendingPlanSyncRef.current = false;
+        void loadAuth(true);
+      }
+    };
+    window.addEventListener('focus', handleWindowFocus);
+    return () => window.removeEventListener('focus', handleWindowFocus);
+  }, [isOpen, loadAuth]);
 
   // Initial local state load
   useEffect(() => {
@@ -75,9 +120,9 @@ export default function SettingsModal({
   // When modal opens or tab changes, refresh auth live
   useEffect(() => {
     if (isOpen) {
-      loadAuth(activeTab === 'usage');
+      void loadAuth(activeTab === 'usage');
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeTab, loadAuth]);
 
   // Apply theme dynamically to document root
   useEffect(() => {
@@ -393,18 +438,20 @@ export default function SettingsModal({
                   <div className="shrink-0">
                     {isPro ? (
                       <a
-                        href="https://mahwa5531-coder.github.io/mash-website/pricing"
+                        href={siteUrls.pricingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => { pendingPlanSyncRef.current = true; }}
                         className="h-7 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-white/[0.08] transition-colors cursor-pointer inline-flex items-center"
                       >
                         Manage
                       </a>
                     ) : (
                       <a
-                        href="https://mahwa5531-coder.github.io/mash-website/pricing"
+                        href={siteUrls.pricingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => { pendingPlanSyncRef.current = true; }}
                         className="h-7 px-3 py-1 rounded-md text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 transition-all cursor-pointer inline-flex items-center shadow-xs"
                       >
                         Upgrade
@@ -444,7 +491,7 @@ export default function SettingsModal({
               <div className="pt-3 text-[11.5px] text-zinc-500 dark:text-zinc-400">
                 <span>By using this app, you agree to its </span>
                 <a
-                  href="https://mahwa5531-coder.github.io/mash-website/terms"
+                  href={`${siteUrls.websiteUrl}/terms`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white underline underline-offset-2"
@@ -453,7 +500,7 @@ export default function SettingsModal({
                 </a>
                 <span> and </span>
                 <a
-                  href="https://mahwa5531-coder.github.io/mash-website/privacy"
+                  href={`${siteUrls.websiteUrl}/privacy`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white underline underline-offset-2"

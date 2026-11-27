@@ -29,6 +29,8 @@ export interface UsageInfo {
 export interface AuthUser {
   authenticated: boolean;
   offline?: boolean;
+  sync_error?: string;
+  auth_expired?: boolean;
   email?: string;
   name?: string;
   plan?: string;
@@ -51,9 +53,22 @@ export async function fetchAuthMe(fresh = false): Promise<AuthUser | null> {
     const res = await safeFetch(url);
     if (!res.ok) return null;
     const data = await res.json();
+    if (data?.auth_expired && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('mash:auth_expired'));
+    }
     return data;
   } catch (err) {
     console.warn("Failed to fetch auth state:", err);
+    return null;
+  }
+}
+
+export async function fetchAuthConfig(): Promise<{ website_url?: string; pricing_url?: string } | null> {
+  try {
+    const res = await safeFetch(`${BASE_URL}/api/auth/config`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
     return null;
   }
 }
